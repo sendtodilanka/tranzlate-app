@@ -39,15 +39,15 @@ Order (core value first):
 ### Phase D — Design production
 Figma per feature from DESIGN_SYSTEM tokens (designer role already unblocked). Runs parallel with late Phase S.
 
-### Phase C — Code build (clean-room greenfield **with salvage**)
+### Phase C — Code build (greenfield — write everything fresh, **no code copied from Tranzlate**)
 New module structure (per cruxes / CLAUDE Phase 7 split). Build order:
 1. `:core` — modes orchestrator, FeatureAccess, UsagePolicy, Result types, DI
-2. `:data` — Room (salvage entities + 180-lang seed + migrations), clients (salvage MLKit/Retrofit logic), DataStore
+2. `:data` — Room (re-derive entities + 180-lang catalog + migrations fresh), clients (write to current MLKit/Retrofit API docs), DataStore
 3. Feature by feature (spec-driven, tests alongside — contracts exist)
 4. Integrations (Qonversion, AdMob, Firebase) behind the gateways
 5. Adaptive/nav shell (NavigationSuiteScaffold)
 
-**Salvage (clean + carry):** language seed data · Room entities/migrations · MLKit/Google/Cloud client logic · string resources (many already fil/pt-rBR) · brand assets.
+**Re-derive fresh, verify vs standards (NEVER copy Tranzlate code — Rule 1):** language catalog (verify BCP-47 + capabilities) · entity shapes (design clean) · client integrations (write to current API docs) · strings/copy (rewrite per Material UX writing) · brand direction (redesign per DESIGN_SYSTEM). Tranzlate = suspect reference for behaviour only.
 **Rebuild:** all ViewModels · navigation/IA · subscription/ads/usage layers · onboarding · paywall · every screen.
 
 ### Phase H — Hardening & launch
