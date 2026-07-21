@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Scaffold placeholder strings. Real keys arrive from STRINGS_*.md (C-3 authority).
+     TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR queued before ship. -->
+<resources>
+    <string name="feature_history_placeholder">History</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window-level theme only — all real theming is Compose TranzlateTheme
+         (DESIGN_SYSTEM §10). Light/dark window backgrounds via values-night. -->
+    <style name="Theme.Tranzlate" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

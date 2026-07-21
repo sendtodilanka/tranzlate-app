@@ -1,0 +1,48 @@
+# Tranzlate detekt overrides (buildUponDefaultConfig = true).
+#
+# Token discipline (DESIGN_SYSTEM §10 rule — "no raw hex, dp text sizes, or magic paddings
+# in Composables; everything resolves through a token"):
+#   - Raw hex colors (`Color(0xFF...)`) belong ONLY in :core:designsystem token files.
+#   - Raw `dp`/`sp` literals belong ONLY in :core:designsystem (Spacing/Dimensions/Type tokens).
+#   Detekt's rule set cannot express these type-resolved checks reliably without a
+#   classpath-aware run, so the enforcement home is code review + the designsystem module
+#   boundary (only :core:designsystem may define tokens); MagicNumber below is configured
+#   to keep numeric literals out of feature/UI code as a proxy guard.
+
+build:
+  maxIssues: 0
+
+style:
+  MagicNumber:
+    active: true
+    excludes: ['**/core/designsystem/**', '**/core/testing/**', '**/test/**', '**/androidTest/**', '**/androidTestProd/**']
+    ignoreAnnotated: ['Preview']
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreEnums: true
+  MaxLineLength:
+    maxLineLength: 140
+  ReturnCount:
+    active: false
+  ThrowsCount:
+    active: false
+
+complexity:
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+    ignoreAnnotated: ['Composable']
+  LongMethod:
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    active: false
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+    excludes: ['**/test/**', '**/androidTest/**', '**/androidTestProd/**']
+  TopLevelPropertyNaming:
+    active: false
+
+comments:
+  active: false

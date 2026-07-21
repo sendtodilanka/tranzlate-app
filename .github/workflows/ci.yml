@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build (all variants, unit tests, lint)
+        run: ./gradlew build
+
+      - name: Unit tests incl. golden-table + Konsist gates
+        run: ./gradlew test :app:testTranzlateProdDebugUnitTest
+
+      # ---- plan §6.6 guards ------------------------------------------------------
+
+      - name: "Guard: prod/release runtime classpath excludes fake/test modules"
+        run: |
+          set -euo pipefail
+          LEAKS=$(./gradlew -q :app:dependencies --configuration tranzlateProdReleaseRuntimeClasspath | grep -E "core:testing|translate-fake" || true)
+          if [ -n "$LEAKS" ]; then
+            echo "::error::fake/test module leaked into the prod release runtime classpath:"; echo "$LEAKS"; exit 1
+          fi
+
+      - name: "Guard: fake runtime classpath excludes real brains and :lib:* AARs"
+        run: |
+          set -euo pipefail
+          # Gradle prints project deps QUOTED (project ':core:translate') — pattern must
+          # tolerate both quoted and unquoted forms or the guard is vacuous (co-verify finding #1).
+          LEAKS=$(./gradlew -q :app:dependencies --configuration tranzlateFakeDebugRuntimeClasspath | grep -E "project '?:core:(translate|access|usage|ads)'?( |$)|project '?:lib:" | grep -v "translate-fake" || true)
+          if [ -n "$LEAKS" ]; then
+            echo "::error::real brain/:lib:* module leaked into the fake runtime classpath:"; echo "$LEAKS"; exit 1
+          fi
+
+      - name: "Guard: no fakeRelease variant, no Play-publish task outside Prod"
+        run: |
+          set -euo pipefail
+          TASKS=$(./gradlew -q :app:tasks --all)
+          if echo "$TASKS" | grep -iE "(assemble|bundle|install).*fakeRelease"; then
+            echo "::error::fakeRelease variant tasks exist (beforeVariants guard broken)"; exit 1
+          fi
+          if echo "$TASKS" | grep -iE "publish.*(Apk|Bundle|Release)" | grep -ivE "prod"; then
+            echo "::error::Play-publish task exists outside Prod variants"; exit 1
+          fi
+
+      - name: Detekt + Spotless
+        run: ./gradlew detekt spotlessCheck

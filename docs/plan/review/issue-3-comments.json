@@ -1,0 +1,53 @@
+[
+  {
+    "id": 1,
+    "section": "s2/:feature:text",
+    "section_title": "කැටය: Text තිරය (:feature:text)",
+    "quote": "",
+    "comment": "Google translator eke wage trype karaddima translation eka penwanne mlkit or google online models support karanawanam witharai. Google Cloud translation use karaddi ehema karoth API cost eka wadi wenawa., ea nisa GCT walata translate button ekak penwanna. \n\nUI consistency oni nam auto translation completely remove karala button action eken translate karanna danna.",
+    "kind": "comment",
+    "created_at": "2026-07-21T20:39:09",
+    "status": "open"
+  },
+  {
+    "id": 2,
+    "section": "s5",
+    "section_title": "පාට / අකුරු / ඉඩ (theme)",
+    "quote": "",
+    "comment": "App eke UI Claude Design eken design karagaththa nam hodai mulinma. ethakota UI/UX final nisa implementation lesi. oya mawa guide karanna kohomada Claude Design use karala meka karanne kiyala. mama nathuwa oyatama Claude Design use karala karaganna puluwanda balanna.",
+    "kind": "comment",
+    "created_at": "2026-07-21T20:46:41",
+    "status": "open"
+  },
+  {
+    "id": 3,
+    "section": "s7",
+    "section_title": "අලුත්ම පාට්ස් (versions)",
+    "quote": "",
+    "comment": "samahara libraries thama stable nathiwa athi. alpha wage variants thiyenne. check karala balanna. stable ganna puluwannam hodai",
+    "kind": "comment",
+    "created_at": "2026-07-21T20:49:22",
+    "status": "open"
+  },
+  {
+    "id": 4,
+    "section": "s9",
+    "section_title": "ඔබෙන් ඕන තීරණ",
+    "quote": "",
+    "comment": "9.1 A hodai.\n2nd app eka widiyata com.french.translator.free.english.traduction.offline meka danna puluwanda balanna. me app eka google play eke live app ekak. ethanin awashya details ganna\n\n9.2 UI design karala color finalyze karanna wenne. mama godak kamathi Google Translate eke wage white color app ekakata. eth UI desing eke hatiyata thamai thiranaya karanna wenne.",
+    "kind": "comment",
+    "created_at": "2026-07-21T20:52:43",
+    "status": "open",
+    "edited_at": "2026-07-21T20:54:35"
+  },
+  {
+    "id": 5,
+    "section": "plan-final",
+    "section_title": "මුළු සැලැස්ම",
+    "quote": "",
+    "comment": "මුළු scaffold සැලැස්මම අනුමතයි — වැඩේ පටන් ගන්න",
+    "kind": "approve",
+    "created_at": "2026-07-21T20:55:00",
+    "status": "open"
+  }
+]
