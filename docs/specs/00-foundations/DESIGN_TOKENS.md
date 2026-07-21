@@ -1,6 +1,6 @@
 # Design Tokens (shared — every feature spec builds from these)
 
-> Status: **v1 — engineering-complete, brand-seed PROPOSED.** The seed colour needs one product-owner confirmation (§1); everything else is decided. Spacing/alpha values salvaged from the proven Phase-4 token plan.
+> Status: **v1 — engineering-complete, brand-seed PROPOSED.** The seed colour needs one product-owner confirmation (§1); everything else is decided. Spacing/alpha values derived from the Phase-4 token plan (design decisions, not Tranzlate code).
 
 ## 1. Colour — Material 3 roles, seed-generated
 
@@ -12,7 +12,7 @@
 ## 2. Typography (M3 scale, default type — no custom face v1)
 `displaySmall 36/44` · `headlineSmall 24/32` · `titleLarge 22/28` · `titleMedium 16/24 w500` · `bodyLarge 16/24` · `bodyMedium 14/20` · `labelLarge 14/20 w500` · `labelMedium 12/16 w500`. Result text: `headlineSmall`, user-scalable 0.85×–1.6× (persisted). Never `sp` hardcodes in composables — roles only.
 
-## 3. Spacing scale (salvaged Phase-4 values)
+## 3. Spacing scale (from the Phase-4 token plan)
 `none 0 · xs 4 · small 8 · medium 12 · default 16 · large 24 · xl 32 · xxl 40 · huge 48 · massive 56` (dp). Screen edge padding = `default`. Card inner = `default`. Between stacked cards = `medium`.
 
 ## 4. Shape & elevation

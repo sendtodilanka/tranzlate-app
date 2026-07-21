@@ -19,7 +19,7 @@ The ground-up rebuild of the Tranzlate Android translator. **No app code yet —
 | `.claude/memory/` | Project rules (Sinhala, no-speculation, JAVA_HOME) |
 
 ## References (not in this repo)
-- **Old app** (read-only, salvage from): `github.com/sendtodilanka/Tranzlate`
+- **Old app** (read-only reference — study behaviour, **never copy code**): `github.com/sendtodilanka/Tranzlate`
 - **Full archive** (audit, UX eval, captures): `github.com/sendtodilanka/tranzlate-dirty-room` (branch `archive`)
 
 ## Behaviour target

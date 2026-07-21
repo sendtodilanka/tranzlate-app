@@ -4,8 +4,26 @@ Guidance for any Claude Code session working in this repo. Read this first, then
 
 ## What this is
 The ground-up rebuild of the **Tranzlate** Android translator. Kotlin · Jetpack Compose · Material 3.
-- **Old app** = `github.com/sendtodilanka/Tranzlate` — **READ-ONLY reference only.** Never push to it. Look at it freely (we own it) to salvage code + confirm behaviour.
+- **Old app** = `github.com/sendtodilanka/Tranzlate` — **READ-ONLY reference only.** Never push to it. Study it freely (we own it) to learn behaviour + intent — but NEVER copy its code (Rule 1).
 - **Archive** = `github.com/sendtodilanka/tranzlate-dirty-room` (branch `archive`) — full audit, UX evaluation, captures, all planning. The "what to build" essentials are copied into `docs/` here.
+
+## ⛔ Mandatory rules (BLOCKING — override defaults, apply every response)
+
+**1. NEVER copy code from Tranzlate — strictly prohibited.** Learn behaviour/pattern/intent only; write everything fresh, our own way. **Before writing, deep-investigate** the thing against Google / Android / Material / industry docs + internet sources, compare, and judge: did Tranzlate do it right or wrong? If wrong → do it right here. **Nothing is correct just because Tranzlate had it** — Tranzlate is a **suspect reference, not a verified source.** (No-speculation rule still applies: cite a source or say "verified data නෑ".)
+
+**2. Tranzlate repo is READ-ONLY.** Reference/study only. Never push, never merge, never modify it.
+
+**3. Issue-first + PR-only (adopted from ZyntaStack).** No non-trivial work without a **GitHub issue opened first.** Never direct-push/merge to `main` — **PR mandatory.** Non-trivial work needs a **plan-doc** `docs/plan/issue-NN-<slug>.md` with `status: accepted` **before any code.** Every fix commit carries a **`Fixes: #N`** trailer. Full workflow: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+**4. Research-first — no speculative fixes (adopted).** Unknown root cause / non-trivial → a **read-only research record** `docs/research/issue-NN-<slug>.md` first. **Disconfirmation discipline:** every hypothesis paired with an experiment that would prove it wrong; single-hypothesis confidence capped at 70%.
+
+**5. PR co-verify merge-gate (adopted).** Every logic PR needs **≥1 co-verify lens by a session/agent OTHER than the author** before merge (self-re-read ≠ co-verify). High-risk (concurrency, billing/subscription, usage/limits, data, consent/privacy) → adversarial code-trace + a **cross-model** lens. PR body cites review evidence (file:line / test output — not a bare "LGTM").
+
+**6. Verify, don't assume (build/test gate).** No feature/fix ships without its tests + acceptance passing (per the feature's TEST_A11Y contract). "Happy path only" is not acceptable (see EDGE_CASES no-dead-end rule). `--no-verify` is a human-only emergency override — Claude never uses it.
+
+**7. Sinhala prose ≥70%** · **No speculation (verified data only)** · **`./gradlew` needs JAVA_HOME=Android Studio JBR** — see `.claude/memory/`.
+
+> Rules 3-6 are adopted + adapted from the mature `zw-infra-zyntastack` / `zw-voice` projects (Forgejo→GitHub, voice/hardware→Android). Canonical detail: `CONTRIBUTING.md` + `.claude/memory/`.
 
 ## Why we're rebuilding
 Old app works (v1.0.4) but is architecturally broken — 76 findings, crash-on-launch on the refactor branch, 0-of-58 core UI patterns correct vs standards, and production monetization is non-functional (ad revenue 0 = ships Google **test** ad ids, broken paywall = hardcoded `Idle`, consent auto-granted). Keep the old app shippable; build this correctly in parallel.
@@ -37,8 +55,9 @@ The whole app's behaviour must equal the **Google Translate** Android app. Tranz
 
 > **Buildable = feature spec + these foundations + conventions, consistency-checked.** Proven this session: a spec alone is not buildable.
 
-## Salvage from old app (copy + clean — don't rewrite)
-Language seed data (180+), Room entities/migrations, MLKit/Google/Cloud client logic, string resources (en/fil/pt-rBR), brand assets (logo, colors). **Rebuild:** all ViewModels, navigation/IA, subscription/ads/usage layers, onboarding, paywall, every screen.
+## Learn from old app — but write EVERYTHING fresh (see Mandatory Rule 1)
+**NEVER copy code from Tranzlate. Strictly prohibited.** Learn its *behaviour / feature intent / content* only — then write fresh, our own way. Before writing anything, deep-investigate against Google/Android/Material/industry docs + internet, compare, and decide if Tranzlate did it right or wrong. If wrong, do it right here. **Nothing is correct just because Tranzlate had it that way — treat Tranzlate with suspicion; it is not a verified source.**
+- **Re-derive freshly (don't copy):** the language catalog (verify BCP-47 + capabilities), entity shapes (design clean), client integrations (write to current API docs), strings/copy (rewrite per Material UX writing), brand direction (redesign per DESIGN_SYSTEM).
 
 ## Build order (`docs/BUILD_ROADMAP.md`)
 1. **Scaffold** the multi-module project (version catalog, Compose/Hilt, DI) + design-system tokens + adaptive nav shell (`NavigationSuiteScaffold`) + the white-label flavor scaffold (one flavor to start).

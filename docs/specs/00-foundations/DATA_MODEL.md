@@ -1,6 +1,6 @@
 # Data Model (typed — shared by all feature specs)
 
-> Salvaged from proven schema v8 of the current app, **corrected** (adds engine provenance; renames for clarity). Room + DataStore.
+> Modelled fresh. References the old schema v8 for **behaviour only** (not copied), **corrected** (adds engine provenance; renames for clarity). Room + DataStore.
 
 ## Entities (Room, db `tranzlate.db`)
 
@@ -21,7 +21,7 @@ Indices: `(source_text, source_lang, target_lang, engine)` for cache lookup; `fa
 
 > Legacy mapping (migration from old app if ever needed): `src_lang→source_lang, src→source_text, tgt_lang→target_lang, tgt→target_text, time→created_at`; `engine`/`detected` backfill = `ONLINE_GOOGLE`/false.
 
-### `Language` (table `language`) — catalog (salvage 180+ seed)
+### `Language` (table `language`) — catalog (re-derive 180+ languages fresh; verify BCP-47 + capabilities)
 `id: String (PK, BCP-47)` · `name: String` · `offline_available: Boolean` · `offline_downloaded: Boolean` · `last_used_at: Long?`
 
 ### Collections (secondary feature — spec later)
