@@ -15,6 +15,9 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                 defaultConfig.targetSdk = TranzlateSdk.TARGET_SDK
                 defaultConfig.testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                 buildFeatures.buildConfig = true
+                // AGP 9 disables resValues by default; white-label brands inject
+                // app_name via resValue (plan §4 — the one app_name mechanism).
+                buildFeatures.resValues = true
             }
         }
     }

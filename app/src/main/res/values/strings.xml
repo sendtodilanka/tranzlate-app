@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shell strings only (nav labels). app_name comes from the brand flavor's
+     resValue (plan §4 — the one mechanism). Feature strings live in features.
+     TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR queued before ship. -->
+<resources>
+    <string name="nav_text">Text</string>
+    <string name="nav_camera">Camera</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+</resources>
