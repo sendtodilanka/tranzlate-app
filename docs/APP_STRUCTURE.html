@@ -1,0 +1,205 @@
+<title>Tranzlate — අලුත් app එකේ ව්‍යුහය</title>
+<style>
+:root{
+  --bg:#f5f7f8; --panel:#ffffff; --panel2:#eef2f4; --ink:#15242b; --ink2:#4a626d;
+  --line:#d8e0e4; --teal:#1f8ba8; --teal-deep:#0d5f76; --coral:#e0725a;
+  --good:#2c9d6d; --warn:#c9701f;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e1418; --panel:#161f25; --panel2:#1d2830; --ink:#e7eef2; --ink2:#9fb2bd;
+  --line:#273540; --teal:#41b8d6; --teal-deep:#7ad4ea; --coral:#f0876e;
+  --good:#4cc38a; --warn:#e0934a;
+}}
+:root[data-theme="dark"]{
+  --bg:#0e1418; --panel:#161f25; --panel2:#1d2830; --ink:#e7eef2; --ink2:#9fb2bd;
+  --line:#273540; --teal:#41b8d6; --teal-deep:#7ad4ea; --coral:#f0876e; --good:#4cc38a; --warn:#e0934a;}
+:root[data-theme="light"]{
+  --bg:#f5f7f8; --panel:#ffffff; --panel2:#eef2f4; --ink:#15242b; --ink2:#4a626d;
+  --line:#d8e0e4; --teal:#1f8ba8; --teal-deep:#0d5f76; --coral:#e0725a; --good:#2c9d6d; --warn:#c9701f;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.65;font-size:16px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:40px 20px 80px}
+h1{font-size:30px;letter-spacing:-.01em;margin:0 0 6px;line-height:1.2}
+h2{font-size:21px;margin:0 0 4px;letter-spacing:-.01em}
+.kick{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--teal-deep);font-weight:700;margin-bottom:10px}
+.sub{color:var(--ink2);font-size:15px;margin:0 0 34px}
+section{margin-top:44px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--teal-deep);font-weight:700;margin-bottom:12px}
+p{margin:0 0 12px}
+.big{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--teal);border-radius:14px;padding:22px 24px}
+.big b{color:var(--teal-deep)}
+.big .idea{font-size:19px;font-weight:600;margin:0;line-height:1.5}
+/* diagram */
+.diagram{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px 20px;text-align:center}
+.layer-label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);font-weight:700;margin:0 0 12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.box{border-radius:10px;padding:10px 16px;font-weight:600;font-size:14.5px;border:1.5px solid var(--line);background:var(--panel2)}
+.box.screen{border-color:var(--teal);color:var(--teal-deep)}
+.box.brain{border-color:var(--coral);background:color-mix(in srgb,var(--coral) 12%,transparent);color:var(--ink);font-size:15.5px;padding:12px 18px}
+.box.data{border-color:var(--line);color:var(--ink2)}
+.arrow{color:var(--teal);font-size:26px;margin:14px 0 6px;font-weight:700}
+.arrow small{display:block;font-size:12px;color:var(--ink2);font-weight:600;letter-spacing:.02em;margin-top:-4px}
+.divider{height:1px;background:var(--line);margin:22px 0}
+.mini{font-size:12.5px;color:var(--ink2);margin-top:8px}
+/* brain cards */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.card h3{margin:0 0 6px;font-size:16.5px;color:var(--coral)}
+.card p{margin:0;font-size:14px;color:var(--ink2)}
+/* flow */
+.flow{counter-reset:s;list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.flow li{counter-increment:s;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 16px 13px 50px;font-size:14.5px}
+.flow li::before{content:counter(s);position:absolute;left:12px;top:12px;width:26px;height:26px;border-radius:50%;background:var(--teal);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.flow b{color:var(--teal-deep)}
+/* rules */
+.rules{display:flex;flex-direction:column;gap:10px}
+.rule{display:flex;gap:12px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+.rule .n{flex:none;width:28px;height:28px;border-radius:8px;background:var(--teal);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.rule span{font-size:15px}
+/* before/after */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ba .col{border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.ba .before{background:color-mix(in srgb,var(--warn) 8%,var(--panel));border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+.ba .after{background:color-mix(in srgb,var(--good) 8%,var(--panel));border-color:color-mix(in srgb,var(--good) 40%,var(--line))}
+.ba h4{margin:0 0 8px;font-size:15px}
+.ba .before h4{color:var(--warn)} .ba .after h4{color:var(--good)}
+.ba ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink2)}
+.ba li{margin-bottom:6px}
+footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--ink2);font-size:13px}
+@media (max-width:620px){.cards,.ba{grid-template-columns:1fr}h1{font-size:25px}}
+</style>
+
+<div class="wrap">
+  <div class="kick">Tranzlate · අලුත් app එක</div>
+  <h1>ව්‍යුහය — කොටස් සම්බන්ධ වෙන විදිය</h1>
+  <p class="sub">Jargon නැතුව, සරලව. පදනම (මොළ) + advanced කෑලි 2ක් (කැට/modules · එක source → apps කිහිපයක්). මේකයි වැදගත්ම තීරණය — දැන් app එකේ mess එක හැදුණේ හරියටම මෙතන.</p>
+
+  <div class="big">
+    <p class="idea">මූලික අදහස: හැම ලොකු වැඩකටම <b>එක නිවහනක්.</b> තිර (screens) නිකම් <b>අහනවා</b> — ඒවා වැඩේ <b>තනියම කරන්නේ නෑ.</b></p>
+  </div>
+
+  <section>
+    <div class="eyebrow">සම්පූර්ණ පින්තූරය</div>
+    <div class="diagram">
+      <p class="layer-label">① තිර — ඔබ දකින දේ</p>
+      <div class="row">
+        <span class="box screen">Text</span>
+        <span class="box screen">Voice</span>
+        <span class="box screen">Camera</span>
+        <span class="box screen">Dialog</span>
+        <span class="box screen">History</span>
+        <span class="box screen">Settings</span>
+      </div>
+      <div class="arrow">↓<small>නිකම් අහනවා</small></div>
+      <p class="layer-label">② මොළ — shared, එක නිවහන බැගින්</p>
+      <div class="row">
+        <span class="box brain">🌐 පරිවර්තනය</span>
+        <span class="box brain">👤 දායකත්වය</span>
+        <span class="box brain">📊 සීමා</span>
+        <span class="box brain">📣 දැන්වීම්</span>
+      </div>
+      <div class="arrow">↓</div>
+      <p class="layer-label">③ දත්ත + පිටත සේවා</p>
+      <div class="row">
+        <span class="box data">භාෂා</span>
+        <span class="box data">ඉතිහාසය</span>
+        <span class="box data">සුරැකි</span>
+        <span class="box data">Google</span>
+        <span class="box data">MLKit</span>
+        <span class="box data">Cloud AI</span>
+        <span class="box data">Play billing</span>
+      </div>
+      <p class="mini">තිර මොළ වලට විතරයි කතා කරන්නේ · මොළ පිටත සේවා handle කරනවා · තිර පිටත සේවා ගැන දන්නේ නෑ</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">මොළ 4 — එක එක මොකද කරන්නේ</div>
+    <div class="cards">
+      <div class="card"><h3>🌐 පරිවර්තන මොළය</h3><p>"මේක හරවන්න" කියලා අහනවා. කුමන ක්‍රමය (auto / offline / online / AI), එකක් fail වුණොත් ඊළඟ එක, පරණ උත්තර මතක තියාගැනීම — ඔක්කොම මේක. තිර විස්තර දන්නේ නෑ.</p></div>
+      <div class="card"><h3>👤 දායකත්ව මොළය</h3><p>"මේ user ට මේක පුළුවන්ද? සීමාව මොකක්ද?" — Free / Plus / Premium ගැන දන්නේ මේක <b>විතරයි.</b> තිර 8ක check කරන එක නවතිනවා.</p></div>
+      <div class="card"><h3>📊 සීමා මොළය</h3><p>දවසේ භාවිතය එක තැනකින් count කරනවා, දවස මාරු වුණාම reset කරනවා. සාර්ථක වුණාම විතරයි +1 (දැන් වගේ දෙපාරක් නෙවෙයි).</p></div>
+      <div class="card"><h3>📣 දැන්වීම් මොළය</h3><p>දැන්වීමක් පෙන්නන්නේ කවදද කියලා එක තැනකින් තීරණය — පරිවර්තනයක් ඉවර වුණාම විතරයි, Back එබුවම නෙවෙයි.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">උදාහරණයක් — text එකක් හරවනකොට</div>
+    <ol class="flow">
+      <li><b>Text තිරය:</b> පරිවර්තන මොළයට කියනවා "මේ 'Good morning' එක French වලට හරවන්න."</li>
+      <li><b>පරිවර්තන මොළය:</b> දායකත්ව මොළයෙන් අහනවා "මේ user ට පුළුවන්ද? සීමාව ඉවරද?"</li>
+      <li>පුළුවන් නම් → හරි ක්‍රමයෙන් හරවනවා (පරණ උත්තරයක් තියෙනවනම් ඒක දෙනවා, කාලය ඉතුරු).</li>
+      <li>සාර්ථක නම් → <b>සීමා මොළය</b> +1, උත්තර <b>දත්ත</b> වලට save.</li>
+      <li><b>දැන්වීම් මොළය:</b> "දැන් දැන්වීමක් ඕනද?" බලනවා.</li>
+    </ol>
+    <p class="mini">තිරය මේ කිසිවක් තනියම කරන්නේ නෑ — නිකම් <b>අහනවා + පෙන්නනවා.</b> ඒකයි වෙනස.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">පිරිසිදුව තියාගන්න රීති 3</div>
+    <div class="rules">
+      <div class="rule"><span class="n">1</span><span>හැම වැඩකටම <b>එක නිවහන.</b> Subscription check එක තැනක් · translate එක තැනක් · සීමා එක තැනක් · ads එක තැනක්.</span></div>
+      <div class="rule"><span class="n">2</span><span>තිර නිකම් <b>අහනවා</b> — වැඩේ තනියම කරන්නේ නෑ. (දැන් app එකේ තිර හැම දෙයක්ම තනියම කරනවා — ඒකයි ප්‍රශ්නය.)</span></div>
+      <div class="rule"><span class="n">3</span><span>අලුත් feature එකක් දාන්න → මොළ වලට <b>plug</b> කරනවා විතරයි, මොළ වෙනස් කරන්නේ නෑ.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">ඇයි මේකෙන් හදිසිය විසඳෙන්නේ</div>
+    <div class="ba">
+      <div class="col before">
+        <h4>දැන් (mess)</h4>
+        <ul>
+          <li>Subscription check තිර <b>8ක</b> විසිරිලා</li>
+          <li>Translation ක්‍රම magic-number විදිහට</li>
+          <li>සීමා count එක එක තැන දෙපාරක්</li>
+          <li>දැන්වීම් තිර ඇතුළේ hard-wired</li>
+          <li>→ bug එකක් fix කරන්න තැන් 8ක් හොයන්න ඕන</li>
+        </ul>
+      </div>
+      <div class="col after">
+        <h4>අලුතෙන් (clean)</h4>
+        <ul>
+          <li>එක එක වැඩ එක එක නිවහනේ</li>
+          <li>ක්‍රම = පැහැදිලි නම්, plug කරන්න පුළුවන්</li>
+          <li>සීමා එක තැනක් — bug නෑ</li>
+          <li>දැන්වීම් එක තැනක් — policy-safe</li>
+          <li>→ fix එකක් = එක තැනක් · test කරන්න ලේසි · feature දාන්න ලේසි</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Advanced ① — කැට (building blocks / modules)</div>
+    <p>මොළ 4 විතරක් නෙවෙයි — ඒවා <b>වෙන් කරපු කැට (modules)</b> ලෙස. සමහර කැට <b>වෙන app වලටත්</b> library විදිහට ඉක්මනට ගන්න පුළුවන්.</p>
+    <div class="cards">
+      <div class="card"><h3>🔁 Shareable කැට (library)</h3><p><b>Subscription · Ads · Consent</b> — වෙන ඕනෑම app එකකට library විදිහට drop කරන්න පුළුවන්, clean public API එකක් එක්ක. <i>(දැන් app එකේ Subscription දැනටමත් මෙහෙමයි ✓ — Ads/Consent ත් මෙහෙම කරන්න ඕන)</i></p></div>
+      <div class="card"><h3>📦 App-specific කැට</h3><p><b>Core · Data · Translation · Features</b> — මේ app එකට අදාළ. Shareable කැට වලට plug වෙනවා. <code>:app</code> = සිහින් shell එකක් විතරයි.</p></div>
+    </div>
+    <p class="mini">වාසිය: කැට එකින් එක වෙන වෙනම test/build · Ads library එක හෙට වෙන project එකකට ගන්න පුළුවන් · එකක් break වුණොත් අනිත්වට බලපාන්නේ නෑ</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">⭐ Advanced ② — එක source → apps කිහිපයක් (reskin / white-label)</div>
+    <p>ඔබේ දැන් app එකේ <b>gradle එක දැනටමත් මේකට හදලා</b> — <b>එක codebase එකෙන් apps කිහිපයක්.</b> අලුත් app එකේත් මේක අනිවාර්යයෙන් තියෙන්න ඕන.</p>
+    <div class="diagram">
+      <div class="row"><span class="box brain">📱 එකම app codebase</span></div>
+      <div class="arrow">↓<small>flavor එකින් එක</small></div>
+      <div class="row">
+        <span class="box screen">Offline Translator</span>
+        <span class="box screen">Spanish Translator</span>
+        <span class="box screen">French Translator</span>
+        <span class="box screen">…තව</span>
+      </div>
+      <p class="mini">හැම app එකකටම වෙන වෙනම — <b>app id + signing</b> (→ වෙනම Play Store app) · <b>icon + නම</b> (reskin) · <b>config</b> (AdMob ids, Qonversion keys, default භාෂාව, කුමන features on)</p>
+    </div>
+    <div class="ba" style="margin-top:14px">
+      <div class="col before"><h4>දැන් අඩුපාඩුව</h4><ul><li>AdMob app id <b>main එකේ hardcoded</b> — apps කිහිපයකට වැරදියි (ඔක්කොම එකම id)</li><li>flavor එකක් විතරයි ඇත්තටම පාවිච්චි වෙන්නේ</li></ul></div>
+      <div class="col after"><h4>අලුතෙන්</h4><ul><li>හැම app එකකටම <b>වෙන AdMob / Qonversion / default-language / features config</b></li><li>අලුත් app එකක් = <b>flavor එකක් එකතු කරනවා විතරයි</b> (icon + id + config), code එක touch නෑ</li></ul></div>
+    </div>
+  </section>
+
+  <footer>Tranzlate rewrite · ව්‍යුහ තීරණය (advanced) · 2026-07-21 · මීළඟ: අලුත් repo + Text feature build</footer>
+</div>
