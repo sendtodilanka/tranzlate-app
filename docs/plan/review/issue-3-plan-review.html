@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="si">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tranzlate — අත්තිවාරමේ සැලැස්ම (ඔබේ අදහස් සඳහා)</title>
+<style>
+:root{
+  --bg:#f5f7f8; --panel:#ffffff; --panel2:#eef2f4; --ink:#15242b; --ink2:#4a626d;
+  --line:#d8e0e4; --teal:#1f8ba8; --teal-deep:#0d5f76; --coral:#e0725a;
+  --good:#2c9d6d; --warn:#c9701f; --bad:#c0392b;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Sinhala",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e1418; --panel:#161f25; --panel2:#1d2830; --ink:#e7eef2; --ink2:#9fb2bd;
+  --line:#273540; --teal:#41b8d6; --teal-deep:#7ad4ea; --coral:#f0876e;
+  --good:#4cc38a; --warn:#e0934a; --bad:#e07a6e;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.75;font-size:16.5px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:880px;margin:0 auto;padding:34px 20px 140px}
+h1{font-size:29px;letter-spacing:-.01em;margin:0 0 8px;line-height:1.25}
+h2{font-size:21.5px;margin:0;letter-spacing:-.01em;line-height:1.35}
+h3{font-size:17px;margin:0 0 6px}
+p{margin:0 0 13px}
+.kick{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--teal-deep);font-weight:700;margin-bottom:10px}
+.sub{color:var(--ink2);font-size:15.5px;margin:0 0 26px}
+section.rev{margin-top:42px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px 26px;position:relative}
+section.rev.has-comments{border-left:5px solid var(--coral)}
+section.rev.approved{border-left:5px solid var(--good)}
+.sec-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.sec-head .no{flex:none;width:34px;height:34px;border-radius:10px;background:var(--teal);color:#fff;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.sec-head .ttl{flex:1;min-width:220px}
+.sec-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1.5px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:transform .06s}
+.btn:active{transform:scale(.97)}
+.btn.comment{border-color:var(--coral);color:var(--coral)}
+.btn.approve{border-color:var(--good);color:var(--good)}
+.btn.approve.on{background:var(--good);color:#fff}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff;font-size:15.5px;padding:11px 22px}
+.btn .cnt{display:inline-block;min-width:19px;padding:0 5px;border-radius:999px;background:var(--coral);color:#fff;font-size:12px;margin-left:5px}
+.note{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 18px;font-size:15px;margin:14px 0}
+.note.tip{border-left:4px solid var(--teal)}
+.note.warn{border-left:4px solid var(--warn)}
+.note.good{border-left:4px solid var(--good)}
+.big-idea{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--teal);border-radius:14px;padding:20px 22px;font-size:18px;font-weight:600;line-height:1.6;margin:18px 0}
+.big-idea b{color:var(--teal-deep)}
+/* how-to banner */
+.howto{background:linear-gradient(135deg,color-mix(in srgb,var(--teal) 10%,var(--panel)),color-mix(in srgb,var(--coral) 8%,var(--panel)));border:1.5px solid var(--teal);border-radius:16px;padding:20px 24px;margin:22px 0}
+.howto ol{margin:8px 0 0;padding-left:22px}
+.howto li{margin-bottom:8px}
+/* rings + modules */
+.ring{margin:18px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.ring-head{padding:13px 18px;font-weight:700;display:flex;gap:10px;align-items:center;background:var(--panel2);cursor:pointer;user-select:none}
+.ring-head .em{font-size:20px}
+.ring-head .hint{margin-left:auto;font-weight:500;font-size:13px;color:var(--ink2)}
+.ring-body{padding:10px 14px 14px;display:none}
+.ring.open .ring-body{display:block}
+.ring-desc{font-size:14.5px;color:var(--ink2);padding:2px 6px 10px}
+.mod{border:1px solid var(--line);border-radius:10px;margin:8px 0;overflow:hidden;background:var(--panel)}
+.mod-head{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none}
+.mod-head:hover{background:var(--panel2)}
+.mod-head .nm{font-weight:700;font-size:15px}
+.mod-head .path{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink2);background:var(--panel2);border-radius:6px;padding:2px 7px}
+.mod-head .car{margin-left:auto;color:var(--ink2);transition:transform .15s}
+.mod.open .mod-head .car{transform:rotate(90deg)}
+.mod-body{display:none;padding:4px 16px 13px;font-size:14.8px;color:var(--ink);border-top:1px dashed var(--line)}
+.mod.open .mod-body{display:block}
+.mod-body .why{color:var(--ink2);font-size:13.8px;margin-top:6px}
+.mod-actions{margin-top:9px}
+.mini-btn{border:1px solid var(--coral);color:var(--coral);background:transparent;border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+/* diagram */
+.diagram{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:20px 14px;text-align:center;margin:14px 0}
+.dg-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:6px 0}
+.dg-box{border-radius:9px;padding:7px 13px;font-weight:600;font-size:13.5px;border:1.5px solid var(--line);background:var(--panel)}
+.dg-box.scr{border-color:var(--teal);color:var(--teal-deep)}
+.dg-box.brn{border-color:var(--coral);background:color-mix(in srgb,var(--coral) 12%,transparent)}
+.dg-box.lib{border-color:var(--good);color:var(--good)}
+.dg-box.jvm{border-color:var(--warn);color:var(--warn)}
+.dg-arrow{color:var(--teal);font-size:22px;font-weight:700;margin:2px 0}
+.dg-lbl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);font-weight:700;margin:8px 0 4px}
+/* swatches */
+.swatches{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+.sw{width:120px;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12px}
+.sw .c{height:52px}
+.sw .t{padding:6px 9px;background:var(--panel)}
+.grad-bar{height:40px;border-radius:10px;background:linear-gradient(135deg,#2B8FB0,#F0725A);margin:10px 0;border:1px solid var(--line)}
+/* adaptive demo */
+.dev-tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.dev-tab{border:1.5px solid var(--line);background:var(--panel2);border-radius:999px;padding:7px 16px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.dev-tab.on{background:var(--teal);border-color:var(--teal);color:#fff}
+.dev-stage{border:1px solid var(--line);border-radius:14px;background:var(--panel2);padding:18px;display:flex;justify-content:center}
+.mock{background:var(--panel);border:2px solid var(--ink2);border-radius:14px;overflow:hidden;display:flex;transition:width .25s}
+.mock .content{flex:1;display:flex;flex-direction:column}
+.mock .body{flex:1;display:flex;gap:8px;padding:10px}
+.pane{flex:1;border:1.5px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--ink2);min-height:90px;text-align:center;padding:4px}
+.mock .bar{display:flex;border-top:1.5px solid var(--line)}
+.mock .bar div{flex:1;text-align:center;padding:7px 0 5px;font-size:15px}
+.mock .bar div.sel{color:var(--teal);font-weight:700}
+.mock .rail{width:44px;border-right:1.5px solid var(--line);display:flex;flex-direction:column;align-items:center;padding-top:8px;gap:10px;font-size:15px}
+.mock .drawer{width:120px;border-right:1.5px solid var(--line);padding:10px 8px;font-size:12px}
+.mock .drawer div{padding:5px 8px;border-radius:8px;margin-bottom:3px}
+.mock .drawer div.sel{background:color-mix(in srgb,var(--teal) 18%,transparent);color:var(--teal-deep);font-weight:700}
+/* tables */
+table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2)}
+.tbl-scroll{overflow-x:auto}
+/* story steps */
+.flow{counter-reset:s;list-style:none;padding:0;margin:12px 0;display:flex;flex-direction:column;gap:9px}
+.flow li{counter-increment:s;position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 15px 12px 50px;font-size:14.8px}
+.flow li::before{content:counter(s);position:absolute;left:12px;top:11px;width:26px;height:26px;border-radius:50%;background:var(--teal);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.flow b{color:var(--teal-deep)}
+/* checklist */
+.check{list-style:none;padding:0;margin:10px 0}
+.check li{padding:7px 0 7px 30px;position:relative;font-size:14.8px;border-bottom:1px dashed var(--line)}
+.check li::before{content:"✓";position:absolute;left:4px;color:var(--good);font-weight:800}
+.check li.x::before{content:"✗";color:var(--bad)}
+/* decisions */
+.decision{border:1.5px solid var(--warn);border-radius:12px;padding:16px 18px;margin:14px 0;background:color-mix(in srgb,var(--warn) 6%,var(--panel))}
+.decision h3{color:var(--warn)}
+/* comment dialog */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+.overlay.show{display:flex}
+.dialog{background:var(--panel);border:1px solid var(--line);border-radius:16px;max-width:560px;width:100%;padding:22px 24px;max-height:88vh;overflow:auto}
+.dialog h3{font-size:17px;margin-bottom:4px}
+.dialog .ctx{font-size:13px;color:var(--ink2);margin-bottom:10px}
+.dialog .quote{border-left:3px solid var(--coral);background:var(--panel2);border-radius:8px;padding:8px 12px;font-size:13.5px;color:var(--ink2);margin-bottom:12px;font-style:italic}
+.dialog textarea{width:100%;min-height:120px;border:1.5px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--ink);padding:12px;font-family:inherit;font-size:15px;resize:vertical}
+.dialog textarea:focus{outline:2px solid var(--teal)}
+.dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+/* comments panel */
+.fab{position:fixed;right:22px;bottom:22px;z-index:50;background:var(--coral);color:#fff;border:none;border-radius:999px;padding:14px 20px;font-size:15.5px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25);font-family:inherit}
+.panel{position:fixed;top:0;right:-420px;width:min(400px,92vw);height:100vh;background:var(--panel);border-left:1px solid var(--line);z-index:70;transition:right .22s;display:flex;flex-direction:column}
+.panel.show{right:0}
+.panel-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.panel-head h3{flex:1}
+.panel-body{flex:1;overflow:auto;padding:12px 16px}
+.cmt{border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin-bottom:10px;font-size:14px;background:var(--panel2)}
+.cmt .meta{font-size:12px;color:var(--ink2);margin-bottom:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.cmt .meta .sec{background:color-mix(in srgb,var(--teal) 15%,transparent);color:var(--teal-deep);border-radius:6px;padding:1px 7px;font-weight:700}
+.cmt .q{border-left:3px solid var(--coral);padding:2px 8px;color:var(--ink2);font-size:12.5px;font-style:italic;margin:4px 0}
+.cmt .ops{margin-top:6px;display:flex;gap:8px}
+.cmt .ops button{border:none;background:none;color:var(--ink2);font-size:12.5px;cursor:pointer;text-decoration:underline;font-family:inherit;padding:0}
+.cmt.approve{border-color:var(--good);background:color-mix(in srgb,var(--good) 8%,var(--panel))}
+/* toast */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);border-radius:999px;padding:10px 22px;font-size:14.5px;font-weight:600;opacity:0;transition:.25s;z-index:80;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* final */
+.final{margin-top:44px;text-align:center;background:var(--panel);border:1.5px solid var(--good);border-radius:16px;padding:28px}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--ink2);font-size:13px}
+@media(max-width:620px){h1{font-size:24px}section.rev{padding:18px 16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="kick">Tranzlate · අලුත් app එක · පියවර 1</div>
+  <h1>අත්තිවාරමේ සැලැස්ම — ඔබේ අනුමැතියට</h1>
+  <p class="sub">මේක තමයි අලුත් app එකේ <b>පළමු ගඩොල</b> තියන්න කලින් ඔබට පෙන්නන සැලැස්ම. සරල සිංහලෙන්, කෑලි කෑලි වලට කඩලා. ඔබ කැමති / අකමැති / අහන්න ඕන ඕනම දෙයක් — ඒ කොටස ළඟම තියෙන <b style="color:var(--coral)">💬 බොත්තමෙන්</b> ලියන්න.</p>
+
+  <div class="howto">
+    <h3>📝 මේ පිටුව පාවිච්චි කරන විදිහ</h3>
+    <ol>
+      <li>එක එක කොටස කියවන්න — හැම කොටසකම උඩ <b>💬 අදහසක්</b> සහ <b style="color:var(--good)">✓ මේ කොටස හරි</b> බොත්තම් දෙකක් තියෙනවා.</li>
+      <li>යමක් ගැන කියන්න ඕන නම් <b>💬</b> ඔබලා ලියලා <b>Save</b> කරන්න. (කොටසක වචන ටිකක් <b>select කරලා</b> 💬 එබුවොත්, ඒ වචන ටිකත් comment එකට ඇමිණෙනවා — එතකොට මට හරියටම තේරෙනවා ඔබ කතා කරන්නේ මොන තැන ගැනද කියලා.)</li>
+      <li>කොටස ප්‍රශ්නයක් නැත්නම් <b style="color:var(--good)">✓ මේ කොටස හරි</b> ඔබන්න.</li>
+      <li>ඔබ දාන හැම comment එකක්ම <b>කෙලින්ම project එකට save වෙනවා</b> — copy කරලා එවන්න ඕන නෑ. ඉවර වුණාම chat එකේ "comments දැම්මා" කියන්න විතරයි.</li>
+    </ol>
+  </div>
+
+  <!-- S1 -->
+  <section class="rev" data-sec="s1" data-title="මොකක්ද මේ අත්තිවාරම?">
+    <div class="sec-head">
+      <div class="no">1</div>
+      <div class="ttl"><h2>මොකක්ද මේ "අත්තිවාරම" (scaffold) කියන්නේ?</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+    <p>ගෙයක් හදනකොට මුලින්ම කරන්නේ කාමර හදන එක නෙවෙයි — <b>අත්තිවාරම දාලා, කණු ගහලා, වහලේ රාමුව</b> හදන එක. ඒක හරියට හැදුවොත් ඊට පස්සේ කාමර එකින් එක ලේසියෙන්, ආරක්ෂිතව හැදෙනවා. වැරදියට හැදුවොත් — පරණ app එකේ වුණේ ඒකයි — පස්සේ හැම දෙයක්ම එකිනෙකට පැටලිලා, එක තැනක් fix කරන්න තැන් අටක් හොයන්න වෙනවා.</p>
+    <p>මේ පියවරේදී අපි හදන්නේ:</p>
+    <ul style="padding-left:20px">
+      <li><b>කැට 26ක රාමුව</b> — app එකේ හැම වැඩකටම වෙන වෙනම "පෙට්ටි", එකිනෙකට සම්බන්ධ වෙන නීති එක්කම (කොටස 2).</li>
+      <li><b>පාට / අකුරු / ඉඩ පද්ධතිය</b> — මුළු app එකම එක පෙනුමකින් තියන්න (කොටස 5).</li>
+      <li><b>තිර අතර යන රාමුව</b> — දුරකථනේ, ටැබ්ලට් එකේ, ලොකු තිරයක — තුනේම හරියට පේන විදිහට (කොටස 6).</li>
+      <li><b>"අච්චුව"</b> — එක codebase එකෙන් apps කිහිපයක් හදන්න පුළුවන් සැකැස්ම (කොටස 4).</li>
+      <li><b>"බොරු එන්ජිම"</b> — පරීක්ෂණ 100%ක් විශ්වාස කරන්න පුළුවන් වෙන්න (කොටස 3).</li>
+    </ul>
+    <div class="note warn"><b>මේ පියවරේ නැති දේ:</b> ඇත්ත පරිවර්තනය තාම නෑ. Text තිරය, කැමරාව — ඒවා ඊළඟ පියවර වල. මේ පියවර ඉවර වුණාම ඔබට බලන්න ලැබෙන්නේ: app එකක් open වෙනවා, අලුත් පාට තේමාව පේනවා, පහළ tab bar එකෙන් තිර මාරු වෙනවා, "බොරු එන්ජිමෙන්" පරීක්ෂණ දුවනවා. කාමර නැති, ඒත් හැම කාමරයකටම තැන හදපු ගෙයක් වගේ.</div>
+  </section>
+
+  <!-- S2 -->
+  <section class="rev" data-sec="s2" data-title="කැට 26 — රවුම් 4">
+    <div class="sec-head">
+      <div class="no">2</div>
+      <div class="ttl"><h2>කැට 26ක්, රවුම් 4කට — කවුද කාට කතා කරන්නේ</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+    <p>ඔබ කලින් අනුමත කරපු <b>"මොළ 4 + තිර නිකම් අහනවා"</b> ව්‍යුහයම තමයි මේ — දැන් ඒක ඇත්ත ගොඩනැගිලි කැට (modules) වලට කඩලා. හිතන්න <b>නගරයක්</b> වගේ:</p>
+    <div class="big-idea">තිර (කඩ) → මොළ (කර්මාන්තශාලා) → ගබඩා/සේවා. කඩේකට කර්මාන්තශාලාවේ ඇතුළට යන්න බෑ — <b>ඉල්ලන්න විතරයි පුළුවන්.</b> ඒ නීතිය කැඩෙන්නේ නැති විදිහට කැට බෙදලා.</div>
+
+    <div class="diagram">
+      <div class="dg-lbl">④ තිර + ඇප් ෂෙල් එක</div>
+      <div class="dg-row"><span class="dg-box scr">Text</span><span class="dg-box scr">භාෂා තෝරනය</span><span class="dg-box scr">Camera</span><span class="dg-box scr">History</span><span class="dg-box scr">Settings</span><span class="dg-box scr">Paywall</span><span class="dg-box">📱 app shell</span></div>
+      <div class="dg-arrow">↓ <span style="font-size:12px;color:var(--ink2)">අහනවා විතරයි</span></div>
+      <div class="dg-lbl">③ මොළ 4 + ගබඩා</div>
+      <div class="dg-row"><span class="dg-box brn">🌐 පරිවර්තන</span><span class="dg-box brn">👤 දායකත්ව</span><span class="dg-box brn">📊 සීමා</span><span class="dg-box brn">📣 දැන්වීම්</span></div>
+      <div class="dg-row"><span class="dg-box">ගබඩාව (history)</span><span class="dg-box">සැකසුම් මතකය</span><span class="dg-box">පාට/අකුරු</span><span class="dg-box">පොදු UI</span></div>
+      <div class="dg-arrow">↓</div>
+      <div class="dg-lbl">② ගිවිසුම් පොත් (පිරිසිදු කොටස)</div>
+      <div class="dg-row"><span class="dg-box jvm">වචන මාලාව</span><span class="dg-box jvm">පොරොන්දු ලැයිස්තුව</span><span class="dg-box jvm">config හැඩය</span><span class="dg-box jvm">test උපකරණ</span></div>
+      <div class="dg-arrow">↓</div>
+      <div class="dg-lbl">① බෙදාගත හැකි පෙට්ටි 3 (වෙන app වලටත්)</div>
+      <div class="dg-row"><span class="dg-box lib">💳 Subscription</span><span class="dg-box lib">📣 Ads</span><span class="dg-box lib">🛡 Consent</span></div>
+    </div>
+
+    <p>පහළින් රවුම් 4 — එකක් open කරලා, ඕනම කැටයක් click කළාම ඒක මොකද කරන්නේ කියලා සරලව කියනවා. <b>ඕනම කැටයක් ගැන</b> අදහසක් තියෙනවා නම් ඒ කැටේ ඇතුළේම 💬 බොත්තමක් තියෙනවා.</p>
+    <div id="rings"></div>
+    <div class="note tip"><b>ඇයි 26ක්?</b> — වැඩිත් නෑ, අඩුත් නෑ. හැම කැටයක්ම "කුලිය ගෙවනවා" (ඒකට හේතුවක් තියෙනවා): වෙනම test කරන්න පුළුවන්, වෙන app එකකට දෙන්න පුළුවන්, නැත්නම් නීතියක් රකිනවා. සමහර කැට පස්සේ කුඩා වැඩියි කියලා පේනවා නම් ඒවා ඒකාබද්ධ කරන "trigger" ලකුණුත් සැලැස්මේ ලියලා තියෙනවා — හිතුවක්කාරව ලොකු කරන්නේ නෑ.</div>
+  </section>
+
+  <!-- S3 -->
+  <section class="rev" data-sec="s3" data-title="බොරු එන්ජිම (පරීක්ෂණ)">
+    <div class="sec-head">
+      <div class="no">3</div>
+      <div class="ttl"><h2>"බොරු එන්ජිම" — පරීක්ෂණ කවදාවත් බොරු නොකියන්න</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+    <p>ඇත්ත පරිවර්තන එන්ජින් (Google, MLKit…) <b>හැමදාම එකම උත්තරේ දෙන්නේ නෑ</b> — network එක, model version එක අනුව ටිකක් වෙනස් වෙනවා. ඒ නිසා ඒවා උඩ automated පරීක්ෂණ දැම්මොත් පරීක්ෂණ සමහර දවසට fail වෙනවා, සමහර දවසට pass — කාටවත් විශ්වාස කරන්න බෑ.</p>
+    <p><b>විසඳුම:</b> නාට්‍යයක <b>රඟපාන නළුවෙක්</b> වගේ "බොරු එන්ජිමක්". ඌට කලින්ම කටපාඩම් කරපු පිළිතුරු ටිකක් දීලා තියෙනවා — "Good morning" ඉංග්‍රීසි→ප්‍රංශ ඇහුවොත් <i>හැමදාම, හැම වෙලේම</i> "Bonjour (fake)" කියනවා. ඒ නිසා පරීක්ෂණයක් fail වුණා නම් ඒ <b>අපේ code එකේම වැරැද්දක්</b> — කවදාවත් "network එක හින්දා" නෙවෙයි.</p>
+    <ul class="check">
+      <li>App එකේ <b>copy දෙකක්</b> හැදෙනවා: ඇත්ත එන්ජින් සහිත එක (ඔබ Play Store එකට දාන එක) + බොරු එන්ජිම සහිත test copy එක.</li>
+      <li>Test copy එකේ ඇත්ත Google/AdMob/Qonversion කෑලි <b>ඇතුළෙම නෑ</b> — අතින් වැරදිලාවත් ඇත්ත server එකකට කතා කරන්න බැරි විදිහට.</li>
+      <li>බොරු copy එක <b>Play Store එකට යන එක තුන් ආකාරයකින් block</b> කරලා (build එකේම, CI පරීක්ෂාවක්, publish-lock එකක්) — මාරු වෙන්න බෑ.</li>
+    </ul>
+    <div class="note good">මේ ක්‍රමය Google ම තමන්ගේ ආදර්ශ app එකේ (Now in Android) පාවිච්චි කරන, ලේඛනගත ක්‍රමයමයි — අපේ specs වල TEST contract එකත් ඉල්ලන්නේ මේකමයි.</div>
+  </section>
+
+  <!-- S4 -->
+  <section class="rev" data-sec="s4" data-title="එක අච්චුවෙන් apps ගොඩක් (white-label)">
+    <div class="sec-head">
+      <div class="no">4</div>
+      <div class="ttl"><h2>එක අච්චුවෙන් apps ගොඩක් — "Spanish Translator" පරීක්ෂාව</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+    <p>ඔබට ඕන වුණේ: එක codebase එකෙන් <b>Offline Translator, Spanish Translator, French Translator…</b> වගේ apps කිහිපයක් — අලුත් app එකක් හදනකොට <b>code එකට අත තියන්නේ නැතුව.</b> කේක් <b>අච්චුවක්</b> වගේ: අච්චුව එකයි, කේක් ගොඩයි — වෙනස් වෙන්නේ රසය (නම, icon එක, භාෂාව, ගිණුම්) විතරයි.</p>
+    <p>මේ සැලැස්ම ඒක ඇත්තටම කරනවද කියලා බලන්න, <b>"Spanish Translator" කියලා දෙවෙනි app එකක් හදනවා කියලා simulation එකක්</b> කළා (ස්වාධීන පරීක්ෂකයෙක් අතින්). ප්‍රතිඵලය — අලුත් app එකකට ඕන වෙන්නේ:</p>
+    <ul class="check">
+      <li>App icon එක + නම (config ගොනුවක)</li>
+      <li>Play Store ගිණුම් විස්තර + app හැඳුනුම (id) + අත්සන (signing)</li>
+      <li>ඒ app එකේම දැන්වීම් / දායකත්ව ගිණුම් අංක</li>
+      <li>Default භාෂා (උදා: Spanish) + on/off කරන features (උදා: කැමරාව off)</li>
+      <li class="x"><b>Code එකේ එක අකුරක්වත් වෙනස් කරන්න වෙන්නේ නෑ</b> — පරීක්ෂකයා හැම ගොනුවක්ම trace කරලා තහවුරු කළා ✓</li>
+    </ul>
+    <div class="note tip">පරීක්ෂාවෙන් හොඳ අනතුරු ඇඟවීම් 2ක් ආවා (දෙකම සැලැස්මට ඇතුළත් කළා): (1) app ලැයිස්තුව code ගොනුවක නොතියා config ගොනුවක තියන්න — නැත්නම් අලුත් app එකක් දාද්දී "code වෙනසක්" වෙනවා; (2) කැමරාව වගේ feature එකක් off කරන switch එක පළමු දවසේම රාමුවට හදලා තියන්න ඕන.</div>
+  </section>
+
+  <!-- S5 -->
+  <section class="rev" data-sec="s5" data-title="පාට / අකුරු / ඉඩ (theme)">
+    <div class="sec-head">
+      <div class="no">5</div>
+      <div class="ttl"><h2>පාට, අකුරු, ඉඩ — හැම තැනම එක තැනකින්</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+    <p>පරණ app එකේ පාට/අකුරු තැනින් තැන අතින් ලියලා තිබුණා — ඒකයි එක තිරයක් එක විදිහයි, තව තිරයක් තව විදිහයි වුණේ. අලුත් app එකේ <b>නීතියක්:</b> කිසිම තිරයක පාටක්, අකුරු ප්‍රමාණයක්, ඉඩක් අතින් ලියන්නේ නෑ — ඔක්කොම එන්නේ <b>එක "පාට පෙට්ටියකින්"</b> (design tokens). පාටක් වෙනස් කරන්න ඕන නම් එක තැනක් වෙනස් කළාම මුළු app එකම මාරු වෙනවා.</p>
+    <p>ඔබේ brand එකේ පාට — <b>teal (නිල්-කොළ) + coral (තැඹිලි-රෝස)</b> — designer ලේඛනයේ තියෙන, අකුරු කියවීමේ පහසුව (contrast) ගණනය කරලා තහවුරු කරපු අගයන්ම:</p>
+    <div class="swatches">
+      <div class="sw"><div class="c" style="background:#1C7A97"></div><div class="t">ප්‍රධාන teal (ලයිට්)</div></div>
+      <div class="sw"><div class="c" style="background:#3FB6D4"></div><div class="t">ප්‍රධාන teal (ඩාර්ක්)</div></div>
+      <div class="sw"><div class="c" style="background:#C0563E"></div><div class="t">coral (ලයිට්)</div></div>
+      <div class="sw"><div class="c" style="background:#FFB4A0"></div><div class="t">coral (ඩාර්ක්)</div></div>
+      <div class="sw"><div class="c" style="background:#7A5A2E"></div><div class="t">රන්වන් accent</div></div>
+    </div>
+    <p>Logo/විශේෂ තැන් වලට brand gradient එක (teal→coral):</p>
+    <div class="grad-bar"></div>
+    <p>Android 12+ දුරකථන වල, user කැමති නම්, දුරකථනේ wallpaper එකට ගැලපෙන "Material You" පාටත් auto-support වෙනවා — ඒත් ඔබේ brand පාට <b>guaranteed fallback</b> එක විදිහට හැම දුරකථනකම වැඩ කරනවා. ලයිට් + ඩාර්ක් තේමා දෙකම දවස one-න් support.</p>
+    <div class="note warn"><b>⚠ ඔබෙන් තහවුරුවක් ඕන (තීරණ කොටසේ 9.2):</b> ලේඛන දෙකක පාට යෝජනා දෙකක් තිබුණා — එකක "නිල් + රෝස" seed එකක් (අවසන් නොකළ proposal එකක්), අනෙකේ මේ උඩ පෙන්නපු සම්පූර්ණ teal+coral පද්ධතිය (designer "buildable" කියලා confirm කරපු). අපි <b>teal+coral සම්පූර්ණ පද්ධතිය</b> ගන්නවා කියලයි යෝජනාව.</div>
+  </section>
+
+  <!-- S6 -->
+  <section class="rev" data-sec="s6" data-title="තිර අතර යාම (navigation)">
+    <div class="sec-head">
+      <div class="no">6</div>
+      <div class="ttl"><h2>තිර අතර යාම — දුරකථනේ / ටැබ්ලට් / ලොකු තිර</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+    <p>Google Translate වගේම: ප්‍රධාන වැඩ (Text · Camera · History · Settings) <b>එක tap එකකින්</b> ළඟා වෙන්න ඕන. තිරේ ප්‍රමාණය අනුව menu එක auto-මාරු වෙනවා — පහළ බොත්තම් පේළිය (දුරකථනය) → පැත්තේ පටිය (ටැබ්ලට්) → සම්පූර්ණ side menu + පැති දෙකේ layout (ලොකු තිර). මේ බොත්තම් ඔබලා බලන්න:</p>
+    <div class="dev-tabs">
+      <button class="dev-tab on" data-dev="phone">📱 දුරකථනය</button>
+      <button class="dev-tab" data-dev="tablet">💻 ටැබ්ලට්</button>
+      <button class="dev-tab" data-dev="desktop">🖥 ලොකු තිරය</button>
+    </div>
+    <div class="dev-stage"><div class="mock" id="mock"></div></div>
+    <p style="margin-top:12px">මේක අතින් හදන්නේ නෑ — Google ගේ නිල, stable "adaptive navigation" කොටසින්මයි. ඒ වගේම තිර අතර මාරු වෙන යටිතල පද්ධතියට Google දැන් අලුත් apps වලට නිර්දේශ කරන අලුත්ම stable ක්‍රමය (Navigation 3) පාවිච්චි කරනවා — internet එකෙන් verify කරලා.</p>
+  </section>
+
+  <!-- S7 -->
+  <section class="rev" data-sec="s7" data-title="අලුත්ම පාට්ස් (versions)">
+    <div class="sec-head">
+      <div class="no">7</div>
+      <div class="ttl"><h2>"පාට්ස් ලැයිස්තුව" — ඔක්කොම අලුත්ම, ස්ථිර, verify කරපු</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+    <p>App එකක් හැදෙන්නේ Google/community එකෙන් එන "පාට්ස්" (libraries) ගොඩක් උඩ. නීති 2ක් තියාගත්තා: (1) <b>අලුත්ම ඒත් "stable"</b> (ස්ථිර යැයි ප්‍රකාශිත) versions විතරයි — beta/පරීක්ෂණ versions නෑ; (2) මගේ මතකයෙන් නෙවෙයි — <b>හැම version එකක්ම internet එකේ නිල source දෙකකින්</b> වෙන වෙනම verify කළා.</p>
+    <div class="note good"><b>Double-check කිරීම වැඩ කළා කියලා ඔප්පු වුණා:</b> පළමු පරීක්ෂාවේ එක version එකක් (Kotlin) ටිකක් පරණ අගයක් ඇවිත් තිබුණා — දෙවෙනි ස්වාධීන පරීක්ෂාව ඒක අල්ලලා නිවැරදි කළා (2.4.0 → 2.4.10). ඉතුරු 9ම දෙපාරම සමපාත වුණා.</div>
+    <details>
+      <summary style="cursor:pointer;font-weight:700;margin-bottom:8px">සම්පූර්ණ ලැයිස්තුව බලන්න (කැමති නම් විතරක්)</summary>
+      <div class="tbl-scroll">
+      <table>
+        <tr><th>මොකක්ද</th><th>සරලව</th><th>Version</th></tr>
+        <tr><td>AGP + Gradle</td><td>app එක "බේක්" කරන උඳුන</td><td>9.3.0 / 9.5+</td></tr>
+        <tr><td>Kotlin</td><td>ලියන භාෂාව</td><td>2.4.10 ✏️ (නිවැරදි කළ එක)</td></tr>
+        <tr><td>Compose + Material 3</td><td>තිර අඳින කට්ටලය</td><td>BOM 2026.06.01 · M3 1.4.0</td></tr>
+        <tr><td>Adaptive suite</td><td>දුරකථන→ටැබ්ලට් auto-menu</td><td>1.2.0 / 1.4.0</td></tr>
+        <tr><td>Navigation 3</td><td>තිර අතර මාරුව</td><td>1.1.4</td></tr>
+        <tr><td>Hilt</td><td>කැට එකට අමුණන මැලියම</td><td>2.60.1</td></tr>
+        <tr><td>Room / DataStore</td><td>ගබඩාව / සැකසුම් මතකය</td><td>2.8.4 / 1.2.1</td></tr>
+        <tr><td>WorkManager</td><td>background වැඩ (downloads)</td><td>2.11.2</td></tr>
+        <tr><td>MLKit translate</td><td>offline පරිවර්තනය (පියවර 2ට)</td><td>17.0.3</td></tr>
+        <tr><td>Android target</td><td>Android 16 (API 36) — Play අලුත් නීතියටත් ගැලපේ; පරණම support: Android 7 (API 24)</td><td>36 / min 24</td></tr>
+        <tr><td>Test කට්ටල</td><td>Turbine·Truth·Detekt·Spotless…</td><td>ඔක්කොම stable</td></tr>
+      </table>
+      </div>
+    </details>
+  </section>
+
+  <!-- S8 -->
+  <section class="rev" data-sec="s8" data-title="සැලැස්ම පරීක්ෂා වුණ විදිහ">
+    <div class="sec-head">
+      <div class="no">8</div>
+      <div class="ttl"><h2>මේ සැලැස්ම හැදුණේ + පරීක්ෂා වුණේ කොහොමද</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+    <p>එක හිසකින් හදපු සැලැස්මක් එක හිසකම වැරදිත් උරුම කරගන්නවා. ඒ නිසා මේක <b>තරඟයක් + විභාගයක්</b> විදිහට කළා:</p>
+    <ol class="flow">
+      <li><b>ස්වාධීන architects 3ක්</b> (AI agents) — එක එකා වෙන වෙනම, වෙනස් දෘෂ්ටිකෝණ 3කින් සැලසුම් 3ක් හැදුවා: ① Google ගේ නිල guide එකට ළඟින්ම · ② "බෙදාගත හැකි පෙට්ටි + apps ගොඩක්" priority · ③ පුළුවන් තරම් සරලම.</li>
+      <li><b>විනිසුරුවන් 3ක්</b> ලකුණු දුන්නා (ලකුණු 78–91). තුන්දෙනාම <b>එකම එක</b> තෝරාගත්තා: ② — ඒත් ① සහ ③ වල හොඳම අදහස් 15ක් ඒකට එකතු කළා.</li>
+      <li><b>"කඩන්න බලන" පරීක්ෂකයන් 3ක්</b> — දිනපු සැලැස්ම වට්ටන්නම බලලා: නීති ලැයිස්තුවම trace කළා · test contract එක ගොනුවෙන් ගොනුවට simulate කළා · "Spanish Translator" add කිරීම step-by-step ඇවිද්දා.</li>
+      <li>ඒ පරීක්ෂාවලින් <b>සැබෑ අඩුපාඩු 6ක් හම්බවුණා</b> (උදා: test-wiring එක compile නොවෙන තැනක් 2ක්, config එක වැරදි තැනක තිබ්බොත් "code-නොවෙනස්" පොරොන්දුව කැඩෙන තැනක්) — <b>ඔක්කොම fix එක්කම සැලැස්මට ඇතුළත් කළා.</b> අවසාන තීන්දුව තුන්දෙනාගෙන්ම: "වට්ටන්න බෑ" ✓</li>
+    </ol>
+    <p>ඒ වගේම මේ මුළු සැලැස්මම repo එකේ ලේඛනගතයි (<span style="font-family:ui-monospace,Menlo,monospace;font-size:13px">docs/plan/issue-3-scaffold-multimodule.md</span>) — ඔබ accept කළාට පස්සේ ඒක "accepted" වෙලා, ඒකට අනුවම code ලියැවෙනවා. (නීතිය: සැලැස්ම accept නැතුව code නෑ.)</p>
+  </section>
+
+  <!-- S9 -->
+  <section class="rev" data-sec="s9" data-title="ඔබෙන් ඕන තීරණ">
+    <div class="sec-head">
+      <div class="no">9</div>
+      <div class="ttl"><h2>ඔබෙන් ඕන තීරණ 3ක්</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+
+    <div class="decision">
+      <h3>9.1 — App හැඳුනුම (application id): පරණ එකමද, අලුත් එකක්ද?</h3>
+      <p>හැම Android app එකකටම Play Store එකේ වෙනස් නොවෙන හැඳුනුම් අංකයක් තියෙනවා. <b>විකල්ප 2ක්:</b></p>
+      <p><b>A (නිර්දේශිතයි):</b> පරණ app එකේම හැඳුනුම පාවිච්චි කරනවා. එතකොට අලුත් app එක හැදිලා ඉවර වුණාම, දැනට Play Store එකේ ඉන්න <b>පරිශීලකයන්ටම ලොකු update එකක් විදිහට</b> යවන්න පුළුවන් — ඒ අය, ඒ reviews, ඒ install ගණන් ඔක්කොම රැකෙනවා. (specs වල test ලේඛනත් මේ හැඳුනුමමයි භාවිත කරන්නේ.)</p>
+      <p><b>B:</b> අලුත් හැඳුනුමක් = Play Store එකේ සම්පූර්ණ අලුත් app එකක්. පරණ එක වෙනමම ඉතුරු වෙනවා, අලුත් එක බිංදුවෙන් පටන් ගන්නවා.</p>
+      <p style="margin-bottom:0">💬 බොත්තමෙන් <b>A</b> හෝ <b>B</b> කියලා දාන්න (නැත්නම් ප්‍රශ්නයක් අහන්න).</p>
+    </div>
+
+    <div class="decision">
+      <h3>9.2 — පාට තහවුරුව</h3>
+      <p style="margin-bottom:0">කොටස 5-එ පෙන්නපු <b>teal + coral</b> පද්ධතිය app එකේ නිල පාට වෙනවට කැමතිද? (කැමති නම් ඒ කොටසේ ✓ ඔබන්න ඇති; වෙනසක් ඕන නම් 💬.)</p>
+    </div>
+
+    <div class="decision">
+      <h3>9.3 — මුළු සැලැස්ම අනුමත කිරීම</h3>
+      <p style="margin-bottom:0">ඔක්කොම කියවලා, comments දාලා ඉවර වුණාම — පිටුවේ අන්තිමේ තියෙන <b style="color:var(--good)">ලොකු කොළ බොත්තම</b> ඔබන්න, නැත්නම් chat එකේ "accept" කියන්න. ඊට පස්සේ තමයි මම පළමු ගඩොල තියන්නේ.</p>
+    </div>
+  </section>
+
+  <!-- S10 -->
+  <section class="rev" data-sec="s10" data-title="ඊළඟ පියවර">
+    <div class="sec-head">
+      <div class="no">10</div>
+      <div class="ttl"><h2>ඊළඟට මොකද වෙන්නේ?</h2></div>
+      <div class="sec-actions"></div>
+    </div>
+    <ol class="flow">
+      <li><b>ඔබ:</b> මේ පිටුව review කරලා comments/අනුමැතිය දෙනවා.</li>
+      <li><b>මම:</b> comments වලට උත්තර / සැලැස්ම revise → ඔබ OK කළාම plan එක "accepted".</li>
+      <li><b>ගඩොල 1 — මේ සැලැස්ම code වෙනවා:</b> කැට 26, theme එක, tab රාමුව, අච්චුව, බොරු-එන්ජිම — ඔක්කොම build වෙලා, තවත් ස්වාධීන reviewer කෙනෙක් (මම නොවන) පරීක්ෂා කරලා merge. ඔබට බලන්න demo app එකක්.</li>
+      <li><b>ගඩොල 2 — මොළ 4:</b> ඇත්ත පරිවර්තන එන්ජින්, දායකත්ව, සීමා, දැන්වීම් මොළ.</li>
+      <li><b>ගඩොල 3 — Text තිරය:</b> පළමු ඇත්ත feature එක, Google Translate UX එකට සමානව, tests එක්කම.</li>
+      <li>ඊට පස්සේ: Camera → භාෂා තෝරනය → History → Settings → Paywall (MVP).</li>
+    </ol>
+  </section>
+
+  <div class="final" data-sec="plan-final" data-title="මුළු සැලැස්ම">
+    <h2 style="margin-bottom:8px">ඔක්කොම බැලුවා නම්…</h2>
+    <p class="sub" style="margin-bottom:16px">Comments ඔක්කොම දාලා ඉවර නම්, මෙතනින් මුළු සැලැස්මටම අනුමැතිය දෙන්න පුළුවන් —</p>
+    <button class="btn primary" id="approveAll" style="background:var(--good);border-color:var(--good)">✓ සැලැස්ම අනුමතයි — වැඩේ පටන් ගන්න</button>
+    <p style="margin-top:12px;font-size:13.5px;color:var(--ink2)">(අනුමත කළත්, comments තිබුණොත් මම ඒවා මුලින්ම විසඳලා ඔබට කියනවා.)</p>
+  </div>
+
+  <footer>Tranzlate rebuild · Issue #3 scaffold plan · 2026-07-21 · මේ පිටුව ඔබේ පරිගණකයේම දුවන්නේ — comments කෙලින්ම project ගොනුවකට (docs/plan/review/issue-3-comments.json) save වෙනවා.</footer>
+</div>
+
+<!-- comment dialog -->
+<div class="overlay" id="overlay">
+  <div class="dialog">
+    <h3 id="dlgTitle">💬 අදහසක් දාන්න</h3>
+    <div class="ctx" id="dlgCtx"></div>
+    <div class="quote" id="dlgQuote" style="display:none"></div>
+    <textarea id="dlgText" placeholder="ඔබේ අදහස / ප්‍රශ්නය / වෙනස මෙතන ලියන්න…"></textarea>
+    <div class="row">
+      <button class="btn" id="dlgCancel">අත්හරින්න</button>
+      <button class="btn primary" id="dlgSave">Save කරන්න</button>
+    </div>
+  </div>
+</div>
+
+<!-- comments panel -->
+<button class="fab" id="fab">💬 අදහස් <span id="fabCount" class="cnt" style="background:#fff;color:var(--coral)">0</span></button>
+<div class="panel" id="panel">
+  <div class="panel-head">
+    <h3>ඔබ දාපු අදහස්</h3>
+    <button class="btn" id="panelClose">වහන්න</button>
+  </div>
+  <div class="panel-body" id="panelBody"><p style="color:var(--ink2);font-size:14px">තාම අදහස් නෑ. කොටසක 💬 බොත්තම ඔබලා පටන් ගන්න.</p></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- module data (රවුම් 4) ---------- */
+const RINGS = [
+  { id:'r1', em:'🟢', title:'රවුම 1 — බෙදාගත හැකි පෙට්ටි 3', desc:'මේ තුන ස්වාධීන "නිෂ්පාදන". Tranzlate ගැන කිසිවක් දන්නේ නෑ — ඒ නිසා හෙට ඔබේ වෙනත් app එකකට ඒ විදිහටම ගෙනියන්න පුළුවන්.', mods:[
+    { p:':lib:subscription', n:'දායකත්ව පෙට්ටිය', d:'Plus/Premium මිලදී ගැනීම් හසුරුවන ස්වාධීන පෙට්ටිය. Qonversion (ගෙවීම් සේවාව) ඇතුළේ හංගලා — පිටතට පේන්නේ සරල දොරටුවක් විතරයි.', w:'පරණ app එකේත් මේක library එකක් වෙලා තිබුණ එකම හොඳ දේ — ඒ අදහස තව හොඳට, බිංදුවෙන් අලුතින්.' },
+    { p:':lib:ads', n:'දැන්වීම් පෙට්ටිය', d:'දැන්වීම් load කරලා පෙන්නන යාන්ත්‍රිකය විතරයි. "කවදද පෙන්නන්නේ" කියන තීරණය මෙතන නෑ — ඒක තියෙන්නේ දැන්වීම් මොළයේ (රවුම 3). ඒ නිසා මේ පෙට්ටිය ඕනම app එකකට දෙන්න පුළුවන්.', w:'තීරණ + යාන්ත්‍රිකය වෙන් කිරීම = "එක වැඩකට එක නිවහන" නීතිය.' },
+    { p:':lib:consent', n:'කැමැත්ත පෙට්ටිය', d:'දැන්වීම් වලට user ගේ කැමැත්ත (GDPR consent) අහන නිල Google ක්‍රමය wrap කරනවා. User "එපා" කිව්වම ඒක ඇත්තටම "එපා" — පරණ app එකේ තිබුණ auto-yes bug එක ව්‍යුහයෙන්ම වළක්වලා.', w:'විශ්වාසය + නීතිමය අවදානම — දෙකටම වැදගත්ම fix එක.' },
+  ]},
+  { id:'r2', em:'🟡', title:'රවුම 2 — ගිවිසුම් පොත් (පිරිසිදු කොටස)', desc:'මෙතන තියෙන්නේ "පොරොන්දු" විතරයි — වැඩ කරන code නෙවෙයි. මේ කොටසේ Android එකක්වත් නෑ (ඒක automated පරීක්ෂාවකින්ම රකිනවා) — ඒ නිසා tests අති-වේගවත්, ඕන තැනක run කරන්න පුළුවන්.', mods:[
+    { p:':core:common', n:'පොදු මෙවලම්', d:'"සාර්ථකයි / අසාර්ථකයි + හේතුව" කියන ප්‍රතිඵල හැඩය, වේලාව බලන ඔරලෝසු පොරොන්දුව වගේ හැම තැනම ඕන පොදු දේවල්.', w:'ඔරලෝසුව "පොරොන්දුවක්" කළාම tests වලට වෙලාව හසුරුවන්න පුළුවන් — "දවස මාරු වුණාම සීමාව reset වෙනවද" වගේ දේවල් තත්පරයකින් test වෙනවා.' },
+    { p:':core:model', n:'වචන මාලාව', d:'"පරිවර්තනයක්", "භාෂාවක්", "මාදිලියක්" කියන්නේ මොකක්ද කියලා app එකම කතා කරන පොදු වචන ටික — specs වල C-9 නීතියේ හැටියටම.', w:'හැම කැටයක්ම එකම වචන පාවිච්චි කරන නිසා තේරුම්ගැනීමේ වැරදි නෑ.' },
+    { p:':core:domain', n:'පොරොන්දු ලැයිස්තුව', d:'"පරිවර්තනය කරලා දෙන්නම්", "මේ user ට පුළුවන්ද කියලා කියන්නම්" වගේ පොරොන්දු (interfaces). තිර දන්නේ මේ පොරොන්දු විතරයි — ඇතුළේ වැඩේ කරන්නේ කවුද කියලා දන්නේ නෑ. මෙතනම තියෙනවා "පරිවර්තන ඉල්ලීමක සම්පූර්ණ පිළිවෙල" එක තැනක ලියපු එකම වට්ටෝරුවත් (අහන්න → කරන්න → ගණන +1 → දැන්වීම්?) — කිසිම තිරයක් ඒක ආයේ ලියන්නේ නෑ.', w:'test contract එක ඉල්ලන ස්ථීර ලිපිනයක් මේකේ තියෙනවා — ඒක "FROZEN" (වෙනස් කරන්නේ නෑ) කියලා ලේබල් කරලා.' },
+    { p:':core:config', n:'Config හැඩය', d:'App එකක් හැඳින්වීමට ඕන කරන config (නම, ගිණුම් අංක, default භාෂා, on/off features) වල "හැඩය" — අගයන් නෙවෙයි. අගයන් එන්නේ අච්චුවෙන් (කොටස 4).', w:'' },
+    { p:':core:testing', n:'Test උපකරණ පෙට්ටිය', d:'"බොරු එන්ජිම" + බොරු දායකත්ව/සීමා/ඔරලෝසු — ඔක්කොම එක තැනක. Unit tests, UI tests, බොරු-app copy — තුනම එකම බොරු පිළිතුරු ටිකෙන් වැඩ කරනවා (උත්තර දෙපැත්තක නෑ).', w:'' },
+  ]},
+  { id:'r3', em:'🔴', title:'රවුම 3 — මොළ 4 + ගබඩා', desc:'ඔබ දන්න මොළ 4 — එක මොළයකට එක කැටයක්. + ගබඩාව, සැකසුම් මතකය, පාට පෙට්ටිය, පොදු UI කෑලි.', mods:[
+    { p:':core:translate', n:'🌐 පරිවර්තන මොළය', d:'එන්ජින් 3 (offline MLKit · free online · ගෙවන Cloud), AUTO මාදිලියේ "නොමිලේ එන්ජින් විතරක්" නීතිය (C-10), fail වුණොත් ඊළඟ එන්ජිමට වැටෙන පිළිවෙල, පරණ උත්තර මතක තියාගැනීම (cache), offline භාෂා pack manager එක — ඔක්කොම මේ එක නිවහනේ.', w:'මේ පියවරේදී මේක හිස් රාමුවක් ("TODO" ලේබල් එක්ක) — ඇත්ත එන්ජින් ගඩොල 2 දී.' },
+    { p:':core:access', n:'👤 දායකත්ව මොළය', d:'"මේ user Free ද Plus ද Premium ද, මොනවද පුළුවන්" — දන්නේ මේක විතරයි. රවුම 1ේ දායකත්ව පෙට්ටියෙන් තොරතුරු අරගෙන app එකේ භාෂාවට පරිවර්තනය කරනවා. තීරණ ගන්නේ තහවුරු වූ තොරතුරු වලින් විතරයි (loading අතරතුර guess නෑ).', w:'' },
+    { p:':core:usage', n:'📊 සීමා මොළය', d:'දවසේ භාවිතය එක තැනක count, දවස මාරු වුණාම reset (device එකේ මධ්‍යම රාත්‍රියට), සාර්ථක වුණාම විතරයි +1 — පරණ app එකේ වගේ දෙපාරක් ගණන් වෙන්නේ නෑ.', w:'' },
+    { p:':core:ads', n:'📣 දැන්වීම් මොළය', d:'"දැන් දැන්වීමක් පෙන්නනවද?" කියන තීරණය ගන්න එකම තැන: පරිවර්තන 2කට 1ක්, අවම පරතරය 90s, දවසකට උපරිම 12, Back බොත්තමට කවදාවත් නෑ (D-4 නීති). කැමැත්ත (consent) බලලා විතරයි.', w:'' },
+    { p:':core:database', n:'ගබඩාව', d:'පරිවර්තන history, තරු දාපු ඒවා, භාෂා catalog එක — device එකේම. specs වල නිශ්චය කරපු වේගවත් "කලින් හැරෙව්වද?" බැලීමේ index එකත් එක්ක.', w:'' },
+    { p:':core:datastore', n:'සැකසුම් මතකය', d:'තෝරාගත් භාෂා, මාදිලිය, theme, දවසේ ගණන් — කුඩා settings ගබඩාව.', w:'' },
+    { p:':core:data', n:'දත්ත සම්බන්ධක', d:'ගිවිසුම් පොතේ පොරොන්දු ඇත්තටම ඉටු කරන ස්ථරය: history repo, භාෂා ලැයිස්තුව (bundled 180+), internet තියෙනවද බලන්නා, remote settings.', w:'' },
+    { p:':core:designsystem', n:'🎨 පාට පෙට්ටිය', d:'කොටස 5ේ පෙන්නපු ඔක්කොම — පාට, අකුරු, ඉඩ, හැඩ, චලන — tokens විදිහට. වෙන කිසිම business වැඩක් නෑ.', w:'' },
+    { p:':core:ui', n:'පොදු UI කෑලි', d:'Error view ("මොකක් හරි වැරදුණා + Retry"), loading view, තිරේ ප්‍රමාණය බලන helper එක — හැම feature එකක්ම බෙදාගන්න කෑලි. "user කවදාවත් හිර වෙන්නේ නෑ" (no-dead-end) නීතිය රකින කෑලිත් මෙතන.', w:'' },
+    { p:':core:translate-fake', n:'🎭 බොරු එන්ජින් ඇසුරුම', d:'Test copy එකට මොළ 4ේම බොරු versions (බොරු පරිවර්තක + බොරු දායකත්ව + බොරු සීමා + දැන්වීම් නිහඬ) සපයන කුඩා ඇසුරුම. ඇත්ත copy එකට මේක ළං වෙන්නවත් බෑ.', w:'"කඩන්න බලන" පරීක්ෂාවෙන් හම්බවුණ අඩුපාඩු 2ක් මෙතන fix වුණා — දැන් සම්පූර්ණයි.' },
+  ]},
+  { id:'r4', em:'🔵', title:'රවුම 4 — තිර + ඇප් ෂෙල් එක', desc:'තිර "අහනවා විතරයි". මේ පියවරේදී හැම තිරයක්ම placeholder එකක් — රාමුව + නම විතරයි. ඇත්ත UI එක එක feature ගඩොලේදී.', mods:[
+    { p:':feature:text', n:'Text තිරය', d:'ප්‍රධාන පරිවර්තන තිරය (ගඩොල 3 දී ඇත්ත UI — type කරද්දීම පරිවර්තනය, Google Translate වගේම).', w:'' },
+    { p:':feature:languagepicker', n:'භාෂා තෝරනය', d:'භාෂාව තෝරන තිරය — search, මෑතක පාවිච්චි කළ, සම්පූර්ණ ලැයිස්තුව. (Download කිරීම මෙතන නෑ — ඒක Settings ඇතුළේ, specs වල D-E2 නීතිය.)', w:'' },
+    { p:':feature:camera', n:'Camera තිරය', d:'කැමරාවෙන් පරිවර්තනය (MVP එකේ කොටසක් — UI පස්සේ).', w:'' },
+    { p:':feature:history', n:'History / Saved', d:'ඉතිහාසය + තරු දාපු ඒවා.', w:'' },
+    { p:':feature:settings', n:'Settings', d:'සැකසුම් + offline භාෂා manage කරන තැන + privacy/consent එන්ට්‍රිය.', w:'' },
+    { p:':feature:paywall', n:'Paywall', d:'Upgrade තිරය — මිල, කොන්දේසි පැහැදිලිව (පරණ app එකේ හිස්-paywall bug එක නැති විදිහට).', w:'' },
+    { p:':app', n:'📱 ඇප් ෂෙල් එක', d:'ඔක්කොම එකට අමුණන තුනී කවරය: tab රාමුව, තිර අතර මාරුව, අච්චු config, ඇත්ත/බොරු එන්ජින් තෝරන switch එක. Business logic බින්දුවයි.', w:'' },
+    { p:'build-logic', n:'🔧 Build වට්ටෝරු', d:'"Android කැටයක් හදන හැටි" එක තැනක ලියපු වට්ටෝරු — අලුත් කැටයක් = එක පේළියක්. Google ගේ ආදර්ශ ක්‍රමයමයි.', w:'' },
+  ]},
+];
+
+/* ---------- render rings ---------- */
+const ringsEl = document.getElementById('rings');
+RINGS.forEach((r,i)=>{
+  const ring = document.createElement('div');
+  ring.className = 'ring' + (i===0?' open':'');
+  ring.innerHTML = `<div class="ring-head"><span class="em">${r.em}</span><span>${r.title}</span><span class="hint">${r.mods.length} කැට · open/close</span></div>
+    <div class="ring-body"><div class="ring-desc">${r.desc}</div></div>`;
+  const body = ring.querySelector('.ring-body');
+  r.mods.forEach(m=>{
+    const el = document.createElement('div');
+    el.className='mod';
+    el.innerHTML = `<div class="mod-head"><span class="nm">${m.n}</span><span class="path">${m.p}</span><span class="car">▸</span></div>
+      <div class="mod-body"><div>${m.d}</div>${m.w?`<div class="why">💡 ${m.w}</div>`:''}
+      <div class="mod-actions"><button class="mini-btn" data-mod="${m.p}" data-modname="${m.n}">💬 මේ කැටේ ගැන අදහසක්</button></div></div>`;
+    el.querySelector('.mod-head').addEventListener('click',()=>el.classList.toggle('open'));
+    body.appendChild(el);
+  });
+  ring.querySelector('.ring-head').addEventListener('click',()=>ring.classList.toggle('open'));
+  ringsEl.appendChild(ring);
+});
+
+/* ---------- adaptive mock ---------- */
+const mock = document.getElementById('mock');
+const DEST = ['✏️','📷','🕘','⚙️'];
+const DESTN = ['Text','Camera','History','Settings'];
+function renderMock(kind){
+  if(kind==='phone'){
+    mock.style.width='190px';
+    mock.innerHTML = `<div class="content"><div class="body"><div class="pane">Text තිරය<br>(input + result)</div></div>
+      <div class="bar">${DEST.map((d,i)=>`<div class="${i===0?'sel':''}">${d}</div>`).join('')}</div></div>`;
+  } else if(kind==='tablet'){
+    mock.style.width='320px';
+    mock.innerHTML = `<div class="rail">${DEST.map((d,i)=>`<div class="${i===0?'sel':''}" style="${i===0?'color:var(--teal);font-weight:700':''}">${d}</div>`).join('')}</div>
+      <div class="content"><div class="body"><div class="pane">Text තිරය — පළල් layout</div></div></div>`;
+  } else {
+    mock.style.width='460px';
+    mock.innerHTML = `<div class="drawer">${DESTN.map((d,i)=>`<div class="${i===0?'sel':''}">${DEST[i]} ${d}</div>`).join('')}</div>
+      <div class="content"><div class="body"><div class="pane">Input<br>(type කරන පැත්ත)</div><div class="pane">Result<br>(උත්තරේ පැත්ත)</div></div></div>`;
+  }
+}
+renderMock('phone');
+document.querySelectorAll('.dev-tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.dev-tab').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); renderMock(b.dataset.dev);
+}));
+
+/* ---------- comments ---------- */
+let comments = [];
+let dlgState = null; // {section, section_title, quote, editId}
+const overlay=document.getElementById('overlay'), dlgText=document.getElementById('dlgText'),
+      dlgQuote=document.getElementById('dlgQuote'), dlgCtx=document.getElementById('dlgCtx'),
+      dlgTitle=document.getElementById('dlgTitle'),
+      panel=document.getElementById('panel'), panelBody=document.getElementById('panelBody'),
+      fabCount=document.getElementById('fabCount'), toast=document.getElementById('toast');
+
+function showToast(msg){ toast.textContent=msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),2600); }
+
+async function api(payload){
+  const r = await fetch('/api/comments', payload?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}:undefined);
+  if(!r.ok) throw new Error('server');
+  return r.json();
+}
+async function refresh(){
+  try{ comments = await api(); }catch(e){ showToast('⚠ server එකට කතා කරන්න බෑ — පිටුව reload කරලා බලන්න'); return; }
+  const n = comments.filter(c=>c.kind==='comment').length;
+  fabCount.textContent = n;
+  // section badges + states
+  document.querySelectorAll('[data-sec]').forEach(sec=>{
+    const id=sec.dataset.sec;
+    const mine=comments.filter(c=>c.section===id||c.section.startsWith(id+'/'));
+    const cBtn=sec.querySelector('.btn.comment .cnt');
+    if(cBtn) cBtn.textContent=mine.filter(c=>c.kind==='comment').length;
+    if(sec.classList.contains('rev')){
+      sec.classList.toggle('has-comments', mine.some(c=>c.kind==='comment'));
+      sec.classList.toggle('approved', mine.some(c=>c.kind==='approve') && !mine.some(c=>c.kind==='comment'));
+      const aBtn=sec.querySelector('.btn.approve');
+      if(aBtn) aBtn.classList.toggle('on', mine.some(c=>c.kind==='approve'));
+    }
+  });
+  // panel
+  if(!comments.length){ panelBody.innerHTML='<p style="color:var(--ink2);font-size:14px">තාම අදහස් නෑ. කොටසක 💬 බොත්තම ඔබලා පටන් ගන්න.</p>'; return; }
+  panelBody.innerHTML='';
+  comments.slice().reverse().forEach(c=>{
+    const el=document.createElement('div');
+    el.className='cmt'+(c.kind==='approve'?' approve':'');
+    el.innerHTML=`<div class="meta"><span class="sec">${c.section_title||c.section}</span><span>${c.created_at.replace('T',' · ')}</span></div>
+      ${c.quote?`<div class="q">"${esc(c.quote)}"</div>`:''}
+      <div>${c.kind==='approve'?'✓ ':''}${esc(c.comment)}</div>
+      <div class="ops">${c.kind==='comment'?`<button data-e="${c.id}">වෙනස් කරන්න</button>`:''}<button data-d="${c.id}">මකන්න</button></div>`;
+    el.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',async()=>{ await api({action:'delete',id:+b.dataset.d}); showToast('මැකුවා'); refresh(); }));
+    el.querySelectorAll('[data-e]').forEach(b=>b.addEventListener('click',()=>{ openDialog({section:c.section,section_title:c.section_title,quote:c.quote,editId:c.id,text:c.comment}); }));
+    panelBody.appendChild(el);
+  });
+}
+function esc(s){ return (s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function openDialog(st){
+  dlgState=st;
+  dlgTitle.textContent = st.editId? '✏️ අදහස වෙනස් කරන්න' : '💬 අදහසක් දාන්න';
+  dlgCtx.textContent = 'කොටස: ' + st.section_title;
+  if(st.quote){ dlgQuote.style.display='block'; dlgQuote.textContent='"'+st.quote+'"'; } else dlgQuote.style.display='none';
+  dlgText.value = st.text||'';
+  overlay.classList.add('show'); dlgText.focus();
+}
+document.getElementById('dlgCancel').addEventListener('click',()=>overlay.classList.remove('show'));
+overlay.addEventListener('click',e=>{ if(e.target===overlay) overlay.classList.remove('show'); });
+document.getElementById('dlgSave').addEventListener('click',async()=>{
+  const txt=dlgText.value.trim();
+  if(!txt){ dlgText.focus(); return; }
+  try{
+    if(dlgState.editId) await api({action:'edit',id:dlgState.editId,comment:txt});
+    else await api({action:'add',section:dlgState.section,section_title:dlgState.section_title,quote:dlgState.quote||'',comment:txt,kind:'comment'});
+    overlay.classList.remove('show'); showToast('✓ Save වුණා — project එකට ලියැවුණා'); refresh();
+  }catch(e){ showToast('⚠ save කරන්න බැරි වුණා — ආයේ try කරන්න'); }
+});
+
+function selectedQuoteIn(sec){
+  const s=window.getSelection();
+  if(!s||s.isCollapsed) return '';
+  const t=s.toString().trim();
+  if(!t||t.length<3) return '';
+  if(sec && !sec.contains(s.anchorNode)) return '';
+  return t.slice(0,600);
+}
+
+/* section action buttons */
+document.querySelectorAll('section.rev').forEach(sec=>{
+  const act=sec.querySelector('.sec-actions');
+  const id=sec.dataset.sec, title=sec.dataset.title;
+  const cb=document.createElement('button');
+  cb.className='btn comment'; cb.innerHTML='💬 අදහසක් <span class="cnt">0</span>';
+  cb.addEventListener('click',()=>openDialog({section:id,section_title:title,quote:selectedQuoteIn(sec)}));
+  const ab=document.createElement('button');
+  ab.className='btn approve'; ab.textContent='✓ මේ කොටස හරි';
+  ab.addEventListener('click',async()=>{
+    if(ab.classList.contains('on')){ showToast('දැනටමත් අනුමතයි ✓'); return; }
+    await api({action:'add',section:id,section_title:title,quote:'',comment:'මේ කොටස අනුමතයි',kind:'approve'});
+    showToast('✓ "'+title+'" අනුමතයි'); refresh();
+  });
+  act.append(cb,ab);
+});
+/* module comment buttons (delegated after render) */
+document.querySelectorAll('.mini-btn').forEach(b=>b.addEventListener('click',()=>{
+  openDialog({section:'s2/'+b.dataset.mod, section_title:'කැටය: '+b.dataset.modname+' ('+b.dataset.mod+')', quote:''});
+}));
+/* final approve */
+document.getElementById('approveAll').addEventListener('click',async()=>{
+  await api({action:'add',section:'plan-final',section_title:'මුළු සැලැස්ම',quote:'',comment:'මුළු scaffold සැලැස්මම අනුමතයි — වැඩේ පටන් ගන්න',kind:'approve'});
+  showToast('🎉 අනුමැතිය save වුණා! chat එකේ "බලන්න" කියලා කියන්න.');
+  refresh();
+});
+/* panel */
+document.getElementById('fab').addEventListener('click',()=>{ panel.classList.add('show'); });
+document.getElementById('panelClose').addEventListener('click',()=>panel.classList.remove('show'));
+
+refresh();
+</script>
+</body>
+</html>

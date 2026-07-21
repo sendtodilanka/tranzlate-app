@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "plan-review",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["docs/plan/review/review_server.py"],
+      "port": 8765
+    }
+  ]
+}
