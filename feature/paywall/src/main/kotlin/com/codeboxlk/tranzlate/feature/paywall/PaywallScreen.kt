@@ -18,9 +18,10 @@ import androidx.compose.ui.res.stringResource
 @Composable
 fun PaywallScreen(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("tt_paywall_placeholder"),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .testTag("tt_paywall_placeholder"),
         contentAlignment = Alignment.Center,
     ) {
         Text(

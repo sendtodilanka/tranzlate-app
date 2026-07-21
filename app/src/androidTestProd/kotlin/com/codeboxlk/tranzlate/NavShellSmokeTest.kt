@@ -16,7 +16,6 @@ import org.junit.Test
  */
 @HiltAndroidTest
 class NavShellSmokeTest {
-
     @get:Rule(order = 0)
     val hilt = HiltAndroidRule(this)
 

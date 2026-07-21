@@ -39,11 +39,12 @@ fun ErrorView(
 ) {
     val spacing = LocalSpacing.current
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(spacing.md16)
-            .testTag(containerTestTag)
-            .semantics { liveRegion = LiveRegionMode.Assertive },
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(spacing.md16)
+                .testTag(containerTestTag)
+                .semantics { liveRegion = LiveRegionMode.Assertive },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(spacing.sm8),
     ) {
@@ -62,9 +63,10 @@ fun ErrorView(
         if (onRetry != null) {
             Button(
                 onClick = onRetry,
-                modifier = Modifier
-                    .heightIn(min = Dimensions.touchTargetMin)
-                    .testTag(retryTestTag),
+                modifier =
+                    Modifier
+                        .heightIn(min = Dimensions.touchTargetMin)
+                        .testTag(retryTestTag),
             ) {
                 Text(text = retryLabel)
             }

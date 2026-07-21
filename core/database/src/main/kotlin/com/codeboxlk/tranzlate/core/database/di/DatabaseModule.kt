@@ -15,11 +15,11 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal object DatabaseModule {
-
     @Provides
     @Singleton
-    fun database(@ApplicationContext context: Context): TranzlateDatabase =
-        Room.databaseBuilder(context, TranzlateDatabase::class.java, "tranzlate.db").build()
+    fun database(
+        @ApplicationContext context: Context,
+    ): TranzlateDatabase = Room.databaseBuilder(context, TranzlateDatabase::class.java, "tranzlate.db").build()
 
     @Provides
     fun translationDao(database: TranzlateDatabase): TranslationDao = database.translationDao()

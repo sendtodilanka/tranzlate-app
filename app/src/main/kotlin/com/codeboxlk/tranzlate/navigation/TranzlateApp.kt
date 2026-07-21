@@ -32,16 +32,18 @@ import com.codeboxlk.tranzlate.feature.text.TextScreen
  */
 @Composable
 fun TranzlateApp(appConfig: AppConfig) {
-    val destinations = remember(appConfig) {
-        TopLevelDestination.entries.filter { it.toggle in appConfig.featureToggles }
-    }
+    val destinations =
+        remember(appConfig) {
+            TopLevelDestination.entries.filter { it.toggle in appConfig.featureToggles }
+        }
     val backStack = rememberNavBackStack(TextNavKey)
     val windowInfo = rememberWindowInfo()
-    val layoutType = if (windowInfo.isExpanded) {
-        NavigationSuiteType.NavigationDrawer
-    } else {
-        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
-    }
+    val layoutType =
+        if (windowInfo.isExpanded) {
+            NavigationSuiteType.NavigationDrawer
+        } else {
+            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+        }
 
     NavigationSuiteScaffold(
         layoutType = layoutType,
@@ -66,12 +68,13 @@ fun TranzlateApp(appConfig: AppConfig) {
         NavDisplay(
             backStack = backStack,
             onBack = { backStack.removeLastOrNull() },
-            entryProvider = entryProvider {
-                entry<TextNavKey> { TextScreen() }
-                entry<CameraNavKey> { CameraScreen() }
-                entry<HistoryNavKey> { HistoryScreen() }
-                entry<SettingsNavKey> { SettingsScreen() }
-            },
+            entryProvider =
+                entryProvider {
+                    entry<TextNavKey> { TextScreen() }
+                    entry<CameraNavKey> { CameraScreen() }
+                    entry<HistoryNavKey> { HistoryScreen() }
+                    entry<SettingsNavKey> { SettingsScreen() }
+                },
         )
     }
 }

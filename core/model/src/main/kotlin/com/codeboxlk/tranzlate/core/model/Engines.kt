@@ -28,9 +28,10 @@ enum class Engine {
  * AUTO returns null — it is resolved at runtime by the Translation brain among free
  * engines only (C-10), so it has no static image.
  */
-fun ModeId.resolvedEngineOrNull(): Engine? = when (this) {
-    ModeId.AUTO -> null
-    ModeId.ML2_MINI -> Engine.OFFLINE_MLKIT
-    ModeId.ML2_ONLINE -> Engine.ONLINE_GOOGLE
-    ModeId.NLP35 -> Engine.ONLINE_CLOUD_NLP
-}
+fun ModeId.resolvedEngineOrNull(): Engine? =
+    when (this) {
+        ModeId.AUTO -> null
+        ModeId.ML2_MINI -> Engine.OFFLINE_MLKIT
+        ModeId.ML2_ONLINE -> Engine.ONLINE_GOOGLE
+        ModeId.NLP35 -> Engine.ONLINE_CLOUD_NLP
+    }

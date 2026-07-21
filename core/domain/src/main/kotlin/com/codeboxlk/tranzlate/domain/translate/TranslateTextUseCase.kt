@@ -26,27 +26,29 @@ import javax.inject.Inject
  *  - The Ads brain is ASKED after every completed translation (D-4 counts
  *    completions); the show/no-show DECISION stays inside [AdsCoordinator].
  */
-class TranslateTextUseCase @Inject constructor(
-    private val translator: Translator,
-    private val featureAccess: FeatureAccess,
-    private val usagePolicy: UsagePolicy,
-    private val adsCoordinator: AdsCoordinator,
-) {
-    suspend operator fun invoke(
-        text: String,
-        srcLang: String,
-        tgtLang: String,
-        mode: ModeId,
-    ): TranslationOutcome {
-        val metered = mode == ModeId.NLP35
-        if (metered && (!featureAccess.isEngineAllowed(mode) || usagePolicy.isOver())) {
-            return TranslationOutcome.LimitReached
+class TranslateTextUseCase
+    @Inject
+    constructor(
+        private val translator: Translator,
+        private val featureAccess: FeatureAccess,
+        private val usagePolicy: UsagePolicy,
+        private val adsCoordinator: AdsCoordinator,
+    ) {
+        suspend operator fun invoke(
+            text: String,
+            srcLang: String,
+            tgtLang: String,
+            mode: ModeId,
+        ): TranslationOutcome {
+            val metered = mode == ModeId.NLP35
+            if (metered && (!featureAccess.isEngineAllowed(mode) || usagePolicy.isOver())) {
+                return TranslationOutcome.LimitReached
+            }
+            val outcome = translator.translate(text, srcLang, tgtLang, mode)
+            if (outcome is TranslationOutcome.Success) {
+                if (metered) usagePolicy.increment()
+                adsCoordinator.onTranslationCompleted()
+            }
+            return outcome
         }
-        val outcome = translator.translate(text, srcLang, tgtLang, mode)
-        if (outcome is TranslationOutcome.Success) {
-            if (metered) usagePolicy.increment()
-            adsCoordinator.onTranslationCompleted()
-        }
-        return outcome
     }
-}

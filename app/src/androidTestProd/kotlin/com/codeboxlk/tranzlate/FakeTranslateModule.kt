@@ -29,7 +29,6 @@ import javax.inject.Singleton
 @Module
 @TestInstallIn(components = [SingletonComponent::class], replaces = [TranslateModule::class])
 object FakeTranslateModule {
-
     @Provides
     @Singleton
     fun translator(): Translator = FakeTranslator()

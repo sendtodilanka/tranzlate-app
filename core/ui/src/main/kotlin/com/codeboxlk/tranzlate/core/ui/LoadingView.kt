@@ -31,11 +31,12 @@ fun LoadingView(
 ) {
     val spacing = LocalSpacing.current
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(spacing.md16)
-            .testTag(testTag)
-            .semantics { liveRegion = LiveRegionMode.Polite },
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(spacing.md16)
+                .testTag(testTag)
+                .semantics { liveRegion = LiveRegionMode.Polite },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(spacing.sm8),
     ) {

@@ -14,13 +14,14 @@ import javax.inject.Singleton
  * for a resolved, non-Loading value).
  */
 @Singleton
-class RealFeatureAccess @Inject constructor() : FeatureAccess {
+class RealFeatureAccess
+    @Inject
+    constructor() : FeatureAccess {
+        // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
+        // Safe defaults: FREE tier, every mode visible (contract §1.3 matrix), not paid.
+        override val tier: Tier = Tier.FREE
 
-    // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
-    // Safe defaults: FREE tier, every mode visible (contract §1.3 matrix), not paid.
-    override val tier: Tier = Tier.FREE
+        override fun isEngineAllowed(mode: ModeId): Boolean = true
 
-    override fun isEngineAllowed(mode: ModeId): Boolean = true
-
-    override fun isPaid(): Boolean = false
-}
+        override fun isPaid(): Boolean = false
+    }

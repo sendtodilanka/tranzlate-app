@@ -18,9 +18,10 @@ import androidx.compose.ui.res.stringResource
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("tt_settings_placeholder"),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .testTag("tt_settings_placeholder"),
         contentAlignment = Alignment.Center,
     ) {
         Text(

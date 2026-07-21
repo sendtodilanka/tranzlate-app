@@ -26,12 +26,13 @@ fun TranzlateTheme(
     content: @Composable () -> Unit,
 ) {
     val useDynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val colorScheme = when {
-        useDynamic && darkTheme -> dynamicDarkColorScheme(LocalContext.current)
-        useDynamic -> dynamicLightColorScheme(LocalContext.current)
-        darkTheme -> TranzlateDarkColors
-        else -> TranzlateLightColors
-    }
+    val colorScheme =
+        when {
+            useDynamic && darkTheme -> dynamicDarkColorScheme(LocalContext.current)
+            useDynamic -> dynamicLightColorScheme(LocalContext.current)
+            darkTheme -> TranzlateDarkColors
+            else -> TranzlateLightColors
+        }
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
         LocalGradientColors provides if (darkTheme) DarkGradientColors else LightGradientColors,

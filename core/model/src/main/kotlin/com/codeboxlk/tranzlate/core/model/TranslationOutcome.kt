@@ -8,9 +8,14 @@ package com.codeboxlk.tranzlate.core.model
  */
 sealed interface TranslationOutcome {
     /** @property resolvedEngine the engine that actually produced [text] (C-9 resolved form). */
-    data class Success(val text: String, val resolvedEngine: Engine) : TranslationOutcome
+    data class Success(
+        val text: String,
+        val resolvedEngine: Engine,
+    ) : TranslationOutcome
 
-    data class Error(val reason: FailureReason) : TranslationOutcome
+    data class Error(
+        val reason: FailureReason,
+    ) : TranslationOutcome
 
     /** Metered path only (C-10) — surfaced as the dismissible limit sheet (C-11). */
     data object LimitReached : TranslationOutcome

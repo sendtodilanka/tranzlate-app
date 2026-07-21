@@ -23,8 +23,12 @@ class FakeTranslator(
     private val golden: Map<GoldenKey, TranslationOutcome> = defaultGolden,
     var forcedFailure: FailureReason? = null, // test can force NETWORK/ENGINE (G10)
 ) : Translator {
-
-    data class GoldenKey(val text: String, val src: String, val tgt: String, val mode: ModeId)
+    data class GoldenKey(
+        val text: String,
+        val src: String,
+        val tgt: String,
+        val mode: ModeId,
+    )
 
     /** Spy: assert the engine/mode actually invoked (contract §1.1). */
     val calls = mutableListOf<GoldenKey>()
@@ -44,32 +48,33 @@ class FakeTranslator(
 
     companion object {
         /** Golden fixture table §1.2 — EXACT. G8–G11 are behaviour rows (no map entry). */
-        val defaultGolden: Map<GoldenKey, TranslationOutcome> = mapOf(
-            // G1
-            GoldenKey("Good morning", "en", "fr", ModeId.ML2_MINI) to
-                TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
-            // G2 — AUTO resolves offline-first (→ ML2_MINI ≙ OFFLINE_MLKIT)
-            GoldenKey("Good morning", "en", "fr", ModeId.AUTO) to
-                TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
-            // G3
-            GoldenKey("Good morning", "en", "fr", ModeId.NLP35) to
-                TranslationOutcome.Success("Bonjour, comment allez-vous (fake)", Engine.ONLINE_CLOUD_NLP),
-            // G4
-            GoldenKey("Thank you", "en", "es", ModeId.ML2_ONLINE) to
-                TranslationOutcome.Success("Gracias (fake)", Engine.ONLINE_GOOGLE),
-            // G5
-            GoldenKey("Hello world", "en", "de", ModeId.ML2_MINI) to
-                TranslationOutcome.Success("Hallo Welt (fake)", Engine.OFFLINE_MLKIT),
-            // G6
-            GoldenKey("こんにちは", "ja", "en", ModeId.NLP35) to
-                TranslationOutcome.Success("Hello (fake)", Engine.ONLINE_CLOUD_NLP),
-            // G7 — src "auto", detect→en, resolves offline-first
-            GoldenKey("Good morning", "auto", "fr", ModeId.AUTO) to
-                TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
-            // G8  `நன்றி` ta→en ML2_MINI — intentionally NO row → Error(UNSUPPORTED_PAIR)
-            // G9  blank input — behaviour → Error(EMPTY_INPUT)
-            // G10 `Offline test` — behaviour via forcedFailure=NETWORK → Error(NETWORK)
-            // G11 `Quota text` NLP35 — LimitReached via UsagePolicy (§1.4), not a golden row
-        )
+        val defaultGolden: Map<GoldenKey, TranslationOutcome> =
+            mapOf(
+                // G1
+                GoldenKey("Good morning", "en", "fr", ModeId.ML2_MINI) to
+                    TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
+                // G2 — AUTO resolves offline-first (→ ML2_MINI ≙ OFFLINE_MLKIT)
+                GoldenKey("Good morning", "en", "fr", ModeId.AUTO) to
+                    TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
+                // G3
+                GoldenKey("Good morning", "en", "fr", ModeId.NLP35) to
+                    TranslationOutcome.Success("Bonjour, comment allez-vous (fake)", Engine.ONLINE_CLOUD_NLP),
+                // G4
+                GoldenKey("Thank you", "en", "es", ModeId.ML2_ONLINE) to
+                    TranslationOutcome.Success("Gracias (fake)", Engine.ONLINE_GOOGLE),
+                // G5
+                GoldenKey("Hello world", "en", "de", ModeId.ML2_MINI) to
+                    TranslationOutcome.Success("Hallo Welt (fake)", Engine.OFFLINE_MLKIT),
+                // G6
+                GoldenKey("こんにちは", "ja", "en", ModeId.NLP35) to
+                    TranslationOutcome.Success("Hello (fake)", Engine.ONLINE_CLOUD_NLP),
+                // G7 — src "auto", detect→en, resolves offline-first
+                GoldenKey("Good morning", "auto", "fr", ModeId.AUTO) to
+                    TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
+                // G8  `நன்றி` ta→en ML2_MINI — intentionally NO row → Error(UNSUPPORTED_PAIR)
+                // G9  blank input — behaviour → Error(EMPTY_INPUT)
+                // G10 `Offline test` — behaviour via forcedFailure=NETWORK → Error(NETWORK)
+                // G11 `Quota text` NLP35 — LimitReached via UsagePolicy (§1.4), not a golden row
+            )
     }
 }

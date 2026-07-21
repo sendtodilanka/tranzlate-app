@@ -11,5 +11,8 @@ import kotlinx.coroutines.flow.Flow
 interface LanguageRepository {
     fun languages(): Flow<List<Language>>
 
-    suspend fun setLastUsed(languageId: String, atMillis: Long)
+    suspend fun setLastUsed(
+        languageId: String,
+        atMillis: Long,
+    )
 }

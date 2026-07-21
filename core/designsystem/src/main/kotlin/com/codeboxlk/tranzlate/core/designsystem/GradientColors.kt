@@ -35,19 +35,22 @@ data class GradientColors(
     }
 }
 
-val LightGradientColors = GradientColors(
-    start = Color(0xFF2B8FB0),
-    mid = Color(0xFFD67A6E),
-    end = Color(0xFFF0725A),
-)
+val LightGradientColors =
+    GradientColors(
+        start = Color(0xFF2B8FB0),
+        mid = Color(0xFFD67A6E),
+        end = Color(0xFFF0725A),
+    )
 
-val DarkGradientColors = GradientColors(
-    start = Color(0xFF3FB6D4),
-    mid = Color(0xFFD67A6E),
-    end = Color(0xFFF0725A),
-)
+val DarkGradientColors =
+    GradientColors(
+        start = Color(0xFF3FB6D4),
+        mid = Color(0xFFD67A6E),
+        end = Color(0xFFF0725A),
+    )
 
 /** Provided by [TranzlateTheme] (§10 — non-M3 tokens ride CompositionLocals). */
-val LocalGradientColors = staticCompositionLocalOf<GradientColors> {
-    error("No GradientColors provided — wrap content in TranzlateTheme")
-}
+val LocalGradientColors =
+    staticCompositionLocalOf<GradientColors> {
+        error("No GradientColors provided — wrap content in TranzlateTheme")
+    }

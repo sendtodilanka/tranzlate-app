@@ -10,6 +10,7 @@ import androidx.compose.animation.core.Easing
  */
 object Motion {
     // Durations (ms)
+
     /** Icon state flip, ripple start. */
     const val SHORT_1 = 50
 
@@ -41,6 +42,7 @@ object Motion {
     const val LONG_2 = 500
 
     // Easing (cubic-bezier)
+
     /** Most on-screen state changes. */
     val standard: Easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
 

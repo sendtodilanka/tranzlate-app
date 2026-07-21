@@ -48,8 +48,9 @@ interface AdsGateway {
  * Pure frequency mechanics over [AdPolicyConfig] — deterministic and host-agnostic.
  * The host feeds its own counters; this only answers "does the cadence allow it?".
  */
-class AdFrequencyEngine(private val policy: AdPolicyConfig) {
-
+class AdFrequencyEngine(
+    private val policy: AdPolicyConfig,
+) {
     fun isEligible(
         actionsSinceLastAd: Int,
         lastShownEpochMillis: Long,

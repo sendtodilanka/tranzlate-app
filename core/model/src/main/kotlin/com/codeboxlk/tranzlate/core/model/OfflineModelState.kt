@@ -25,7 +25,9 @@ sealed interface OfflineModelState {
     data object Deleting : OfflineModelState
 
     /** Failure with retry (spec 02 §4.3: network / wifi-required / storage). */
-    data class Failed(val cause: OfflineModelFailure) : OfflineModelState
+    data class Failed(
+        val cause: OfflineModelFailure,
+    ) : OfflineModelState
 }
 
 enum class OfflineModelFailure {

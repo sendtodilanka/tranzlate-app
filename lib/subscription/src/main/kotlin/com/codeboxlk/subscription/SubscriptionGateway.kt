@@ -27,7 +27,9 @@ sealed interface Entitlement {
     data object Free : Entitlement
 
     /** @property tier provider-side entitlement/tier identifier (e.g. "plus", "premium"). */
-    data class Paid(val tier: String) : Entitlement
+    data class Paid(
+        val tier: String,
+    ) : Entitlement
 }
 
 /**

@@ -18,9 +18,10 @@ import androidx.compose.ui.res.stringResource
 @Composable
 fun LanguagePickerScreen(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("tt_languagepicker_placeholder"),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .testTag("tt_languagepicker_placeholder"),
         contentAlignment = Alignment.Center,
     ) {
         Text(

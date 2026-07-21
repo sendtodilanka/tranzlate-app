@@ -12,16 +12,18 @@ import javax.inject.Singleton
  * phase; until then the confirmed D-2/D-4 defaults serve.
  */
 @Singleton
-class StaticRemoteConfigSource @Inject constructor() : RemoteConfigSource {
-    override fun limitFree(): Int = RemoteConfigDefaults.LIMIT_FREE
+class StaticRemoteConfigSource
+    @Inject
+    constructor() : RemoteConfigSource {
+        override fun limitFree(): Int = RemoteConfigDefaults.LIMIT_FREE
 
-    override fun limitPlus(): Int = RemoteConfigDefaults.LIMIT_PLUS
+        override fun limitPlus(): Int = RemoteConfigDefaults.LIMIT_PLUS
 
-    override fun adNth(): Int = RemoteConfigDefaults.AD_NTH
+        override fun adNth(): Int = RemoteConfigDefaults.AD_NTH
 
-    override fun adMinGapSeconds(): Int = RemoteConfigDefaults.AD_MIN_GAP_SECONDS
+        override fun adMinGapSeconds(): Int = RemoteConfigDefaults.AD_MIN_GAP_SECONDS
 
-    override fun adDailyCap(): Int = RemoteConfigDefaults.AD_DAILY_CAP
+        override fun adDailyCap(): Int = RemoteConfigDefaults.AD_DAILY_CAP
 
-    override fun textLimit(): Int = RemoteConfigDefaults.TEXT_LIMIT
-}
+        override fun textLimit(): Int = RemoteConfigDefaults.TEXT_LIMIT
+    }

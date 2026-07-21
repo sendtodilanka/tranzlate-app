@@ -4,10 +4,10 @@ import com.codeboxlk.tranzlate.core.database.LanguageDao
 import com.codeboxlk.tranzlate.core.database.LanguageEntity
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Language catalog over the Room table.
@@ -18,22 +18,27 @@ import kotlinx.coroutines.flow.map
  * contents as-is.
  */
 @Singleton
-class LanguageRepositoryImpl @Inject constructor(
-    private val languageDao: LanguageDao,
-) : LanguageRepository {
+class LanguageRepositoryImpl
+    @Inject
+    constructor(
+        private val languageDao: LanguageDao,
+    ) : LanguageRepository {
+        override fun languages(): Flow<List<Language>> =
+            languageDao.languages().map { entities -> entities.map(LanguageEntity::toDomain) }
 
-    override fun languages(): Flow<List<Language>> =
-        languageDao.languages().map { entities -> entities.map(LanguageEntity::toDomain) }
-
-    override suspend fun setLastUsed(languageId: String, atMillis: Long) {
-        languageDao.setLastUsed(languageId, atMillis)
+        override suspend fun setLastUsed(
+            languageId: String,
+            atMillis: Long,
+        ) {
+            languageDao.setLastUsed(languageId, atMillis)
+        }
     }
-}
 
-private fun LanguageEntity.toDomain(): Language = Language(
-    id = id,
-    name = name,
-    offlineAvailable = offlineAvailable,
-    offlineDownloaded = offlineDownloaded,
-    lastUsedAt = lastUsedAt,
-)
+private fun LanguageEntity.toDomain(): Language =
+    Language(
+        id = id,
+        name = name,
+        offlineAvailable = offlineAvailable,
+        offlineDownloaded = offlineDownloaded,
+        lastUsedAt = lastUsedAt,
+    )

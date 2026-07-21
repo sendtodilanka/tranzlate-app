@@ -16,12 +16,13 @@ import javax.inject.Singleton
  * `:lib:ads` AdFrequencyEngine.
  */
 @Singleton
-class RealAdsCoordinator @Inject constructor(
-    @Suppress("unused") private val adsGateway: AdsGateway,
-    @Suppress("unused") private val consentGateway: ConsentGateway,
-) : AdsCoordinator {
-
-    // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
-    // Safe default: never shows anything.
-    override suspend fun onTranslationCompleted() = Unit
-}
+class RealAdsCoordinator
+    @Inject
+    constructor(
+        @Suppress("unused") private val adsGateway: AdsGateway,
+        @Suppress("unused") private val consentGateway: ConsentGateway,
+    ) : AdsCoordinator {
+        // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
+        // Safe default: never shows anything.
+        override suspend fun onTranslationCompleted() = Unit
+    }

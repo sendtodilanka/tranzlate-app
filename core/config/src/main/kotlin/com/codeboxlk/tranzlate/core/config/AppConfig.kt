@@ -42,7 +42,8 @@ enum class FeatureToggle {
     companion object {
         /** Parse a FEATURES csv ("text,camera,history,settings") — unknown names are an error. */
         fun parseCsv(csv: String): Set<FeatureToggle> =
-            csv.split(',')
+            csv
+                .split(',')
                 .map(String::trim)
                 .filter(String::isNotEmpty)
                 .map { valueOf(it.uppercase()) }

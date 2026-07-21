@@ -18,9 +18,10 @@ import androidx.compose.ui.res.stringResource
 @Composable
 fun TextScreen(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("tt_text_placeholder"),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .testTag("tt_text_placeholder"),
         contentAlignment = Alignment.Center,
     ) {
         Text(

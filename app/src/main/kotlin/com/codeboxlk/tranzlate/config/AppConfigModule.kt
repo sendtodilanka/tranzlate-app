@@ -11,7 +11,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal abstract class AppConfigModule {
-
     @Binds
     @Singleton
     abstract fun appConfig(impl: BuildConfigAppConfig): AppConfig

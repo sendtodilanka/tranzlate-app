@@ -21,7 +21,6 @@ import dagger.hilt.components.SingletonComponent
 @Module
 @InstallIn(SingletonComponent::class)
 internal abstract class DataModule {
-
     @Binds
     abstract fun translationRepository(impl: TranslationRepositoryImpl): TranslationRepository
 

@@ -34,7 +34,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object FakeTranslateModule {
-
     @Provides
     @Singleton
     fun translator(): Translator = FakeTranslator()

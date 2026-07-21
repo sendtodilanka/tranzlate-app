@@ -1,12 +1,11 @@
 package com.codeboxlk.tranzlate.core.testing
 
 import com.google.common.truth.Truth.assertThat
-import java.time.LocalDate
 import org.junit.Test
+import java.time.LocalDate
 
 /** §1.5 determinism: fixed instant, Asia/Colombo zone, advanceDays moves the date. */
 class FakeClockTest {
-
     @Test
     fun `fixed instant maps to the contract date in Asia-Colombo`() {
         val clock = FakeClock()

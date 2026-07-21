@@ -18,9 +18,10 @@ import androidx.compose.ui.res.stringResource
 @Composable
 fun CameraScreen(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("tt_camera_placeholder"),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .testTag("tt_camera_placeholder"),
         contentAlignment = Alignment.Center,
     ) {
         Text(

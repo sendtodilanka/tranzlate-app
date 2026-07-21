@@ -16,14 +16,15 @@ import javax.inject.Singleton
  * cache-first lookup via TranslationRepository.
  */
 @Singleton
-class RealTranslator @Inject constructor() : Translator {
-
-    // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
-    // NO fake/golden behaviour belongs here (prod module).
-    override suspend fun translate(
-        text: String,
-        srcLang: String,
-        tgtLang: String,
-        mode: ModeId,
-    ): TranslationOutcome = TranslationOutcome.Error(FailureReason.ENGINE)
-}
+class RealTranslator
+    @Inject
+    constructor() : Translator {
+        // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
+        // NO fake/golden behaviour belongs here (prod module).
+        override suspend fun translate(
+            text: String,
+            srcLang: String,
+            tgtLang: String,
+            mode: ModeId,
+        ): TranslationOutcome = TranslationOutcome.Error(FailureReason.ENGINE)
+    }

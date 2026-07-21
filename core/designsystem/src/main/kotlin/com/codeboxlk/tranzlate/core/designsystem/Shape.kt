@@ -14,13 +14,14 @@ import androidx.compose.ui.unit.dp
  *  - large 16dp: bottom sheets (top corners), dialogs, hero cards
  *  - extraLarge 28dp: large modal sheets, FAB-adjacent surfaces
  */
-val TranzlateShapes = Shapes(
-    extraSmall = RoundedCornerShape(4.dp),
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(16.dp),
-    extraLarge = RoundedCornerShape(28.dp),
-)
+val TranzlateShapes =
+    Shapes(
+        extraSmall = RoundedCornerShape(4.dp),
+        small = RoundedCornerShape(8.dp),
+        medium = RoundedCornerShape(12.dp),
+        large = RoundedCornerShape(16.dp),
+        extraLarge = RoundedCornerShape(28.dp),
+    )
 
 /** §5 `full` (50%) token — pills, AssistChip, avatar, NavigationBar indicator. */
 val TranzlateShapeFull: Shape = CircleShape

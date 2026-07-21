@@ -14,18 +14,18 @@ import javax.inject.Singleton
  * Tranzlate-agnostic).
  */
 @Singleton
-class SubscriptionPurchaseFlow @Inject constructor(
-    private val gateway: SubscriptionGateway,
-) : PurchaseFlow {
+class SubscriptionPurchaseFlow
+    @Inject
+    constructor(
+        private val gateway: SubscriptionGateway,
+    ) : PurchaseFlow {
+        // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
+        // (Gateway today = NoOpSubscriptionGateway; mapping shape is final, data isn't.)
+        override suspend fun purchase(offeringId: String): AppResult<Entitlement> =
+            gateway.purchase(offeringId).toAppResult()
 
-    // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
-    // (Gateway today = NoOpSubscriptionGateway; mapping shape is final, data isn't.)
-    override suspend fun purchase(offeringId: String): AppResult<Entitlement> =
-        gateway.purchase(offeringId).toAppResult()
-
-    override suspend fun restore(): AppResult<Entitlement> =
-        gateway.restore().toAppResult()
-}
+        override suspend fun restore(): AppResult<Entitlement> = gateway.restore().toAppResult()
+    }
 
 private fun Result<com.codeboxlk.subscription.Entitlement>.toAppResult(): AppResult<Entitlement> =
     fold(
@@ -33,11 +33,20 @@ private fun Result<com.codeboxlk.subscription.Entitlement>.toAppResult(): AppRes
         onFailure = { AppResult.Failure(it) },
     )
 
-private fun com.codeboxlk.subscription.Entitlement.toDomain(): Entitlement = when (this) {
-    com.codeboxlk.subscription.Entitlement.Loading -> Entitlement.Loading
-    com.codeboxlk.subscription.Entitlement.Free -> Entitlement.Free
-    is com.codeboxlk.subscription.Entitlement.Paid -> when (tier.lowercase()) {
-        "premium" -> Entitlement.Paid(Tier.PREMIUM)
-        else -> Entitlement.Paid(Tier.PLUS)
+private fun com.codeboxlk.subscription.Entitlement.toDomain(): Entitlement =
+    when (this) {
+        com.codeboxlk.subscription.Entitlement.Loading -> {
+            Entitlement.Loading
+        }
+
+        com.codeboxlk.subscription.Entitlement.Free -> {
+            Entitlement.Free
+        }
+
+        is com.codeboxlk.subscription.Entitlement.Paid -> {
+            when (tier.lowercase()) {
+                "premium" -> Entitlement.Paid(Tier.PREMIUM)
+                else -> Entitlement.Paid(Tier.PLUS)
+            }
+        }
     }
-}

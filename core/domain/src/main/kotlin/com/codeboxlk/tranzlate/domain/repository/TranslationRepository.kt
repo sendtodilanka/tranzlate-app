@@ -26,5 +26,8 @@ interface TranslationRepository {
     suspend fun save(translation: Translation): Long
 
     /** D-3: star toggles favourite. */
-    suspend fun setFavourite(id: Long, favourite: Boolean)
+    suspend fun setFavourite(
+        id: Long,
+        favourite: Boolean,
+    )
 }

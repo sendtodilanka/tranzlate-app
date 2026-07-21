@@ -14,17 +14,18 @@ import javax.inject.Singleton
  * D-2 limits from RemoteConfigSource, success-only increment.
  */
 @Singleton
-class RealUsagePolicy @Inject constructor(
-    @Suppress("unused") private val clock: AppClock,
-) : UsagePolicy {
+class RealUsagePolicy
+    @Inject
+    constructor(
+        @Suppress("unused") private val clock: AppClock,
+    ) : UsagePolicy {
+        // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
+        // Safe defaults: full free allowance, never over, no warning, no-op increment.
+        override fun remaining(): Int = RemoteConfigDefaults.LIMIT_FREE
 
-    // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
-    // Safe defaults: full free allowance, never over, no warning, no-op increment.
-    override fun remaining(): Int = RemoteConfigDefaults.LIMIT_FREE
+        override fun isOver(): Boolean = false
 
-    override fun isOver(): Boolean = false
+        override fun warningMessage(): String? = null
 
-    override fun warningMessage(): String? = null
-
-    override suspend fun increment() = Unit
-}
+        override suspend fun increment() = Unit
+    }

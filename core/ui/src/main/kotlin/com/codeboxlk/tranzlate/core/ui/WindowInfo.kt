@@ -37,8 +37,9 @@ fun rememberWindowInfo(): WindowInfo {
     }
 }
 
-private fun WindowSizeClass.toWidthClass(): WindowWidthClass = when {
-    isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) -> WindowWidthClass.EXPANDED
-    isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) -> WindowWidthClass.MEDIUM
-    else -> WindowWidthClass.COMPACT
-}
+private fun WindowSizeClass.toWidthClass(): WindowWidthClass =
+    when {
+        isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) -> WindowWidthClass.EXPANDED
+        isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) -> WindowWidthClass.MEDIUM
+        else -> WindowWidthClass.COMPACT
+    }

@@ -35,7 +35,14 @@ spotless {
         ktlint()
     }
     kotlinGradle {
-        target("*.gradle.kts", "app/*.gradle.kts", "core/**/*.gradle.kts", "feature/**/*.gradle.kts", "lib/**/*.gradle.kts", "build-logic/**/*.gradle.kts")
+        target(
+            "*.gradle.kts",
+            "app/*.gradle.kts",
+            "core/**/*.gradle.kts",
+            "feature/**/*.gradle.kts",
+            "lib/**/*.gradle.kts",
+            "build-logic/**/*.gradle.kts",
+        )
         targetExclude("**/build/**")
         ktlint()
     }

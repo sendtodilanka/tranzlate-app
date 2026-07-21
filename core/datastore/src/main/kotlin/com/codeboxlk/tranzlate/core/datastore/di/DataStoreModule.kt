@@ -15,10 +15,11 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal object DataStoreModule {
-
     @Provides
     @Singleton
-    fun preferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+    fun preferencesDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> =
         PreferenceDataStoreFactory.create {
             context.preferencesDataStoreFile("tranzlate_preferences")
         }

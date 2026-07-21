@@ -1,9 +1,9 @@
 package com.codeboxlk.tranzlate.core.data.network
 
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Connectivity axis input for Availability resolvers (EDGE_CASES §2/§6 — the
@@ -19,6 +19,8 @@ interface ConnectivityMonitor {
  * callbackFlow + distinctUntilChanged; lands with the brains phase.
  */
 @Singleton
-class StubConnectivityMonitor @Inject constructor() : ConnectivityMonitor {
-    override val isOnline: Flow<Boolean> = flowOf(true)
-}
+class StubConnectivityMonitor
+    @Inject
+    constructor() : ConnectivityMonitor {
+        override val isOnline: Flow<Boolean> = flowOf(true)
+    }

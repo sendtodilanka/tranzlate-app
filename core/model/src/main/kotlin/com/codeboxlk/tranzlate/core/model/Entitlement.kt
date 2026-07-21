@@ -19,7 +19,9 @@ sealed interface Entitlement {
 
     data object Free : Entitlement
 
-    data class Paid(val tier: Tier) : Entitlement {
+    data class Paid(
+        val tier: Tier,
+    ) : Entitlement {
         init {
             require(tier != Tier.FREE) { "Paid entitlement requires PLUS or PREMIUM" }
         }

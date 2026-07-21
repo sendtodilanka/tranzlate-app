@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TranslationDao {
-
     @Query("SELECT * FROM translation ORDER BY created_at DESC")
     fun history(): Flow<List<TranslationEntity>>
 
@@ -32,5 +31,8 @@ interface TranslationDao {
     suspend fun insert(entity: TranslationEntity): Long
 
     @Query("UPDATE translation SET favourite = :favourite WHERE id = :id")
-    suspend fun setFavourite(id: Long, favourite: Boolean)
+    suspend fun setFavourite(
+        id: Long,
+        favourite: Boolean,
+    )
 }

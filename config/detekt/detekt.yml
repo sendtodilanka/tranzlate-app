@@ -15,7 +15,7 @@ build:
 style:
   MagicNumber:
     active: true
-    excludes: ['**/core/designsystem/**', '**/test/**', '**/androidTest/**']
+    excludes: ['**/core/designsystem/**', '**/core/testing/**', '**/test/**', '**/androidTest/**', '**/androidTestProd/**']
     ignoreAnnotated: ['Preview']
     ignorePropertyDeclaration: true
     ignoreCompanionObjectPropertyDeclaration: true
@@ -40,6 +40,7 @@ complexity:
 naming:
   FunctionNaming:
     ignoreAnnotated: ['Composable']
+    excludes: ['**/test/**', '**/androidTest/**', '**/androidTestProd/**']
   TopLevelPropertyNaming:
     active: false
 

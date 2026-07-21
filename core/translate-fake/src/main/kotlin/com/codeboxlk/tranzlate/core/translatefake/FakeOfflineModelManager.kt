@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.update
  * OnlineOnly rows ignore both (no download control — §4.3).
  */
 class FakeOfflineModelManager : OfflineModelManager {
-
     private val states = MutableStateFlow(SEED)
 
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = states.asStateFlow()
@@ -35,23 +34,28 @@ class FakeOfflineModelManager : OfflineModelManager {
                 states.update { it + (languageTag to OfflineModelState.Deleting) }
                 states.update { it + (languageTag to OfflineModelState.NotDownloaded) }
             }
+
             // delete-to-cancel (spec 02 §4.4 step 2)
             OfflineModelState.Downloading -> {
                 states.update { it + (languageTag to OfflineModelState.NotDownloaded) }
             }
-            else -> Unit
+
+            else -> {
+                Unit
+            }
         }
     }
 
     companion object {
         /** Deterministic seed — golden languages downloaded; every state represented. */
-        val SEED: Map<String, OfflineModelState> = mapOf(
-            "en" to OfflineModelState.Downloaded,
-            "fr" to OfflineModelState.Downloaded,
-            "de" to OfflineModelState.NotDownloaded,
-            "es" to OfflineModelState.NotDownloaded,
-            "ja" to OfflineModelState.OnlineOnly,
-            "ta" to OfflineModelState.Failed(OfflineModelFailure.NETWORK),
-        )
+        val SEED: Map<String, OfflineModelState> =
+            mapOf(
+                "en" to OfflineModelState.Downloaded,
+                "fr" to OfflineModelState.Downloaded,
+                "de" to OfflineModelState.NotDownloaded,
+                "es" to OfflineModelState.NotDownloaded,
+                "ja" to OfflineModelState.OnlineOnly,
+                "ta" to OfflineModelState.Failed(OfflineModelFailure.NETWORK),
+            )
     }
 }

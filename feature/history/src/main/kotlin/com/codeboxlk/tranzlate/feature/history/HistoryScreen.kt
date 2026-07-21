@@ -18,9 +18,10 @@ import androidx.compose.ui.res.stringResource
 @Composable
 fun HistoryScreen(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("tt_history_placeholder"),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .testTag("tt_history_placeholder"),
         contentAlignment = Alignment.Center,
     ) {
         Text(

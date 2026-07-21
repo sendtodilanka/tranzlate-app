@@ -46,7 +46,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object TranslateModule {
-
     // ---- The four ask-seams --------------------------------------------------
 
     @Provides
@@ -99,11 +98,12 @@ object TranslateModule {
 
     @Provides
     @Singleton
-    fun adsConfig(config: AppConfig): AdsConfig = AdsConfig(
-        applicationId = config.admobAppId,
-        bannerUnitId = config.adUnitBanner,
-        interstitialUnitId = config.adUnitInterstitial,
-    )
+    fun adsConfig(config: AppConfig): AdsConfig =
+        AdsConfig(
+            applicationId = config.admobAppId,
+            bannerUnitId = config.adUnitBanner,
+            interstitialUnitId = config.adUnitInterstitial,
+        )
 
     @Provides
     @Singleton
@@ -112,6 +112,5 @@ object TranslateModule {
 
     @Provides
     @Singleton
-    fun consentGateway(): ConsentGateway =
-        NoOpConsentGateway() // TODO(#4-brains): swap for the UMP-backed gateway
+    fun consentGateway(): ConsentGateway = NoOpConsentGateway() // TODO(#4-brains): swap for the UMP-backed gateway
 }
