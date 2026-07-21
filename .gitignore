@@ -4,10 +4,11 @@
 /local.properties
 /.idea/
 .DS_Store
-/build/
+build/
 /captures/
 .externalNativeBuild/
 .cxx/
+.kotlin/
 *.apk
 *.aab
 *.jks
