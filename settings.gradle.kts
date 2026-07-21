@@ -22,6 +22,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "tranzlate"
 
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 // Ring 1 — reusable AAR libraries (zero project deps)
 include(":lib:subscription")
 include(":lib:ads")

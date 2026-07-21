@@ -26,7 +26,7 @@ internal fun Project.configureAndroidCommon(extension: CommonExtension) {
     extension.apply {
         compileSdk = TranzlateSdk.COMPILE_SDK
         defaultConfig.minSdk = TranzlateSdk.MIN_SDK
-        compileOptions {
+        with(compileOptions) {
             sourceCompatibility = JavaVersion.VERSION_17
             targetCompatibility = JavaVersion.VERSION_17
             // Built-in Kotlin (AGP 9) derives jvmTarget from targetCompatibility.

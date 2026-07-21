@@ -90,7 +90,7 @@ desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", ver
 
 # Test
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-turbine = { group = "app.cash", name = "turbine", version.ref = "turbine" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 konsist = { group = "com.lemonappdev", name = "konsist", version.ref = "konsist" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
