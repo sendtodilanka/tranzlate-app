@@ -11,9 +11,16 @@ import org.gradle.kotlin.dsl.getByType
 val Project.libs: VersionCatalog
     get() = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
-/** SDK levels — plan §1 (compileSdk 36 / targetSdk 36 / minSdk 24). */
+/**
+ * SDK levels — plan §1 pinned targetSdk 36 / minSdk 24.
+ * compileSdk DEVIATION (recorded): plan pinned 36, but the pinned androidx.hilt
+ * 1.4.0 and lifecycle 2.11.0 AAR metadata REQUIRE compileSdk >= 37 (AGP
+ * checkAarMetadata, verified in-build). AGP 9.3 supports max API 37 (official
+ * release notes), so compileSdk = 37 rather than downgrading two pinned
+ * libraries. targetSdk stays 36 (Play new-app target-36 deadline 2026-08-31).
+ */
 object TranzlateSdk {
-    const val COMPILE_SDK = 36
+    const val COMPILE_SDK = 37
     const val TARGET_SDK = 36
     const val MIN_SDK = 24
 }
