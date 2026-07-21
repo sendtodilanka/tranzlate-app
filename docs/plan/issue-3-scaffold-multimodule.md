@@ -30,7 +30,7 @@ author: Claude (Fable 5) · design-debate + version-verify workflow `wf_7ca4d35c
 | Navigation | **Navigation 3 = 1.1.4 stable** (`navigation3-runtime`, `navigation3-ui`) — Google's recommendation for NEW Compose apps (verified) | releases/navigation3 · §7 decision |
 | Coroutines / Serialization | **1.11.0 / 1.11.0** (`-play-services` included — MLKit `Task.await()`) | github releases |
 | MLKit translate | **17.0.3** (phase 2 එකේ use; catalog-pinned now) | ml-kit release notes |
-| compileSdk / targetSdk / minSdk | **36 / 36 / 24** | Android 16 stable; Play new-app target-36 deadline 2026-08-31; minSdk 24 ← DESIGN_SYSTEM "static palette = fallback API 24–30" |
+| compileSdk / targetSdk / minSdk | **37 / 36 / 24** | compileSdk 37 (implementation deviation, co-verified): androidx.hilt 1.4.0 + lifecycle 2.11.0 AAR metadata **require ≥37** (`minCompileSdk=37` — AAR-extract verified); AGP 9.3 max = 37. targetSdk **36** (Play new-app deadline 2026-08-31); minSdk 24 ← DESIGN_SYSTEM "static palette = fallback API 24–30" |
 | Test/quality | turbine **1.2.1** · truth **1.4.5** · coroutines-test **1.11.0** · ui-test-junit4 (BOM) · hilt-android-testing **2.60.1** · Detekt **1.23.8** · Spotless **8.8.0** | maven central / plugin portal |
 | coreLibraryDesugaring | **enabled (mandatory)** | minSdk 24 + `AppClock`/`java.time` (TEST contract :152) — audit finding |
 

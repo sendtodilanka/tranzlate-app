@@ -44,7 +44,9 @@ jobs:
       - name: "Guard: fake runtime classpath excludes real brains and :lib:* AARs"
         run: |
           set -euo pipefail
-          LEAKS=$(./gradlew -q :app:dependencies --configuration tranzlateFakeDebugRuntimeClasspath | grep -E "project :core:(translate|access|usage|ads)( |$)|project :lib:" | grep -v "translate-fake" || true)
+          # Gradle prints project deps QUOTED (project ':core:translate') — pattern must
+          # tolerate both quoted and unquoted forms or the guard is vacuous (co-verify finding #1).
+          LEAKS=$(./gradlew -q :app:dependencies --configuration tranzlateFakeDebugRuntimeClasspath | grep -E "project '?:core:(translate|access|usage|ads)'?( |$)|project '?:lib:" | grep -v "translate-fake" || true)
           if [ -n "$LEAKS" ]; then
             echo "::error::real brain/:lib:* module leaked into the fake runtime classpath:"; echo "$LEAKS"; exit 1
           fi
