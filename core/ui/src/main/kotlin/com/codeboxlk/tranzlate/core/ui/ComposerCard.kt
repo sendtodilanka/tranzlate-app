@@ -72,6 +72,7 @@ fun ComposerCard(
     swapContentDescription: String,
     micContentDescription: String,
     translateContentDescription: String,
+    inputContentDescription: String,
     onSourceClick: () -> Unit,
     onTargetClick: () -> Unit,
     onSwap: () -> Unit,
@@ -145,7 +146,8 @@ fun ComposerCard(
                             Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = Dimensions.composerInputMinHeight)
-                                .testTag(inputTestTag),
+                                .testTag(inputTestTag)
+                                .semantics { contentDescription = inputContentDescription },
                     )
                 }
                 if (counterText != null) {
@@ -190,6 +192,7 @@ fun ComposerCard(
                         contentDescription = targetContentDescription,
                         enabled = enabled,
                         testTag = targetTestTag,
+                        modifier = Modifier.weight(1f),
                     )
                     val showMic = value.isEmpty()
                     FilledIconButton(
@@ -236,6 +239,7 @@ private fun ComposerCardEmptyPreview() {
                 targetContentDescription = "Target language, Sinhala",
                 swapContentDescription = "Swap source and target languages",
                 micContentDescription = "Translate by voice",
+                inputContentDescription = "Text to translate",
                 translateContentDescription = "Translate",
                 onSourceClick = {},
                 onTargetClick = {},
@@ -264,6 +268,7 @@ private fun ComposerCardFilledPreview() {
                 targetContentDescription = "Target language, French",
                 swapContentDescription = "Swap source and target languages",
                 micContentDescription = "Translate by voice",
+                inputContentDescription = "Text to translate",
                 translateContentDescription = "Translate",
                 onSourceClick = {},
                 onTargetClick = {},

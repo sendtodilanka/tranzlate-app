@@ -125,6 +125,7 @@ private fun HomePreview() {
                     targetContentDescription = "Target language, Sinhala",
                     swapContentDescription = "Swap source and target languages",
                     micContentDescription = "Translate by voice",
+                    inputContentDescription = "Text to translate",
                     translateContentDescription = "Translate",
                     onSourceClick = {},
                     onTargetClick = {},
