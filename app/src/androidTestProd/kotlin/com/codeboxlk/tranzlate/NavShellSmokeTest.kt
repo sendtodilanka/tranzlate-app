@@ -11,7 +11,8 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Scaffold smoke: nav shell renders, toggle-filtered destinations navigate.
+ * Shell smoke (issue #11 hub model, D-5): the Home hub renders on Compact —
+ * no bottom bar — and the ☰ drawer reaches secondary destinations.
  * Runs against the §1.6 FakeTranslateModule (no real engine on any test path).
  */
 @HiltAndroidTest
@@ -28,13 +29,15 @@ class NavShellSmokeTest {
     }
 
     @Test
-    fun navShell_showsTextPlaceholderByDefault() {
-        compose.onNodeWithTag("tt_text_placeholder").assertIsDisplayed()
+    fun navShell_showsHomeHubByDefault() {
+        compose.onNodeWithTag("tt_text_input").assertIsDisplayed()
+        compose.onNodeWithTag("tt_text_translate_btn").assertIsDisplayed()
     }
 
     @Test
-    fun navShell_navigatesToSettings() {
-        compose.onNodeWithTag("tt_app_nav_settings").performClick()
+    fun navShell_drawerNavigatesToSettings() {
+        compose.onNodeWithTag("tt_text_menu").performClick()
+        compose.onNodeWithTag("tt_app_drawer_settings").performClick()
         compose.onNodeWithTag("tt_settings_placeholder").assertIsDisplayed()
     }
 }

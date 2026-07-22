@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Filipino — ONLY catalogue-verbatim translations (STRINGS_text-translation.md;
+     never guessed). TODO(NEEDS-TRANSLATION, C-12): every remaining key in
+     values/strings.xml is queued in the tracked content backlog before ship. -->
+<resources>
+    <string name="text_char_counter">%1$d/%2$d</string>
+    <string name="cd_translate">Isalin</string>
+    <string name="cd_swap_language">Palitan ang Wika</string>
+    <string name="home_edit_no_text_to_translate_warning">Pakilagay ang text na isasalin.</string>
+    <string name="button_retry">Subukang muli</string>
+</resources>
