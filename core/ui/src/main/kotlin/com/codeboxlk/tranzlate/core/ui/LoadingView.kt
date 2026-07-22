@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -15,7 +16,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
+import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 
 /**
  * Shared in-progress surface (EDGE_CASES §7 lifecycle: InProgress = VISIBLE
@@ -46,5 +49,15 @@ fun LoadingView(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun LoadingViewPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            LoadingView(label = "Translating…")
+        }
     }
 }

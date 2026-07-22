@@ -41,6 +41,13 @@ object Motion {
     /** Splash → home hand-off. */
     const val LONG_2 = 500
 
+    /**
+     * Loading-shimmer sweep period (UI_SPEC §2.5 translating state). Deliberately
+     * outside the M3 short/medium/long scale — a continuous indeterminate loop,
+     * not a one-shot transition.
+     */
+    const val SHIMMER_CYCLE = 1200
+
     // Easing (cubic-bezier)
 
     /** Most on-screen state changes. */

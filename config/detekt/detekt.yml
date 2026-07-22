@@ -16,10 +16,15 @@ style:
   MagicNumber:
     active: true
     excludes: ['**/core/designsystem/**', '**/core/testing/**', '**/test/**', '**/androidTest/**', '**/androidTestProd/**']
-    ignoreAnnotated: ['Preview']
+    ignoreAnnotated: ['Preview', 'PreviewLightDark']
     ignorePropertyDeclaration: true
     ignoreCompanionObjectPropertyDeclaration: true
     ignoreEnums: true
+  UnusedPrivateMember:
+    # Preview functions are entry points for Android Studio / screenshot tooling,
+    # not dead code — the project convention REQUIRES a @PreviewLightDark per
+    # public composable (.claude/memory compose-preview convention).
+    ignoreAnnotated: ['Preview', 'PreviewLightDark']
   MaxLineLength:
     maxLineLength: 140
   ReturnCount:
