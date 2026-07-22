@@ -164,7 +164,7 @@ fun LanguagePickerContent(
                     modifier = Modifier.padding(horizontal = spacing.md16, vertical = spacing.sm8),
                 )
             }
-            items(languages, key = Language::id) { language ->
+            items(languages.sortedBy { languageDisplayName(it.id) }, key = Language::id) { language ->
                 LanguageRow(
                     id = language.id,
                     label = languageDisplayName(language.id),
