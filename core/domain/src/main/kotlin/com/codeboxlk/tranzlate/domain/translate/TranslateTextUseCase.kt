@@ -1,16 +1,22 @@
 package com.codeboxlk.tranzlate.domain.translate
 
+import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
+import com.codeboxlk.tranzlate.domain.repository.TranslationRepository
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
 import javax.inject.Inject
+
+/** "auto" sentinel (Translator contract §1.1) — never persisted (DATA_MODEL). */
+private const val AUTO_DETECT_LANG = "auto"
 
 /**
  * THE single ask-flow encoding (plan §2 `:core:domain`):
  *
- *   Access check → translate → Usage +1 on SUCCESS ONLY → Ads ask
+ *   Access check → translate → Usage +1 on SUCCESS ONLY → history write → Ads ask
  *
  * APP_STRUCTURE's flow is sequenced HERE once, so no feature can ever re-sequence
  * it (screens just ask; they don't do the work).
@@ -21,8 +27,13 @@ import javax.inject.Inject
  *  - At-limit metered ask short-circuits to [TranslationOutcome.LimitReached]
  *    BEFORE any engine call (G11) — no quota burn, no network.
  *  - Usage increments once, on engine success only (DECISIONS engineering
- *    constants: never on start, failure — cache-hit short-circuiting lands with
- *    the repository wiring in the Text vertical, phase 3).
+ *    constants: never on start, failure).
+ *  - History write on success only (DATA_MODEL `translation`; drawer Recents,
+ *    issue #11): C-8 cache-deduped — an identical normalized tuple is never
+ *    inserted twice. Skipped while srcLang is the "auto" sentinel because
+ *    `Translation.sourceLang` must be a RESOLVED id (DATA_MODEL) and detect
+ *    metadata only arrives with the Translation brain. A failed history write
+ *    never fails the translation the user is reading.
  *  - The Ads brain is ASKED after every completed translation (D-4 counts
  *    completions); the show/no-show DECISION stays inside [AdsCoordinator].
  */
@@ -33,6 +44,8 @@ class TranslateTextUseCase
         private val featureAccess: FeatureAccess,
         private val usagePolicy: UsagePolicy,
         private val adsCoordinator: AdsCoordinator,
+        private val translationRepository: TranslationRepository,
+        private val clock: AppClock,
     ) {
         suspend operator fun invoke(
             text: String,
@@ -47,8 +60,41 @@ class TranslateTextUseCase
             val outcome = translator.translate(text, srcLang, tgtLang, mode)
             if (outcome is TranslationOutcome.Success) {
                 if (metered) usagePolicy.increment()
+                saveToHistory(text, srcLang, tgtLang, outcome)
                 adsCoordinator.onTranslationCompleted()
             }
             return outcome
+        }
+
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
+        private suspend fun saveToHistory(
+            text: String,
+            srcLang: String,
+            tgtLang: String,
+            outcome: TranslationOutcome.Success,
+        ) {
+            if (srcLang == AUTO_DETECT_LANG) return
+            try {
+                val duplicate =
+                    translationRepository.cached(text, srcLang, tgtLang, outcome.resolvedEngine)
+                if (duplicate == null) {
+                    translationRepository.save(
+                        Translation(
+                            sourceLang = srcLang,
+                            sourceText = text,
+                            targetLang = tgtLang,
+                            targetText = outcome.text,
+                            engine = outcome.resolvedEngine,
+                            createdAt = clock.nowMillis(),
+                        ),
+                    )
+                }
+            } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                throw rethrown // never break structured cancellation
+            } catch (ignored: Exception) {
+                // Best-effort history: a failed write must never fail the
+                // translation the user is reading (EDGE_CASES no-dead-end —
+                // the Success outcome still surfaces; Recents just misses one row).
+            }
         }
     }
