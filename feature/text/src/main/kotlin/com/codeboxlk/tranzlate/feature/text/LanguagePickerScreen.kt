@@ -137,6 +137,7 @@ fun LanguagePickerContent(
         },
         modifier = modifier.fillMaxSize(),
     ) { padding ->
+        val sortedLanguages = remember(languages) { languages.sortedBy { languageDisplayName(it.id) } }
         LazyColumn(
             contentPadding = PaddingValues(bottom = spacing.lg24),
             modifier =
@@ -164,7 +165,7 @@ fun LanguagePickerContent(
                     modifier = Modifier.padding(horizontal = spacing.md16, vertical = spacing.sm8),
                 )
             }
-            items(languages.sortedBy { languageDisplayName(it.id) }, key = Language::id) { language ->
+            items(sortedLanguages, key = Language::id) { language ->
                 LanguageRow(
                     id = language.id,
                     label = languageDisplayName(language.id),

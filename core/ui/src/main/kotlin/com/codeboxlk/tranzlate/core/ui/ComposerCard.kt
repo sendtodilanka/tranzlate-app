@@ -258,6 +258,7 @@ private fun RowScope.LanguagePill(
             Modifier
                 .weight(1f)
                 .height(Dimensions.languageChipHeight)
+                .heightIn(min = Dimensions.touchTargetMin)
                 .testTag(testTag)
                 .semantics { this.contentDescription = contentDescription },
     )
