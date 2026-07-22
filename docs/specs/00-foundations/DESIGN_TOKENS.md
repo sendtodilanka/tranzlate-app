@@ -1,6 +1,7 @@
 # Design Tokens (shared — every feature spec builds from these)
 
 > Status: **v1 — engineering-complete, brand-seed PROPOSED.** The seed colour needs one product-owner confirmation (§1); everything else is decided. Spacing/alpha values derived from the Phase-4 token plan (design decisions, not Tranzlate code).
+> **⚠ 2026-07-22 (issue #10): §1 Colour is SUPERSEDED** by [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) §1 (**P8 "Tranzlate Teal"** role tables) + [`docs/design/PALETTES.md`](../../design/PALETTES.md). The seed-generation strategy and the proposed `#1E88A8` seed below are historical — the shipped palette is the explicit P8 role table, not a seed derivation. The non-colour sections (§2–§8) remain in force.
 
 ## 1. Colour — Material 3 roles, seed-generated
 

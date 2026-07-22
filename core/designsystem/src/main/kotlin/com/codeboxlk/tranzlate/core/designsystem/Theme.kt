@@ -16,8 +16,8 @@ import androidx.compose.ui.platform.LocalContext
  * brand identity, not gray defaults).
  *
  * [dynamicColor] defaults to false so the brand palette is the baseline; a Settings
- * preference wires user opt-in later (D-P2: palette itself is provisional until the
- * UI-design phase — swap = Color.kt only).
+ * preference wires user opt-in later. Palette = P8 "Tranzlate Teal" (owner-final
+ * 2026-07-22, issue #10) — a preset swap (issue #7) touches Color.kt only.
  */
 @Composable
 fun TranzlateTheme(
@@ -35,7 +35,7 @@ fun TranzlateTheme(
         }
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
-        LocalGradientColors provides if (darkTheme) DarkGradientColors else LightGradientColors,
+        LocalAmbientGradient provides if (darkTheme) DarkAmbientGradient else LightAmbientGradient,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

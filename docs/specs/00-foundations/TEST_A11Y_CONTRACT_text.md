@@ -3,6 +3,7 @@
 > **Feature:** TEXT TRANSLATION (`HomeScreen` + `ResultScreen` සහ ඒවායේ `TextInputCard`, `SourceCard`, `ResultCard`, `ErrorView` components).
 > **Status:** Foundation contract — Phase 5 (Testing) + Adaptive/A11y සඳහා pre-condition එකකි. මෙය implement කරන කවුරුත් මේ contract එකට **conform** විය යුතුයි.
 > **Verified grounding:** `data/model/TranslationModels.kt` (tags: `AUTO`, `ML2-mini`, `ML2 - ONLINE`, `NLP3.5 - ONLINE`), `util/QonversionManager.kt` (`EntitlementState = LOADING, UNKNOWN, PREMIUM, PLUS, NOT_SUBSCRIBED`), `ui/screen/home/HomeUiState.kt` (sealed `Loading | Ready`), usage limit `20/day` (CLAUDE.md, `Constants.Defaults.FEATURE_LIMIT_PER_DAY`).
+> **2026-07-22: C-2 amended — explicit Translate for all engines (issue #9).**
 
 ---
 
@@ -182,7 +183,7 @@ Namespace convention: `tt_text_*`. සෑම control එකකටම `Modifier.t
 | # | Control | `testTag` | Screen / component | Node type | Notes |
 |---|---------|-----------|--------------------|-----------|-------|
 | 1 | Input text field | `tt_text_input` | `TextInputCard` | `TextField` | editable, multi-line |
-| 2 | Translate button | `tt_text_translate_btn` | `HomeScreen` | `Button` | disabled when input blank |
+| 2 | Translate button | `tt_text_translate_btn` | `HomeScreen` | `Button` | disabled when input blank; present in EVERY mode (C-2, amended 2026-07-22) |
 | 3 | Swap languages | `tt_text_swap` | `MiddleContent` | `IconButton` | src↔tgt |
 | 4 | Source language selector | `tt_text_source_lang` | `MiddleContent` | `Button`/chip | opens `LanguageScreen` |
 | 5 | Target language selector | `tt_text_target_lang` | `MiddleContent` | `Button`/chip | opens `LanguageScreen` |
@@ -460,7 +461,7 @@ Verify: TalkBack swipe-right sequence මේ පිළිවෙලට යා ය
 ## ⚖️ CONFORMANCE OVERRIDE (DECISIONS C-1..C-13 win over anything above)
 
 Where this contract conflicts with `DECISIONS.md` canonical conventions, **C-n wins.** Specifically:
-- **C-2 (button vs live):** free-engine happy-path tests assert **wait-for-result after debounce**, NOT a button tap. `tt_text_translate_action` exists **only** for the metered Advanced-AI path.
+- **C-2 (Translate trigger — amended 2026-07-22, issue #9):** happy-path tests in **EVERY mode** (free and metered) assert a **tap on `tt_text_translate_btn`** — the button now exists in every mode and no translation fires on debounce. ~~free-engine happy-path tests assert **wait-for-result after debounce**, NOT a button tap. `tt_text_translate_action` exists **only** for the metered Advanced-AI path.~~ *(pre-amendment rule, superseded 2026-07-22 — kept struck for history; `tt_text_translate_action` is retired.)*
 - **C-1 testTags:** the `tt_text_*` set here is authoritative; the feature spec references it.
 - **C-5 char counter:** exact rendered value = **`12/500`** (no spaces) — fix any `12/500` assertion.
 - **C-6 counter:** `text_metered_counter` = used/limit ("15/20 today").

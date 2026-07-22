@@ -1,0 +1,51 @@
+/* Tranzlate design tokens — APP PALETTE = P8 "Tranzlate Teal (cool-mono)" — teal accents + P1 neutrals per docs/design/PALETTES.md
+   (research-verified 2026-07-21, workflow wf_d446a618-efd; owner directive: most-popular mobile palette).
+   Preset classes (.preset-*) carry the saved alternative palettes for the future theme-picker (issue #7).
+   Cards must use ONLY these vars — raw hex in card bodies is a QA failure. */
+.theme-light{
+  --primary:#1C7A97; --on-primary:#FFFFFF; --primary-container:#B8E7F5; --on-primary-container:#002F3C;
+  --secondary:#00639B; --on-secondary:#FFFFFF; --secondary-container:#C2E7FF; --on-secondary-container:#004A77;
+  --tertiary:#10586B; --on-tertiary:#FFFFFF; --tertiary-container:#CDE9F2; --on-tertiary-container:#002F3C;
+  --background:#FAF9F8; --on-background:#1F1F1F; --surface:#FAF9F8; --on-surface:#1F1F1F;
+  --surface-variant:#E1E3E1; --on-surface-variant:#444746;
+  --surface-lowest:#FFFFFF; --surface-low:#F4F3F2; --surface-c:#EFEDED; --surface-high:#E9E8E8; --surface-highest:#E3E3E3;
+  --inverse-surface:#303030; --inverse-on-surface:#F2F2F2; --inverse-primary:#3FB6D4;
+  --outline:#747775; --outline-variant:#C4C7C5;
+  --error:#B3261E; --on-error:#FFFFFF; --error-container:#F9DEDC; --on-error-container:#8C1D18;
+  --scrim:rgba(0,0,0,.32); --shadow:rgba(31,31,31,.14);
+  --grad-start:#1C7A97; --grad-end:#00639B;
+}
+.theme-dark{
+  --primary:#3FB6D4; --on-primary:#00363F; --primary-container:#10586B; --on-primary-container:#B8E7F5;
+  --secondary:#7FCFFF; --on-secondary:#003355; --secondary-container:#004A77; --on-secondary-container:#C2E7FF;
+  --tertiary:#8FD3E3; --on-tertiary:#00363F; --tertiary-container:#0B4A5A; --on-tertiary-container:#CDE9F2;
+  --background:#131314; --on-background:#E3E3E3; --surface:#131314; --on-surface:#E3E3E3;
+  --surface-variant:#444746; --on-surface-variant:#C4C7C5;
+  --surface-lowest:#0E0E0F; --surface-low:#1F1F1F; --surface-c:#1F2020; --surface-high:#2A2A2A; --surface-highest:#343535;
+  --inverse-surface:#E3E3E3; --inverse-on-surface:#303030; --inverse-primary:#1C7A97;
+  --outline:#8E918F; --outline-variant:#444746;
+  --error:#F2B8B5; --on-error:#601410; --error-container:#8C1D18; --on-error-container:#F9DEDC;
+  --scrim:rgba(0,0,0,.5); --shadow:rgba(0,0,0,.5);
+  --grad-start:#3FB6D4; --grad-end:#00639B;
+}
+/* ---- saved presets (PALETTES.md P2/P3) — P5 teal RETIRED by owner 2026-07-22 ---- */
+.preset-purple-light{--primary:#6750A4;--on-primary:#FFFFFF;--primary-container:#EADDFF;--on-primary-container:#4F378B;
+  --secondary-container:#E8DEF8;--on-secondary-container:#4A4458;--surface:#FEF7FF;--on-surface:#1D1B20;--surface-c:#F3EDF7;
+  --surface-variant:#E7E0EC;--on-surface-variant:#49454F;--outline:#79747E;--outline-variant:#CAC4D0}
+.preset-purple-dark{--primary:#D0BCFF;--on-primary:#381E72;--primary-container:#4F378B;--on-primary-container:#EADDFF;
+  --secondary-container:#4A4458;--on-secondary-container:#E8DEF8;--surface:#141218;--on-surface:#E6E0E9;--surface-c:#211F26;
+  --surface-variant:#49454F;--on-surface-variant:#CAC4D0;--outline:#938F99;--outline-variant:#49454F}
+.preset-blue600-light{--primary:#1A73E8;--on-primary:#FFFFFF;--primary-container:#D2E3FC;--on-primary-container:#174EA6;
+  --secondary-container:#E8F0FE;--on-secondary-container:#174EA6;--surface:#FFFFFF;--on-surface:#202124;--surface-c:#F1F3F4;
+  --surface-variant:#E8EAED;--on-surface-variant:#5F6368;--outline:#747775;--outline-variant:#DADCE0}
+.preset-blue600-dark{--primary:#8AB4F8;--on-primary:#062E6F;--primary-container:#174EA6;--on-primary-container:#D2E3FC;
+  --secondary-container:#174EA6;--on-secondary-container:#D2E3FC;--surface:#202124;--on-surface:#E8EAED;--surface-c:#292A2D;
+  --surface-variant:#3C4043;--on-surface-variant:#BDC1C6;--outline:#8E918F;--outline-variant:#3C4043}
+/* spacing (§4) */
+:root{ --sp-2:2px; --sp-4:4px; --sp-8:8px; --sp-16:16px; --sp-24:24px; --sp-32:32px; --sp-48:48px;
+/* radius (§5) */ --r-4:4px; --r-8:8px; --r-12:12px; --r-16:16px; --r-28:28px; --r-full:999px;
+/* type (§3) — px stands in for sp in mockups */
+  --font:system-ui,-apple-system,Roboto,"Noto Sans Sinhala",sans-serif;
+  --display-s:36px/44px; --headline-s:24px/32px; --title-l:22px/28px; --title-m:16px/24px; --title-s:14px/20px;
+  --body-l:16px/24px; --body-m:14px/20px; --body-s:12px/16px; --label-l:14px/20px; --label-m:12px/16px; --label-s:11px/16px;
+/* alpha */ --a-disabled:.38; --a-draghandle:.4; }

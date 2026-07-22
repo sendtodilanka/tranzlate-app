@@ -2,6 +2,7 @@
 
 > **Template status:** this is the reference shape for all ~16 feature specs. v1 scored 55%/not-buildable in adversarial review (47 gaps); v2 resolves every blocker by (a) leading with GT-equivalent behaviour, (b) inlining the resolved decisions, (c) delegating shared detail to the 5 foundation docs instead of hand-waving.
 > **Status:** DRAFT v2 · uncommitted · 2026-07-21.
+> **2026-07-22: C-2 amended — explicit Translate for all engines (issue #9).**
 
 ## Foundations this spec builds on (read as one contract)
 | Concern | Source of truth | This spec does NOT redefine it |
@@ -18,11 +19,11 @@
 ## 0. GT-equivalent behaviour (D-0 north star)
 Behave like the **Google Translate Android app** text tab, then layer Tranzlate deltas:
 
-**Match GT:** live translate **as you type** (debounced ~400ms after last keystroke); tap source/target chip → language picker; **⇄ swap** re-translates instantly; **✕ clear** empties input+result; auto source-detection with "%s (Detected)" label; result shows below with **Copy · TTS · fullscreen · ⭐ Save**; tapping the result opens a larger reading view; recent languages surface first in the picker.
+**Match GT:** tap source/target chip → language picker; **⇄ swap** re-translates instantly; **✕ clear** empties input+result; auto source-detection with "%s (Detected)" label; result carries **Copy · TTS · fullscreen · ⭐ Save**; recent languages surface first in the picker. **Deviation (owner-approved 2026-07-22, C-2 amended):** GT's live-as-you-type trigger does **not** apply — every engine translates on the explicit **Translate** action (`tt_text_translate_btn`) and the result opens on its own screen (Compose transition keeps it feeling continuous).
 
 **Tranzlate deltas (layer on, don't break GT UX):**
 1. A **mode chip** (AUTO / Offline / Standard / Advanced AI) — GT has no engine choice; we do.
-2. **Metered exception to live-translate (D-0 tension resolved):** live-translate applies to **free engines** (Offline, Standard, and AUTO when it resolves free). For the **metered Advanced AI (NLP3.5)**, translation is **not** fired per keystroke — it fires on **debounce-pause of ~1.2s OR explicit ⏎/Translate affordance**, so one quota unit = one intentional translation.
+2. **Explicit Translate for ALL engines (C-2 amended 2026-07-22 — D-0 tension resolved):** no engine fires per keystroke or on debounce. Free (Offline, Standard, AUTO) and metered (Advanced AI) alike translate **only** on the explicit Translate action (`tt_text_translate_btn`; IME ⏎ mirrors it), so one quota unit = one intentional translation by construction. The one action is predictable across engines and keeps the editor a large, comfortable composing surface.
 3. Subscription gating + ads per D-2/D-4.
 
 ---
@@ -30,7 +31,7 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 ## 1. User stories + acceptance criteria
 | # | Story | Acceptance (Given/When/Then) — expected values in TEST_A11Y_CONTRACT |
 |---|-------|----------------------------------------------------------------------|
-| US-1 | translate typed text | Given EN→FR, when input="Good morning" settles (debounce), then the fake-engine golden output renders in the result area and a `Translation` row is written (DATA_MODEL). |
+| US-1 | translate typed text | Given EN→FR, when input="Good morning" and the user taps Translate (`tt_text_translate_btn`), then the fake-engine golden output renders in the result area and a `Translation` row is written (DATA_MODEL). |
 | US-2 | change language | Given a result exists, when I change target via picker, then it **auto re-translates** (D-1) using cache if hit (no meter charge). |
 | US-3 | auto-detect | Given source=Auto, then result header shows `language_detected` ("%1$s (Detected)") with the resolved id stored (never "auto"). |
 | US-4 | swap | Given source≠Auto, when I tap ⇄, then langs swap **and** input↔result text swap + re-translate. Given source=Auto, ⇄ is disabled with `swap_disabled_auto` reason. |
@@ -43,15 +44,15 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 
 ## 2. Screen anatomy
 **Compact** (tokens from DESIGN_SYSTEM; layout order fixed):
-`TopAppBar(title) → LanguageBar([source ▾] ⇄ [target ▾]) → ModeChip + counter → InputCard(field, ✕, counter "0/500", [mic]) → live ResultCard(langs+detected, text, [Copy][TTS][Reverse][⭐][⋮])`.
+`TopAppBar(title) → LanguageBar([source ▾] ⇄ [target ▾]) → ModeChip + counter → InputCard(field, ✕, counter "0/500", [mic ↔ Translate]) → ResultCard(langs+detected, text, [Copy][TTS][Reverse][⭐][⋮]) on its own Result screen`.
 - Input uses `bodyLarge`; result uses `headlineSmall`; spacing `md16` between blocks, `sm8` within (DESIGN_SYSTEM §4).
-- **No** explicit Translate button for free engines (GT-style live); the metered engine shows a small "Translate" text-action per §0.2.
+- **Explicit Translate action (`tt_text_translate_btn`) in EVERY mode** (C-2 amended 2026-07-22): disabled while the input is blank; the result opens on its own screen with a continuous Compose transition. No live/debounce-fired translation for any engine.
 
 **Medium/Expanded:** `ListDetailPaneScaffold` — input pane | result pane. Pane split + min-widths per DESIGN_SYSTEM adaptive section. Never a stretched single column.
 
 ## 3. Components & interactions (deltas from foundations)
 
-> **testTags follow DECISIONS C-1** — canonical prefix `tt_text_`. The bare names below map 1:1: `tt_text_source`, `tt_text_target`, `tt_text_swap`, `tt_text_mode_chip`, `tt_text_counter`, `tt_text_input`, `tt_text_charcount`, `tt_text_result`, `tt_text_copy`, `tt_text_tts`, `tt_text_reverse`, `tt_text_star`, `tt_text_more`, `tt_text_error_view`, `tt_text_retry`, `tt_text_translate_action` (metered only), `tt_text_limit_sheet`.
+> **testTags follow DECISIONS C-1** — canonical prefix `tt_text_`. The bare names below map 1:1: `tt_text_source`, `tt_text_target`, `tt_text_swap`, `tt_text_mode_chip`, `tt_text_counter`, `tt_text_input`, `tt_text_charcount`, `tt_text_result`, `tt_text_copy`, `tt_text_tts`, `tt_text_reverse`, `tt_text_star`, `tt_text_more`, `tt_text_error_view`, `tt_text_retry`, `tt_text_translate_btn` (ALL modes — C-2 amended 2026-07-22; the former metered-only `tt_text_translate_action` is superseded), `tt_text_limit_sheet`.
 
 | Element | Component (DESIGN_SYSTEM) | testTag | Spec note |
 |---------|--------------------------|---------|-----------|
@@ -59,7 +60,7 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 | Swap | `IconButton` | `btn_swap` | **Swap** = exchange the two languages (US-4). Disabled on Auto source. |
 | Mode chip | `AssistChip`+menu | `chip_mode` | real ripple/role (fixes badge-disguise bug) |
 | Counter | `Badge`/supporting text | `text_counter` | `usage_counter` string, hidden Premium |
-| Input | `OutlinedTextField` multiline | `input_text` | ✕ trailing = clear; IME action = translate (metered only) |
+| Input | `OutlinedTextField` multiline | `input_text` | ✕ trailing = clear; IME action = translate in every mode (mirrors `tt_text_translate_btn`, C-2) |
 | Char counter | supporting text | `text_charcount` | "0/500"; inline `home_edit_dialog_reach_text_limit_*` at limit (rewritten copy, no "Translate Pro") |
 | Result text | selectable `Text`, font-scalable | `text_result` | tap → fullscreen reader |
 | Copy | `IconButton` | `btn_copy` | `home_result_option_copy` |
@@ -71,13 +72,13 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 
 ## 4. State machine (deterministic — no open branches)
 ```
-EMPTY ─type→ TYPING ─debounce settle→ VALIDATING
+EMPTY ─type→ TYPING ─tapTranslate→ VALIDATING
 VALIDATING ─gate/meter (§5)→ { blocked → LIMIT_SHEET | ok → TRANSLATING }
 TRANSLATING ─success→ RESULT | ─fail→ ERROR ─Retry→ VALIDATING
 RESULT/ERROR ─clear(✕)→ EMPTY
 RESULT ─lang change→ VALIDATING (D-1 auto re-translate; cache-first)
 ```
-- Free engines: `TYPING→VALIDATING` on 400ms debounce. Advanced AI: 1.2s debounce **or** explicit action (§0.2).
+- ALL engines: `TYPING→VALIDATING` fires **only** on the explicit Translate action (`tt_text_translate_btn` / IME ⏎) — no debounce transition in any mode (C-2 amended 2026-07-22).
 - Cache hit (key per DECISIONS engineering constants) → `RESULT` immediately, **no meter charge**.
 
 ## 5. Behaviour: modes, gating, metering (exact)
@@ -95,13 +96,13 @@ RESULT ─lang change→ VALIDATING (D-1 auto re-translate; cache-first)
 - **a11y & tests:** governed entirely by TEST_A11Y_CONTRACT (fake engine golden outputs, testTags, per-control localized descriptions, focus order, live regions, ≥4.5:1, RTL, 200% scale). **pass/fail gate.**
 - **Localization:** 0 hardcoded strings; all keys in STRINGS catalogue (en/fil/pt-rBR present or flagged NEEDS-TRANSLATION).
 - **Adaptive:** Compact one-pane, Medium/Expanded ListDetail; landscape/multi-window reflow; tokens only, no raw dp.
-- **Offline-first + performance:** live-translate ≤ debounce; no cursor jump on recomposition.
+- **Offline-first + performance:** translation starts within one frame of the Translate tap (no artificial delay); no cursor jump on recomposition.
 
 ## 8. Edge cases
-empty/whitespace (no translate) · >500 chars: **hard-block the translate transition** (VALIDATING→TRANSLATING gated) + show inline `home_edit_dialog_reach_text_limit_*` copy, input **not truncated** · source==target · unsupported pair · single long word · emoji/RTL · rapid retype (debounce+cache) · network drop mid-translate · offline model missing (Download CTA) · limit hit mid-session (AUTO continues) · process death restore · paste >limit.
+empty/whitespace (no translate) · >500 chars: **hard-block the translate transition** (VALIDATING→TRANSLATING gated) + show inline `home_edit_dialog_reach_text_limit_*` copy, input **not truncated** · source==target · unsupported pair · single long word · emoji/RTL · rapid retype (edits alone never fire translation; cache serves repeated requests) · network drop mid-translate · offline model missing (Download CTA) · limit hit mid-session (AUTO continues) · process death restore · paste >limit.
 
 ## 9. Anti-requirements (do NOT carry)
-❌ chat "What can I help with?" framing · ❌ rainbow gradient headline · ❌ NLP3.5 default · ❌ invisible metered status · ❌ silent truncation · ❌ dead text-limit AlertDialog · ❌ full-screen ErrorDialog for transient errors · ❌ drawer-only nav · ❌ "Translate Pro" copy · ❌ Back-press ad · ❌ thumbs-as-save.
+❌ chat "What can I help with?" framing · ❌ rainbow gradient headline · ❌ NLP3.5 default · ❌ invisible metered status · ❌ silent truncation · ❌ dead text-limit AlertDialog · ❌ full-screen ErrorDialog for transient errors · ❌ drawer-only nav that HIDES peer tasks (D-5 hub model keeps peer modes on-canvas; drawer = secondary destinations only) · ❌ "Translate Pro" copy · ❌ Back-press ad · ❌ thumbs-as-save.
 
 ## 10. Deltas from v1 (what the review fixed)
-Open questions **resolved** (D-1..D-4) · GT-equivalent behaviour now the spine · live-translate replaces "always a button" (with metered exception) · Reverse vs Swap disambiguated · entity/strings/tokens/tests **delegated to foundations** (no hand-waving) · cache-key + meter + reset now exact (DECISIONS).
+Open questions **resolved** (D-1..D-4) · GT-equivalent behaviour now the spine · ~~live-translate replaces "always a button" (with metered exception)~~ *(v2 history — superseded 2026-07-22 by the C-2 amendment: explicit Translate for ALL engines, see §0)* · Reverse vs Swap disambiguated · entity/strings/tokens/tests **delegated to foundations** (no hand-waving) · cache-key + meter + reset now exact (DECISIONS).
