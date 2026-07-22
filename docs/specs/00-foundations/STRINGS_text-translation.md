@@ -180,3 +180,38 @@
 | `a11y_limit_reached` | string | Daily Advanced-AI limit reached | NEEDS-TRANSLATION | NEEDS-TRANSLATION | — |
 
 > **C-3:** this catalogue is the ONLY string-key authority; TEST_A11Y references these keys (no invented `a11y_*`/`cd_*`). `usage_counter` is retired (C-6). NEEDS-TRANSLATION = tracked content task, not a spec blocker (C-12).
+
+---
+
+## 6. Issue #11 vertical additions (2026-07-22 — C-3 "missing keys get ADDED to STRINGS")
+
+Keys shipped by the Home/Composer/Drawer/Result vertical (PR-C). `en` values are the UI_SPEC §2 approved copy; every `fil`/`pt-rBR` cell is **NEEDS TRANSLATION** unless a reuse is cited (tracked content task, C-12 — `tools:ignore="MissingTranslation"` is the interim guard in the shipped resource files).
+
+| Key | Type | `en` | Notes |
+|-----|------|------|-------|
+| `text_input_placeholder` | string | `Enter text` | UI_SPEC §2.2 composer placeholder (supersedes old-app hint rotation for this surface) |
+| `cd_text_input` | string | `Text to translate` | contract §2.1 row 1 |
+| `cd_text_counter` | string | `%1$d of %2$d characters used` | contract §2.1 row 7 |
+| `cd_text_source_lang` / `cd_text_target_lang` | string | `Source language, %1$s` / `Target language, %1$s` | contract §2.1 rows 4–5 |
+| `cd_text_mic` | string | `Translate by voice` | composer mic morph (voice vertical later) |
+| `cd_text_mode_chip` | string | `Translation model, %1$s` | contract §2.1 row 6 |
+| `cd_text_menu` / `cd_text_clear` / `cd_text_back` / `cd_text_more` | string | `Open navigation` / `New translation` / `Back` / `More options` | hub top bar + result top bar |
+| `cd_text_copy_source` / `cd_text_speak_source` | string | `Copy source text` / `Read source text aloud` | result source block |
+| `cd_text_thumb_up` / `cd_text_thumb_down` | string | `Good translation` / `Bad translation` | result feedback (guided no-op until #8) |
+| `cd_text_retry` | string | `Retry translation` | contract §2.1 row 13 |
+| `home_greeting_morning` / `_afternoon` / `_evening` | string | `Morning` / `Afternoon` / `Evening` | UI_SPEC §2.1 time-aware greeting |
+| `home_greeting_named` | string | `%1$s, %2$s` | greeting + account name (name slot — no account system yet) |
+| `home_subtitle` | string | `What would you like to translate?` | UI_SPEC §2.1 |
+| `home_tile_conversation` (+`_sub`) · `home_tile_camera` (+`_sub`) | string | `Conversation`/`Two-way talk` · `Camera`/`Point and translate` | canvas quick-action tiles |
+| `text_guided_mode` / `_voice` / `_tts` / `_conversation` / `_bookmark` / `_more` / `_feedback` | string | "… arrives with the … update" family | EDGE_CASES no-dead-end guided messages for not-yet-built asks |
+| `text_copied` | string | `Copied` | EDGE_CASES §7 copy success feedback |
+| `text_engine_badge_offline` / `_online` / `_advanced` | string | `Offline · instant` / `Online` / `Advanced AI` | UI_SPEC §2.4 engine badge per resolved Engine (C-9) |
+| `text_error_generic_body` | string | `Something went wrong while translating. Please check your connection and try again.` | §2.9 (already proposed NEW there) |
+| `text_error_unsupported_pair` | string | `This language pair isn't supported yet. Try a different language pair.` | UNSUPPORTED_PAIR outcome (G8) |
+| `text_lang_sheet_source_title` / `_target_title` | string | `Translate from` / `Translate to` | interim minimal picker sheet |
+| `drawer_search` / `drawer_history` / `drawer_saved` / `drawer_offline_languages` / `drawer_settings` | string (`:app`) | `Search` / `History` / `Saved` / `Offline languages` / `Settings` | UI_SPEC §2.3 drawer sections |
+| `drawer_recents_header` / `drawer_recents_empty` | string (`:app`) | `Recents` / `Your recent translations will appear here` | drawer Recents |
+| `drawer_account_guest` / `drawer_tier_free` | string (`:app`) | `Guest` / `Free` | account row (static until the Access brain) |
+| `app_guided_search` | string (`:app`) | `Search arrives with the history update` | drawer Search guided message |
+
+**Reuse decisions applied (C-3):** `cd_translate`, `cd_swap_language`, `button_retry`, `home_edit_no_text_to_translate_warning`, `text_char_counter`, `cd_copy`, `cd_speak`, `cd_favourite`, `text_mode_automatic`, `a11y_translating` — used with the catalogue keys/values above (the contract's older `cd_text_translate`/`cd_text_swap`/`cd_text_speak` spellings defer to these per the C-3 conformance override).

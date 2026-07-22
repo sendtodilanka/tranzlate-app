@@ -14,8 +14,10 @@ import javax.inject.Singleton
  *
  * TODO(#4-brains): seed the bundled static 180+ list (spec 02 §4.1 — BCP-47
  * verified, re-derived fresh) and intersect with MLKit `getAllLanguages()` at
- * runtime (§4.2) when the Translation brain lands. Skeleton serves the DB
- * contents as-is.
+ * runtime (§4.2) when the Translation brain lands. Until then an empty table
+ * falls back to [BundledLanguageCatalog.minimal] (pure read-side fallback — no
+ * write; the picker stays functional, issue #11) and non-empty DB contents are
+ * served as-is.
  */
 @Singleton
 class LanguageRepositoryImpl
@@ -24,7 +26,13 @@ class LanguageRepositoryImpl
         private val languageDao: LanguageDao,
     ) : LanguageRepository {
         override fun languages(): Flow<List<Language>> =
-            languageDao.languages().map { entities -> entities.map(LanguageEntity::toDomain) }
+            languageDao.languages().map { entities ->
+                if (entities.isEmpty()) {
+                    BundledLanguageCatalog.minimal
+                } else {
+                    entities.map(LanguageEntity::toDomain)
+                }
+            }
 
         override suspend fun setLastUsed(
             languageId: String,

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brazilian Portuguese — ONLY catalogue-verbatim translations
+     (STRINGS_text-translation.md; never guessed). TODO(NEEDS-TRANSLATION, C-12):
+     every remaining key in values/strings.xml is queued in the tracked content
+     backlog before ship. -->
+<resources>
+    <string name="text_char_counter">%1$d/%2$d</string>
+    <string name="cd_translate">Traduzir</string>
+    <string name="cd_swap_language">Trocar Idioma</string>
+    <string name="home_edit_no_text_to_translate_warning">Digite um texto para traduzir.</string>
+    <string name="button_retry">Tentar novamente</string>
+</resources>

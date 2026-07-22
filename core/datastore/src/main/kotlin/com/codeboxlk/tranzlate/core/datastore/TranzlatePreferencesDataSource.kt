@@ -40,6 +40,17 @@ class TranzlatePreferencesDataSource
             dataStore.edit { it[KEY_TARGET_LANG] = value }
         }
 
+        /** Swap-safe: both ids in ONE edit so no observer ever sees a torn pair. */
+        suspend fun setLanguagePair(
+            sourceValue: String,
+            targetValue: String,
+        ) {
+            dataStore.edit {
+                it[KEY_SOURCE_LANG] = sourceValue
+                it[KEY_TARGET_LANG] = targetValue
+            }
+        }
+
         suspend fun setTextMode(value: String) {
             dataStore.edit { it[KEY_TEXT_MODE] = value }
         }

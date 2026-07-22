@@ -1,6 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Scaffold placeholder strings. Real keys arrive from STRINGS_*.md (C-3 authority).
-     TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR queued before ship. -->
-<resources>
-    <string name="feature_text_placeholder">Text translation</string>
+<!-- Text-translation feature strings — keys per STRINGS_text-translation.md (C-3
+     key authority). REUSED keys keep the catalogue's verbatim en values; NEW keys
+     (UI_SPEC §2 copy: greeting/subtitle/tiles/guided messages/badges) are added to
+     the catalogue §2.11 in the same PR.
+     TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR carry only the
+     catalogue-verbatim translations; the rest are a tracked content task
+     (backlog before ship — DoD gate 12). MissingTranslation is suppressed until
+     that task lands. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="MissingTranslation">
+
+    <!-- Composer (UI_SPEC §2.2) -->
+    <string name="text_input_placeholder">Enter text</string>
+    <string name="cd_text_input">Text to translate</string>
+    <string name="text_char_counter">%1$d/%2$d</string>
+    <string name="cd_text_counter">%1$d of %2$d characters used</string>
+    <string name="cd_translate">Translate</string>
+    <string name="cd_swap_language">Swap Language</string>
+    <string name="cd_text_source_lang">Source language, %1$s</string>
+    <string name="cd_text_target_lang">Target language, %1$s</string>
+    <string name="cd_text_mic">Translate by voice</string>
+    <string name="cd_text_mode_chip">Translation model, %1$s</string>
+    <string name="text_mode_automatic">Automatic</string>
+    <string name="cd_text_menu">Open navigation</string>
+    <string name="cd_text_clear">New translation</string>
+
+    <!-- Home canvas (UI_SPEC §2.1) -->
+    <string name="home_greeting_morning">Morning</string>
+    <string name="home_greeting_afternoon">Afternoon</string>
+    <string name="home_greeting_evening">Evening</string>
+    <string name="home_greeting_named">%1$s, %2$s</string>
+    <string name="home_subtitle">What would you like to translate?</string>
+    <string name="home_tile_conversation">Conversation</string>
+    <string name="home_tile_conversation_sub">Two-way talk</string>
+    <string name="home_tile_camera">Camera</string>
+    <string name="home_tile_camera_sub">Point and translate</string>
+
+    <!-- Guided messages (EDGE_CASES no-dead-end rule: a tap never lands nowhere) -->
+    <string name="text_guided_mode">Engine selection arrives with the brains update</string>
+    <string name="text_guided_voice">Voice input arrives with the voice update</string>
+    <string name="text_guided_tts">Text-to-speech arrives with the voice update</string>
+    <string name="text_guided_conversation">Conversation arrives with the voice update</string>
+    <string name="text_guided_bookmark">Saving arrives with the history update</string>
+    <string name="text_guided_more">More options arrive in a later update</string>
+    <string name="text_guided_feedback">Feedback arrives in a later update</string>
+
+    <!-- Result screen (UI_SPEC §2.4) -->
+    <string name="cd_text_back">Back</string>
+    <string name="cd_favourite">Add to favourites</string>
+    <string name="cd_text_more">More options</string>
+    <string name="cd_copy">Copy translation</string>
+    <string name="cd_text_copy_source">Copy source text</string>
+    <string name="cd_speak">Read translation aloud</string>
+    <string name="cd_text_speak_source">Read source text aloud</string>
+    <string name="cd_text_thumb_up">Good translation</string>
+    <string name="cd_text_thumb_down">Bad translation</string>
+    <string name="text_copied">Copied</string>
+    <string name="text_engine_badge_offline">Offline · instant</string>
+    <string name="text_engine_badge_online">Online</string>
+    <string name="text_engine_badge_advanced">Advanced AI</string>
+    <string name="a11y_translating">Translating…</string>
+
+    <!-- Error states (UI_SPEC §2.5 · EDGE_CASES §7) -->
+    <string name="text_error_generic_body">Something went wrong while translating. Please check your connection and try again.</string>
+    <string name="text_error_unsupported_pair">This language pair isn\'t supported yet. Try a different language pair.</string>
+    <string name="home_edit_no_text_to_translate_warning">Please enter text to translate.</string>
+    <string name="button_retry">Retry</string>
+    <string name="cd_text_retry">Retry translation</string>
+
+    <!-- Minimal language picker sheet (issue #11 interim) -->
+    <string name="text_lang_sheet_source_title">Translate from</string>
+    <string name="text_lang_sheet_target_title">Translate to</string>
+
+    <!-- C-7 Reverse action (result → input, languages swapped, re-translated) -->
+    <string name="cd_text_reverse">Reverse translation direction</string>
+    <!-- C-4 canonical live-region announcements -->
+    <string name="a11y_result_ready">Translation ready: %1$s</string>
+    <string name="a11y_error">Translation failed. %1$s</string>
+    <!-- EDGE_CASES OVER_CHAR_LIMIT — shown inline; input is never truncated (spec-01 §8/§9) -->
+    <string name="text_over_char_limit">Limited to %1$d characters per translation. Shorten the text to translate.</string>
 </resources>

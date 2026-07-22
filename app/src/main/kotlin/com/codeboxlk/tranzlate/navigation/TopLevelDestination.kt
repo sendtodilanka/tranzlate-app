@@ -16,11 +16,19 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object TextNavKey : NavKey
 
+/** Text vertical's reading surface (UI_SPEC §2.4) — pushed by the Home composer, popped by back. */
+@Serializable
+data object ResultNavKey : NavKey
+
 @Serializable
 data object CameraNavKey : NavKey
 
 @Serializable
 data object HistoryNavKey : NavKey
+
+/** Drawer "Offline languages" placeholder destination (languagepicker feature). */
+@Serializable
+data object LanguagesNavKey : NavKey
 
 @Serializable
 data object SettingsNavKey : NavKey

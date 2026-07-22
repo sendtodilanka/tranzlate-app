@@ -5,8 +5,10 @@ import com.codeboxlk.tranzlate.core.data.config.StaticRemoteConfigSource
 import com.codeboxlk.tranzlate.core.data.network.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.data.network.StubConnectivityMonitor
 import com.codeboxlk.tranzlate.core.data.repository.LanguageRepositoryImpl
+import com.codeboxlk.tranzlate.core.data.repository.TranslatePrefsRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.TranslationRepositoryImpl
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
+import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslationRepository
 import dagger.Binds
 import dagger.Module
@@ -26,6 +28,9 @@ internal abstract class DataModule {
 
     @Binds
     abstract fun languageRepository(impl: LanguageRepositoryImpl): LanguageRepository
+
+    @Binds
+    abstract fun translatePrefsRepository(impl: TranslatePrefsRepositoryImpl): TranslatePrefsRepository
 
     @Binds
     abstract fun connectivityMonitor(impl: StubConnectivityMonitor): ConnectivityMonitor
