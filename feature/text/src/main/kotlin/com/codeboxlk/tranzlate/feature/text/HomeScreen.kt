@@ -24,25 +24,33 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
@@ -53,12 +61,8 @@ import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.Motion
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
-import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.ui.ComposerCard
-import com.codeboxlk.tranzlate.core.ui.DottedRingIconButton
-import com.codeboxlk.tranzlate.core.ui.ModeChip
-import com.codeboxlk.tranzlate.core.ui.QuickActionTile
-import com.codeboxlk.tranzlate.core.ui.TranzlateTopBar
+import com.codeboxlk.tranzlate.core.ui.QuickActionButton
 import kotlinx.coroutines.launch
 
 /** Composer growth cap — ~40% of the viewport (UI_SPEC §2.2). */
@@ -70,8 +74,10 @@ private const val COMPOSER_MAX_HEIGHT_FRACTION = 0.4f
  *
  * @param onTranslateRequested called AFTER a translation actually started
  *   (C-2 tap → Translating) — the caller opens the Result screen.
- * @param onOpenConversation Conversation tile destination; null (no Dialog
- *   vertical yet) falls back to a guided message — never a dead tile.
+ * @param onPickLanguage the caller opens the full-screen language picker for
+ *   the tapped side (issue #15 — the picker is a destination, not a sheet).
+ * @param onOpenConversation Conversation action destination; null (no Dialog
+ *   vertical yet) falls back to a guided message — never a dead control.
  * @param userName future account-system slot (UI_SPEC greeting "Afternoon,
  *   *Dilanka*") — always null today.
  */
@@ -81,6 +87,7 @@ fun HomeScreen(
     onOpenDrawer: () -> Unit,
     onTranslateRequested: () -> Unit,
     onOpenCamera: () -> Unit,
+    onPickLanguage: (LanguagePickerTarget) -> Unit,
     modifier: Modifier = Modifier,
     onOpenConversation: (() -> Unit)? = null,
     userName: String? = null,
@@ -88,19 +95,16 @@ fun HomeScreen(
     val input by viewModel.input.collectAsStateWithLifecycle()
     val sourceLang by viewModel.sourceLang.collectAsStateWithLifecycle()
     val targetLang by viewModel.targetLang.collectAsStateWithLifecycle()
-    val languages by viewModel.languages.collectAsStateWithLifecycle()
     HomeContent(
         input = input,
         sourceLangId = sourceLang,
         targetLangId = targetLang,
-        languages = languages,
         greeting = viewModel.greeting,
         userName = userName,
         onInputChange = viewModel::onInputChange,
         onTranslate = { if (viewModel.onTranslate()) onTranslateRequested() },
         onSwapLanguages = viewModel::onSwapLanguages,
-        onSelectSourceLanguage = viewModel::onSelectSourceLanguage,
-        onSelectTargetLanguage = viewModel::onSelectTargetLanguage,
+        onPickLanguage = onPickLanguage,
         onClearAll = viewModel::onClearAll,
         onOpenDrawer = onOpenDrawer,
         onOpenCamera = onOpenCamera,
@@ -110,9 +114,10 @@ fun HomeScreen(
 }
 
 /**
- * Stateless Home hub layout (previewable without DI): transparent top bar over
- * the ambient wash · vertically-centred canvas that hides on the first typed
- * character · [ComposerCard] pinned above the IME with a ~40%-viewport cap.
+ * Stateless Home hub layout (previewable without DI): flat `surface` page ·
+ * transparent [CenterAlignedTopAppBar] · vertically-centred canvas that hides on
+ * the first typed character · [ComposerCard] pinned above the IME with a
+ * ~40%-viewport cap.
  */
 @Composable
 @Suppress("LongMethod") // one cohesive UI_SPEC §2.1 screen; splitting hides the hub structure
@@ -120,14 +125,12 @@ fun HomeContent(
     input: String,
     sourceLangId: String,
     targetLangId: String,
-    languages: List<Language>,
     greeting: GreetingPeriod,
     userName: String?,
     onInputChange: (String) -> Unit,
     onTranslate: () -> Unit,
     onSwapLanguages: () -> Unit,
-    onSelectSourceLanguage: (String) -> Unit,
-    onSelectTargetLanguage: (String) -> Unit,
+    onPickLanguage: (LanguagePickerTarget) -> Unit,
     onClearAll: () -> Unit,
     onOpenDrawer: () -> Unit,
     onOpenCamera: () -> Unit,
@@ -137,7 +140,6 @@ fun HomeContent(
     val spacing = LocalSpacing.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    var pickerTarget by rememberSaveable { mutableStateOf<LanguagePickerTarget?>(null) }
 
     val guidedMode = stringResource(R.string.text_guided_mode)
     val guidedVoice = stringResource(R.string.text_guided_voice)
@@ -161,35 +163,10 @@ fun HomeContent(
         ) {
             val composerMaxHeight = maxHeight * COMPOSER_MAX_HEIGHT_FRACTION
             Column(modifier = Modifier.fillMaxSize()) {
-                TranzlateTopBar(
-                    navigationIcon = {
-                        DottedRingIconButton(
-                            onClick = onOpenDrawer,
-                            contentDescription = stringResource(R.string.cd_text_menu),
-                            testTag = "tt_text_menu",
-                        ) {
-                            Icon(Icons.Filled.Menu, contentDescription = null)
-                        }
-                    },
-                    centerContent = {
-                        val modeLabel = stringResource(R.string.text_mode_automatic)
-                        ModeChip(
-                            label = modeLabel,
-                            onClick = { showGuided(guidedMode) },
-                            contentDescription = stringResource(R.string.cd_text_mode_chip, modeLabel),
-                            stateDescription = modeLabel,
-                            testTag = "tt_text_mode_chip",
-                        )
-                    },
-                    actions = {
-                        DottedRingIconButton(
-                            onClick = onClearAll,
-                            contentDescription = stringResource(R.string.cd_text_clear),
-                            testTag = "tt_text_clear",
-                        ) {
-                            Icon(Icons.Filled.Add, contentDescription = null)
-                        }
-                    },
+                HomeTopBar(
+                    onOpenDrawer = onOpenDrawer,
+                    onClearAll = onClearAll,
+                    onModeClick = { showGuided(guidedMode) },
                 )
                 Box(
                     contentAlignment = Alignment.Center,
@@ -213,22 +190,25 @@ fun HomeContent(
                     value = input,
                     onValueChange = onInputChange,
                     placeholder = stringResource(R.string.text_input_placeholder),
-                    sourceLabel = languageDisplayName(sourceLangId),
-                    targetLabel = languageDisplayName(targetLangId),
+                    sourceLabel = languageLabel(sourceLangId),
+                    targetLabel = languageLabel(targetLangId),
                     sourceContentDescription =
-                        stringResource(R.string.cd_text_source_lang, languageDisplayName(sourceLangId)),
+                        stringResource(R.string.cd_text_source_lang, languageLabel(sourceLangId)),
                     targetContentDescription =
-                        stringResource(R.string.cd_text_target_lang, languageDisplayName(targetLangId)),
+                        stringResource(R.string.cd_text_target_lang, languageLabel(targetLangId)),
                     swapContentDescription = stringResource(R.string.cd_swap_language),
                     micContentDescription = stringResource(R.string.cd_text_mic),
                     translateContentDescription = stringResource(R.string.cd_translate),
                     inputContentDescription = stringResource(R.string.cd_text_input),
-                    onSourceClick = { pickerTarget = LanguagePickerTarget.SOURCE },
-                    onTargetClick = { pickerTarget = LanguagePickerTarget.TARGET },
+                    onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
+                    onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
                     onSwap = onSwapLanguages,
                     onMic = { showGuided(guidedVoice) },
                     onTranslate = onTranslate,
                     translateEnabled = input.isNotBlank() && input.length <= TEXT_CHAR_LIMIT,
+                    // "Detect language" has nothing to swap INTO the target slot,
+                    // so the control is disabled rather than silently wrong.
+                    swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
                     counterText =
                         when {
                             input.isEmpty() -> {
@@ -269,22 +249,64 @@ fun HomeContent(
             )
         }
     }
+}
 
-    pickerTarget?.let { target ->
-        LanguagePickerSheet(
-            target = target,
-            languages = languages,
-            selectedId = if (target == LanguagePickerTarget.SOURCE) sourceLangId else targetLangId,
-            onSelect = { id ->
-                when (target) {
-                    LanguagePickerTarget.SOURCE -> onSelectSourceLanguage(id)
-                    LanguagePickerTarget.TARGET -> onSelectTargetLanguage(id)
-                }
-                pickerTarget = null
-            },
-            onDismiss = { pickerTarget = null },
-        )
-    }
+/**
+ * UI_SPEC §2.1 hub top bar: ☰ · centred mode chip · new/clear. Stock
+ * [CenterAlignedTopAppBar], transparent so the flat page `surface` shows through;
+ * insets are already handled by the screen's `safeDrawing` padding.
+ */
+@OptIn(ExperimentalMaterial3Api::class) // CenterAlignedTopAppBar's insets/colors overload
+@Composable
+private fun HomeTopBar(
+    onOpenDrawer: () -> Unit,
+    onClearAll: () -> Unit,
+    onModeClick: () -> Unit,
+) {
+    val modeLabel = stringResource(R.string.text_mode_automatic)
+    val modeDescription = stringResource(R.string.cd_text_mode_chip, modeLabel)
+    CenterAlignedTopAppBar(
+        title = {
+            AssistChip(
+                onClick = onModeClick,
+                label = { Text(modeLabel) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(Dimensions.iconSm),
+                    )
+                },
+                trailingIcon = {
+                    Icon(
+                        Icons.Filled.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(Dimensions.iconSm),
+                    )
+                },
+                modifier =
+                    Modifier
+                        .testTag("tt_text_mode_chip")
+                        .semantics {
+                            contentDescription = modeDescription
+                            stateDescription = modeLabel
+                        },
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onOpenDrawer, modifier = Modifier.testTag("tt_text_menu")) {
+                Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.cd_text_menu))
+            }
+        },
+        actions = {
+            IconButton(onClick = onClearAll, modifier = Modifier.testTag("tt_text_clear")) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.cd_text_clear))
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+        windowInsets = WindowInsets(0, 0, 0, 0),
+    )
 }
 
 /**
@@ -305,7 +327,11 @@ private fun CanvasVisibility(
     }
 }
 
-/** Canvas band (UI_SPEC §2.1): sparkle → greeting → subtitle → quick-action tiles. */
+/**
+ * Canvas band (UI_SPEC §2.1): sparkle → greeting → subtitle → quick actions.
+ * The actions are GT-shaped tonal circles with their label beneath, and the row
+ * is built to keep looking intentional as more of them arrive.
+ */
 @Composable
 private fun HomeCanvas(
     greeting: GreetingPeriod,
@@ -357,23 +383,19 @@ private fun HomeCanvas(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(spacing.lg24))
-        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm8)) {
-            QuickActionTile(
-                title = stringResource(R.string.home_tile_conversation),
+        Spacer(modifier = Modifier.height(spacing.xl32))
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xl32)) {
+            QuickActionButton(
+                label = stringResource(R.string.home_tile_conversation),
                 icon = Icons.Filled.Forum,
                 onClick = onOpenConversation,
-                subLabel = stringResource(R.string.home_tile_conversation_sub),
                 testTag = "tt_text_tile_conversation",
-                modifier = Modifier.weight(1f),
             )
-            QuickActionTile(
-                title = stringResource(R.string.home_tile_camera),
+            QuickActionButton(
+                label = stringResource(R.string.home_tile_camera),
                 icon = Icons.Filled.PhotoCamera,
                 onClick = onOpenCamera,
-                subLabel = stringResource(R.string.home_tile_camera_sub),
                 testTag = "tt_text_tile_camera",
-                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -387,14 +409,12 @@ private fun HomeContentEmptyPreview() {
             input = "",
             sourceLangId = "en",
             targetLangId = "fr",
-            languages = emptyList(),
             greeting = GreetingPeriod.AFTERNOON,
             userName = null,
             onInputChange = {},
             onTranslate = {},
             onSwapLanguages = {},
-            onSelectSourceLanguage = {},
-            onSelectTargetLanguage = {},
+            onPickLanguage = {},
             onClearAll = {},
             onOpenDrawer = {},
             onOpenCamera = {},
@@ -410,14 +430,12 @@ private fun HomeContentTypingPreview() {
             input = "Good morning",
             sourceLangId = "en",
             targetLangId = "fr",
-            languages = emptyList(),
             greeting = GreetingPeriod.MORNING,
             userName = null,
             onInputChange = {},
             onTranslate = {},
             onSwapLanguages = {},
-            onSelectSourceLanguage = {},
-            onSelectTargetLanguage = {},
+            onPickLanguage = {},
             onClearAll = {},
             onOpenDrawer = {},
             onOpenCamera = {},

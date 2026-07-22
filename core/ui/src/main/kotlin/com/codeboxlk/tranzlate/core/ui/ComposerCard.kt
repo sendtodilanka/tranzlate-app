@@ -5,12 +5,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -19,9 +19,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material3.FilledIconButton
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,33 +31,42 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.LayoutDirection
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
-import com.codeboxlk.tranzlate.core.designsystem.Elevation
 import com.codeboxlk.tranzlate.core.designsystem.LocalFloatingSurface
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
+import com.codeboxlk.tranzlate.core.designsystem.TranzlateShapeFull
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 
 /**
- * UI_SPEC §2.2 — THE signature component. Always a card (owner decision A,
- * 2026-07-22): floating-surface rounded card with a multi-line text area on
- * top and the full-width control row beneath —
- * `[source ▾] ⇄ [target ▾] (action)`.
+ * UI_SPEC §2.2 — THE signature layout (owner decision A, 2026-07-22), assembled
+ * from stock Material 3 parts only: a [Surface] panel holding a [BasicTextField]
+ * over the full-width control row `[source] ⇄ [target] (action)`.
  *
- * - **Primary action** = the ONE saturated `primary` element on the screen:
- *   mic while [value] is empty, Translate (➜) as soon as there is text (C-2:
- *   translation fires only on this explicit action).
- * - **Growth**: the card grows with content; the CALLER caps it by passing
+ * - **Panel**: a lighter surface step, no border and no shadow — Google
+ *   Translate separates the composer from the page by lightness alone.
+ * - **Language selectors**: stock [AssistChip]s in the neutral tonal step, label
+ *   only. GT shows no dropdown caret on these pills, and the pill shape plus the
+ *   "Source language, …" description already say "tappable".
+ * - **Primary action**: [PrimaryActionButton] — mic while [value] is empty,
+ *   Translate (➜) as soon as there is text (C-2: translation fires only on this
+ *   explicit action).
+ * - **Growth**: the panel grows with content; the CALLER caps it by passing
  *   `Modifier.heightIn(max = …)` (e.g. ~40% of the viewport) — beyond the cap
  *   the text area scrolls internally. Unconstrained (e.g. in previews) it
  *   simply wraps.
  * - **No IME logic inside** — the caller applies `imePadding()` and keeps the
- *   card directly above the keyboard.
+ *   panel directly above the keyboard.
  * - Char counter ([counterText], C-5 `"12/500"`) sits at the text-area corner
  *   with a polite live region (a11y contract §2.3).
  */
@@ -96,10 +107,9 @@ fun ComposerCard(
     val spacing = LocalSpacing.current
     val scrollState = rememberScrollState()
     Surface(
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         color = LocalFloatingSurface.current,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shadowElevation = Elevation.level2,
         modifier = modifier,
     ) {
         BoxWithConstraints {
@@ -172,54 +182,110 @@ fun ComposerCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(spacing.xs4),
                 ) {
-                    LanguageChip(
+                    LanguagePill(
                         label = sourceLabel,
                         onClick = onSourceClick,
                         contentDescription = sourceContentDescription,
                         enabled = enabled,
                         testTag = sourceTestTag,
-                        modifier = Modifier.weight(1f),
                     )
-                    SwapButton(
+                    SwapAction(
                         onClick = onSwap,
                         contentDescription = swapContentDescription,
                         enabled = enabled && swapEnabled,
                         testTag = swapTestTag,
                     )
-                    LanguageChip(
+                    LanguagePill(
                         label = targetLabel,
                         onClick = onTargetClick,
                         contentDescription = targetContentDescription,
                         enabled = enabled,
                         testTag = targetTestTag,
-                        modifier = Modifier.weight(1f),
                     )
                     val showMic = value.isEmpty()
-                    FilledIconButton(
+                    PrimaryActionButton(
                         onClick = if (showMic) onMic else onTranslate,
+                        contentDescription =
+                            if (showMic) micContentDescription else translateContentDescription,
                         enabled = enabled && (showMic || translateEnabled),
-                        colors =
-                            IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ),
-                        modifier =
-                            Modifier
-                                .size(Dimensions.touchTargetMin)
-                                .testTag(actionTestTag),
+                        testTag = actionTestTag,
                     ) {
                         if (showMic) {
-                            Icon(Icons.Filled.Mic, contentDescription = micContentDescription)
+                            Icon(Icons.Filled.Mic, contentDescription = null)
                         } else {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = translateContentDescription,
-                            )
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Language selector: stock [AssistChip] in the neutral tonal step, stretched to
+ * share the control row. The a11y phrase ("Source language, English") replaces
+ * the chip's own label semantics (contract §2.1 rows 4–5).
+ */
+@Composable
+private fun RowScope.LanguagePill(
+    label: String,
+    onClick: () -> Unit,
+    contentDescription: String,
+    enabled: Boolean,
+    testTag: String,
+) {
+    AssistChip(
+        onClick = onClick,
+        enabled = enabled,
+        shape = TranzlateShapeFull,
+        border = null,
+        colors =
+            AssistChipDefaults.assistChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                labelColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        label = {
+            Text(
+                text = label,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        modifier =
+            Modifier
+                .weight(1f)
+                .height(Dimensions.languageChipHeight)
+                .testTag(testTag)
+                .semantics { this.contentDescription = contentDescription },
+    )
+}
+
+/**
+ * Swap (⇄) between the two language pills — a plain [IconButton]. Mirrored in
+ * RTL (a11y contract §2.6: swap/reverse icons must mirror; `SwapHoriz` has no
+ * AutoMirrored variant, so we flip it explicitly).
+ */
+@Composable
+private fun SwapAction(
+    onClick: () -> Unit,
+    contentDescription: String,
+    enabled: Boolean,
+    testTag: String,
+) {
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.testTag(testTag),
+    ) {
+        Icon(
+            Icons.Filled.SwapHoriz,
+            contentDescription = contentDescription,
+            modifier = Modifier.graphicsLayer { scaleX = if (isRtl) -1f else 1f },
+        )
     }
 }
 

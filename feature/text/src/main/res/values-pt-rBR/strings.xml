@@ -9,4 +9,8 @@
     <string name="cd_swap_language">Trocar Idioma</string>
     <string name="home_edit_no_text_to_translate_warning">Digite um texto para traduzir.</string>
     <string name="button_retry">Tentar novamente</string>
+    <!-- TODO(NEEDS-TRANSLATION, C-12) issue #15 language-picker keys queued in the
+         content backlog: text_lang_detect, text_lang_all_header,
+         cd_text_lang_search, text_guided_lang_search. Left untranslated on
+         purpose — a guessed translation is worse than the en fallback. -->
 </resources>
