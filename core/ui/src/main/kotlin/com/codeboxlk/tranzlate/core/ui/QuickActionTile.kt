@@ -121,7 +121,7 @@ fun QuickActionTile(
 private fun QuickActionTilePreview() {
     TranzlateTheme {
         val spacing = LocalSpacing.current
-        AmbientBackground {
+        Surface(color = MaterialTheme.colorScheme.surface) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
                 modifier =

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -45,7 +46,7 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 private fun HomePreview() {
     TranzlateTheme {
         val spacing = LocalSpacing.current
-        AmbientBackground(modifier = Modifier.fillMaxSize()) {
+        Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 TranzlateTopBar(
                     navigationIcon = {
@@ -151,7 +152,7 @@ private fun HomePreview() {
 private fun ResultPreview() {
     TranzlateTheme {
         val spacing = LocalSpacing.current
-        AmbientBackground(modifier = Modifier.fillMaxSize()) {
+        Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(spacing.lg24),
                 modifier =

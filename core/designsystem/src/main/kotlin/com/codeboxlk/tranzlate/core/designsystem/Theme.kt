@@ -16,8 +16,12 @@ import androidx.compose.ui.platform.LocalContext
  * brand identity, not gray defaults).
  *
  * [dynamicColor] defaults to false so the brand palette is the baseline; a Settings
- * preference wires user opt-in later. Palette = P8 "Tranzlate Teal" (owner-final
- * 2026-07-22, issue #10) — a preset swap (issue #7) touches Color.kt only.
+ * preference wires user opt-in later. Palette = "GT Blue (Google 1P)" (owner-final
+ * 2026-07-22, issue #15) — a preset swap (issue #7) touches Color.kt only.
+ *
+ * Backgrounds are FLAT (issue #15): pages paint `surface`; there is no ambient
+ * gradient token any more. Elevated panels separate by a lighter surface step
+ * ([LocalFloatingSurface]), never by a wash.
  */
 @Composable
 fun TranzlateTheme(
@@ -37,7 +41,6 @@ fun TranzlateTheme(
         if (darkTheme) colorScheme.surfaceContainer else colorScheme.surfaceContainerLowest
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
-        LocalAmbientGradient provides if (darkTheme) DarkAmbientGradient else LightAmbientGradient,
         LocalFloatingSurface provides floatingSurface,
     ) {
         MaterialTheme(

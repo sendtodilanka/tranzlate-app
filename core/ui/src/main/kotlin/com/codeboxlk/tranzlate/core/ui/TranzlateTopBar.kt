@@ -10,6 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,8 +22,8 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 
 /**
  * UI_SPEC §2.1 top bar: ☰ nav slot at the start, [ModeChip] centred, action
- * slot at the end. TRANSPARENT — it rides directly on [AmbientBackground]
- * (no container color, no elevation; the wash shows through).
+ * slot at the end. TRANSPARENT — it rides directly on the page `surface`
+ * (no container color, no elevation).
  *
  * The centre slot stays optically centred regardless of how wide the side
  * slots are (Box alignment, not a Row split).
@@ -59,7 +61,7 @@ fun TranzlateTopBar(
 @Composable
 private fun TranzlateTopBarPreview() {
     TranzlateTheme {
-        AmbientBackground(modifier = Modifier.fillMaxWidth()) {
+        Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
             TranzlateTopBar(
                 navigationIcon = {
                     DottedRingIconButton(onClick = {}, contentDescription = "Open navigation") {

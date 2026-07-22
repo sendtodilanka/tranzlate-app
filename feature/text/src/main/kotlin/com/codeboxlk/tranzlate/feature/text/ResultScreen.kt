@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.feature.text
 
 import android.content.ClipData
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,7 +53,6 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.FailureReason
 import com.codeboxlk.tranzlate.core.model.ModeId
-import com.codeboxlk.tranzlate.core.ui.AmbientBackground
 import com.codeboxlk.tranzlate.core.ui.DottedRingIconButton
 import com.codeboxlk.tranzlate.core.ui.EngineBadge
 import com.codeboxlk.tranzlate.core.ui.InlineErrorRetry
@@ -108,7 +108,12 @@ fun ResultContent(
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
 
-    AmbientBackground(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface),
+    ) {
         Column(
             modifier =
                 Modifier

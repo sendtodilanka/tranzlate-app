@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -53,7 +54,6 @@ import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.Motion
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.Language
-import com.codeboxlk.tranzlate.core.ui.AmbientBackground
 import com.codeboxlk.tranzlate.core.ui.ComposerCard
 import com.codeboxlk.tranzlate.core.ui.DottedRingIconButton
 import com.codeboxlk.tranzlate.core.ui.ModeChip
@@ -147,7 +147,12 @@ fun HomeContent(
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
 
-    AmbientBackground(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface),
+    ) {
         BoxWithConstraints(
             modifier =
                 Modifier

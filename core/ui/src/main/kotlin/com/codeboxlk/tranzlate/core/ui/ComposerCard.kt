@@ -228,7 +228,7 @@ fun ComposerCard(
 private fun ComposerCardEmptyPreview() {
     TranzlateTheme {
         val spacing = LocalSpacing.current
-        AmbientBackground {
+        Surface(color = MaterialTheme.colorScheme.surface) {
             ComposerCard(
                 value = "",
                 onValueChange = {},
@@ -257,7 +257,7 @@ private fun ComposerCardEmptyPreview() {
 private fun ComposerCardFilledPreview() {
     TranzlateTheme {
         val spacing = LocalSpacing.current
-        AmbientBackground {
+        Surface(color = MaterialTheme.colorScheme.surface) {
             ComposerCard(
                 value = "Good morning",
                 onValueChange = {},
