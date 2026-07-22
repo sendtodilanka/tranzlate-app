@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Brand teal (DESIGN_SYSTEM light primary #1C7A97). Placeholder scaffold icon;
+    <!-- Brand blue (DESIGN_SYSTEM §1.1 light primary #0B57D0 — palette P9 "GT Blue",
+         issue #15; the teal it replaced is retired). Placeholder scaffold icon;
          final brand icon lands in the UI-design phase (D-P2). -->
-    <color name="ic_launcher_background">#1C7A97</color>
+    <color name="ic_launcher_background">#0B57D0</color>
 </resources>

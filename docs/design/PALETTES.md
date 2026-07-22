@@ -1,4 +1,6 @@
-# Palette Catalog — Tranzlate (research-verified, 2026-07-21)
+# Palette Catalog — Tranzlate (research-verified, 2026-07-21 · app palette re-decided 2026-07-22)
+
+> **Shipped palette = [P9 GT Blue](#p9--gt-blue-google-1p-complete-48-role--app-palette-owner-final-2026-07-22-issue-15).** P8 (teal) is retired; P5 stays retired. Everything else in this file is preset material for the future theme picker (issue #7).
 
 > Owner directive: "internet එකේ වඩාත්ම ජනප්‍රිය mobile light/dark palette එක use කරන්න + candidates ඔක්කොම save කරන්න — theme color-change feature එකට".
 > Method: 4-lens web research (M3 official token DB · iOS HIG/UIKit · top-app teardowns · community consensus) + synthesis + 2 adversarial verifications (source spot-checks + WCAG math recomputed). Workflow `wf_d446a618-efd` (agents 7). සියලු hex අගයන් source-cited; contrast WCAG 2.x relative-luminance formula එකෙන් double-computed.
@@ -6,7 +8,54 @@
 
 ---
 
-## P1 — Google Blue (GM3 "1P") — research winner; now the NEUTRAL/SUPPORT source for P8
+## P9 — GT Blue (Google 1P, complete 48-role) ⭐ **APP PALETTE (owner-final 2026-07-22, issue #15)**
+
+Owner ran **Google Translate v10.27** beside our build on the emulator and picked GT's own colours over the teal brand set. Verified result: **P9 = P1 verbatim + the 12 `*Fixed` roles** that P1 never listed. Every role Compose's `ColorScheme` exposes is now set explicitly in `core/designsystem/Color.kt` — nothing falls back to a Material default.
+
+**Accent reference tones** (chromium `ui/color/ref_color_mixer.cc`, cross-checked against the m3.material.io 1P token DB):
+
+| Tone | Primary | Secondary | Tertiary |
+|---|---|---|---|
+| 10 | `#041E49` | `#001D35` | `#072711` |
+| 20 | `#062E6F` | `#003355` | `#0A3818` |
+| 30 | `#0842A0` | `#004A77` | `#0F5223` |
+| 40 | `#0B57D0` | `#00639B` | `#146C2E` |
+| 80 | `#A8C7FA` | `#7FCFFF` | `#6DD58C` |
+| 90 | `#D3E3FD` | `#C2E7FF` | `#C4EED0` |
+
+**Light + dark (36 base roles):** identical to the **P1 table below** — accents, surfaces, neutrals, outline, inverse and the error set, hex for hex.
+
+**The 12 `*Fixed` roles — IDENTICAL in BOTH schemes.** That is what "fixed" means: a colour that survives a light↔dark switch unchanged. Ladder verified in Compose `ColorLightTokens.kt`/`ColorDarkTokens.kt`: Fixed = tone90 · FixedDim = tone80 · onFixed = tone10 · onFixedVariant = tone30.
+
+| Role | Value | Role | Value |
+|---|---|---|---|
+| `primaryFixed` | `#D3E3FD` | `onPrimaryFixed` | `#041E49` |
+| `primaryFixedDim` | `#A8C7FA` | `onPrimaryFixedVariant` | `#0842A0` |
+| `secondaryFixed` | `#C2E7FF` | `onSecondaryFixed` | `#001D35` |
+| `secondaryFixedDim` | `#7FCFFF` | `onSecondaryFixedVariant` | `#004A77` |
+| `tertiaryFixed` | `#C4EED0` | `onTertiaryFixed` | `#072711` |
+| `tertiaryFixedDim` | `#6DD58C` | `onTertiaryFixedVariant` | `#0F5223` |
+
+**Contrast — recomputed 2026-07-22 with the WCAG 2.x relative-luminance formula (issue #15). All pass AA; no pair below 4.5.**
+
+| Pair | Light | Dark |
+|---|---|---|
+| `onPrimary` / `primary` | 6.39 ✓ | 7.50 ✓ |
+| `onSurface` / `surface` | 15.67 ✓ | 14.47 ✓ |
+| `onSurfaceVariant` / `surfaceVariant` | 7.28 ✓ | 5.51 ✓ |
+| `onPrimaryContainer` / `primaryContainer` | 7.04 ✓ | 7.04 ✓ |
+| `onSecondaryContainer` / `secondaryContainer` | 7.20 ✓ | 7.20 ✓ |
+| `onTertiaryContainer` / `tertiaryContainer` | 7.32 ✓ | 7.32 ✓ |
+| `onErrorContainer` / `errorContainer` | 7.17 ✓ | 7.17 ✓ |
+| `primary` / `surface` (icon/label accent) | 6.07 ✓ | 10.80 ✓ |
+
+Call-site pairs the stock-M3 swap introduced: `onSurfaceVariant`/`surface` 8.93 · 10.90 — `onSurface`/`surfaceContainerLowest` 16.48 · 15.03 — `onSurfaceVariant`/`surfaceContainerHigh` 7.68 · 8.42 — `primary`/`surfaceContainerLowest` 6.39 · 11.22. `*Fixed` pairs: lowest is `onTertiaryFixedVariant`/`tertiaryFixedDim` **5.13 ✓** (all 12 pass).
+
+**Gradient:** none. The ambient-wash token is deleted (issue #15) — pages are flat `surface`, panels separate by a lighter surface step.
+
+---
+
+## P1 — Google Blue (GM3 "1P") — research winner; the base of the shipped P9 (was the NEUTRAL/SUPPORT source for the retired P8)
 
 Google තමන්ගේම apps වල (Gmail/Drive/Chrome static baseline) ship කරන scheme එක. Blue = top apps + surveys දෙකෙන්ම dominant accent hue; surfaces = M3 tonal-neutral greys (M2 #121212 එකේ අනුප්‍රාප්තිකයා). Status: **COMPLETE** — Compose `lightColorScheme()`/`darkColorScheme()` වලට කෙලින්ම.
 
@@ -50,9 +99,11 @@ Google තමන්ගේම apps වල (Gmail/Drive/Chrome static baseline) sh
 **Contrast (recomputed, verifier-confirmed):** 14/14 text pairs pass — light onPrimary/primary 6.39 · onSurface/surface 15.67 · dark onPrimary/primary 7.50 · onSurface/surface 14.47 · full list in workflow record. **Sources:** m3.material.io DSM token DB (1P Baseline context) · chromium `ref_color_mixer.cc` (`kColorRefPrimary40=#0B57D0`, `kColorRefPrimary80=#A8C7FA`) · Compose `ColorDarkTokens.kt` role ladder · material-web `_md-sys-color.scss`.
 **Notes:** (1) Compose එකට `surfaceTint = primary` explicit දාන්න. (2) Live 1P DB surface-variant එකක් තියෙනවා (light surface `#FFFFFF` + blue-tinted ladder `#F8FAFD/#F0F4F9/#E9EEF6/#DDE3EA`; dark `#0E0E0E/#1B1B1B/#1E1F20/#282A2C/#333537`) — අපේ pick = Compose-token-structure grey ladder (fidelity to the shipped Compose defaults); blue-tinted variant P1b ලෙස note කර ඇත.
 
-## P8 — Tranzlate Teal (cool-mono) ⭐ **APP PALETTE (owner-final 2026-07-22)**
+## P8 — Tranzlate Teal (cool-mono) — ❌ **RETIRED 2026-07-22 (issue #15)**
 
-Owner: the **teal accent is beautiful — keep it**; the *coral + gold* companions in the old heritage set were the problem, so all warm accents are gone. Result: a **single cool family** — teal primary, blue support, P1 neutral greys. Every pair below computed with the WCAG 2.x relative-luminance formula (13/13 pass).
+Was the app palette for a few hours on 2026-07-22 (issue #10). **Retired the same day** after the owner drove Google Translate on the emulator beside our build: the north star (D-0) is GT's behaviour AND its look, and a teal identity fights that. Superseded by **P9 (GT Blue)** above. Kept here as a preset candidate (issue #7) and as history — the teal hexes below must not appear in shipped code.
+
+Original note: the teal accent kept from the brand set with all warm accents (coral/gold) removed — a single cool family, teal primary, blue support, P1 neutral greys. Every pair computed with the WCAG 2.x relative-luminance formula (13/13 pass).
 
 | Role | Light | Dark |
 |---|---|---|
@@ -73,8 +124,8 @@ Owner: the **teal accent is beautiful — keep it**; the *coral + gold* companio
 | surfaceTint | = primary | = primary |
 | ambient gradient | teal→blue wash (`#1C7A97`→`#00639B` at low opacity over surface) | same family, deeper |
 
-`primary` on `surface`: light 4.67:1 ✓ · dark 7.83:1 ✓ (icon/label accent use). **No coral, no gold, no violet, no warm hue anywhere.**
-Provenance: teal tones from the original DESIGN_SYSTEM §1 brand set (kept), blue/neutral/error from P1 (Google 1P, research-verified), tertiary tones derived in-family and contrast-verified here.
+`primary` on `surface`: light 4.67:1 ✓ · dark 7.83:1 ✓ (icon/label accent use).
+Provenance: teal tones from the original DESIGN_SYSTEM §1 brand set, blue/neutral/error from P1 (Google 1P, research-verified), tertiary tones derived in-family and contrast-verified here. The "ambient gradient" row is retired with the palette — the app has no gradient token at all (issue #15).
 
 ## P2 — Material 3 Baseline Purple (3P) — COMPLETE preset
 
@@ -92,7 +143,7 @@ systemBlue `#007AFF`/dark `#0A84FF` (accessible variants `#0040DD`/`#409CFF`) ·
 
 ## P5 — Tranzlate Teal/Coral (brand heritage) — ❌ RETIRED 2026-07-22
 
-Full light+dark tables: [`docs/specs/00-foundations/DESIGN_SYSTEM.md` §1](../specs/00-foundations/DESIGN_SYSTEM.md) (teal `#1C7A97`/`#3FB6D4` + coral + gold, WCAG-checked). **Owner FINAL 2026-07-22: permanently retired** — design system එකෙන් ඉවත් කරන ලදී (theme-preset එකක් ලෙසවත් නෑ). **2026-07-22 පසුව:** owner ට teal එක ලස්සන බව තහවුරු වුණා — coral/gold පමණක් නරකයි. එබැවින් **P8 (Tranzlate Teal cool-mono)** = app palette; P5 ගේ teal tones P8 එකට carry වුණා, coral/gold ස්ථිරව අයින්. Issue #10 scope = P8 apply (P1 නෙවෙයි).
+Full light+dark tables: [`docs/specs/00-foundations/DESIGN_SYSTEM.md` §1](../specs/00-foundations/DESIGN_SYSTEM.md) (teal `#1C7A97`/`#3FB6D4` + coral + gold, WCAG-checked). **Owner FINAL 2026-07-22: permanently retired** — design system එකෙන් ඉවත් කරන ලදී (theme-preset එකක් ලෙසවත් නෑ). **2026-07-22 පසුව:** owner ට teal එක ලස්සන බව තහවුරු වුණා — coral/gold පමණක් නරකයි. එබැවින් P5 ගේ teal tones **P8** එකට carry වුණා (coral/gold ස්ථිරව අයින්), issue #10 scope = P8 apply. **එදිනම (issue #15) owner Google Translate emulator එකේ අපේ build එක ළඟ තියලා බැලුවාට පස්සේ P8 ත් retire වුණා** — shipped palette දැන් **P9 (GT Blue)**.
 
 ## P6 — M2 Classic Dark (historic reference only)
 

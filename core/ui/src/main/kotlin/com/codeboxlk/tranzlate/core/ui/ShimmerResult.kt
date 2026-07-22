@@ -38,9 +38,11 @@ private const val LINE_SHORT = 0.45f
  * block (two text lines + a caption line), swept by an animated highlight
  * ([Motion.SHIMMER_CYCLE], linear — a continuous loop, not a one-shot).
  *
- * Purely decorative: announcements come from the feature's loading live region
- * ([LoadingView] / `tt_text_loading`, a11y contract §2.3) — this draws no
- * semantics of its own beyond the [testTag].
+ * Kept custom on purpose: Material 3 ships no skeleton/placeholder component.
+ *
+ * Purely decorative: announcements come from the feature's own loading live
+ * region (`tt_text_loading`, a11y contract §2.3) — this draws no semantics of
+ * its own beyond the [testTag].
  */
 @Composable
 fun ShimmerResult(

@@ -2,7 +2,7 @@
 
 > Clean-room design foundation for the Tranzlate Android translator (Jetpack Compose + Material 3).
 > This document **replaces** the Material template purple stubs (`Purple80`/`Pink80`) currently in `ui/theme/Color.kt`.
-> **2026-07-22 (issue #10): palette = P8 "Tranzlate Teal (cool-mono)"** — owner-final. Teal primary kept from the brand set; blue support + neutrals + error from Google 1P (P1); **all warm accents (coral / gold) permanently removed.** Provenance + WCAG math: [`docs/design/PALETTES.md`](../../design/PALETTES.md) §P8.
+> **2026-07-22 (issue #15): palette = P9 "GT Blue (Google 1P)"** — owner-final, decided by running Google Translate v10.27 beside our build. **All 48 `ColorScheme` roles are set explicitly** (36 base + the 12 `*Fixed`); nothing falls back to a Material default. P8 teal is retired. Provenance + WCAG math: [`docs/design/PALETTES.md`](../../design/PALETTES.md) §P9.
 > **Component-level contract: [`docs/design/UI_SPEC.md`](../../design/UI_SPEC.md).**
 >
 > **Scope:** static (baseline) palette + full M3 role tokens, type, spacing, shape, elevation, iconography, motion, and component notes.
@@ -10,54 +10,54 @@
 
 ---
 
-## 0. Contrast validation summary (P8 — precomputed in PALETTES.md)
+## 0. Contrast validation summary (P9 — recomputed 2026-07-22, issue #15)
 
 Every pair below was computed with the WCAG 2.x relative-luminance formula
-`(L1 + 0.05) / (L2 + 0.05)` during the P8 verification (PALETTES.md §P8 — **13/13 pass**).
-Values are copied verbatim from that record.
+`(L1 + 0.05) / (L2 + 0.05)` against the shipped `Color.kt` values.
+**All pass AA; the lowest text pair is 5.13.** Full list incl. the `*Fixed`
+ladder: PALETTES.md §P9.
 
-| Pair | Theme | Ratio | Verdict |
-|---|---|---|---|
-| `onPrimary` `#FFFFFF` on `primary` `#1C7A97` | light | 4.91:1 | ✓ |
-| `onPrimary` `#00363F` on `primary` `#3FB6D4` | dark | 5.54:1 | ✓ |
-| `onPrimaryContainer` `#002F3C` on `primaryContainer` `#B8E7F5` | light | 10.73:1 | ✓ |
-| `onPrimaryContainer` `#B8E7F5` on `primaryContainer` `#10586B` | dark | 6.00:1 | ✓ |
-| `onSecondary` `#FFFFFF` on `secondary` `#00639B` | light | 6.45:1 | ✓ |
-| `onSecondary` `#003355` on `secondary` `#7FCFFF` | dark | 7.65:1 | ✓ |
-| `onSecondaryContainer` `#004A77` on `secondaryContainer` `#C2E7FF` | light | 7.20:1 | ✓ |
-| `onTertiary` `#FFFFFF` on `tertiary` `#10586B` | light | 7.98:1 | ✓ |
-| `onTertiary` `#00363F` on `tertiary` `#8FD3E3` | dark | 7.87:1 | ✓ |
-| `onTertiaryContainer` `#002F3C` on `tertiaryContainer` `#CDE9F2` | light | 11.23:1 | ✓ |
-| `onTertiaryContainer` `#CDE9F2` on `tertiaryContainer` `#0B4A5A` | dark | 7.72:1 | ✓ |
-| `primary` `#1C7A97` on `surface` `#FAF9F8` (icon/label accent use) | light | 4.67:1 | ✓ |
-| `primary` `#3FB6D4` on `surface` `#131314` (icon/label accent use) | dark | 7.83:1 | ✓ |
+| Pair | Light | Dark |
+|---|---|---|
+| `onPrimary` / `primary` | 6.39 ✓ | 7.50 ✓ |
+| `onSurface` / `surface` | 15.67 ✓ | 14.47 ✓ |
+| `onSurfaceVariant` / `surfaceVariant` | 7.28 ✓ | 5.51 ✓ |
+| `onPrimaryContainer` / `primaryContainer` | 7.04 ✓ | 7.04 ✓ |
+| `onSecondaryContainer` / `secondaryContainer` | 7.20 ✓ | 7.20 ✓ |
+| `onTertiaryContainer` / `tertiaryContainer` | 7.32 ✓ | 7.32 ✓ |
+| `onErrorContainer` / `errorContainer` | 7.17 ✓ | 7.17 ✓ |
+| `primary` / `surface` (icon/label accent use) | 6.07 ✓ | 10.80 ✓ |
+| `onSurface` / `surfaceContainerLowest` (panel text) | 16.48 ✓ | 15.03 ✓ |
+| `onSurfaceVariant` / `surfaceContainerHigh` (chip label) | 7.68 ✓ | 8.42 ✓ |
 
-> Surfaces, neutrals, outline, inverse neutrals and the error set are **P1 values verbatim** and inherit P1's independently verified ratios (PALETTES.md §P1 — 14/14 pass; e.g. `onSurface`/`surface` light 15.67:1 · dark 14.47:1).
-
-> **Design rule for `primary`:** the brand teal `#1C7A97` (light) / `#3FB6D4` (dark) is **kept** from the original brand set (owner 2026-07-22: the teal stays; only the warm coral/gold companions were the problem). All support/neutral/error tones come from P1 (Google 1P, research-verified). **No coral, no gold, no violet, no warm hue anywhere** (P8 rule).
+> **Design rule for `primary`:** `#0B57D0` (light) / `#A8C7FA` (dark) — Google's
+> own reference tones, so our accent equals Google Translate's. **The dark theme
+> never fills a large element with `primary`** (a near-white disc on `#131314`
+> glares): the primary action fills with `primaryContainer` there — the rule
+> lives in `PrimaryActionButton` (`:core:ui`), stated once.
 
 ---
 
-## 1. Color role tokens (Material 3) — P8 "Tranzlate Teal (cool-mono)"
+## 1. Color role tokens (Material 3) — P9 "GT Blue (Google 1P)"
 
-> Accents (primary/secondary/tertiary families) from the P8 table; surfaces, neutrals, outline, inverse neutrals and the error set are **P1 (Google 1P) values verbatim** — see PALETTES.md §P8/§P1.
+> The complete 48-role set, hex-for-hex with PALETTES.md §P9. §1.1/§1.2 list the 36 base roles per theme; §1.3 the 12 `*Fixed` roles, which are **the same in both themes**.
 
 ### 1.1 Light scheme
 
 | Role | HEX | Notes |
 |---|---|---|
-| `primary` | `#1C7A97` | Brand teal (kept), AA-checked |
+| `primary` | `#0B57D0` | Google reference primary40 |
 | `onPrimary` | `#FFFFFF` | |
-| `primaryContainer` | `#B8E7F5` | Light teal fill (chips, tonal buttons) |
-| `onPrimaryContainer` | `#002F3C` | |
-| `secondary` | `#00639B` | Support blue (P1 secondary) |
+| `primaryContainer` | `#D3E3FD` | primary90 — tonal fill (chips, tonal buttons) |
+| `onPrimaryContainer` | `#0842A0` | primary30 |
+| `secondary` | `#00639B` | secondary40 |
 | `onSecondary` | `#FFFFFF` | |
-| `secondaryContainer` | `#C2E7FF` | Light blue fill |
-| `onSecondaryContainer` | `#004A77` | |
-| `tertiary` | `#10586B` | Deep teal, in-family (P8-derived) |
+| `secondaryContainer` | `#C2E7FF` | secondary90 |
+| `onSecondaryContainer` | `#004A77` | secondary30 |
+| `tertiary` | `#146C2E` | tertiary40 (green) |
 | `onTertiary` | `#FFFFFF` | |
-| `tertiaryContainer` | `#CDE9F2` | |
-| `onTertiaryContainer` | `#002F3C` | |
+| `tertiaryContainer` | `#C4EED0` | tertiary90 |
+| `onTertiaryContainer` | `#0F5223` | tertiary30 |
 | `background` | `#FAF9F8` | = `surface` (P1) |
 | `onBackground` | `#1F1F1F` | |
 | `surface` | `#FAF9F8` | |
@@ -69,17 +69,17 @@ Values are copied verbatim from that record.
 | `surfaceContainerLowest` | `#FFFFFF` | |
 | `surfaceContainerLow` | `#F4F3F2` | |
 | `surfaceContainer` | `#EFEDED` | Default card/sheet base |
-| `surfaceContainerHigh` | `#E9E8E8` | |
+| `surfaceContainerHigh` | `#E9E8E8` | Chip / language-pill fill |
 | `surfaceContainerHighest` | `#E3E3E3` | |
-| `surfaceTint` | `#1C7A97` | = `primary` (tonal elevation tint) |
+| `surfaceTint` | `#0B57D0` | = `primary` (tonal elevation tint) |
 | `inverseSurface` | `#303030` | |
 | `inverseOnSurface` | `#F2F2F2` | |
-| `inversePrimary` | `#3FB6D4` | = dark `primary` (P8 teal family) |
+| `inversePrimary` | `#A8C7FA` | = dark `primary` (primary80) |
 | `outline` | `#747775` | Borders, dividers with emphasis |
 | `outlineVariant` | `#C4C7C5` | Low-emphasis dividers |
-| `error` | `#B3261E` | P1 error set |
+| `error` | `#B3261E` | 1P error set |
 | `onError` | `#FFFFFF` | |
-| `errorContainer` | `#F9DEDC` | |
+| `errorContainer` | `#F9DEDC` | Error card container |
 | `onErrorContainer` | `#8C1D18` | |
 | `scrim` | `#000000` | |
 
@@ -87,18 +87,18 @@ Values are copied verbatim from that record.
 
 | Role | HEX | Notes |
 |---|---|---|
-| `primary` | `#3FB6D4` | Bright brand teal (kept) |
-| `onPrimary` | `#00363F` | |
-| `primaryContainer` | `#10586B` | |
-| `onPrimaryContainer` | `#B8E7F5` | |
-| `secondary` | `#7FCFFF` | Support blue (P1 secondary) |
-| `onSecondary` | `#003355` | |
-| `secondaryContainer` | `#004A77` | |
-| `onSecondaryContainer` | `#C2E7FF` | |
-| `tertiary` | `#8FD3E3` | Soft teal, in-family (P8-derived) |
-| `onTertiary` | `#00363F` | |
-| `tertiaryContainer` | `#0B4A5A` | |
-| `onTertiaryContainer` | `#CDE9F2` | |
+| `primary` | `#A8C7FA` | primary80 — accent for text/icons, NOT large fills |
+| `onPrimary` | `#062E6F` | primary20 |
+| `primaryContainer` | `#0842A0` | primary30 — the primary ACTION fill in dark |
+| `onPrimaryContainer` | `#D3E3FD` | primary90 |
+| `secondary` | `#7FCFFF` | secondary80 |
+| `onSecondary` | `#003355` | secondary20 |
+| `secondaryContainer` | `#004A77` | secondary30 |
+| `onSecondaryContainer` | `#C2E7FF` | secondary90 |
+| `tertiary` | `#6DD58C` | tertiary80 (green) |
+| `onTertiary` | `#0A3818` | tertiary20 |
+| `tertiaryContainer` | `#0F5223` | tertiary30 |
+| `onTertiaryContainer` | `#C4EED0` | tertiary90 |
 | `background` | `#131314` | = `surface` (P1) |
 | `onBackground` | `#E3E3E3` | |
 | `surface` | `#131314` | |
@@ -109,42 +109,55 @@ Values are copied verbatim from that record.
 | `surfaceBright` | `#393939` | |
 | `surfaceContainerLowest` | `#0E0E0F` | |
 | `surfaceContainerLow` | `#1F1F1F` | |
-| `surfaceContainer` | `#1F2020` | Default card/sheet base |
-| `surfaceContainerHigh` | `#2A2A2A` | |
+| `surfaceContainer` | `#1F2020` | Default card/panel base (composer in dark) |
+| `surfaceContainerHigh` | `#2A2A2A` | Chip / language-pill fill |
 | `surfaceContainerHighest` | `#343535` | |
-| `surfaceTint` | `#3FB6D4` | = `primary` (tonal elevation tint) |
+| `surfaceTint` | `#A8C7FA` | = `primary` (tonal elevation tint) |
 | `inverseSurface` | `#E3E3E3` | |
 | `inverseOnSurface` | `#303030` | |
-| `inversePrimary` | `#1C7A97` | = light `primary` (P8 teal family) |
+| `inversePrimary` | `#0B57D0` | = light `primary` (primary40) |
 | `outline` | `#8E918F` | |
 | `outlineVariant` | `#444746` | |
-| `error` | `#F2B8B5` | P1 error set |
+| `error` | `#F2B8B5` | 1P error set |
 | `onError` | `#601410` | |
-| `errorContainer` | `#8C1D18` | |
+| `errorContainer` | `#8C1D18` | Error card container |
 | `onErrorContainer` | `#F9DEDC` | |
 | `scrim` | `#000000` | |
 
+### 1.3 The 12 `*Fixed` roles — identical in BOTH schemes
+
+A "fixed" role is one that must survive a light↔dark switch unchanged, so the
+same value is passed to `lightColorScheme()` and `darkColorScheme()`. Ladder
+(verified against Compose `ColorLightTokens`/`ColorDarkTokens`):
+Fixed = tone90 · FixedDim = tone80 · onFixed = tone10 · onFixedVariant = tone30.
+
+| Role | HEX | Role | HEX |
+|---|---|---|---|
+| `primaryFixed` | `#D3E3FD` | `onPrimaryFixed` | `#041E49` |
+| `primaryFixedDim` | `#A8C7FA` | `onPrimaryFixedVariant` | `#0842A0` |
+| `secondaryFixed` | `#C2E7FF` | `onSecondaryFixed` | `#001D35` |
+| `secondaryFixedDim` | `#7FCFFF` | `onSecondaryFixedVariant` | `#004A77` |
+| `tertiaryFixed` | `#C4EED0` | `onTertiaryFixed` | `#072711` |
+| `tertiaryFixedDim` | `#6DD58C` | `onTertiaryFixedVariant` | `#0F5223` |
+
 ---
 
-## 2. Ambient wash (gradient token) — per UI_SPEC.md §1
+## 2. No gradient — flat surfaces (issue #15)
 
-The old teal→coral brand gradient is **retired with the warm accents** (2026-07-22, issue #10). The gradient token is now the **ambient wash**: a soft, low-opacity teal→blue tint laid over `surface`, strengthening toward the bottom of the page — light theme reads near-white → pale teal, dark theme `#131314` → a deep teal glow. No hard edges.
+**The app has no gradient token.** `AmbientGradient` / `LocalAmbientGradient`
+are deleted. Google Translate paints flat pages, and side by side the wash only
+muddied ours.
 
-| Property | Light | Dark |
-|---|---|---|
-| `washStart` (teal = `primary`) | `#1C7A97` | `#3FB6D4` |
-| `washEnd` (blue = `secondary` family) | `#00639B` | `#00639B` |
-| Application | low-opacity radial/vertical gradient **over `surface`** | same family, deeper |
-
-**Usage rules (gradient discipline):**
-- **Page background + at most ONE signature element per screen.** Nothing else carries the gradient.
-- **Never behind body text** — text always sits on a solid surface step.
-- **Never on dividers, borders, icons, or text** (dividers use `outlineVariant`; icons use solid roles).
-- Floating surfaces (composer, tiles, drawer sheet, cards) sit as a **lighter step over the wash** — light `surfaceContainerLowest`, dark `surfaceContainer`/`High`; separation by lightness, not outlines.
+| Rule | |
+|---|---|
+| Page background | solid `surface`. Nothing paints a gradient — not a page, not a card, not a "signature element". |
+| Depth | **lightness steps only.** A panel that must lift off the page uses a lighter surface role — light `surfaceContainerLowest` (#FFFFFF), dark `surfaceContainer` (#1F2020). |
+| Borders / shadows | avoid both on panels; a border or a drop shadow is a fallback for when no step is available, not the default. |
+| Dividers | `outlineVariant` hairlines, where a step alone would not read. |
 
 ```kotlin
-// :core:designsystem — provided by TranzlateTheme per theme
-val ambient = LocalAmbientGradient.current   // start = teal, end = blue
+// :core:designsystem — provided by TranzlateTheme, resolved from the ACTIVE scheme
+val panel = LocalFloatingSurface.current   // light #FFFFFF · dark #1F2020
 ```
 
 ---
@@ -239,7 +252,7 @@ Material 3 uses **tonal elevation** (surface color shift via `surfaceTint`) in a
 - **Filled (`fill 1`) vs outlined (`fill 0`):**
   - Outlined = inactive / unselected / default affordance.
   - Filled = **active/selected** state only — selected `NavigationBar` item, active favourite star, playing TTS, current translation model.
-- **Color:** icons inherit `onSurfaceVariant` for inactive, `primary` (or `onSecondaryContainer` inside a selected pill) for active. Decorative brand marks may use the gradient; functional icons never do.
+- **Color:** icons inherit `onSurfaceVariant` for inactive, `primary` (or `onSecondaryContainer` inside a selected pill) for active. Solid roles only — no icon carries a gradient (there is none, §2).
 - **Sizes:** `20.dp` dense inline (chips), `24.dp` standard, `40.dp` avatars/feature glyphs.
 
 ---
@@ -279,6 +292,17 @@ Guidance: **enter** with decelerate (`medium2`), **exit** with accelerate (`shor
 ---
 
 ## 9. Component style notes
+
+> **Stock-M3-first (issue #15, BINDING).** If Material 3 ships the component, we
+> use it — `IconButton`, `FilledIconButton`, `FilledTonalIconButton`,
+> `AssistChip`, `SuggestionChip`, `CenterAlignedTopAppBar`, `Card`, `TextButton`,
+> `ListItem`, `Scaffold`. A wrapper in `:core:ui` is justified only when it
+> carries a RULE or a state a call site would otherwise repeat — today:
+> `PrimaryActionButton` (the dark-theme fill rule), `QuickActionButton` (circle +
+> caption + the a11y merge), `ErrorCard` (assertive live region + testTags),
+> `ComposerCard` (the §2.2 layout), `ResultBlock` (the §2.4 layout) and
+> `ShimmerResult` (M3 has no skeleton). A wrapper that only re-colours a stock
+> component is NOT justified — set the colours at the call site.
 
 **Button (filled / primary CTA)**
 - Container `primary`, label `onPrimary`, `labelLarge`.
@@ -323,12 +347,14 @@ val colorScheme = when {
 }
 ```
 
-**2. Non-M3 tokens** (spacing, gradient, motion, dimensions) — expose via CompositionLocals, provided inside the theme:
+**2. Non-M3 tokens** (spacing, panel step, motion, dimensions) — expose via CompositionLocals, provided inside the theme:
 
 ```kotlin
 CompositionLocalProvider(
     LocalSpacing provides Spacing(),
-    LocalAmbientGradient provides if (darkTheme) DarkAmbientGradient else LightAmbientGradient,
+    // resolved from the ACTIVE scheme, so it follows dynamic color too
+    LocalFloatingSurface provides
+        if (darkTheme) colorScheme.surfaceContainer else colorScheme.surfaceContainerLowest,
 ) {
     MaterialTheme(colorScheme = colorScheme, typography = TranzlateTypography, shapes = TranzlateShapes, content = content)
 }
@@ -339,7 +365,7 @@ CompositionLocalProvider(
 - Type → `MaterialTheme.typography.bodyLarge`
 - Shape → `MaterialTheme.shapes.medium`
 - Spacing → `LocalSpacing.current.md16`
-- Ambient wash → `LocalAmbientGradient.current` (§2 usage rules)
+- Panel step → `LocalFloatingSurface.current` (§2 — never branch on `isSystemInDarkTheme()` at a call site to pick a panel colour)
 - Motion → `Motion.medium2`, `Motion.standardDecelerate`
 
 **Rule:** no raw hex, `dp` text sizes, or magic paddings in Composables — everything resolves through a token. Dynamic color must always fall back to this static palette so API 24–30 renders the brand identity, not gray defaults.

@@ -29,9 +29,9 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
  *
  * The only thing this adds over calling [FilledIconButton] directly is the
  * **light/dark container rule**, which lives here so it is stated once:
- * light theme fills with `primary`, dark theme with `primaryContainer`. A
- * `primary` fill in dark is `#A8C7FA` — a near-white blue disc that glares next
- * to `#131314`; Google Translate uses the deep container tone there instead.
+ * light theme fills with `primary`, dark theme with `primaryContainer`. In dark
+ * `primary` is a near-white blue that glares as a large disc on the near-black
+ * page; Google Translate uses the deep container tone there instead.
  *
  * The [icon] slot is decorative — pass `contentDescription = null` on the inner
  * [Icon]; TalkBack reads this button's [contentDescription] (a11y contract §2.1).

@@ -1,30 +1,34 @@
-# UI Spec — approved design contract (2026-07-22)
+# UI Spec — approved design contract (2026-07-22 · §1/§3 reset by issue #15)
 
-> Owner-approved after 7 design rounds (Claude Design project "Tranzlate UI v2"). **This file is the ground truth for implementation** — the Claude Design chat is not. Palette = [`PALETTES.md` P8](PALETTES.md); reference apps = [`reference-apps/`](reference-apps/README.md).
+> Owner-approved after 7 design rounds (Claude Design project "Tranzlate UI v2"). **This file is the ground truth for implementation** — the Claude Design chat is not. Palette = [`PALETTES.md` P9 "GT Blue"](PALETTES.md); reference apps = [`reference-apps/`](reference-apps/README.md).
 > Behaviour rules still come from `docs/specs/` (DECISIONS, EDGE_CASES, TEST_A11Y) — with the C-2 amendment (issue #9): **explicit Translate action for ALL engines, result on its own screen.**
+> **2026-07-22 — issue #15 reset:** owner drove Google Translate v10.27 beside our build. The gradient, the dotted-ring buttons and the bespoke component set are gone; the app is **flat + stock Material 3 + GT's palette**. §1 and §3 below are rewritten; §2.3 is unchanged; the language picker (§2.6) becomes a full screen.
 
 ## 1. Global visual language
 
 | Aspect | Rule |
 |---|---|
-| Background | `surface` + **ambient wash**: a soft `primary`-tinted radial/vertical gradient strengthening toward the bottom (low opacity). Light: near-white → pale teal. Dark: `#131314` → deep teal glow. No hard edges. |
-| Floating surfaces | Composer, tiles, drawer sheet, cards = a **lighter step** over the wash — light `surfaceContainerLowest` (#FFFFFF), dark `surfaceContainer`/`High`. **Separation by lightness, not outlines**; hairlines only where no step exists. |
-| Accent discipline | **Exactly one saturated `primary` element per screen** (the primary action). Everything else neutral or soft tonal (`primaryContainer`-tinted). |
-| Icon buttons | Circular, tonal fill, **dotted-ring detail** as our signature; 48dp target, 24dp glyph. |
+| **Components** | **Stock Material 3 first.** If M3 ships the component, use it as-is — `IconButton`, `FilledIconButton`, `FilledTonalIconButton`, `AssistChip`, `CenterAlignedTopAppBar`, `Card`, `TextButton`, `ListItem`, `Scaffold`. A `:core:ui` wrapper needs a rule to carry (see DESIGN_SYSTEM §9); a re-colour is not a rule. |
+| Background | Flat `surface`. **No gradient anywhere** — not on pages, cards, icons or text (the ambient-wash token is deleted). |
+| Elevated panels | Composer, drawer sheet, cards = a **lighter surface step** — light `surfaceContainerLowest` (#FFFFFF), dark `surfaceContainer`. **Separation by lightness**, no border and no shadow; `outlineVariant` hairlines only where no step exists. |
+| Accent discipline | **Exactly one saturated element per screen** (the primary action). Everything else neutral or soft tonal. |
+| **Primary action** | `FilledIconButton` — **light: `primary` fill · dark: `primaryContainer` fill** (in dark, `primary` is a near-white blue that glares on `#131314`; GT uses the deep container tone). The rule lives in `PrimaryActionButton` (`:core:ui`), once. |
+| Icon buttons | Plain M3 `IconButton` — no container, no ring, no bespoke detail. 48dp target, 24dp glyph. Quick actions on the canvas are `FilledTonalIconButton` circles with the label **beneath** (GT parity). |
 | Type | One neutral sans (Roboto/system class) at every level incl. greeting + result; hierarchy by **size + weight** only. Non-Latin scripts pair to Noto (Sinhala result must render in the same visual family). |
-| Shape / rhythm | One radius scale (chips/buttons `full`, cards `md12`–`lg16`, sheets `xl28`); 8dp vertical rhythm; ambient, barely-there shadows. |
-| Gradient discipline | Ambient wash + at most ONE signature element. Never on dividers, borders, icons or text. |
+| Shape / rhythm | One radius scale (chips/buttons `full`, cards `md12`–`lg16`, composer + error card `xl28`); 8dp vertical rhythm; no decorative shadows. |
 
 ## 2. Screens
 
 ### 2.1 Home hub
-- **Top bar:** ☰ hamburger (opens drawer) · centered **mode chip** `✦ Automatic ▾` · right = new/clear icon. No bottom nav bar (hub model — official decision record: DECISIONS.md **D-5**; Medium/Expanded keep C-13 rail/drawer).
-- **Canvas** (the band between top bar and composer, content **vertically centred**, re-centres when the IME opens): brand sparkle → greeting (time-aware, e.g. "Afternoon, *Dilanka*" — name in `primary`) → subtitle "What would you like to translate?" → **compact quick-action tiles** (Conversation · Camera; ≈64–72dp tall, icon chip + label + sub-label) in a wrapping grid that must scale to 5–6 tiles and still look intentional with 2.
+- **Top bar:** stock `CenterAlignedTopAppBar`, transparent container over the page `surface` — ☰ hamburger (opens drawer) · centered **mode chip** `✦ Automatic ▾` (an `AssistChip`) · right = new/clear icon. No bottom nav bar (hub model — official decision record: DECISIONS.md **D-5**; Medium/Expanded keep C-13 rail/drawer).
+- **Canvas** (the band between top bar and composer, content **vertically centred**, re-centres when the IME opens): brand sparkle → greeting (time-aware, e.g. "Afternoon, *Dilanka*" — name in `primary`) → subtitle "What would you like to translate?" → **quick actions** (Conversation · Camera) as GT-style **tonal circles (56dp) with their label beneath**, a row that must scale to 5–6 actions and still look intentional with 2.
 - **First run:** zero history — the canvas must feel complete (no empty-state apology). Recents live in the drawer.
 
 ### 2.2 Composer (always a CARD — owner decision A, 2026-07-22)
 Rationale: our control row carries two language chips + swap + action, so it needs full width; a Gemini-style inline pill is not possible. One consistent shape avoids layout jumping.
-- **Structure:** multi-line text area on top (placeholder "Enter text") → **control row beneath, full width**: `[source chip ▾]` `⇄` `[target chip ▾]` + primary action at the end.
+- **Built from stock parts** (issue #15): `Surface` (panel step, `xl28`, no shadow) + `BasicTextField` + two `AssistChip`s + `IconButton` + `PrimaryActionButton`.
+- **Structure:** multi-line text area on top (placeholder "Enter text") → **control row beneath, full width**: `[source chip]` `⇄` `[target chip]` + primary action at the end. **No dropdown caret on the language chips** — GT has none; the pill shape plus "Source language, …" already say tappable.
+- **Swap is disabled when the source is "Detect language"** — there is nothing to move into the target slot (EDGE_CASES: say why, never act wrongly).
 - **Primary action:** 🎤 mic when the field is empty → **Translate (➜)** as soon as there is text.
 - **Growth:** grows with content to a max height (~40% of the viewport), then scrolls internally. Sits **directly above the IME**.
 - **Char counter** `12/500` (C-5 format) in the control row / under the text area.
@@ -35,18 +39,27 @@ Claude-app structure: wordmark (sparkle + "Tranzlate") → sections **Search · 
 **Motion:** drawer slides in from the left while the main screen is **pushed right, scaled down, corner-rounded and dimmed** — one continuous, gesture-driven motion (predictive-back friendly).
 
 ### 2.4 Result screen (separate reading surface — no composer)
-- Top: back · bookmark · ⋯
+- Top: `CenterAlignedTopAppBar` (transparent) — back · bookmark · ⋯, all plain `IconButton`s.
 - Source block: `ENGLISH` label · source text · phonetic (`/ həˈloʊ /`) · speaker + copy (top-right).
 - Divider (neutral hairline).
-- Target block: `සිංහල` label + **engine badge** (`⏷ Offline · instant`) · **result text large in `primary`** · transliteration · actions: speaker · copy · 👍 · 👎.
+- Target block: `සිංහල` label + **engine badge** — a small `AssistChip` (`⚡ Offline · instant`). *Not* a `SuggestionChip(enabled = false)*: a disabled chip alpha-dims its label under the 4.5:1 floor (contract §2.5). Tapping it explains the engine rather than doing nothing.
+- **Result text large in `primary`** · transliteration · actions: reverse · speaker · copy · 👍 · 👎.
 - **Follow-up chips:** `✦ Formal` · `Explain` · `Examples` (the AI-enhancement slot — issue #8).
 - Home → Result feels continuous (shared-element / container transform).
 
 ### 2.5 States (EDGE_CASES — every one designed, no dead ends)
-Translating (shimmer in the result area) · network error + inline **Retry** · offline/engine badge · daily-limit **dismissible bottom sheet** (Upgrade / Not now, C-11) · over-char-limit inline copy · empty field (action disabled with reason).
+Translating (shimmer in the result area — kept custom, M3 has no skeleton) · error as an **`errorContainer` `Card` with a `TextButton` bottom-end** (`xl28` corners, assertive live region — never a dialog) · offline/engine chip · daily-limit **dismissible bottom sheet** (Upgrade / Not now, C-11) · over-char-limit inline copy · empty field (action disabled with reason).
+
+### 2.6 Language picker (full screen — issue #15)
+Replaces the interim bottom sheet: a sheet cannot hold ~100 languages plus search, and GT uses a screen.
+- `Scaffold` + `CenterAlignedTopAppBar`: back · title ("Translate from" / "Translate to") · **search action** (guided message until the search vertical lands).
+- **"Detect language" row first — source side only** (a target cannot be detected).
+- Section header **"All languages" in `primary`** (`labelLarge`).
+- Plain `ListItem` rows, **no dividers**, transparent containers; the current choice reads in `primary` with a trailing check AND `selected` semantics.
+- Selecting writes the pref and pops back. Rows carry `tt_lang_row_<id>`.
 
 ## 3. Token mapping (implementation)
-`page` = `surface` + gradient overlay · `card` = `surfaceContainerLowest` (light) / `surfaceContainer` (dark) · `chip` = `surfaceContainerHigh` tonal, selected = `primaryContainer` · `primary action` = `primary`/`onPrimary` · `divider` = `outlineVariant` · `result text` = `primary` · `secondary text` = `onSurfaceVariant`. All values from PALETTES.md **P8**.
+`page` = flat `surface` (no overlay) · `panel/card` = `surfaceContainerLowest` (light) / `surfaceContainer` (dark), via `LocalFloatingSurface` · `chip` = `surfaceContainerHigh` tonal, selected = `primaryContainer` · `primary action` = `primary`/`onPrimary` in LIGHT, `primaryContainer`/`onPrimaryContainer` in DARK · `divider` = `outlineVariant` · `result text` = `primary` · `secondary text` = `onSurfaceVariant` · `error card` = `errorContainer`/`onErrorContainer`. All values from PALETTES.md **P9**.
 
 ## 4. Not yet designed (later rounds / can be built from rules)
-Advanced-AI variant of the composer (mode chip `✦ Advanced AI ▾` + `15/20 today` counter) · mode-picker sheet · language picker · History & Saved · Settings + offline languages (6 row states) · paywall · camera. Build these from the rules above + their feature specs.
+Advanced-AI variant of the composer (mode chip `✦ Advanced AI ▾` + `15/20 today` counter) · mode-picker sheet · picker search + Recent section · History & Saved · Settings + offline languages (6 row states) · paywall · camera. Build these from the rules above + their feature specs.
