@@ -229,13 +229,49 @@ class TextViewModelTest {
     // ---- Input cap + clear ---------------------------------------------------
 
     @Test
-    fun `input is hard-capped at the 500-char limit`() {
+    fun `over-limit input is kept intact, never truncated`() {
         val vm = viewModel()
         settle()
+        val long = "a".repeat(TEXT_CHAR_LIMIT + 100)
 
-        vm.onInputChange("a".repeat(TEXT_CHAR_LIMIT + 100))
+        vm.onInputChange(long)
 
-        assertThat(vm.input.value.length).isEqualTo(TEXT_CHAR_LIMIT)
+        // spec-01 §8/§9: the input is NOT truncated — the action blocks instead.
+        assertThat(vm.input.value).isEqualTo(long)
+    }
+
+    @Test
+    fun `over-limit input blocks the translate action`() {
+        val translator = FakeTranslator()
+        val vm = viewModel(translator = translator)
+        settle()
+        vm.onInputChange("a".repeat(TEXT_CHAR_LIMIT + 1))
+
+        val started = vm.onTranslate()
+        settle()
+
+        assertThat(started).isFalse()
+        assertThat(translator.calls).isEmpty()
+    }
+
+    @Test
+    fun `reverse moves the result into the input, swaps languages and re-translates`() {
+        val vm = viewModel()
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        settle()
+        val first = vm.uiState.value as TextUiState.Result
+
+        vm.onReverse()
+        settle()
+
+        // C-7 post-condition: input == prior result, languages swapped.
+        assertThat(vm.input.value).isEqualTo(first.translatedText)
+        assertThat(vm.sourceLang.value).isEqualTo(first.request.targetLang)
+        assertThat(vm.targetLang.value).isEqualTo(first.request.sourceLang)
+        val reversed = vm.uiState.value
+        assertThat(reversed).isNotEqualTo(first)
     }
 
     @Test

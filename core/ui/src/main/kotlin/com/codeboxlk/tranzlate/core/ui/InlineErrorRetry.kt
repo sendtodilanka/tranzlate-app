@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -29,6 +30,8 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 @Composable
 fun InlineErrorRetry(
     message: String,
+    /** C-4 assertive announcement (e.g. "Translation failed. …"); null = read the message. */
+    announcement: String? = null,
     onRetry: () -> Unit,
     retryLabel: String,
     modifier: Modifier = Modifier,
@@ -43,7 +46,10 @@ fun InlineErrorRetry(
         modifier =
             modifier
                 .testTag(containerTestTag)
-                .semantics { liveRegion = LiveRegionMode.Assertive },
+                .semantics {
+                    liveRegion = LiveRegionMode.Assertive
+                    if (announcement != null) contentDescription = announcement
+                },
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

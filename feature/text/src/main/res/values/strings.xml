@@ -71,4 +71,12 @@
     <!-- Minimal language picker sheet (issue #11 interim) -->
     <string name="text_lang_sheet_source_title">Translate from</string>
     <string name="text_lang_sheet_target_title">Translate to</string>
+
+    <!-- C-7 Reverse action (result → input, languages swapped, re-translated) -->
+    <string name="cd_text_reverse">Reverse translation direction</string>
+    <!-- C-4 canonical live-region announcements -->
+    <string name="a11y_result_ready">Translation ready: %1$s</string>
+    <string name="a11y_error">Translation failed. %1$s</string>
+    <!-- EDGE_CASES OVER_CHAR_LIMIT — shown inline; input is never truncated (spec-01 §8/§9) -->
+    <string name="text_over_char_limit">Limited to %1$d characters per translation. Shorten the text to translate.</string>
 </resources>

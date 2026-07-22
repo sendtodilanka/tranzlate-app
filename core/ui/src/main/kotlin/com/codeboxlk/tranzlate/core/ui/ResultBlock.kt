@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -46,6 +47,8 @@ fun ResultBlock(
     textColor: Color = Color.Unspecified,
     secondaryText: String? = null,
     textTestTag: String = "tt_core_result_text",
+    /** C-4 live-region announcement (e.g. "Translation ready: …"); null = read the text itself. */
+    announcement: String? = null,
     badge: (@Composable () -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
@@ -73,7 +76,10 @@ fun ResultBlock(
                 modifier =
                     Modifier
                         .testTag(textTestTag)
-                        .semantics { liveRegion = LiveRegionMode.Polite },
+                        .semantics {
+                            liveRegion = LiveRegionMode.Polite
+                            if (announcement != null) contentDescription = announcement
+                        },
             )
         }
         if (secondaryText != null) {

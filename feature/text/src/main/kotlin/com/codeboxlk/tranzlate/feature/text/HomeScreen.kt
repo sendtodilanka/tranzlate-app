@@ -223,12 +223,22 @@ fun HomeContent(
                     onSwap = onSwapLanguages,
                     onMic = { showGuided(guidedVoice) },
                     onTranslate = onTranslate,
-                    translateEnabled = input.isNotBlank(),
+                    translateEnabled = input.isNotBlank() && input.length <= TEXT_CHAR_LIMIT,
                     counterText =
-                        if (input.isEmpty()) {
-                            null
-                        } else {
-                            stringResource(R.string.text_char_counter, input.length, TEXT_CHAR_LIMIT)
+                        when {
+                            input.isEmpty() -> {
+                                null
+                            }
+
+                            // Over-limit: never truncate — keep the text, block the
+                            // action and say why (EDGE_CASES OVER_CHAR_LIMIT).
+                            input.length > TEXT_CHAR_LIMIT -> {
+                                stringResource(R.string.text_over_char_limit, TEXT_CHAR_LIMIT)
+                            }
+
+                            else -> {
+                                stringResource(R.string.text_char_counter, input.length, TEXT_CHAR_LIMIT)
+                            }
                         },
                     counterContentDescription =
                         stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT),

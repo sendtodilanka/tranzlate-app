@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.OfflineBolt
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.HorizontalDivider
@@ -80,6 +81,7 @@ fun ResultScreen(
         uiState = uiState,
         onBack = onBack,
         onRetry = viewModel::onRetry,
+        onReverse = viewModel::onReverse,
         modifier = modifier,
     )
 }
@@ -95,6 +97,7 @@ fun ResultContent(
     uiState: TextUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onReverse: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
@@ -134,7 +137,7 @@ fun ResultContent(
                     is TextUiState.Result -> {
                         SourceBlock(uiState.request, onGuided = ::showMessage, onCopied = ::showMessage)
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        TargetBlock(uiState, onGuided = ::showMessage, onCopied = ::showMessage)
+                        TargetBlock(uiState, onReverse = onReverse, onGuided = ::showMessage, onCopied = ::showMessage)
                     }
 
                     is TextUiState.Error -> {
@@ -142,6 +145,7 @@ fun ResultContent(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         InlineErrorRetry(
                             message = errorMessage(uiState.reason),
+                            announcement = stringResource(R.string.a11y_error, errorMessage(uiState.reason)),
                             onRetry = onRetry,
                             retryLabel = stringResource(R.string.button_retry),
                             containerTestTag = "tt_text_error_view",
@@ -229,6 +233,7 @@ private fun SourceBlock(
 @Composable
 private fun TargetBlock(
     result: TextUiState.Result,
+    onReverse: () -> Unit,
     onGuided: (String) -> Unit,
     onCopied: (String) -> Unit,
 ) {
@@ -240,6 +245,7 @@ private fun TargetBlock(
         textColor = MaterialTheme.colorScheme.primary,
         secondaryText = result.transliteration,
         textTestTag = "tt_text_result",
+        announcement = stringResource(R.string.a11y_result_ready, result.translatedText),
         badge = {
             EngineBadge(
                 text = engineBadgeText(result.engine),
@@ -248,6 +254,14 @@ private fun TargetBlock(
             )
         },
         actions = {
+            // C-7 Reverse: result → input, languages swapped, re-translated.
+            DottedRingIconButton(
+                onClick = onReverse,
+                contentDescription = stringResource(R.string.cd_text_reverse),
+                testTag = "tt_text_reverse",
+            ) {
+                Icon(Icons.Filled.SwapVert, contentDescription = null)
+            }
             DottedRingIconButton(
                 onClick = { onGuided(guidedTts) },
                 contentDescription = stringResource(R.string.cd_speak),

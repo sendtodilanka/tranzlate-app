@@ -90,9 +90,10 @@ class TextViewModel
         private var translateJob: Job? = null
 
         fun onInputChange(value: String) {
-            // Defaults-table hard cap: over-limit input is unreachable, so the
-            // OVER_CHAR_LIMIT blocked state can't occur (EDGE_CASES §4 row 6).
-            savedStateHandle[KEY_INPUT] = value.take(TEXT_CHAR_LIMIT)
+            // NEVER truncate (spec-01 §8/§9: "input not truncated", "no silent
+            // truncation"). Over-limit text is kept and the Translate action is
+            // blocked with inline guidance instead (EDGE_CASES OVER_CHAR_LIMIT).
+            savedStateHandle[KEY_INPUT] = value
         }
 
         /**
@@ -102,7 +103,7 @@ class TextViewModel
          */
         fun onTranslate(): Boolean {
             val text = input.value
-            if (text.isBlank()) return false
+            if (text.isBlank() || text.length > TEXT_CHAR_LIMIT) return false
             startTranslation(
                 TranslateRequest(
                     text = text,
@@ -127,6 +128,29 @@ class TextViewModel
          */
         fun restoreResultIfNeeded() {
             if (_uiState.value is TextUiState.Idle) onRetry()
+        }
+
+        /**
+         * C-7 Reverse: move the result text into the composer, swap source↔target
+         * and re-translate. Post-condition: input == prior result, languages
+         * swapped, new result = the reverse translation.
+         */
+        fun onReverse() {
+            val done = _uiState.value as? TextUiState.Result ?: return
+            val newSource = done.request.targetLang
+            val newTarget = done.request.sourceLang
+            savedStateHandle[KEY_INPUT] = done.translatedText
+            viewModelScope.launch {
+                prefs.setLanguagePair(sourceId = newSource, targetId = newTarget)
+            }
+            startTranslation(
+                TranslateRequest(
+                    text = done.translatedText,
+                    sourceLang = newSource,
+                    targetLang = newTarget,
+                    mode = textMode.value,
+                ),
+            )
         }
 
         /** UI_SPEC §2.2 swap ⇄ — one atomic pair write; always available. */
