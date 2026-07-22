@@ -6,4 +6,5 @@ plugins {
 dependencies {
     api(projects.core.designsystem)
     api(libs.androidx.compose.material3.adaptive)
+    implementation(libs.androidx.compose.material.icons.extended)
 }
