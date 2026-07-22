@@ -2,6 +2,7 @@
 
 > Rule: **no feature spec may contain an open question that gates coded behaviour.** Decisions land here first; specs cite `D-n`.
 > Status: 2026-07-21 · decisions D-0..D-4 confirmed by product owner in session.
+> **2026-07-22: C-2 amended — explicit Translate for all engines (issue #9).**
 
 ## ⭐ D-0 — NORTH STAR: behave like the Google Translate Android app (governs everything)
 
@@ -9,7 +10,7 @@ The whole app's **behaviour must equal the Google Translate Android app.** GT is
 
 | Tranzlate surface | Match GT's… |
 |-------------------|-------------|
-| Text | live translate **as you type** (debounced), tap-chip language change, swap, clear (✕), result with copy / TTS / fullscreen / star |
+| Text | typed-text translation with tap-chip language change, swap, clear (✕), result with copy / TTS / fullscreen / star. **Trigger deviates from GT by owner decision (2026-07-22): explicit Translate action, not live-as-you-type — see the resolved-tension note below + C-2.** |
 | Language picker | searchable list · Recent · All · "Detected" |
 | Voice | tap mic → live speech → translate |
 | Camera | point → instant on-image overlay (live) + capture/scan |
@@ -19,7 +20,7 @@ The whole app's **behaviour must equal the Google Translate Android app.** GT is
 
 **Layering rule:** Tranzlate-specific additions — the 4 selectable engines (AUTO/Offline/Standard/Advanced-AI), subscription tiers, ads — **layer on top of** GT-equivalent core UX and must **not** break it.
 
-**⚠️ Known tension to resolve per feature (flag, don't silently pick):** GT translates **live as you type** for its (free, unlimited) engine. Tranzlate's **Advanced AI (NLP3.5) is metered** (D-2) — live-translate-on-every-keystroke would burn quota. **Resolution rule:** live-translate applies to the **free/unlimited engines** (Offline, Standard, and AUTO when it resolves to a free engine); the **metered Advanced AI** uses **debounce-on-pause or an explicit "translate" affordance** so a paid quota unit is spent once per intentional translation, not per keystroke. (This supersedes v1's always-a-button design.)
+**✅ Tension RESOLVED (owner decision 2026-07-22, issue #9):** GT translates **live as you type** for its (free, unlimited) engine; Tranzlate's **Advanced AI (NLP3.5) is metered** (D-2), so per-keystroke translation would burn quota. The earlier split rule (live-translate for free engines, debounce/affordance for metered) is **superseded**. Resolution: **every engine — free and metered — uses an explicit Translate action (`tt_text_translate_btn`); the result opens on its own screen** (a Compose transition makes it feel continuous). This is an **intentional, owner-approved deviation from GT's live-typing**, for three reasons: (1) **one predictable action across all engines** — no mode-dependent behaviour switch; (2) a **large, comfortable editor** — the input screen is for composing, the result screen for reading; (3) **zero per-keystroke quota risk** — one quota unit = one intentional translation, by construction. See C-2 for the binding convention.
 
 > Every feature spec begins by stating **"GT-equivalent behaviour: …"** and only then its Tranzlate-specific deltas.
 
@@ -51,7 +52,7 @@ The whole app's **behaviour must equal the Google Translate Android app.** GT is
 | Item | Value |
 |------|-------|
 | Meter charge point | Once, on **engine success only**; never on cache hit, start, or failure |
-| Translate trigger | **live-translate (debounce) for free engines; explicit affordance for metered** (see C-2) |
+| Translate trigger | **Explicit Translate action (`tt_text_translate_btn`) for ALL engines — no debounce-fired translation** (amended 2026-07-22, see C-2) |
 
 ---
 
@@ -62,7 +63,7 @@ The whole app's **behaviour must equal the Google Translate Android app.** GT is
 | # | Conflict | **Canonical resolution** |
 |---|----------|--------------------------|
 | C-1 | testTag namespace | **`tt_<feature>_<control>`** (e.g. `tt_text_input`, `tt_text_swap`, `tt_text_mode_chip`, `tt_text_result`, `tt_text_copy`, `tt_text_star`, `tt_text_error_view`). The TEST-contract set is authoritative; spec tables reference it verbatim. |
-| C-2 | button vs live-translate | **Free engines (Offline/Standard/AUTO-resolved-free): live-translate, debounce 400ms, NO translate button.** Metered **Advanced AI only**: explicit `tt_text_translate_action` (or IME ⏎), debounce 1.2s. UI/E2E happy-path for free engines asserts **wait-for-result**, not a button tap. |
+| C-2 | Translate trigger (amended 2026-07-22, issue #9) | **EVERY engine (free and metered) fires translation only on the explicit Translate action `tt_text_translate_btn`** (IME ⏎ mirrors it). **No debounce-fired translation in any mode.** The result opens on its own screen (Compose transition keeps it feeling continuous). Meter charge unchanged: **once, on engine success only** (see Engineering constants). UI/E2E happy-path in ALL modes asserts a **tap on `tt_text_translate_btn`**. *(Supersedes the earlier free=live-translate / metered=`tt_text_translate_action` split.)* |
 | C-3 | string-key authority | **`STRINGS_*.md` is the ONLY key authority.** contentDescriptions use its `cd_*` keys. TEST_A11Y references those keys — never invents `a11y_*`/`cd_*` of its own. Missing keys get ADDED to STRINGS. |
 | C-4 | live-region strings | Canonical keys **in STRINGS**: `a11y_translating`="Translating…", `a11y_result_ready`="Translation ready", `a11y_error`="Translation failed", `a11y_limit_reached`="Daily Advanced-AI limit reached". |
 | C-5 | char counter literal | **`"%1$d/%2$d"` → "12/500"** (no spaces). Key `text_char_counter`. Spec text and every test assertion use exactly `12/500`. |
