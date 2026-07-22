@@ -6,6 +6,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["docs/plan/review/review_server.py"],
       "port": 8765
+    },
+    {
+      "name": "design-cards",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8770", "--directory", "docs/design/claude-design/cards"],
+      "port": 8770
     }
   ]
 }

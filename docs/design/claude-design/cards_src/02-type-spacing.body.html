@@ -1,0 +1,97 @@
+<!-- @dsCard group="Foundations" -->
+<style>
+.tsw{display:flex;flex-direction:column;gap:10px;align-items:center}
+.tsw .caption{font:500 var(--label-l) var(--font);color:var(--on-surface-variant);max-width:600px;text-align:center}
+.tspanel{width:640px;border-radius:16px;padding:20px 22px;background:var(--background);border:1px solid var(--outline-variant);display:flex;flex-direction:column;gap:var(--sp-8)}
+.ts-h{font:500 var(--title-s) var(--font);color:var(--primary);letter-spacing:.1px;padding-top:var(--sp-8)}
+.ts-h span{font:400 var(--label-s) var(--font);color:var(--on-surface-variant);margin-left:var(--sp-8)}
+.ts-div{height:1px;background:var(--outline-variant);margin:var(--sp-8) 0}
+.trow{display:grid;grid-template-columns:150px 1fr 148px;align-items:baseline;column-gap:var(--sp-16);padding:5px 0}
+.trole{font:500 var(--label-l) var(--font);color:var(--on-surface)}
+.trole i{display:block;font:400 var(--label-s) var(--font);color:var(--on-surface-variant);font-style:normal}
+.tnote{font:400 var(--label-s) var(--font);color:var(--on-surface-variant);text-align:right}
+.ts-stair{display:flex;align-items:flex-end;gap:var(--sp-24);padding:var(--sp-8) var(--sp-8) 0}
+.ts-step{display:flex;flex-direction:column;align-items:center;gap:6px}
+.ts-bar{width:40px;background:var(--primary);border-radius:2px}
+.ts-num{font:500 var(--label-l) var(--font);color:var(--on-surface)}
+.ts-num i{display:block;font:400 var(--label-s) var(--font);color:var(--on-surface-variant);font-style:normal;text-align:center}
+.ts-shapes{display:flex;align-items:flex-start;gap:var(--sp-16);padding-top:var(--sp-8)}
+.ts-shape{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1}
+.ts-box{width:76px;height:48px;background:var(--primary-container);border:1.5px solid var(--primary)}
+.ts-hit{width:48px;height:48px;border:2px dashed var(--secondary);border-radius:var(--r-8);display:flex;align-items:center;justify-content:center;flex:none}
+.ts-touchrow{display:flex;align-items:center;gap:var(--sp-16);background:var(--surface-low);border-radius:var(--r-12);padding:var(--sp-16);margin-top:var(--sp-8)}
+</style>
+<div class="tsw theme-light">
+  <div class="tspanel">
+    <div class="ts-h" style="padding-top:0">Type scale — §3 <span>Roboto (system) · sizes = sp (user font scaling respect වෙනවා)</span></div>
+    <div class="trow">
+      <div class="trole">displaySmall<i>36sp / 44 · 400</i></div>
+      <div style="font:400 var(--display-s) var(--font);color:var(--on-surface)">Aa</div>
+      <div class="tnote">hero / empty-state</div>
+    </div>
+    <div class="trow">
+      <div class="trole">headlineSmall<i>24sp / 32 · 400</i></div>
+      <div style="font:400 var(--headline-s) var(--font);color:var(--on-surface)">Bonjour</div>
+      <div class="tnote">result text මේකෙන්</div>
+    </div>
+    <div class="trow">
+      <div class="trole">titleLarge<i>22sp / 28 · 500</i></div>
+      <div style="font:500 var(--title-l) var(--font);color:var(--on-surface)">Tranzlate</div>
+      <div class="tnote">top app bar title</div>
+    </div>
+    <div class="trow">
+      <div class="trole">titleMedium<i>16sp / 24 · 500</i></div>
+      <div style="font:500 var(--title-m) var(--font);letter-spacing:.15px;color:var(--on-surface)">Saved phrases</div>
+      <div class="tnote">card / list header</div>
+    </div>
+    <div class="trow">
+      <div class="trole">bodyLarge<i>16sp / 24 · 400</i></div>
+      <div style="font:400 var(--body-l) var(--font);letter-spacing:.5px;color:var(--on-surface)">Good morning</div>
+      <div class="tnote">input text මේකෙන්</div>
+    </div>
+    <div class="trow">
+      <div class="trole">bodyMedium<i>14sp / 20 · 400</i></div>
+      <div style="font:400 var(--body-m) var(--font);letter-spacing:.25px;color:var(--on-surface-variant)">Translated from English</div>
+      <div class="tnote">secondary body</div>
+    </div>
+    <div class="trow">
+      <div class="trole">labelLarge<i>14sp / 20 · 500</i></div>
+      <div style="font:500 var(--label-l) var(--font);letter-spacing:.1px;color:var(--primary)">Translate</div>
+      <div class="tnote">buttons වල</div>
+    </div>
+    <div class="trow">
+      <div class="trole">labelMedium<i>12sp / 16 · 500</i></div>
+      <div style="font:500 var(--label-m) var(--font);letter-spacing:.5px;color:var(--on-surface-variant)">Text · Camera · History</div>
+      <div class="tnote">nav labels වල</div>
+    </div>
+    <div class="ts-div"></div>
+    <div class="ts-h">Spacing scale — §4 <span>dp tokens · md16 = default screen padding</span></div>
+    <div class="ts-stair">
+      <div class="ts-step"><div class="ts-bar" style="height:var(--sp-2)"></div><div class="ts-num">2<i>xxs2</i></div></div>
+      <div class="ts-step"><div class="ts-bar" style="height:var(--sp-4)"></div><div class="ts-num">4<i>xs4</i></div></div>
+      <div class="ts-step"><div class="ts-bar" style="height:var(--sp-8)"></div><div class="ts-num">8<i>sm8</i></div></div>
+      <div class="ts-step"><div class="ts-bar" style="height:var(--sp-16);background:var(--secondary)"></div><div class="ts-num">16<i>md16 ★</i></div></div>
+      <div class="ts-step"><div class="ts-bar" style="height:var(--sp-24)"></div><div class="ts-num">24<i>lg24</i></div></div>
+      <div class="ts-step"><div class="ts-bar" style="height:var(--sp-32)"></div><div class="ts-num">32<i>xl32</i></div></div>
+      <div class="ts-step"><div class="ts-bar" style="height:var(--sp-48)"></div><div class="ts-num">48<i>xxl48</i></div></div>
+      <div class="tnote" style="text-align:left;align-self:center;max-width:180px">★ md16 (coral) = screen padding default එක. ඉතුරු ඒවා related-items ගැප් සිට hero rhythm දක්වා.</div>
+    </div>
+    <div class="ts-div"></div>
+    <div class="ts-h">Shape / corner — §5 <span>dp radius tokens</span></div>
+    <div class="ts-shapes">
+      <div class="ts-shape"><div class="ts-box" style="border-radius:var(--r-4)"></div><div class="ts-num">4<i>snackbar</i></div></div>
+      <div class="ts-shape"><div class="ts-box" style="border-radius:var(--r-8)"></div><div class="ts-num">8<i>text field</i></div></div>
+      <div class="ts-shape"><div class="ts-box" style="border-radius:var(--r-12)"></div><div class="ts-num">12<i>card ★</i></div></div>
+      <div class="ts-shape"><div class="ts-box" style="border-radius:var(--r-16)"></div><div class="ts-num">16<i>dialog</i></div></div>
+      <div class="ts-shape"><div class="ts-box" style="border-radius:var(--r-28)"></div><div class="ts-num">28<i>modal sheet</i></div></div>
+      <div class="ts-shape"><div class="ts-box" style="border-radius:var(--r-full)"></div><div class="ts-num">full<i>pill / chip</i></div></div>
+    </div>
+    <div class="ts-touchrow">
+      <div class="ts-hit">
+        <svg class="ic primary" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+      </div>
+      <div style="font:400 var(--body-m) var(--font);color:var(--on-surface)"><b>48dp</b> — අවම touch target එක. Icon එක 24dp වුණත් ඇඟිල්ලට ඔබන ප්‍රදේශය (කඩ ඉරි කොටුව) 48×48dp ට අඩු වෙන්න බෑ.</div>
+    </div>
+  </div>
+  <div class="caption">🔤 Typography + spacing + shape — DESIGN_SYSTEM.md §3–§5. උඩ: Material 3 type roles (ලොකු result text එක 24sp, input 16sp, buttons 14sp). මැද: 8-grid spacing පඩිපෙළ. යට: corner radius ප්‍රමාණ + 48dp touch-target නීතිය. හැම screen එකක්ම මේ tokens වලින්මයි හැදෙන්නේ — අතින් ගහපු අගයන් නෑ.</div>
+</div>

@@ -1,0 +1,104 @@
+<!-- @dsCard group="Brief" -->
+<style>
+.brief{max-width:760px;border-radius:16px;border:1px solid var(--outline-variant);background:var(--surface-lowest);padding:26px 30px;color:var(--on-surface);font:400 var(--body-m) var(--font);line-height:1.7}
+.brief h1{font:500 var(--title-l) var(--font);margin:0 0 4px}
+.brief h2{font:500 var(--title-m) var(--font);color:var(--primary);margin:18px 0 6px}
+.brief ul{margin:0;padding-left:20px}
+.brief li{margin-bottom:5px}
+.brief .rule{background:var(--surface-low);border-left:3px solid var(--primary);border-radius:6px;padding:8px 14px;margin:8px 0}
+</style>
+<div class="stage theme-light">
+<div class="brief">
+  <h1>Tranzlate — UI Design Brief (for Claude Design)</h1>
+  <div style="color:var(--on-surface-variant)">Android translator app · Material 3 · behaviour north-star = the Google Translate Android app. Use THIS design system's palette (P1 Google Blue — see the Foundations cards) for every screen, light AND dark.</div>
+
+  <h2>Design these screens (phone-first, 1080×2400-ish frame; each in light + dark)</h2>
+  <div class="rule"><b>Direction (owner-locked 2026-07-22):</b> the INTERACTION skeleton follows the 2026 evolved-GT session model (turn-based, live-as-you-type, thumb-zone chips) — but the VISUAL identity must be <b>distinctly Tranzlate's own. If a screen could be mistaken for Google Translate, it has FAILED the brief.</b> Owner's #1 product goal: every translator on Play looks the same — this one must not.</div>
+
+  <h2>Uniqueness mandate (added 2026-07-22 after first review round)</h2>
+  <ul>
+    <li>Keep the skeleton, change the skin: distinctive accent identity (NOT Google-blue-on-white), signature result-card treatment (shape/border/fill that becomes "ours"), a custom mode-selector element, a recognizable home-hub composition.</li>
+    <li>Palette: SETTLED in Round-5 — the P1 Google-Blue scheme is the app palette (see the Colour bullet in the Round-5 section). Uniqueness comes from composition, ambient gradient, texture and typography — not from picking an unusual hue. WCAG AA (≥4.5:1 text) is non-negotiable.</li>
+    <li>Typography personality allowed for RESULT text (display-weight or a distinctive face) — body/labels stay system-clean.</li>
+    <li>Signature motion/detail notes welcome (e.g., result-card reveal, gradient underline while translating).</li>
+    <li>AI-app energy is on-brand (owner's heritage design was chat-styled) — expressive, modern, but never at the cost of the speed rules below.</li>
+  </ul>
+  <ul>
+    <li><b>0. Home hub (NO bottom nav bar — hub model):</b> top bar = Saved/bookmark icon (left) · "Tranzlate" wordmark centered · avatar/menu (right, opens Settings/account); huge "Enter text" placeholder + handwriting/mic affordance on a big quiet canvas (tapping opens a translate session); bottom thumb-zone = language chips [English] ⇄ [French] above an action row: "Conversation" · <b>center primary MIC (large filled circle)</b> · "Camera" — labeled round buttons. Our delta: small mode chip ("Automatic ▾") near the top.</li>
+    <li><b>1. Translate session (THE core screen):</b> "&lt; Home" pill top-left + History ⏱/bookmark/⋯ (right; while typing: edit + ✕ + ⋯). BOTH sides rich: "English" label → large input text ("hello") → phonetic ("həˈlō") → speaker + copy; divider; "French" label → blue result ("bonjour") → transliteration → speaker · copy · 👍👎 feedback · ⋯. Below the result: an "Examples of hello" dictionary card (quote rows). "+ New translation" pill bottom-right starts the next entry (turn model). Language chips at BOTTOM above keyboard; while typing show a history quick-recall row ("recent: Hello, man. → හෙලෝ මචන්.") above the chips. NO send button on free engines (live as-you-type); Advanced-AI variant: explicit send action + "15/20 today" counter chip near the mode chip.</li>
+    <li><b>2. Model picker</b> (bottom sheet): 4 options — Automatic (selected) / Offline on this device / Standard online / Advanced AI (lock + "Premium" chip + "15/20 today" counter).</li>
+    <li><b>3. Language picker:</b> search, "Detect language", Recent, All (A→Z) with small "Downloaded ⬇ / Online-only ☁" badges. No download buttons here.</li>
+    <li><b>4. History &amp; Saved:</b> list with source + translation + EN→FR, star to save; separate Saved filter; friendly empty state.</li>
+    <li><b>5. Settings + Offline languages:</b> settings list; offline-languages manager rows: Downloaded (delete) / Downloading (spinner + Stop, NO percent) / Not downloaded (⬇) / Failed (Retry) / "Wi-Fi only" toggle.</li>
+    <li><b>6. Paywall:</b> benefits, two plan cards (Plus $4.99/mo "Recommended", Premium $9.99/mo), Subscribe CTA with full price/renewal disclosure UNDER it, Restore/Terms/Privacy links, loading + error states.</li>
+    <li><b>7. Camera translate:</b> viewfinder with live translated overlays, capture, permission-needed state.</li>
+    <li><b>8. Error / limit states:</b> inline error + Retry (never a popup dead-end); daily-limit bottom sheet (dismissible, "Upgrade" + "Not now").</li>
+  </ul>
+
+  <h2>Deliverable format (MANDATORY — added after round 2)</h2>
+  <div class="rule"><b>Every design request = one COMPLETE SET in ONE identity: 4 frames together — Home hub (light) · Home hub (dark) · Translate session (light) · Translate session (dark).</b> Never a single screen alone; never mixed identities within a set. Additional screens later join the same identity.</div>
+
+  <h2>⚠ Surface &amp; sizing rules (owner round-7 — the two things that felt wrong)</h2>
+  <ul>
+    <li><b>1. Elements must SIT IN the background, not on top of it</b> (GT/Gemini do this well):<br>
+      • The page background is the soft tinted <b>wash</b>; anything floating on it (composer, tiles, chips, drawer sheet) is a <b>lighter surface</b> — in light mode pure/near <b>white</b> (surfaceContainerLowest), in dark mode an elevated grey (surfaceContainer/High). Separation comes from the <b>lightness step</b>, not from outlines.<br>
+      • Do NOT draw hairline-outlined boxes whose fill is the same value as the page — that reads as "stuck on". Outlines only where there is no lightness step available.<br>
+      • Secondary/utility controls use <b>soft tonal fills tinted from the background hue</b> (like GT's pale-blue circles), never saturated blocks.<br>
+      • <b>Exactly ONE saturated accent element per screen</b> — the primary action (Translate / mic). Everything else is neutral or tonal.<br>
+      • Shadows: barely-there, ambient. Flat + lightness step first.</li>
+    <li><b>2. Compact sizing, full-width rhythm</b> (from the owner's own earlier app):<br>
+      • Quick-action tiles are <b>compact</b> (≈64–72dp tall, icon + short label, no big padding blocks) so the canvas keeps free space for future items — the grid must still look intentional with only 2 tiles.<br>
+      • Inside the composer, the control row is <b>compact in height but spans the FULL width</b>: the language chips stretch to fill the available width with the swap control between them, and the primary action sits at the end — no cramped, floating little pills in the middle of an empty row.<br>
+      • Keep vertical rhythm at 8dp; prefer more breathing space in the canvas over bulky components.</li>
+  </ul>
+
+  <h2>Professional polish rules (MANDATORY)</h2>
+  <ul>
+    <li><b>Gradient discipline:</b> a gradient may appear on AT MOST 1–2 signature elements per screen (e.g., the mode orb OR the translating-progress underline OR one hero accent). NEVER on divider lines, hairlines, borders of ordinary components, icons, or any body text. Dividers = subtle neutral hairlines only.</li>
+    <li><b>Restraint:</b> one accent family + calm neutrals per identity. No rainbow, no glows on multiple elements, no decorative noise.</li>
+    <li><b>System discipline:</b> one consistent corner-radius scale, 8dp spacing rhythm, one type scale; every state (pressed/disabled) designed, not improvised. Elevation subtle — flat-first.</li>
+    <li>Quality bar: should look like a top-tier product-design portfolio shot (think Linear/Arc/Things-level polish), not a template.</li>
+  </ul>
+
+  <h2>⭐ ROUND-5 LOCKED DIRECTION (owner, 2026-07-22) — supersedes everything below</h2>
+  <div class="rule"><b>Reference apps the owner loves (taste anchors):</b> <b>Gemini app</b> — ambient soft-gradient background (light: white→pale wash at the bottom; dark: near-black→deep tinted glow), sparkle mark, dotted-ring icon treatment, hamburger-left + model-chip-center top bar, floating pill composer. <b>Claude app</b> — the side navigation drawer (wordmark, icon list of sections, "Starred"/"Recents", floating "+ New" pill, account row pinned at the bottom) and its greeting composition ("Afternoon, Dilanka") — note: the SERIF face itself is rejected (see Typography). Build the Tranzlate identity from THIS energy — not from Google Translate, and NOT the electric-violet round.</div>
+  <ul>
+    <li><b>Colour (owner-FINAL, round 6):</b> the app palette is <b>P8 "Tranzlate Teal (cool-mono)"</b> — see the "Color roles" card. <b>Teal is the accent and it stays</b> (the owner liked it); what was removed is every WARM colour — no coral, no gold, no violet, no rainbow. Support tones are cool blues, surfaces/neutrals/error come from the Google-blue P1 set (near-white light, tonal-grey dark). Ambient gradient = teal→blue wash. All 13 contrast pairs verified AA/AAA.</li>
+    <li><b>Drawer motion (owner-requested):</b> adopt the Claude-app drawer transition — the drawer slides in from the left while the main content is pushed right, scaled down slightly with rounded corners and dimmed, moving as one continuous gesture-driven motion (Compose: predictive-back / draggable drawer with scale+corner animation).</li>
+    <li><b>Typography (owner-FINAL, round 6):</b> NO serif and NO display/branded face. Use a clean, neutral system-class sans — Roboto / Open Sans / Inter class — at every level, including the greeting and the translated result; differentiate by SIZE and WEIGHT, not by an exotic face. <b>Why:</b> the result text can be Sinhala, Arabic, CJK — a neutral sans pairs cleanly with the Noto family so every script renders consistently. Personality comes from composition, the ambient gradient and the teal accent — not from the typeface.</li>
+    <li><b>Composer behaviour spec (owner-verified against the Gemini captures — implement EXACTLY):</b><br>(a) <b>Idle, no keyboard:</b> composer = single-line PILL pinned at the bottom; canvas above shows greeting + quick actions.<br>(b) <b>Keyboard open, field EMPTY:</b> pill sits directly above the keyboard; the <b>greeting stays visible and RE-CENTRES ITSELF</b> in the space left between the top bar and the composer — the canvas is a flexible region that always vertically centres its content, so nothing is pushed up or clipped when the keyboard appears.<br>(c) <b>Keyboard open, text entered, fits one line:</b> still a PILL and the text sits <b>INLINE on the same row as the controls</b>; the trailing button swaps from mic to the primary <b>Translate</b> action; <b>the greeting/canvas content is HIDDEN as soon as the first character is typed</b> (not only when it wraps).<br>(d) <b>Text wraps to multiple lines:</b> the pill MORPHS into a rounded CARD — the text moves to its own area on TOP and the controls (language chips + swap + Translate) reflow onto a row BENEATH it; the card grows with content to a max height, then scrolls internally.<br>(e) <b>Collapse hysteresis (critical):</b> once expanded to the card layout it does NOT return to the inline pill when text is deleted back to one line/one character — it collapses back to the pill <b>only when the field is completely empty</b> (prevents the layout jumping while editing).<br>This pill ⇄ card morph is a signature interaction — design states (a)–(d) and note (e). <b>Layout rule for every keyboard-open state:</b> the <b>composer DOES sit directly above the keyboard</b> (Gemini-style, correct); everything else treats the band between the top bar and the composer as its viewport and lays out responsively — vertically centred, never clipped or pushed off-screen.</li>
+    <li><b>Home skeleton (final):</b> top bar = ☰ hamburger (opens the drawer) · centered mode chip ("✦ Automatic ▾") · right = new/clear action. Canvas = serif greeting + quick-action tiles (Conversation, Camera today; grid must scale to 5-6 future tiles). Bottom = the input cluster: multi-line text field + [English] ⇄ [සිංහල] chips + <b>Translate button</b>.</li>
+    <li><b>Side drawer (Claude-style, required):</b> wordmark + sections (Search · History · Saved · Offline languages · Settings) · "Recents" list of past translations · account row pinned bottom (avatar, tier chip Free/Premium). <b>NO "+ New translation" pill</b> (owner 2026-07-22 — the composer itself starts a new translation).</li>
+    <li><b>⚠ BEHAVIOUR CHANGE (owner decision, supersedes C-2/live-translate):</b> auto-translate-as-you-type is REMOVED. <b>Every engine — including the free ones — uses an explicit Translate button.</b> Result opens on a SEPARATE result screen (GT-style). <b>The result screen does NOT carry the composer/input cluster</b> (owner 2026-07-22) — it is a focused reading surface; return via back. A shared-element/transition still ties the two screens together visually.</li>
+    <li><b>Empty-state care:</b> a first-run user has no Recents — the canvas (greeting + tiles) must feel complete and intentional with zero history; Recents appear in the drawer and (optionally) below the tiles once they exist.</li>
+    <li><b>Keyboard frame still mandatory</b>, and the text area must be generously large for long text.</li>
+  </ul>
+
+  <h2>Round-4 comparison decisions (owner, 2026-07-22) — superseded by Round-5 above where they conflict</h2>
+  <ul>
+    <li><b>Skeleton is now OPEN:</b> the GT session skeleton is no longer locked. The layout DNA to explore = Tranzlate Heritage: a BOTTOM input cluster card (text field + language chips + ⇄ swap + contextual 🎤/➜ button embedded), canvas above for content. Behaviour rules below still apply.</li>
+    <li><b>Two competing designs, SAME identity (Midnight electric-violet) so only layout differs:</b><br>
+      <b>Design A "Heritage greeting":</b> canvas = toned-down personality greeting (professional, no rainbow) + feature tiles; results = STACKED FEED rising above the bottom input (chat-history feel).<br>
+      <b>Design B "Heritage minimal":</b> canvas = quiet "Enter text"-style emptiness or a BETTER alternative to tiles if one exists; results = REPLACE-IN-PLACE single card.</li>
+    <li><b>Feature tiles must be future-proof:</b> 2 items today (Conversation, Camera) but the layout must scale to 4–6 (wrapping grid or scrollable row) without redesign.</li>
+    <li><b>Latency-aware result states are part of the design:</b> every result presentation shows 3 states — instant (offline engine), "translating…" shimmer/progress (slow online), network error + inline Retry.</li>
+    <li><b>Keyboard-open frame is MANDATORY in every set:</b> layout adjusts to the IME; the input area is LARGE and grows (multi-line) so long text is comfortably editable.</li>
+    <li>Screens may be logically separate but must FEEL continuous — keep element positions consistent across states so shared-element transitions (Compose) can bind them.</li>
+  </ul>
+
+  <h2>Hard rules (from the product spec — do not break)</h2>
+  <div class="rule">Free engines translate LIVE while typing — no Translate button. Only the metered "Advanced AI" mode shows an explicit Translate action + usage counter.</div>
+  <div class="rule">Every error/empty/blocked state offers a next step (Retry / alternative / guidance) — no dead ends. Never an ad or paywall on Back-press.</div>
+  <div class="rule">Neutrals/surfaces may start from the P1 baseline, but the ACCENT/identity layer should be distinctly non-Google (see Uniqueness mandate). Touch targets ≥48dp. Text ≥4.5:1 contrast (both themes). Material 3 component behaviours (chips, tonal buttons, sheets with drag handle) — styled with our identity.</div>
+
+  <h2>Feel</h2>
+  <ul>
+    <li>AI-app conversational: each translation reads like a turn — input up top, response card below with feedback thumbs; "+ New translation" like a next message. Session-based like 2026 Google Translate, but with our own personality.</li>
+    <li>Quiet, near-white, content-first; blue for actions/accents only. Pill-shaped controls, soft cards.</li>
+    <li>The input is the hero — no marketing headline on the hub, no fake chat greeting text.</li>
+    <li>Friendly for a non-technical audience; benefit-named modes, visible limits, honest progress.</li>
+    <li>Future-ready: response cards may later grow AI follow-up chips ("Formal", "Explain", "Nuance") under a result — leave visual room for that row.</li>
+  </ul>
+</div>
+<div class="caption" style="max-width:720px">📋 මේ brief එක Claude Design chat එකට කියන්න පුළුවන්: <b>"Design screen 1 from the design brief, phone, light and dark"</b> වගේ — එතකොට මේ rules + palette එකෙන්ම designs generate වෙනවා.</div>
+</div>
