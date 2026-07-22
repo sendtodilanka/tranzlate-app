@@ -37,12 +37,14 @@ import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 import com.codeboxlk.tranzlate.feature.camera.CameraScreen
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
-import com.codeboxlk.tranzlate.feature.languagepicker.LanguagePickerScreen
 import com.codeboxlk.tranzlate.feature.settings.SettingsScreen
 import com.codeboxlk.tranzlate.feature.text.HomeScreen
+import com.codeboxlk.tranzlate.feature.text.LanguagePickerScreen
+import com.codeboxlk.tranzlate.feature.text.LanguagePickerTarget
 import com.codeboxlk.tranzlate.feature.text.ResultScreen
 import com.codeboxlk.tranzlate.feature.text.TextViewModel
 import kotlinx.coroutines.launch
+import com.codeboxlk.tranzlate.feature.languagepicker.LanguagePickerScreen as OfflineLanguagesScreen
 
 // UI_SPEC §2.3 drawer motion: the main screen is pushed right, scaled down,
 // corner-rounded and dimmed while the sheet slides in — one continuous,
@@ -210,6 +212,11 @@ private fun AppNavDisplay(
                         onOpenDrawer = onOpenDrawer,
                         onTranslateRequested = { onNavigate(ResultNavKey) },
                         onOpenCamera = { onNavigate(CameraNavKey) },
+                        onPickLanguage = { target ->
+                            onNavigate(
+                                LanguagePickerNavKey(forSource = target == LanguagePickerTarget.SOURCE),
+                            )
+                        },
                     )
                 }
                 entry<ResultNavKey> {
@@ -218,9 +225,24 @@ private fun AppNavDisplay(
                         onBack = { backStack.removeLastOrNull() },
                     )
                 }
+                entry<LanguagePickerNavKey> { key ->
+                    LanguagePickerScreen(
+                        viewModel = textViewModel,
+                        target =
+                            if (key.forSource) {
+                                LanguagePickerTarget.SOURCE
+                            } else {
+                                LanguagePickerTarget.TARGET
+                            },
+                        onDone = { backStack.removeLastOrNull() },
+                    )
+                }
                 entry<CameraNavKey> { CameraScreen() }
                 entry<HistoryNavKey> { HistoryScreen() }
-                entry<LanguagesNavKey> { LanguagePickerScreen() }
+                // Drawer "Offline languages" = the :feature:languagepicker
+                // placeholder (download/delete packs) — a different job from the
+                // text vertical's source/target picker above, hence the alias.
+                entry<LanguagesNavKey> { OfflineLanguagesScreen() }
                 entry<SettingsNavKey> { SettingsScreen() }
             },
     )

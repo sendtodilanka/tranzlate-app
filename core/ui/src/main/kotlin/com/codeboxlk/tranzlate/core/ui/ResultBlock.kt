@@ -9,7 +9,9 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.OfflineBolt
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,13 +30,13 @@ import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 
 /**
- * UI_SPEC §2.4 result-screen block (used for BOTH source and target): small
- * caps label ("ENGLISH" / "සිංහල" — pass pre-capitalised where the script has
- * caps) + optional trailing [badge] slot ([EngineBadge]) · main [text] (large,
- * selectable; pass `textColor = colorScheme.primary` for the TARGET block —
- * UI_SPEC §3 result-text rule) · optional [secondaryText] (phonetic /
- * transliteration) · optional [actions] row slot (caller supplies
- * [DottedRingIconButton]s: speaker / copy / 👍 / 👎).
+ * UI_SPEC §2.4 result-screen block (used for BOTH source and target) — pure
+ * layout, no chrome of its own: small caps label ("ENGLISH" / "සිංහල" — pass
+ * pre-capitalised where the script has caps) + optional trailing [badge] slot ·
+ * main [text] (large, selectable; pass `textColor = colorScheme.primary` for the
+ * TARGET block — UI_SPEC §3 result-text rule) · optional [secondaryText]
+ * (phonetic / transliteration) · optional [actions] row slot, into which the
+ * caller puts plain M3 `IconButton`s (speaker / copy / …).
  *
  * The main text carries a polite live region so "result ready" is announced
  * (a11y contract §2.3).
@@ -110,10 +112,16 @@ private fun ResultBlockPreview() {
                 text = "ආයුබෝවන්",
                 textColor = MaterialTheme.colorScheme.primary,
                 secondaryText = "āyubōvan",
-                badge = { EngineBadge(text = "Offline · instant", icon = Icons.Filled.OfflineBolt) },
+                badge = {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text("Offline · instant") },
+                        leadingIcon = { Icon(Icons.Filled.OfflineBolt, contentDescription = null) },
+                    )
+                },
                 actions = {
-                    DottedRingIconButton(onClick = {}, contentDescription = "Copy translation") {
-                        Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                    IconButton(onClick = {}) {
+                        Icon(Icons.Filled.ContentCopy, contentDescription = "Copy translation")
                     }
                 },
                 modifier = Modifier.padding(spacing.md16),

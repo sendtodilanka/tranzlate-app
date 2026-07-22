@@ -20,6 +20,16 @@ data object TextNavKey : NavKey
 @Serializable
 data object ResultNavKey : NavKey
 
+/**
+ * Full-screen language picker (issue #15 — replaces the composer's bottom sheet).
+ * [forSource] rather than the feature's enum: a nav key must be `@Serializable`,
+ * and a Boolean keeps the key free of a feature-module type.
+ */
+@Serializable
+data class LanguagePickerNavKey(
+    val forSource: Boolean,
+) : NavKey
+
 @Serializable
 data object CameraNavKey : NavKey
 

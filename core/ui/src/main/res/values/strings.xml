@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Generic shared-component strings only. Feature strings live in each feature's
-     STRINGS_*.md-governed strings.xml (C-3 key authority).
-     TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR queued before ship. -->
-<resources>
-    <string name="core_ui_retry">Retry</string>
-    <string name="core_ui_loading">Loading…</string>
-</resources>

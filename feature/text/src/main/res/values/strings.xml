@@ -68,9 +68,14 @@
     <string name="button_retry">Retry</string>
     <string name="cd_text_retry">Retry translation</string>
 
-    <!-- Minimal language picker sheet (issue #11 interim) -->
+    <!-- Language picker (issue #15: now a full screen, not a sheet — the two
+         title keys are REUSED verbatim from the interim sheet, C-3). -->
     <string name="text_lang_sheet_source_title">Translate from</string>
     <string name="text_lang_sheet_target_title">Translate to</string>
+    <string name="text_lang_detect">Detect language</string>
+    <string name="text_lang_all_header">All languages</string>
+    <string name="cd_text_lang_search">Search languages</string>
+    <string name="text_guided_lang_search">Language search arrives with the search update</string>
 
     <!-- C-7 Reverse action (result → input, languages swapped, re-translated) -->
     <string name="cd_text_reverse">Reverse translation direction</string>

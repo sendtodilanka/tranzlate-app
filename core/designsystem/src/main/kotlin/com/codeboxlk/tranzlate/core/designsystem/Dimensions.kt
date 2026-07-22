@@ -25,26 +25,20 @@ object Dimensions {
     val sheetPeek: Dp = 56.dp
     val fabSize: Dp = 56.dp
 
-    /** Transparent top bar band over the ambient wash (UI_SPEC §2.1). */
-    val topBarHeight: Dp = 64.dp
-
-    /** Compact quick-action tile (UI_SPEC §2.1: 64–72dp band → midpoint). */
-    val quickTileHeight: Dp = 68.dp
+    /** Home-canvas quick-action circle (UI_SPEC §2.1 — GT-sized tonal button). */
+    val quickActionSize: Dp = 56.dp
 
     /** Feature-glyph / avatar chip container (§7 sizes: 40dp). */
     val iconChip: Dp = 40.dp
 
-    /** Dense badge glyph (EngineBadge leading icon). */
+    /** Dense badge glyph (chip leading icons). */
     val iconXs: Dp = 16.dp
 
     /** Composer text area minimum height (~2 lines of bodyLarge). */
     val composerInputMinHeight: Dp = 56.dp
 
-    /** Dotted-ring signature detail (UI_SPEC §1 icon buttons): dash length. */
-    val ringDash: Dp = 2.dp
-
-    /** Dotted-ring signature detail: gap between dashes. */
-    val ringGap: Dp = 4.dp
+    /** Composer language pill — taller than the 32dp M3 chip default (GT parity). */
+    val languageChipHeight: Dp = 40.dp
 
     /** ListDetailPaneScaffold: list/input pane minimum (C-13). */
     val paneListMin: Dp = 360.dp

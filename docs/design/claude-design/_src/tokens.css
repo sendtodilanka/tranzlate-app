@@ -1,4 +1,9 @@
-/* Tranzlate design tokens — APP PALETTE = P8 "Tranzlate Teal (cool-mono)" — teal accents + P1 neutrals per docs/design/PALETTES.md
+/* ⚠ SUPERSEDED 2026-07-22 (issue #15): the APP PALETTE is now P9 "GT Blue (Google 1P)" —
+   see docs/design/PALETTES.md §P9. The values below are the P8 teal set the owner reviewed
+   during the design rounds; they are kept AS A RECORD of those cards. Do not regenerate
+   design cards from this file without swapping the accents to P9 first.
+
+   Tranzlate design tokens — APP PALETTE = P8 "Tranzlate Teal (cool-mono)" — teal accents + P1 neutrals per docs/design/PALETTES.md
    (research-verified 2026-07-21, workflow wf_d446a618-efd; owner directive: most-popular mobile palette).
    Preset classes (.preset-*) carry the saved alternative palettes for the future theme-picker (issue #7).
    Cards must use ONLY these vars — raw hex in card bodies is a QA failure. */
