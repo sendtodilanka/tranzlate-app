@@ -4,6 +4,7 @@
 > **Status:** Foundation contract — Phase 5 (Testing) + Adaptive/A11y සඳහා pre-condition එකකි. මෙය implement කරන කවුරුත් මේ contract එකට **conform** විය යුතුයි.
 > **Verified grounding:** `data/model/TranslationModels.kt` (tags: `AUTO`, `ML2-mini`, `ML2 - ONLINE`, `NLP3.5 - ONLINE`), `util/QonversionManager.kt` (`EntitlementState = LOADING, UNKNOWN, PREMIUM, PLUS, NOT_SUBSCRIBED`), `ui/screen/home/HomeUiState.kt` (sealed `Loading | Ready`), usage limit `20/day` (CLAUDE.md, `Constants.Defaults.FEATURE_LIMIT_PER_DAY`).
 > **2026-07-22: C-2 amended — explicit Translate for all engines (issue #9).**
+> **2026-07-22 (issue #11 PR-C): §1.7 row 2 reconciled with UI_SPEC §2.2 — the composer action is a MORPHING slot (mic when blank / Translate when text present); "disabled when blank" = no translate affordance exists when blank.**
 
 ---
 
@@ -183,7 +184,7 @@ Namespace convention: `tt_text_*`. සෑම control එකකටම `Modifier.t
 | # | Control | `testTag` | Screen / component | Node type | Notes |
 |---|---------|-----------|--------------------|-----------|-------|
 | 1 | Input text field | `tt_text_input` | `TextInputCard` | `TextField` | editable, multi-line |
-| 2 | Translate button | `tt_text_translate_btn` | `HomeScreen` | `Button` | disabled when input blank; present in EVERY mode (C-2, amended 2026-07-22) |
+| 2 | Translate button | `tt_text_translate_btn` | `HomeScreen` | `Button` | present in EVERY mode (C-2, amended 2026-07-22). **Morphing action slot (2026-07-22, issue #11 PR-C):** the composer's single primary action carries this tag — 🎤 mic while the input is blank, Translate (➜) once text exists (UI_SPEC §2.2). "Disabled when input blank" is satisfied because **no translate affordance exists when blank** — a tap on the blank-state slot is the mic ask and must fire NO translation; whitespace-only text additionally disables the Translate morph. |
 | 3 | Swap languages | `tt_text_swap` | `MiddleContent` | `IconButton` | src↔tgt |
 | 4 | Source language selector | `tt_text_source_lang` | `MiddleContent` | `Button`/chip | opens `LanguageScreen` |
 | 5 | Target language selector | `tt_text_target_lang` | `MiddleContent` | `Button`/chip | opens `LanguageScreen` |
