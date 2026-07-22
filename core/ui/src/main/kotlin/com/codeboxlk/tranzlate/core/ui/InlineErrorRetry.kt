@@ -1,74 +1,69 @@
 package com.codeboxlk.tranzlate.core.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
-import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 
 /**
- * Shared no-dead-end error surface (EDGE_CASES §7): a reason + a way forward,
- * never a blank failure. Container announces assertively (a11y contract §2.3 —
- * Assertive is reserved for error/limit).
- *
- * Features pass their contract testTags (e.g. `tt_text_error_view` /
- * `tt_text_retry`) so Compose + Maestro can target the instance.
+ * UI_SPEC §2.5 inline error: a reason + an inline Retry — no dialog, no dead
+ * end (EDGE_CASES no-dead-end rule). `errorContainer`-tinted row; assertive
+ * live region (a11y contract §2.3 — Assertive is reserved for error/limit).
  */
 @Composable
-fun ErrorView(
-    title: String,
+fun InlineErrorRetry(
+    message: String,
+    onRetry: () -> Unit,
+    retryLabel: String,
     modifier: Modifier = Modifier,
-    message: String? = null,
-    onRetry: (() -> Unit)? = null,
-    retryLabel: String = stringResource(R.string.core_ui_retry),
-    containerTestTag: String = "tt_core_error_view",
-    retryTestTag: String = "tt_core_retry",
+    containerTestTag: String = "tt_core_inline_error",
+    retryTestTag: String = "tt_core_inline_retry",
 ) {
     val spacing = LocalSpacing.current
-    Column(
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
         modifier =
             modifier
-                .fillMaxWidth()
-                .padding(spacing.md16)
                 .testTag(containerTestTag)
                 .semantics { liveRegion = LiveRegionMode.Assertive },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(spacing.sm8),
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.error,
-        )
-        if (message != null) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
+            modifier = Modifier.padding(horizontal = spacing.md16, vertical = spacing.xs4),
+        ) {
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
             )
-        }
-        if (onRetry != null) {
-            Button(
+            TextButton(
                 onClick = onRetry,
+                colors =
+                    ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    ),
                 modifier =
                     Modifier
-                        .heightIn(min = Dimensions.touchTargetMin)
+                        .minimumInteractiveComponentSize()
                         .testTag(retryTestTag),
             ) {
                 Text(text = retryLabel)
@@ -79,13 +74,17 @@ fun ErrorView(
 
 @PreviewLightDark
 @Composable
-private fun ErrorViewPreview() {
+private fun InlineErrorRetryPreview() {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
-            ErrorView(
-                title = "Translation failed",
+            InlineErrorRetry(
                 message = "No connection — check your network",
                 onRetry = {},
+                retryLabel = "Retry",
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(LocalSpacing.current.md16),
             )
         }
     }
