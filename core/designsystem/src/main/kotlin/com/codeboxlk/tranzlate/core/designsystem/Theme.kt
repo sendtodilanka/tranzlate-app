@@ -33,9 +33,12 @@ fun TranzlateTheme(
             darkTheme -> TranzlateDarkColors
             else -> TranzlateLightColors
         }
+    val floatingSurface =
+        if (darkTheme) colorScheme.surfaceContainer else colorScheme.surfaceContainerLowest
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
         LocalAmbientGradient provides if (darkTheme) DarkAmbientGradient else LightAmbientGradient,
+        LocalFloatingSurface provides floatingSurface,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
