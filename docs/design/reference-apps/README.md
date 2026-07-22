@@ -17,4 +17,4 @@ the *energy* and specific patterns below are what we adopt; the identity must re
 - **Side drawer**: serif wordmark, outline-icon section list (Chats/Projects/Artifacts/Code/…), "Starred" + "Recents" groups, floating "+ New chat" white pill, account avatar bottom-left.
 
 ## What Tranzlate adopts (round-5 locked)
-Gemini's ambient gradient + dotted texture + hamburger/mode-chip top bar · Claude's drawer structure + serif greeting + card composer · our own teal→blue→coral hues (violet rejected; Google's palette not copied) · explicit Translate button for all engines + separate result screen (issue #9 amends C-2).
+Gemini's ambient gradient + dotted texture + hamburger/mode-chip top bar · Claude's drawer structure + serif greeting + card composer · our own teal→blue cool-mono hues (P8; violet and all warm tones rejected) · explicit Translate button for all engines + separate result screen (issue #9 amends C-2).

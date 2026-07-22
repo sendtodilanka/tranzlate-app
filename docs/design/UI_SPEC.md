@@ -18,7 +18,7 @@
 ## 2. Screens
 
 ### 2.1 Home hub
-- **Top bar:** ☰ hamburger (opens drawer) · centered **mode chip** `✦ Automatic ▾` · right = new/clear icon. No bottom nav bar (hub model).
+- **Top bar:** ☰ hamburger (opens drawer) · centered **mode chip** `✦ Automatic ▾` · right = new/clear icon. No bottom nav bar (hub model — official decision record: DECISIONS.md **D-5**; Medium/Expanded keep C-13 rail/drawer).
 - **Canvas** (the band between top bar and composer, content **vertically centred**, re-centres when the IME opens): brand sparkle → greeting (time-aware, e.g. "Afternoon, *Dilanka*" — name in `primary`) → subtitle "What would you like to translate?" → **compact quick-action tiles** (Conversation · Camera; ≈64–72dp tall, icon chip + label + sub-label) in a wrapping grid that must scale to 5–6 tiles and still look intentional with 2.
 - **First run:** zero history — the canvas must feel complete (no empty-state apology). Recents live in the drawer.
 

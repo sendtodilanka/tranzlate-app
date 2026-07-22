@@ -22,7 +22,7 @@ Near-white/gray-blue surfaces, white pill controls, Google Blue accents (= our P
 
 ## Tranzlate deltas to layer on (do not break the above)
 Mode chip (Automatic ▾) + metered "15/20 today" counter + explicit send for Advanced AI (C-2) · Settings/Paywall entries (avatar menu) · white-label branding.
-**Spec follow-up queued:** CLEAN_ROOM_UX nav section says bottom NavigationSuiteScaffold on Compact — evolved-GT hub model supersedes on phone; rail/drawer stays for Medium/Expanded (C-13). Needs docs amendment PR.
+**Spec reconciliation DONE (2026-07-22):** DECISIONS **D-5** records the Compact hub model officially; CLEAN_ROOM_UX §3/§4, spec-01 §9 and DESIGN_SYSTEM §9 amended to match. Rail/drawer stays for Medium/Expanded (C-13).
 
 Frames: gt2026-live-typing.jpg · gt2026-result-session.jpg · gt2026-definitions.jpg · gt2026-long-text.jpg (from 61.6s video). Internal design reference only — not shipped assets.
 

@@ -298,8 +298,9 @@ Guidance: **enter** with decelerate (`medium2`), **exit** with accelerate (`shor
 - Shape `sm8`; unfocused border `outline`, focused border `primary` 2dp; label/placeholder `onSurfaceVariant`; input text `bodyLarge`/`onSurface`; cursor `primary`.
 - Error: border/label `error`, supporting text `error`. Container transparent (or `surfaceContainerLowest`).
 
-**NavigationBar / NavigationSuiteScaffold**
-- Use `NavigationSuiteScaffold` (adaptive: bar → rail → drawer per window size class). Never a bare `BottomNavigation`.
+**Navigation (amended 2026-07-22 — DECISIONS D-5)**
+- Compact: HUB model — no bottom nav bar; peer modes live on the hub (composer + quick-action tiles), ☰ drawer = secondary destinations (push+scale motion per UI_SPEC §2.3).
+- Medium/Expanded: `NavigationSuiteScaffold` adaptivity stays per C-13 (rail → permanent drawer). Never a bare `BottomNavigation`.
 - Container `surfaceContainer`, Level 2. Selected item: filled icon `onSecondaryContainer` on a `secondaryContainer` pill indicator (shape `full`); unselected icon+label `onSurfaceVariant`. Label `labelMedium`.
 
 **BottomSheet (modal)**
