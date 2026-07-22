@@ -4,83 +4,88 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-// DESIGN_SYSTEM §1 color role tokens — EXACT hex values (WCAG-AA-checked, §0).
+// DESIGN_SYSTEM §1 color role tokens — P8 "Tranzlate Teal (cool-mono)", owner-final
+// 2026-07-22 (issue #10). EXACT hex values, WCAG-checked (§0 / docs/design/PALETTES.md P8).
+// Teal primary kept from the brand set; blue support + neutrals + error = Google 1P (P1)
+// values verbatim. No coral, no gold, no violet, no warm hue anywhere (P8 rule).
 // The ONLY home for raw hex in the codebase (§10 rule).
-//
-// D-P2 (owner resolution): this palette is the provisional implementation baseline;
-// final colours are decided in the UI-design phase — swapping hex = this file only.
 
 // §1.1 Light scheme
 
-internal val LightPrimary = Color(0xFF1C7A97) // brand teal, deepened for AA (§0 design rule)
+internal val LightPrimary = Color(0xFF1C7A97) // brand teal (kept), AA-checked
 internal val LightOnPrimary = Color(0xFFFFFFFF)
 internal val LightPrimaryContainer = Color(0xFFB8E7F5)
 internal val LightOnPrimaryContainer = Color(0xFF002F3C)
-internal val LightSecondary = Color(0xFFC0563E) // coral swoosh, deepened for AA
+internal val LightSecondary = Color(0xFF00639B) // support blue (P1 secondary)
 internal val LightOnSecondary = Color(0xFFFFFFFF)
-internal val LightSecondaryContainer = Color(0xFFFFDBD1)
-internal val LightOnSecondaryContainer = Color(0xFF3B0A02)
-internal val LightTertiary = Color(0xFF7A5A2E) // warm bronze/gold bridge accent
+internal val LightSecondaryContainer = Color(0xFFC2E7FF)
+internal val LightOnSecondaryContainer = Color(0xFF004A77)
+internal val LightTertiary = Color(0xFF10586B) // deep teal, in-family (P8-derived)
 internal val LightOnTertiary = Color(0xFFFFFFFF)
-internal val LightTertiaryContainer = Color(0xFFFBDFA6)
-internal val LightOnTertiaryContainer = Color(0xFF2A1C00)
-internal val LightBackground = Color(0xFFFCFCFD)
-internal val LightOnBackground = Color(0xFF1A1C1E)
-internal val LightSurface = Color(0xFFFBFCFE)
-internal val LightOnSurface = Color(0xFF1A1C1E)
-internal val LightSurfaceVariant = Color(0xFFDCE3E8)
-internal val LightOnSurfaceVariant = Color(0xFF40484D)
+internal val LightTertiaryContainer = Color(0xFFCDE9F2)
+internal val LightOnTertiaryContainer = Color(0xFF002F3C)
+internal val LightBackground = Color(0xFFFAF9F8) // = surface (P1)
+internal val LightOnBackground = Color(0xFF1F1F1F)
+internal val LightSurface = Color(0xFFFAF9F8)
+internal val LightOnSurface = Color(0xFF1F1F1F)
+internal val LightSurfaceVariant = Color(0xFFE1E3E1)
+internal val LightOnSurfaceVariant = Color(0xFF444746)
+internal val LightSurfaceDim = Color(0xFFDADADA)
+internal val LightSurfaceBright = Color(0xFFFAF9F8)
 internal val LightSurfaceContainerLowest = Color(0xFFFFFFFF)
-internal val LightSurfaceContainerLow = Color(0xFFF4F5F7)
-internal val LightSurfaceContainer = Color(0xFFEEF0F3)
-internal val LightSurfaceContainerHigh = Color(0xFFE8EBED)
-internal val LightSurfaceContainerHighest = Color(0xFFE2E5E8)
-internal val LightSurfaceTint = Color(0xFF1C7A97) // = primary (tonal elevation tint)
-internal val LightInverseSurface = Color(0xFF2E3134)
-internal val LightInverseOnSurface = Color(0xFFF1F1F3)
-internal val LightInversePrimary = Color(0xFF3FB6D4)
-internal val LightOutline = Color(0xFF70787D)
-internal val LightOutlineVariant = Color(0xFFC0C8CD)
-internal val LightError = Color(0xFFBA1A1A)
+internal val LightSurfaceContainerLow = Color(0xFFF4F3F2)
+internal val LightSurfaceContainer = Color(0xFFEFEDED)
+internal val LightSurfaceContainerHigh = Color(0xFFE9E8E8)
+internal val LightSurfaceContainerHighest = Color(0xFFE3E3E3)
+internal val LightSurfaceTint = LightPrimary // = primary (tonal elevation tint)
+internal val LightInverseSurface = Color(0xFF303030)
+internal val LightInverseOnSurface = Color(0xFFF2F2F2)
+internal val LightInversePrimary = Color(0xFF3FB6D4) // = dark primary (P8 teal family)
+internal val LightOutline = Color(0xFF747775)
+internal val LightOutlineVariant = Color(0xFFC4C7C5)
+internal val LightError = Color(0xFFB3261E) // P1 error set
 internal val LightOnError = Color(0xFFFFFFFF)
-internal val LightErrorContainer = Color(0xFFFFDAD6)
-internal val LightOnErrorContainer = Color(0xFF410002)
+internal val LightErrorContainer = Color(0xFFF9DEDC)
+internal val LightOnErrorContainer = Color(0xFF8C1D18)
 internal val LightScrim = Color(0xFF000000)
 
 // §1.2 Dark scheme
-internal val DarkPrimary = Color(0xFF3FB6D4) // bright brand teal
+
+internal val DarkPrimary = Color(0xFF3FB6D4) // bright brand teal (kept)
 internal val DarkOnPrimary = Color(0xFF00363F)
 internal val DarkPrimaryContainer = Color(0xFF10586B)
 internal val DarkOnPrimaryContainer = Color(0xFFB8E7F5)
-internal val DarkSecondary = Color(0xFFFFB4A0) // bright coral
-internal val DarkOnSecondary = Color(0xFF5C1900)
-internal val DarkSecondaryContainer = Color(0xFF7A3421)
-internal val DarkOnSecondaryContainer = Color(0xFFFFDBD1)
-internal val DarkTertiary = Color(0xFFE0C08A) // soft gold
-internal val DarkOnTertiary = Color(0xFF422C00)
-internal val DarkTertiaryContainer = Color(0xFF5E421E)
-internal val DarkOnTertiaryContainer = Color(0xFFFBDFA6)
-internal val DarkBackground = Color(0xFF101416)
-internal val DarkOnBackground = Color(0xFFE2E5E8)
-internal val DarkSurface = Color(0xFF101416)
-internal val DarkOnSurface = Color(0xFFE2E5E8)
-internal val DarkSurfaceVariant = Color(0xFF40484D)
-internal val DarkOnSurfaceVariant = Color(0xFFC0C8CD)
-internal val DarkSurfaceContainerLowest = Color(0xFF0B0F11)
-internal val DarkSurfaceContainerLow = Color(0xFF181C1F)
-internal val DarkSurfaceContainer = Color(0xFF1C2023)
-internal val DarkSurfaceContainerHigh = Color(0xFF262A2E)
-internal val DarkSurfaceContainerHighest = Color(0xFF303539)
-internal val DarkSurfaceTint = Color(0xFF3FB6D4)
-internal val DarkInverseSurface = Color(0xFFE2E5E8)
-internal val DarkInverseOnSurface = Color(0xFF2E3134)
-internal val DarkInversePrimary = Color(0xFF1C7A97)
-internal val DarkOutline = Color(0xFF8A9297)
-internal val DarkOutlineVariant = Color(0xFF40484D)
-internal val DarkError = Color(0xFFFFB4AB)
-internal val DarkOnError = Color(0xFF690005)
-internal val DarkErrorContainer = Color(0xFF93000A)
-internal val DarkOnErrorContainer = Color(0xFFFFDAD6)
+internal val DarkSecondary = Color(0xFF7FCFFF) // support blue (P1 secondary)
+internal val DarkOnSecondary = Color(0xFF003355)
+internal val DarkSecondaryContainer = Color(0xFF004A77)
+internal val DarkOnSecondaryContainer = Color(0xFFC2E7FF)
+internal val DarkTertiary = Color(0xFF8FD3E3) // soft teal, in-family (P8-derived)
+internal val DarkOnTertiary = Color(0xFF00363F)
+internal val DarkTertiaryContainer = Color(0xFF0B4A5A)
+internal val DarkOnTertiaryContainer = Color(0xFFCDE9F2)
+internal val DarkBackground = Color(0xFF131314) // = surface (P1)
+internal val DarkOnBackground = Color(0xFFE3E3E3)
+internal val DarkSurface = Color(0xFF131314)
+internal val DarkOnSurface = Color(0xFFE3E3E3)
+internal val DarkSurfaceVariant = Color(0xFF444746)
+internal val DarkOnSurfaceVariant = Color(0xFFC4C7C5)
+internal val DarkSurfaceDim = Color(0xFF131314)
+internal val DarkSurfaceBright = Color(0xFF393939)
+internal val DarkSurfaceContainerLowest = Color(0xFF0E0E0F)
+internal val DarkSurfaceContainerLow = Color(0xFF1F1F1F)
+internal val DarkSurfaceContainer = Color(0xFF1F2020)
+internal val DarkSurfaceContainerHigh = Color(0xFF2A2A2A)
+internal val DarkSurfaceContainerHighest = Color(0xFF343535)
+internal val DarkSurfaceTint = DarkPrimary // = primary (tonal elevation tint)
+internal val DarkInverseSurface = Color(0xFFE3E3E3)
+internal val DarkInverseOnSurface = Color(0xFF303030)
+internal val DarkInversePrimary = Color(0xFF1C7A97) // = light primary (P8 teal family)
+internal val DarkOutline = Color(0xFF8E918F)
+internal val DarkOutlineVariant = Color(0xFF444746)
+internal val DarkError = Color(0xFFF2B8B5) // P1 error set
+internal val DarkOnError = Color(0xFF601410)
+internal val DarkErrorContainer = Color(0xFF8C1D18)
+internal val DarkOnErrorContainer = Color(0xFFF9DEDC)
 internal val DarkScrim = Color(0xFF000000)
 
 /** Static light scheme — guaranteed fallback for API 24–30 / dynamic-color-off (§ header). */
@@ -115,6 +120,8 @@ val TranzlateLightColors =
         outline = LightOutline,
         outlineVariant = LightOutlineVariant,
         scrim = LightScrim,
+        surfaceBright = LightSurfaceBright,
+        surfaceDim = LightSurfaceDim,
         surfaceContainerLowest = LightSurfaceContainerLowest,
         surfaceContainerLow = LightSurfaceContainerLow,
         surfaceContainer = LightSurfaceContainer,
@@ -154,6 +161,8 @@ val TranzlateDarkColors =
         outline = DarkOutline,
         outlineVariant = DarkOutlineVariant,
         scrim = DarkScrim,
+        surfaceBright = DarkSurfaceBright,
+        surfaceDim = DarkSurfaceDim,
         surfaceContainerLowest = DarkSurfaceContainerLowest,
         surfaceContainerLow = DarkSurfaceContainerLow,
         surfaceContainer = DarkSurfaceContainer,
