@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -83,9 +87,14 @@ fun DrawerContent(
     // installs none of its own, so with a raw Surface the system back button fell
     // through to the nav host and closed the app instead of the drawer.
     //
-    // The sheet also owns DrawerDefaults.windowInsets, which is what should have
-    // kept the wordmark out from under the status bar in the first place — the
-    // manual windowInsetsPadding added in #16 is gone.
+    // windowInsets: DrawerDefaults.windowInsets is systemBarsForVisualComponents
+    // .only(Vertical + Start) — it drops the IME. Under edge-to-edge + adjustResize
+    // the window does not physically shrink, so a screen must consume ime itself or
+    // bottom content sits under the keyboard. The drawer opens from the same screen
+    // as the composer text field, so if it opens with the keyboard up the pinned
+    // AccountRow would be hidden behind it. safeDrawing carries the ime; keep the
+    // same Vertical+Start shape as the default so nothing else changes.
+    // (HomeScreen makes the same choice for the same reason.)
     //
     // Width stays pinned at 300dp rather than letting the sheet size itself: it is
     // inside M3's own 240-360dp range, and the push/scale motion in TranzlateApp
@@ -94,6 +103,7 @@ fun DrawerContent(
         drawerState = drawerState,
         drawerContainerColor = LocalFloatingSurface.current,
         drawerContentColor = MaterialTheme.colorScheme.onSurface,
+        windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical + WindowInsetsSides.Start),
         modifier =
             modifier
                 .width(DrawerSheetWidth)
