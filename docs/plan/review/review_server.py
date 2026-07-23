@@ -3,6 +3,13 @@
 
 Serves the review HTML and persists owner comments to a JSON file next to it,
 so a Claude session can read the comments directly. Localhost-only.
+
+Multi-document: `/<name>.html` serves `<name>.html` from this directory and
+`/api/comments?doc=<name>` reads/writes `<name>-comments.json`.
+
+ADDING A PAGE: put `const DOC = '<name>'` in its JS and append `?doc=` + DOC to
+EVERY /api/comments call. A page that forgets falls back to DEFAULT_DOC without
+complaining, and its comments land in the wrong file.
 """
 import datetime
 import http.server

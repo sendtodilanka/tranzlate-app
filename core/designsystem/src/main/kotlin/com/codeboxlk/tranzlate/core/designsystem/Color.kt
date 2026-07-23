@@ -12,7 +12,11 @@ import androidx.compose.ui.graphics.Color
 //
 // Accent tones are Google's own reference values (chromium
 // `ui/color/ref_color_mixer.cc`), surfaces/neutrals/error the 1P baseline greys.
-// The teal set (P8) is RETIRED. This file is the ONLY home for raw hex (§10).
+// The teal set (P8) is RETIRED. This file is the ONLY home for raw hex (§10),
+// with one unavoidable exception: `app/src/main/res/values*/colors.xml` repeats
+// LightBackground/DarkBackground, because `android:windowBackground` must be a
+// compiled Android resource the framework can paint before any Compose frame
+// exists. Change one, change the other.
 
 // ---- Light scheme (§1.1) ------------------------------------------------------------------------
 
