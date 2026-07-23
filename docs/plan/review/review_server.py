@@ -3,31 +3,62 @@
 
 Serves the review HTML and persists owner comments to a JSON file next to it,
 so a Claude session can read the comments directly. Localhost-only.
+
+Multi-document: `/<name>.html` serves `<name>.html` from this directory and
+`/api/comments?doc=<name>` reads/writes `<name>-comments.json`.
+
+ADDING A PAGE: put `const DOC = '<name>'` in its JS and append `?doc=` + DOC to
+EVERY /api/comments call. A page that forgets falls back to DEFAULT_DOC without
+complaining, and its comments land in the wrong file.
 """
 import datetime
 import http.server
 import json
 import os
+import re
 import socketserver
+import urllib.parse
 
 PORT = 8765
 BASE = os.path.dirname(os.path.abspath(__file__))
-HTML = os.path.join(BASE, "issue-3-plan-review.html")
-DATA = os.path.join(BASE, "issue-3-comments.json")
+DEFAULT_DOC = "issue-3-plan-review"
+SAFE_DOC = re.compile(r"[a-zA-Z0-9._-]+$")
 
 
-def load():
-    if os.path.exists(DATA):
-        with open(DATA, encoding="utf-8") as f:
+def doc_name(path):
+    """Resolve the ?doc= query (or an /<name>.html path) to a safe doc slug."""
+    parsed = urllib.parse.urlparse(path)
+    requested = urllib.parse.parse_qs(parsed.query).get("doc", [""])[0]
+    if not requested and parsed.path.endswith(".html"):
+        requested = parsed.path.lstrip("/")[: -len(".html")]
+    if not requested:
+        return DEFAULT_DOC
+    # Reject traversal / absolute paths outright rather than sanitising them.
+    return requested if SAFE_DOC.fullmatch(requested) else DEFAULT_DOC
+
+
+def html_path(doc):
+    return os.path.join(BASE, f"{doc}.html")
+
+
+def data_path(doc):
+    return os.path.join(BASE, f"{doc.removesuffix('-plan-review')}-comments.json")
+
+
+def load(doc):
+    path = data_path(doc)
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     return []
 
 
-def save(data):
-    tmp = DATA + ".tmp"
+def save(doc, data):
+    path = data_path(doc)
+    tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, DATA)
+    os.replace(tmp, path)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -41,16 +72,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
-            with open(HTML, "rb") as f:
+        path = urllib.parse.urlparse(self.path).path
+        if path.startswith("/img/"):
+            name = path[len("/img/"):]
+            if not SAFE_DOC.fullmatch(name) or not name.endswith((".png", ".jpg")):
+                return self._send(404, '{"error":"not found"}')
+            shot = os.path.join(BASE, "..", "..", "design", "screenshots", name)
+            if not os.path.exists(shot):
+                return self._send(404, '{"error":"no such image"}')
+            ctype = "image/png" if name.endswith(".png") else "image/jpeg"
+            with open(shot, "rb") as f:
+                return self._send(200, f.read(), ctype)
+        if path == "/api/comments":
+            self._send(200, json.dumps(load(doc_name(self.path)), ensure_ascii=False))
+        elif path in ("/", "/index.html") or path.endswith(".html"):
+            page = html_path(doc_name(self.path))
+            if not os.path.exists(page):
+                return self._send(404, '{"error":"no such review page"}')
+            with open(page, "rb") as f:
                 self._send(200, f.read(), "text/html; charset=utf-8")
-        elif self.path == "/api/comments":
-            self._send(200, json.dumps(load(), ensure_ascii=False))
         else:
             self._send(404, '{"error":"not found"}')
 
     def do_POST(self):
-        if self.path != "/api/comments":
+        if urllib.parse.urlparse(self.path).path != "/api/comments":
             return self._send(404, '{"error":"not found"}')
         try:
             n = int(self.headers.get("Content-Length", 0))
@@ -58,7 +103,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except (ValueError, json.JSONDecodeError):
             return self._send(400, '{"error":"bad json"}')
 
-        data = load()
+        doc = doc_name(self.path)
+        data = load(doc)
         action = req.get("action", "add")
         now = datetime.datetime.now().isoformat(timespec="seconds")
 
@@ -83,7 +129,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         else:
             return self._send(400, '{"error":"unknown action"}')
 
-        save(data)
+        save(doc, data)
         self._send(200, json.dumps({"ok": True, "count": len(data)}, ensure_ascii=False))
 
     def log_message(self, *args):  # keep the console quiet

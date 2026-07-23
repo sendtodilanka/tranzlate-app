@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Window-level theme only — all real theming is Compose TranzlateTheme
-         (DESIGN_SYSTEM §10). Light/dark window backgrounds via values-night. -->
-    <style name="Theme.Tranzlate" parent="android:Theme.Material.Light.NoActionBar" />
+         (DESIGN_SYSTEM §10).
+
+         windowBackground is what the framework paints before the first Compose
+         frame exists, and on Android 12+ it is also the splash-screen
+         background (the platform falls back to it when it is a single colour).
+         Without it we inherited the framework's ?colorBackground grey
+         (#FAFAFA/#303030) — that was the cold-start flash.
+
+         forceDarkAllowed=false: we ship our own values-night theme, so the
+         platform's automatic dark conversion must never touch us. Moot for
+         Compose today, but load-bearing for any View content (ad SDK, WebView)
+         that lands later. -->
+    <style name="Theme.Tranzlate" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+    </style>
 </resources>
