@@ -67,19 +67,29 @@ already forbids branching on the system flag at a call site. The `ThemeMode → 
 into `:core:model` as a pure function so it is unit-testable without a Compose host.
 *No behaviour change:* the stored preference is still SYSTEM for everyone.
 
-**PR 5 · A4 — Settings Appearance.** `SettingsScreen` gains its first real section (Light / Dark /
-System + dynamic colour) using stock M3; the placeholder stays for the rest. Needs a new
-`STRINGS_settings.md` — the catalogue is the key authority (C-3) and only Text has one today.
-testTags per C-1.
-*Verify:* toggle each option on device, both orientations.
-
-**PR 6 · A5 + A6 — window chrome + splash.** `DisposableEffect(darkTheme)` re-applying
+**PR 5 · A5 + A6 — window chrome + splash.** `DisposableEffect(darkTheme)` re-applying
 `enableEdgeToEdge(statusBarStyle/navigationBarStyle = SystemBarStyle.auto(…) { darkTheme })` so bar
 icons follow the app, not the system (verified: the default `detectDarkMode` reads
 `resources.configuration`, `EdgeToEdge.kt:167`). Then `androidx.core:core-splashscreen` +
 `installSplashScreen().setKeepOnScreenCondition { themeNotResolved }`.
 *Verify:* device set to light + app set to Dark → status-bar icons must be light, and there must be
 no white flash before the first frame.
+
+**PR 6 · A4 — Settings Appearance. Last on purpose.** `SettingsScreen` gains its first real section (Light / Dark /
+System + dynamic colour) using stock M3; the placeholder stays for the rest. Needs a new
+`STRINGS_settings.md` — the catalogue is the key authority (C-3) and only Text has one today.
+testTags per C-1.
+*Verify:* toggle each option on device, both orientations; confirm no light frame on a cold start
+after choosing Dark.
+
+> **Resequenced after the A3 co-verify lens.** A4 was originally PR 4, ahead of A5/A6. That was
+> wrong: A4 is the *trigger* for both of them. Until a user can pick a mode, the stored preference
+> and the system always agree, so the status-bar icons cannot be wrong (A5) and the first-frame
+> fallback cannot be visible (A6). The moment the toggle ships, both defects become reachable —
+> A6's light-flash on every cold start being the user-visible one. Shipping the switch that turns
+> the feature on *before* the two fixes that make it correct would have put the defect in front of
+> users for one PR's worth of time, for no reason other than the order I happened to write the plan
+> in.
 
 ## 3. Out of scope
 
@@ -88,6 +98,8 @@ batch 🅒 text-vertical fixes · theme-colour presets (#7) · the rest of the S
 
 ## 4. Risks
 
+- **A4 is the switch that turns the whole batch on.** It must land after A5 and A6, never before —
+  see the note under PR 6. This is the one ordering constraint in the batch that is not cosmetic.
 - **A7 touches the two busiest screens.** Mitigate with the dark screenshot test + a device pass on
   Home's keyboard behaviour (the IME-pan bug in PR #14 came from exactly this area).
 - **Splash gating can hide a slow start.** T-6 keeps the gate to one local read; if the preference

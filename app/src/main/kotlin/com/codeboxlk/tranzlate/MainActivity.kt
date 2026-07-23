@@ -27,9 +27,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeSettings by viewModel.themeSettings.collectAsStateWithLifecycle()
             // Until the stored preference arrives we render the documented defaults.
-            // For someone who chose Dark that is a real, brief light frame — which is
-            // exactly what issue #17 A6 removes by holding the splash while
-            // `themeSettings` is still null. The nullable state exists for that gate.
+            // Harmless today — nobody can store anything but SYSTEM, so the fallback and
+            // the real value always agree.
+            // TODO(#17 A6): the moment the Settings toggle (A4) ships this becomes a real
+            //  light frame on every cold start for anyone who picked Dark. A6 removes it by
+            //  holding the splash while `themeSettings` is still null — which is why this
+            //  state is nullable. A4 must not land before A6; see the plan doc.
             TranzlateTheme(settings = themeSettings ?: ThemeSettings.Default) {
                 TranzlateApp(appConfig = appConfig)
             }
