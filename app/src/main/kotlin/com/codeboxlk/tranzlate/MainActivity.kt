@@ -37,9 +37,14 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainActivityViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Before super.onCreate(): the splash has to be installed before the
-        // activity's own content is set up.
+        // Both of these belong before super.onCreate(): the splash has to be
+        // installed before the activity's content is set up, and androidx's own
+        // sample for enableEdgeToEdge places it there too (EdgeToEdge.kt KDoc).
+        // The no-arg call sets the window up for the very first frame; the
+        // DisposableEffect below re-applies it once the app's own dark decision
+        // is known, and again whenever it changes.
         val splashScreen = installSplashScreen()
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         // Hold the splash until the stored appearance is known. Without this the
@@ -54,16 +59,13 @@ class MainActivity : ComponentActivity() {
             val settings = themeSettings ?: ThemeSettings.Default
             val darkTheme = settings.mode.isDark(isSystemInDarkTheme())
 
-            // The ONLY enableEdgeToEdge call. Its default detector reads
-            // resources.configuration — i.e. the SYSTEM theme (EdgeToEdge.kt:167) —
-            // which is the wrong input once the app can override it: someone on a
+            // The onCreate call above uses the DEFAULT detector, which reads
+            // resources.configuration — i.e. the SYSTEM theme (EdgeToEdge.kt:167).
+            // That is the wrong input once the app can override it: someone on a
             // light phone who picks Dark would get dark status-bar icons on our dark
-            // surface, i.e. invisible. detectDarkMode is the seam androidx provides.
-            //
-            // Safe to do here rather than in onCreate: effects run after composition
-            // and before the frame is drawn, and the splash above holds the first
-            // draw anyway, so this is always applied before anything is visible.
-            // Keyed on darkTheme so it re-applies whenever the choice changes.
+            // surface, i.e. invisible. detectDarkMode is the seam androidx provides,
+            // and the app's decision only exists once composition can read it —
+            // hence re-applying here, keyed on darkTheme so it follows every change.
             DisposableEffect(darkTheme) {
                 enableEdgeToEdge(
                     statusBarStyle =
