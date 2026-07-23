@@ -1,6 +1,5 @@
 package com.codeboxlk.tranzlate.core.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -20,6 +19,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
+import com.codeboxlk.tranzlate.core.designsystem.LocalPrimaryActionColors
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 
@@ -45,26 +45,17 @@ fun PrimaryActionButton(
     testTag: String = "tt_core_primary_action",
     icon: @Composable () -> Unit,
 ) {
-    // TODO(#7): when an in-app theme override ships, read the theme's own dark
-    //  flag instead of the system one (the two can disagree only from then on).
-    val dark = isSystemInDarkTheme()
+    // Resolved by TranzlateTheme from the ACTIVE scheme, so this follows the app's
+    // own light/dark choice and dynamic colour — asking isSystemInDarkTheme() here
+    // would ask the wrong question the moment the two can disagree.
+    val actionColors = LocalPrimaryActionColors.current
     FilledIconButton(
         onClick = onClick,
         enabled = enabled,
         colors =
             IconButtonDefaults.filledIconButtonColors(
-                containerColor =
-                    if (dark) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                contentColor =
-                    if (dark) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onPrimary
-                    },
+                containerColor = actionColors.container,
+                contentColor = actionColors.content,
             ),
         modifier =
             modifier

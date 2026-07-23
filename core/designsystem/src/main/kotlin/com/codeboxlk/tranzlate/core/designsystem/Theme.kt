@@ -8,6 +8,8 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
+import com.codeboxlk.tranzlate.core.model.ThemeSettings
+import com.codeboxlk.tranzlate.core.model.isDark
 
 /**
  * DESIGN_SYSTEM §10 theme wiring.
@@ -39,9 +41,16 @@ fun TranzlateTheme(
         }
     val floatingSurface =
         if (darkTheme) colorScheme.surfaceContainer else colorScheme.surfaceContainerLowest
+    val primaryActionColors =
+        if (darkTheme) {
+            PrimaryActionColors(colorScheme.primaryContainer, colorScheme.onPrimaryContainer)
+        } else {
+            PrimaryActionColors(colorScheme.primary, colorScheme.onPrimary)
+        }
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
         LocalFloatingSurface provides floatingSurface,
+        LocalPrimaryActionColors provides primaryActionColors,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
@@ -50,4 +59,23 @@ fun TranzlateTheme(
             content = content,
         )
     }
+}
+
+/**
+ * The overload the app shell uses: the stored [ThemeSettings] decide, not the
+ * system. `isSystemInDarkTheme()` is still read here — it is what
+ * [com.codeboxlk.tranzlate.core.model.ThemeMode.SYSTEM] means — but it is one
+ * input to the decision rather than the decision itself, and it is the only
+ * place that reads it.
+ */
+@Composable
+fun TranzlateTheme(
+    settings: ThemeSettings,
+    content: @Composable () -> Unit,
+) {
+    TranzlateTheme(
+        darkTheme = settings.mode.isDark(isSystemInDarkTheme()),
+        dynamicColor = settings.dynamicColor,
+        content = content,
+    )
 }
