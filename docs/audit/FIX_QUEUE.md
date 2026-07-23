@@ -26,8 +26,8 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | # | තත්ත්වය | මූ | මොකක්ද | තැන |
 |---|---|---|---|---|
 | A1 | ✅ [#18](https://github.com/sendtodilanka/tranzlate-app/pull/18) | 👤 | Window theme: `android:windowBackground` + `android:forceDarkAllowed=false` | `values*/themes.xml`, `values*/colors.xml` |
-| A2 | ⏳ **ඊළඟට** | 🔍 | Theme preference එක: DataStore keys + repository (`SYSTEM`/`LIGHT`/`DARK` + dynamic on/off). **+ corruption handler** — A6 මේ pref එක එනකම් splash එක රඳවන නිසා, file එක හැදුණොත් crash එකක් වෙනුවට **splash එකේම හිරවෙනවා**. ඒ නිසා ඒක මෙතනට ගෙනාවා (කලින් C5) | `TranzlatePreferencesDataSource.kt`, `DataStoreModule.kt:23` |
-| A3 | | 🔍 | `TranzlateTheme(darkTheme, dynamicColor)` ඒ preference එකෙන් run කරන එක + `PrimaryActionButton` එකේ `isSystemInDarkTheme()` branch එක අයින් කිරීම (`TODO(#7)`) | `Theme.kt`, `PrimaryActionButton.kt:48` |
+| A2 | ✅ [#21](https://github.com/sendtodilanka/tranzlate-app/pull/21) | 🔍 | Theme preference එක: DataStore keys + repository (`SYSTEM`/`LIGHT`/`DARK` + dynamic on/off). **+ corruption handler** — A6 මේ pref එක එනකම් splash එක රඳවන නිසා, file එක හැදුණොත් crash එකක් වෙනුවට **splash එකේම හිරවෙනවා**. ඒ නිසා ඒක මෙතනට ගෙනාවා (කලින් C5) | `TranzlatePreferencesDataSource.kt`, `DataStoreModule.kt:23` |
+| A3 | ⏳ **ඊළඟට** | 🔍 | `TranzlateTheme(darkTheme, dynamicColor)` ඒ preference එකෙන් run කරන එක + `PrimaryActionButton` එකේ `isSystemInDarkTheme()` branch එක අයින් කිරීම (`TODO(#7)`) | `Theme.kt`, `PrimaryActionButton.kt:48` |
 | A4 | | 🔍 | **Settings screen** — light / dark / system + dynamic colour toggle (දැන් 32 පේළියේ placeholder එකක්) | `feature/settings` |
 | A5 | | 👤 | `MainActivity`: `DisposableEffect(darkTheme)` + `enableEdgeToEdge(detectDarkMode = { darkTheme })` — status/nav bar icon පාට app එකේ theme එකට. (`Activity` cast + `SideEffect` ක්‍රමය පාවිච්චි කරන්නේ නෑ.) | `MainActivity.kt:20` |
 | A6 | | 👤 | `core-splashscreen` + `setKeepOnScreenCondition` — theme preference එක එනකම් රඳවගන්න (නැත්නම් dark තෝරලා තියෙන කෙනෙකුට **light flash**). API 23+ backport. **සීමාව 1000ms** (Google) | `MainActivity.kt:19` |
@@ -90,4 +90,5 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | # | මොකක්ද | PR | ඔප්පු කරපු විදිහ |
 |---|---|---|---|
 | A1 | Window background + force-dark opt-out | [#18](https://github.com/sendtodilanka/tranzlate-app/pull/18) merged | Launch එකේ frame එකින් එක pixel කියෙව්වා: dark `#131314` · light `#FAF9F8`, Android ගේ `#303030` phase එකක් **එකම frame එකකවත් නෑ**. APK එකේ style එක API bucket අනුව split වෙලා |
+| A2 | Theme preference + corruption handler | [#21](https://github.com/sendtodilanka/tranzlate-app/pull/21) | Test 10ක්. Corruption catch එක තාවකාලිකව අයින් කරලා ඒ test එකම fail වෙනවා කියලා ඔප්පු කළා (vacuous නෙවෙයි). Device එකේ crash නෑ, prefs file ලියවෙනවා |
 | A7 | Home + Result → `Scaffold` | [#19](https://github.com/sendtodilanka/tranzlate-app/pull/19) — CI green, co-verify ඉවරයි, merge එකට සූදානම් | Icon bounds ඇතුළේ luminance මැනලා: dark `#E3E3E3` · light `#1F1F1F` (කලින් දෙකේම `#000000`, ~1.1:1 → ~14.5:1). Snackbar nav-bar (`y=2337`) එකට උඩින්. Keyboard එකේදී composer `1925→1105`, menu `189-252` තැනේම |
