@@ -17,4 +17,20 @@
         <item name="android:windowBackground">@color/window_background</item>
         <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
     </style>
+
+    <!-- The LAUNCH theme. Android 12+ shows a splash whether we configure one or
+         not, so this is about controlling the one that already appears rather
+         than adding anything; core-splashscreen backports the same treatment to
+         API 23+, which is where our minSdk 24 users live.
+
+         Both colours point at @color/window_background so the splash, the window
+         behind it and the first Compose frame are one continuous surface — no
+         step, in either light or dark (the colour has a values-night variant).
+
+         postSplashScreenTheme is what the activity switches to once the splash
+         is dismissed; without it the app would keep the splash theme forever. -->
+    <style name="Theme.Tranzlate.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/window_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.Tranzlate</item>
+    </style>
 </resources>
