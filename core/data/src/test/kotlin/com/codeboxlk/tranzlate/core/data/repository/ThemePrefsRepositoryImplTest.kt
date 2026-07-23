@@ -9,7 +9,11 @@ import com.codeboxlk.tranzlate.core.model.ThemeSettings
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -61,6 +65,41 @@ class ThemePrefsRepositoryImplTest {
             source.setTheme(99)
 
             assertThat(repository.settings.first().mode).isEqualTo(ThemeMode.SYSTEM)
+        }
+
+    /**
+     * The `distinctUntilChanged` in the implementation carries a claim in its
+     * comment — that the raw `combine` emits twice for one write, because both
+     * upstreams derive from the same `dataStore.data`. A claim in a comment is
+     * worth nothing unless something fails when it stops being true, so this
+     * measures both streams over the same single write.
+     */
+    @Test
+    fun `distinctUntilChanged collapses the duplicate the raw combine produces`() =
+        runTest {
+            val (repository, source) = repository()
+            val raw = mutableListOf<Pair<Int, Boolean>>()
+            val deduped = mutableListOf<ThemeSettings>()
+
+            val rawJob =
+                launch(UnconfinedTestDispatcher(testScheduler)) {
+                    combine(source.theme, source.dynamicColor) { mode, dynamic -> mode to dynamic }.toList(raw)
+                }
+            val dedupedJob =
+                launch(UnconfinedTestDispatcher(testScheduler)) {
+                    repository.settings.toList(deduped)
+                }
+
+            repository.setThemeMode(ThemeMode.DARK)
+
+            rawJob.cancel()
+            dedupedJob.cancel()
+
+            // One write, two upstreams: the raw stream repeats itself, the deduped one does not.
+            assertThat(raw).hasSize(3)
+            assertThat(raw.last()).isEqualTo(raw[raw.size - 2])
+            assertThat(deduped).hasSize(2)
+            assertThat(deduped.last().mode).isEqualTo(ThemeMode.DARK)
         }
 
     /**
