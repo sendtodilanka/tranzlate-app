@@ -26,6 +26,7 @@ Cost shape: **foundations = one-time** (shared by all features); **per-feature �
 | DESIGN_SYSTEM (tokens, adaptive dims) | ✅ (designer confirms buildable) |
 | Architecture cruxes: modes · FeatureAccess · UsagePolicy · Ads-pipeline | ⏳ design docs to finalize |
 | Per-feature string catalogue + test contract templates | ⏳ (Text done; template proven) |
+| **Screenshot-test harness (JVM)** — the gate for dark/light · contrast · RTL · 200% text | ⏳ [#20](https://github.com/sendtodilanka/tranzlate-app/issues/20) — none exists; TEST_A11Y gates 11-12 unreachable without it |
 | Dirty-room capture completion (dark/locales/secondary/error states) | ⏳ |
 | GT gold-reference capture (optional, strengthens every behaviour spec) | ⏳ optional |
 
@@ -52,6 +53,7 @@ New module structure (per cruxes / CLAUDE Phase 7 split). Build order:
 
 ### Phase H — Hardening & launch
 a11y gate · NEEDS-TRANSLATION completion (fil/pt-rBR) · adaptive/foldable testing · CI (Detekt/Spotless/tests) · staged release.
+> The a11y gate here **depends on the Phase F screenshot harness ([#20](https://github.com/sendtodilanka/tranzlate-app/issues/20))** — contrast, RTL and 200%-text are gates 11-12 of the TEST_A11Y contract and cannot be asserted without it. Landing it late means hardening becomes a manual sweep of every screen.
 
 ## 3. Recommended strategy — two tracks
 
