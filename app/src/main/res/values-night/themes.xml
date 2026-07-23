@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Theme.Tranzlate" parent="android:Theme.Material.NoActionBar" />
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Dark counterpart — see values/themes.xml for why each item is here.
+         @color/window_background resolves to the values-night value. -->
+    <style name="Theme.Tranzlate" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+    </style>
 </resources>

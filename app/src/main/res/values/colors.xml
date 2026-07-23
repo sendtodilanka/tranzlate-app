@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window-level surface, mirroring LightBackground/LightSurface in
+         :core:designsystem Color.kt. The framework needs it as an XML colour
+         because it paints the window (and the Android 12+ splash) before any
+         Compose frame exists. Keep in sync with Color.kt. -->
+    <color name="window_background">#FAF9F8</color>
+</resources>
