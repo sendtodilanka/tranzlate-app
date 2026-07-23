@@ -33,7 +33,8 @@ Indices: `(source_text, source_lang, target_lang, engine)` for cache lookup; `fa
 | `prefs.source_lang` | String | `en` |
 | `prefs.target_lang` | String | `fr` |
 | `prefs.text_mode` | String (ModeId) | `AUTO` |
-| `prefs.theme` | Int | 0 (system) |
+| `prefs.theme` | Int | 0 (system) · `ThemeMode.storedValue`: 0 SYSTEM · 1 LIGHT · 2 DARK; unknown → SYSTEM |
+| `prefs.dynamic_color` | Boolean | `false` — Material You is opt-in; the GT-identical static palette is the brand identity (issue #15). Stored on every API level, honoured only on 31+. |
 
 ## Usage (DataStore)
 | Key | Type | Notes |
