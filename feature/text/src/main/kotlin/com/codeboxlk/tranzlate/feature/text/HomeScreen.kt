@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -35,6 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -149,25 +148,32 @@ fun HomeContent(
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
 
-    Box(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface),
-    ) {
+    // Scaffold, not a bare Box — see the note in ResultScreen: it supplies the Surface
+    // that sets LocalContentColor, and it offsets the snackbar off the navigation bar.
+    // contentWindowInsets is safeDrawing rather than the Scaffold default
+    // (systemBarsForVisualComponents), because that default excludes the IME and the
+    // composer has to stay pinned above the keyboard.
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = {
+            HomeTopBar(
+                onOpenDrawer = onOpenDrawer,
+                onClearAll = onClearAll,
+                onModeClick = { showGuided(guidedMode) },
+            )
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = WindowInsets.safeDrawing,
+    ) { contentPadding ->
         BoxWithConstraints(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing),
+                    .padding(contentPadding),
         ) {
             val composerMaxHeight = maxHeight * COMPOSER_MAX_HEIGHT_FRACTION
             Column(modifier = Modifier.fillMaxSize()) {
-                HomeTopBar(
-                    onOpenDrawer = onOpenDrawer,
-                    onClearAll = onClearAll,
-                    onModeClick = { showGuided(guidedMode) },
-                )
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier =
@@ -243,10 +249,6 @@ fun HomeContent(
                             .padding(bottom = spacing.md16),
                 )
             }
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
         }
     }
 }
@@ -304,8 +306,9 @@ private fun HomeTopBar(
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.cd_text_clear))
             }
         },
+        // Default windowInsets, not zero: inside a Scaffold the bar owns the status-bar
+        // inset, and the content padding it hands down is measured from the bar's height.
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-        windowInsets = WindowInsets(0, 0, 0, 0),
     )
 }
 

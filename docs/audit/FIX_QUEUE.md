@@ -28,7 +28,8 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | A4 | 🔍 | **Settings screen** — light / dark / system + dynamic colour toggle (දැන් 32 පේළියේ placeholder එකක්) | `feature/settings` |
 | A5 | 👤 | `MainActivity`: `DisposableEffect(darkTheme)` + `enableEdgeToEdge(detectDarkMode = { darkTheme })` — status/nav bar icon පාට app එකේ theme එකට. (`Activity` cast + `SideEffect` ක්‍රමය පාවිච්චි කරන්නේ නෑ.) | `MainActivity.kt:20` |
 | A6 | 👤 | `core-splashscreen` + `setKeepOnScreenCondition` — theme preference එක එනකම් රඳවගන්න (නැත්නම් dark තෝරලා තියෙන කෙනෙකුට **light flash**). API 23+ backport. **සීමාව 1000ms** (Google) | `MainActivity.kt:19` |
-| A7 | 🔍 | `ResultScreen` + `HomeScreen` → `Scaffold`. **මේ කණ්ඩායමේම කරන්න ඕන** — නැත්නම් dark toggle එක ship කරලා, dark mode එකේ icon නොපෙනී තියෙනවා | `ResultScreen.kt:117`, `HomeScreen.kt:152` |
+| A7 | 🔍 | ✅ **ඉවරයි** — `ResultScreen` + `HomeScreen` → `Scaffold`. Device එකේ ඔප්පු කළා: icon දැන් dark `#E3E3E3` / light `#1F1F1F` (කලින් දෙකේම `#000000`); snackbar nav-bar එකට උඩින්; keyboard එකේදී composer උඩට, top bar තැනේම | `ResultScreen.kt`, `HomeScreen.kt` |
+| A8 | 🔍 | **Screenshot-test harness** (Robolectric + Roborazzi). දැන් repo එකේ JVM screenshot test එකක් හදන්න ක්‍රමයක් නෑ — ඒ නිසා A7 එකේ bug එක වගේ එකක් ආපහු ආවොත් CI එකෙන් අහුවෙන්නේ නෑ. මේකෙන් dark mode විතරක් නෙවෙයි, contrast · RTL · අකුරු 200% ඔක්කොම ආවරණය වෙනවා | නව infra |
 
 ## 🅑 Core / Shell — Navigation shell
 

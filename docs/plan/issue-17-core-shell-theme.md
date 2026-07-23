@@ -41,7 +41,14 @@ the black-on-black icons (`LocalContentColor` default `Color.Black`, `ContentCol
 and snackbars drawn under the gesture nav bar (`Scaffold.kt:242-248,282-286`).
 Home must keep its IME-pinned composer working (`imePadding` + `adjustResize`).
 *Verify:* dark-mode screenshot of the result screen; snackbar position with 3-button nav.
-*Test:* a dark-theme screenshot test — this is the gate that would have caught the bug.
+*Test:* **deferred, deliberately.** The intended gate is a dark-theme screenshot test, but the repo
+has no JVM screenshot harness — no Robolectric, no Roborazzi/Paparazzi (checked: the catalog only
+carries `ui-test-junit4`/`ui-test-manifest` for instrumented tests). Standing that up is its own
+piece of infrastructure across modules and would dwarf a two-file fix, and a weaker proxy test
+(e.g. a Konsist rule asserting "a screen root contains `Scaffold(`") would buy false confidence
+rather than coverage. Verification for this PR is therefore measured on device — raw framebuffer
+luminance inside each icon's bounds, in both themes. The harness is queued as its own item; it is
+the gate that protects contrast, RTL and 200 %-text-scale too, not just this one bug.
 
 **PR 3 · A2 — preference layer.** `ThemeMode` in `:core:model`; `prefs.dynamic_color` added to the
 data source **and** to `DATA_MODEL.md`; `ReplaceFileCorruptionHandler` on the DataStore factory plus
