@@ -28,6 +28,20 @@ enum class ThemeMode(
 }
 
 /**
+ * Resolve the choice to an actual dark/light decision.
+ *
+ * Takes the system's current setting as a parameter instead of reading it, so the
+ * rule is a pure function that unit tests can exercise without a Compose host —
+ * the composable caller supplies `isSystemInDarkTheme()`.
+ */
+fun ThemeMode.isDark(systemInDarkTheme: Boolean): Boolean =
+    when (this) {
+        ThemeMode.SYSTEM -> systemInDarkTheme
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+
+/**
  * Everything the theme needs, in one emission.
  *
  * Deliberately one value rather than two flows: `TranzlateTheme` takes both at

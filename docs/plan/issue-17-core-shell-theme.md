@@ -57,14 +57,23 @@ from PR 5 onwards**: once the splash waits on this flow, an unhandled corruption
 permanently stuck splash. No visible change yet (default is still *system*).
 *Test:* unit tests for the mapping and for the corruption fallback.
 
-**PR 4 · A3 + A4 — wiring + Settings Appearance.** `TranzlateTheme(darkTheme, dynamicColor)` driven
-by the stored preference; delete the `isSystemInDarkTheme()` branch in `PrimaryActionButton.kt:48`
-(`TODO(#7)`) so the button follows the *app* theme. `SettingsScreen` gains its first real section
-(Light / Dark / System + dynamic colour) using stock M3 — the placeholder stays for the rest.
-Strings go into the STRINGS catalogue first (C-3), testTags per C-1.
+**PR 4 · A3 — wiring only.** *(Split from A4 after the fact: A3 is a pure refactor with no
+behaviour change, A4 is the visible one. Reviewing "the theme, not the system, decides dark" apart
+from "here is a new screen" is easier, and it matches the owner's one-thing-at-a-time rule.)* `TranzlateTheme(darkTheme, dynamicColor)` driven
+`TranzlateTheme` gains a `ThemeSettings` overload driven by the stored preference; the
+`isSystemInDarkTheme()` branch in `PrimaryActionButton.kt:48` (`TODO(#7)`) is replaced by a colour
+resolved inside the theme, following the `LocalFloatingSurface` precedent — that local's own doc
+already forbids branching on the system flag at a call site. The `ThemeMode → isDark` decision moves
+into `:core:model` as a pure function so it is unit-testable without a Compose host.
+*No behaviour change:* the stored preference is still SYSTEM for everyone.
+
+**PR 5 · A4 — Settings Appearance.** `SettingsScreen` gains its first real section (Light / Dark /
+System + dynamic colour) using stock M3; the placeholder stays for the rest. Needs a new
+`STRINGS_settings.md` — the catalogue is the key authority (C-3) and only Text has one today.
+testTags per C-1.
 *Verify:* toggle each option on device, both orientations.
 
-**PR 5 · A5 + A6 — window chrome + splash.** `DisposableEffect(darkTheme)` re-applying
+**PR 6 · A5 + A6 — window chrome + splash.** `DisposableEffect(darkTheme)` re-applying
 `enableEdgeToEdge(statusBarStyle/navigationBarStyle = SystemBarStyle.auto(…) { darkTheme })` so bar
 icons follow the app, not the system (verified: the default `detectDarkMode` reads
 `resources.configuration`, `EdgeToEdge.kt:167`). Then `androidx.core:core-splashscreen` +
