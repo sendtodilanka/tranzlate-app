@@ -7,7 +7,7 @@ Bulk edit නෑ.
 එකම ලැයිස්තුවක් තියාගන්නේ පිළිවෙළ නැති නොවෙන්න — ඒත් කොහෙන් ආවද කියලා පේනවා.
 👤 ගණන වැඩි වෙනවා කියන්නේ මගේ audit එකේ හිඩැස් තියෙනවා කියන එකයි — ඒක බලාගෙන ඉන්න ඕන දෙයක්.
 
-**තත්ත්වය තීරුව:** ⏳ = දැන් කරන එක · ✅ = ඉවරයි (PR අංකය) · හිස් = පෝලිමේ.
+**තත්ත්වය තීරුව:** ⏳ = දැන් කරන එක · 🔵 = PR එකේ, **තාම merge නෑ** · ✅ = merge වුණා · හිස් = පෝලිමේ.
 අංක (A1 · B2 …) **වෙනස් වෙන්නේ නෑ** — ඉවර වුණාට පස්සෙත් ඒ අංකයම තියෙනවා, ඒ නිසා පරණ සටහන් වල reference රැඳෙනවා.
 
 විස්තර: [`2026-07-23-deep-audit.md`](2026-07-23-deep-audit.md) · Sinhala පිටුව: `docs/plan/review/audit-2026-07-23.html`
@@ -29,8 +29,8 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | A2 | ✅ [#21](https://github.com/sendtodilanka/tranzlate-app/pull/21) | 🔍 | Theme preference එක: DataStore keys + repository (`SYSTEM`/`LIGHT`/`DARK` + dynamic on/off). **+ corruption handler** — A6 මේ pref එක එනකම් splash එක රඳවන නිසා, file එක හැදුණොත් crash එකක් වෙනුවට **splash එකේම හිරවෙනවා**. ඒ නිසා ඒක මෙතනට ගෙනාවා (කලින් C5) | `TranzlatePreferencesDataSource.kt`, `DataStoreModule.kt:23` |
 | A3 | ✅ [#24](https://github.com/sendtodilanka/tranzlate-app/pull/24) | 🔍 | `TranzlateTheme(darkTheme, dynamicColor)` ඒ preference එකෙන් run කරන එක + `PrimaryActionButton` එකේ `isSystemInDarkTheme()` branch එක අයින් කිරීම (`TODO(#7)`) | `Theme.kt`, `PrimaryActionButton.kt:48` |
 | A4 | ⏳ **ඊළඟට — batch එකේ අන්තිම එක** (A5+A6 ට පස්සේ — ඒක තමයි මේ ඔක්කොම ක්‍රියාත්මක කරන switch එක) | 🔍 | **Settings screen** — light / dark / system + dynamic colour toggle (දැන් 32 පේළියේ placeholder එකක්) | `feature/settings` |
-| A5 | ✅ [#25](https://github.com/sendtodilanka/tranzlate-app/pull/25) | 👤 | `MainActivity`: `DisposableEffect(darkTheme)` + `enableEdgeToEdge(detectDarkMode = { darkTheme })` — status/nav bar icon පාට app එකේ theme එකට. (`Activity` cast + `SideEffect` ක්‍රමය පාවිච්චි කරන්නේ නෑ.) | `MainActivity.kt:20` |
-| A6 | ✅ [#25](https://github.com/sendtodilanka/tranzlate-app/pull/25) | 👤 | `core-splashscreen` + `setKeepOnScreenCondition` — theme preference එක එනකම් රඳවගන්න (නැත්නම් dark තෝරලා තියෙන කෙනෙකුට **light flash**). API 23+ backport. **සීමාව 1000ms** (Google) | `MainActivity.kt:19` |
+| A5 | 🔵 [#25](https://github.com/sendtodilanka/tranzlate-app/pull/25) **open** | 👤 | `MainActivity`: `DisposableEffect(darkTheme)` + **එකම** `enableEdgeToEdge`, styles `SystemBarStyle.auto(l, d) { currentDark }` (⚠️ `enableEdgeToEdge` එකට `detectDarkMode` parameter එකක් **නෑ** — ඒක තියෙන්නේ `SystemBarStyle.auto` එකේ). (`Activity` cast + `SideEffect` ක්‍රමය පාවිච්චි කරන්නේ නෑ.) Design-debate එකෙන් හැඩය තීරණය කළා → [`issue-17-debate-edge-to-edge.md`](../plan/issue-17-debate-edge-to-edge.md) | `MainActivity.kt` |
+| A6 | 🔵 [#25](https://github.com/sendtodilanka/tranzlate-app/pull/25) **open** | 👤 | `core-splashscreen` + `setKeepOnScreenCondition` — theme preference එක එනකම් රඳවගන්න (නැත්නම් dark තෝරලා තියෙන කෙනෙකුට **light flash**). API 23+ backport. **සීමාව 1000ms** (Google) | `MainActivity.kt:19` |
 | A7 | ✅ [#19](https://github.com/sendtodilanka/tranzlate-app/pull/19) | 🔍 | `ResultScreen` + `HomeScreen` → `Scaffold` | `ResultScreen.kt`, `HomeScreen.kt` |
 | A8 | | 🔍 | **Screenshot-test harness** — issue [#20](https://github.com/sendtodilanka/tranzlate-app/issues/20) · roadmap Phase F. දැන් repo එකේ JVM screenshot test එකක් හදන්න ක්‍රමයක් නෑ — ඒ නිසා A7 එකේ bug එක වගේ එකක් ආපහු ආවොත් CI එකෙන් අහුවෙන්නේ නෑ. dark mode විතරක් නෙවෙයි — contrast · RTL · අකුරු 200% (TEST_A11Y gates 11-12) | නව infra (`build-logic`) |
 
@@ -65,7 +65,7 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 |---|---|---|---|
 | 🟠 D — brains-prep | 12 | Cache-first read · Access/Usage API හැඩය · placeholders විවෘත පැත්තට වැරදීම · Room migration · භාෂා catalog seed · prefs race · **`UsageDataSource` එකට `.catch` නෑ** (PR #21 review එකෙන්; factory corruption handler එකෙන් ආවරණය වෙනවා, transient IO නෑ — Usage brain හදනකොට) | [audit P1](2026-07-23-deep-audit.md#p1--correctness-that-must-be-settled-before-the-brains-land) |
 | 🔵 E — release readiness | 16 | R8 (#5) · localeConfig · backup rules · DAO `LIMIT` · **`material-icons-extended`** · nav3 decorator. **මනිනලද (2026-07-23):** icon class **10,820ක්** dex එකේ, අපි පාවිච්චි කරන්නේ **~25ක්**; AAR එක **34 MB**; release APK 13.5 MB — R8 නැති නිසා release එකේත් ඔක්කොම තියෙනවා | [audit P2](2026-07-23-deep-audit.md#p2--stock-material-3-and-platform-correctness) |
-| ⚪ F — hygiene | 11 | Tests · Konsist gates · strings/C-3 · dead code · `.gitignore` · D-3 vs UI_SPEC | [audit P3](2026-07-23-deep-audit.md#p3--hygiene-tests-docs) |
+| ⚪ F — hygiene | 12 | Tests · Konsist gates · strings/C-3 · dead code · `.gitignore` · D-3 vs UI_SPEC · **`Konsist.scopeFromProject()` එකෙන් `.claude/worktrees/` එකත් scan වෙනවා** — worktree එකක් තියෙද්දී හැම source file එකක්ම දෙපාරක් පේනවා, `Translator` test එක `[Translator, Translator]` කියලා fail වෙනවා. Worktree එක තමයි මේ project එකේ ක්‍රමය, ඒ නිසා ඒක scope එකෙන් අයින් කරන්න ඕන (2026-07-23 හම්බුණා) | [audit P3](2026-07-23-deep-audit.md#p3--hygiene-tests-docs) |
 | ⚡ G — performance | — | Detectors (LeakCanary · StrictMode · Compose metrics) → R8 (#5) → Macrobenchmark → Baseline Profiles. **පිළිවෙළ වැදගත්**: R8 නැතුව මනින්නේ අපි ship නොකරන build එකක් | issue [#22](https://github.com/sendtodilanka/tranzlate-app/issues/22) · roadmap Phase F |
 
 ---

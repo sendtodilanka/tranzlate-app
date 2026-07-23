@@ -1,7 +1,5 @@
 package com.codeboxlk.tranzlate
 
-import android.content.res.Configuration
-import android.content.res.Resources
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -31,10 +29,6 @@ import javax.inject.Inject
 private val NavigationBarLightScrim = Color.argb(0xE6, 0xFF, 0xFF, 0xFF)
 private val NavigationBarDarkScrim = Color.argb(0x80, 0x1B, 0x1B, 0x1B)
 
-/** What androidx's own default detector does (`EdgeToEdge.kt:167`). */
-private fun Resources.isSystemInDarkMode(): Boolean =
-    (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject
@@ -43,55 +37,77 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainActivityViewModel by viewModels()
 
     /**
-     * One definition of what edge-to-edge means for this app; only the dark
-     * detector varies between call sites.
+     * The single source the bar detectors read.
      *
-     * Re-applying the whole thing (rather than just flipping
-     * `isAppearanceLightStatusBars`) is not belt-and-braces: below API 29 the bar
-     * scrim itself is theme-dependent — `getScrim(isDark)`, `EdgeToEdge.kt:217,262,283`
-     * — so on Android 7–9 a theme change has to go back through here or the bars
-     * keep the wrong scrim. On API 29+ `getScrimWithEnforcedContrast` returns
-     * transparent for `auto` styles and only the appearance flags move.
+     * androidx pins a configuration-change listener to the FIRST enableEdgeToEdge
+     * call and replays that call's styles forever (EdgeToEdge.kt:110-125). A field
+     * is what makes that replay correct: the lambda never captures a Boolean, it
+     * reads this, and the composition updates it before each apply. `@Volatile`
+     * because the listener outlives any single composition and may read it from a
+     * different context — which is also why this is a field rather than the
+     * `rememberUpdatedState` the design debate sketched: the holder must belong to
+     * the Activity, like the listener, not to a composition the listener outlives.
      */
-    private fun applyEdgeToEdge(detectDarkMode: (Resources) -> Boolean) {
+    @Volatile
+    private var currentDark: Boolean = false
+
+    private fun applyEdgeToEdge() {
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT, detectDarkMode),
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { currentDark },
             navigationBarStyle =
-                SystemBarStyle.auto(NavigationBarLightScrim, NavigationBarDarkScrim, detectDarkMode),
+                SystemBarStyle.auto(NavigationBarLightScrim, NavigationBarDarkScrim) { currentDark },
         )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Both belong before super.onCreate(): the splash must be installed before
-        // the activity's content is set up, and androidx's own KDoc sample for
-        // enableEdgeToEdge places it there too.
-        //
-        // The stored preference cannot be read this early — it arrives asynchronously
-        // through a ViewModel — so this first pass uses the system setting, exactly
-        // as the no-arg default would. The composition below re-applies it with the
-        // app's own answer as soon as there is one.
+        // installSplashScreen() must run before super.onCreate(). enableEdgeToEdge()
+        // deliberately does NOT run here at all — see applyEdgeToEdge's call site.
         val splashScreen = installSplashScreen()
-        applyEdgeToEdge { resources -> resources.isSystemInDarkMode() }
         super.onCreate(savedInstanceState)
 
-        // Hold the splash until the stored appearance is known. Without this the
-        // first frame paints the defaults and someone who chose Dark sees a light
-        // flash on every cold start. Safe to wait on: the read is local, and the
-        // data source falls back to defaults rather than failing (issue #17 A2),
-        // so the flow always emits.
+        // Hold the splash until the stored appearance is known, so the first drawn
+        // frame is already the theme the user chose. Safe to wait on: the data
+        // source falls back to defaults rather than failing (issue #17 A2), so the
+        // flow always emits.
+        //
+        // What this does NOT cover: the splash's own background comes from
+        // Theme.Tranzlate.Splash -> @color/window_background, which the framework
+        // resolves against the SYSTEM night qualifier before any of our code runs.
+        // A user whose phone is light but who chose Dark still sees a light splash.
+        // Closing that needs a synchronous read in attachBaseContext, i.e. a second
+        // source of truth — tracked separately. Now in Android has the same gap.
         splashScreen.setKeepOnScreenCondition { viewModel.themeSettings.value == null }
 
         setContent {
             val themeSettings by viewModel.themeSettings.collectAsStateWithLifecycle()
             val settings = themeSettings ?: ThemeSettings.Default
+
+            // Derived ONCE. The window and the theme must never disagree about this.
             val darkTheme = settings.mode.isDark(isSystemInDarkTheme())
 
-            // The app's answer, which can disagree with the system's. Without this a
-            // user on a light phone who picks Dark gets dark status-bar icons drawn
-            // on our near-black surface — i.e. no icons at all. Keyed on darkTheme so
-            // it follows every change, including the Settings toggle (A4).
+            // The ONE and ONLY enableEdgeToEdge in this app, reached through
+            // applyEdgeToEdge(). Updating the field first is what keeps the pinned
+            // replay listener correct; the call then applies the change now, because
+            // setting the field alone repaints nothing.
+            //
+            // An earlier pass in onCreate was tried and measured: it changes nothing
+            // (1 transitional frame either way, twice, at normal animation speed),
+            // because the stored preference cannot be read that early — the guess it
+            // would have to make is exactly the one that is wrong in the case this
+            // whole design exists for.
+            //
+            // ⚠️ Every enableEdgeToEdge in this app must go through applyEdgeToEdge().
+            // A plain no-arg call added anywhere — it is the androidx KDoc sample, so
+            // it is the natural thing to reach for — pins the bars to the system theme
+            // and nothing fails at build or test time.
+            //
+            // It must also be the whole call, not a flip of isAppearanceLightStatusBars:
+            // below API 29 the bar scrim itself is theme-dependent (getScrim(isDark),
+            // EdgeToEdge.kt:217,262,283), so on Android 7-9 patching only the appearance
+            // flag would leave the wrong scrim behind.
             DisposableEffect(darkTheme) {
-                applyEdgeToEdge { darkTheme }
+                currentDark = darkTheme
+                applyEdgeToEdge()
                 onDispose {}
             }
 
