@@ -64,7 +64,7 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | කණ්ඩායම | ගණන | මොකක්ද | ලියලා තියෙන්නේ |
 |---|---|---|---|
 | 🟠 D — brains-prep | 12 | Cache-first read · Access/Usage API හැඩය · placeholders විවෘත පැත්තට වැරදීම · Room migration · භාෂා catalog seed · prefs race · **`UsageDataSource` එකට `.catch` නෑ** (PR #21 review එකෙන්; factory corruption handler එකෙන් ආවරණය වෙනවා, transient IO නෑ — Usage brain හදනකොට) | [audit P1](2026-07-23-deep-audit.md#p1--correctness-that-must-be-settled-before-the-brains-land) |
-| 🔵 E — release readiness | 16 | R8 (#5) · localeConfig · backup rules · DAO `LIMIT` · icon library · nav3 decorator | [audit P2](2026-07-23-deep-audit.md#p2--stock-material-3-and-platform-correctness) |
+| 🔵 E — release readiness | 16 | R8 (#5) · localeConfig · backup rules · DAO `LIMIT` · **`material-icons-extended`** · nav3 decorator. **මනිනලද (2026-07-23):** icon class **10,820ක්** dex එකේ, අපි පාවිච්චි කරන්නේ **~25ක්**; AAR එක **34 MB**; release APK 13.5 MB — R8 නැති නිසා release එකේත් ඔක්කොම තියෙනවා | [audit P2](2026-07-23-deep-audit.md#p2--stock-material-3-and-platform-correctness) |
 | ⚪ F — hygiene | 11 | Tests · Konsist gates · strings/C-3 · dead code · `.gitignore` · D-3 vs UI_SPEC | [audit P3](2026-07-23-deep-audit.md#p3--hygiene-tests-docs) |
 | ⚡ G — performance | — | Detectors (LeakCanary · StrictMode · Compose metrics) → R8 (#5) → Macrobenchmark → Baseline Profiles. **පිළිවෙළ වැදගත්**: R8 නැතුව මනින්නේ අපි ship නොකරන build එකක් | issue [#22](https://github.com/sendtodilanka/tranzlate-app/issues/22) · roadmap Phase F |
 
