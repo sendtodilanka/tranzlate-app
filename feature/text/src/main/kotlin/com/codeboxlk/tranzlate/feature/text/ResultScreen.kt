@@ -1,17 +1,13 @@
 package com.codeboxlk.tranzlate.feature.text
 
 import android.content.ClipData
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,6 +29,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -42,7 +39,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -114,63 +110,56 @@ fun ResultContent(
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
 
-    Box(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface),
-    ) {
+    // Scaffold, not a bare Box: it is the Surface that provides LocalContentColor
+    // (material3 defaults it to Color.Black when nothing does — which painted every
+    // icon here black in dark mode), and it is what offsets the snackbar above the
+    // navigation bar. Both were audit P0s.
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = { ResultTopBar(onBack = onBack, onGuided = ::showMessage) },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) { contentPadding ->
         Column(
+            verticalArrangement = Arrangement.spacedBy(spacing.lg24),
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing),
+                    .padding(contentPadding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(spacing.md16),
         ) {
-            ResultTopBar(onBack = onBack, onGuided = ::showMessage)
-            Column(
-                verticalArrangement = Arrangement.spacedBy(spacing.lg24),
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(spacing.md16),
-            ) {
-                when (uiState) {
-                    // transient frame during restore only — nothing to draw
-                    is TextUiState.Idle -> {}
+            when (uiState) {
+                // transient frame during restore only — nothing to draw
+                is TextUiState.Idle -> {}
 
-                    is TextUiState.Translating -> {
-                        SourceBlock(uiState.request, onGuided = ::showMessage, onCopied = ::showMessage)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        TranslatingShimmer()
-                    }
+                is TextUiState.Translating -> {
+                    SourceBlock(uiState.request, onGuided = ::showMessage, onCopied = ::showMessage)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    TranslatingShimmer()
+                }
 
-                    is TextUiState.Result -> {
-                        SourceBlock(uiState.request, onGuided = ::showMessage, onCopied = ::showMessage)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        TargetBlock(uiState, onReverse = onReverse, onGuided = ::showMessage, onCopied = ::showMessage)
-                    }
+                is TextUiState.Result -> {
+                    SourceBlock(uiState.request, onGuided = ::showMessage, onCopied = ::showMessage)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    TargetBlock(uiState, onReverse = onReverse, onGuided = ::showMessage, onCopied = ::showMessage)
+                }
 
-                    is TextUiState.Error -> {
-                        SourceBlock(uiState.request, onGuided = ::showMessage, onCopied = ::showMessage)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        ErrorCard(
-                            message = errorMessage(uiState.reason),
-                            actionLabel = stringResource(R.string.button_retry),
-                            onAction = onRetry,
-                            announcement = stringResource(R.string.a11y_error, errorMessage(uiState.reason)),
-                            containerTestTag = "tt_text_error_view",
-                            actionTestTag = "tt_text_retry",
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                is TextUiState.Error -> {
+                    SourceBlock(uiState.request, onGuided = ::showMessage, onCopied = ::showMessage)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ErrorCard(
+                        message = errorMessage(uiState.reason),
+                        actionLabel = stringResource(R.string.button_retry),
+                        onAction = onRetry,
+                        announcement = stringResource(R.string.a11y_error, errorMessage(uiState.reason)),
+                        containerTestTag = "tt_text_error_view",
+                        actionTestTag = "tt_text_retry",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
     }
 }
 
@@ -210,8 +199,9 @@ private fun ResultTopBar(
                 Icon(Icons.Filled.MoreHoriz, contentDescription = stringResource(R.string.cd_text_more))
             }
         },
+        // Default windowInsets, not zero: inside a Scaffold the bar owns the status-bar
+        // inset, and the content padding it hands down is measured from the bar's height.
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-        windowInsets = WindowInsets(0, 0, 0, 0),
     )
 }
 
