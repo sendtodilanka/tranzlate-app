@@ -8,14 +8,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -26,11 +26,15 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,25 +75,42 @@ enum class DrawerDestination {
  */
 @Composable
 fun DrawerContent(
+    drawerState: DrawerState,
     recents: List<Translation>,
     onDestinationClick: (DrawerDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
-    Surface(
-        color = LocalFloatingSurface.current,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+    // ModalDrawerSheet, not a bare Surface, and specifically the drawerState
+    // overload: back handling for the drawer lives ONLY there, via
+    // DrawerPredictiveBackHandler (NavigationDrawer.kt:643). ModalNavigationDrawer
+    // installs none of its own, so with a raw Surface the system back button fell
+    // through to the nav host and closed the app instead of the drawer.
+    //
+    // windowInsets: DrawerDefaults.windowInsets is systemBarsForVisualComponents
+    // .only(Vertical + Start) — it drops the IME. Under edge-to-edge + adjustResize
+    // the window does not physically shrink, so a screen must consume ime itself or
+    // bottom content sits under the keyboard. The drawer opens from the same screen
+    // as the composer text field, so if it opens with the keyboard up the pinned
+    // AccountRow would be hidden behind it. safeDrawing carries the ime; keep the
+    // same Vertical+Start shape as the default so nothing else changes.
+    // (HomeScreen makes the same choice for the same reason.)
+    //
+    // Width stays pinned at 300dp rather than letting the sheet size itself: it is
+    // inside M3's own 240-360dp range, and the push/scale motion in TranzlateApp
+    // reads this same constant to compute its fraction.
+    ModalDrawerSheet(
+        drawerState = drawerState,
+        drawerContainerColor = LocalFloatingSurface.current,
+        drawerContentColor = MaterialTheme.colorScheme.onSurface,
+        windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical + WindowInsetsSides.Start),
         modifier =
             modifier
                 .width(DrawerSheetWidth)
-                .fillMaxHeight()
                 .testTag("tt_app_drawer"),
     ) {
         Column(
-            modifier =
-                Modifier
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(vertical = spacing.md16),
+            modifier = Modifier.padding(vertical = spacing.md16),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -292,6 +313,8 @@ private fun DrawerContentPreview() {
                     ),
                 ),
             onDestinationClick = {},
+            // Open: the sheet is the whole subject of the preview.
+            drawerState = rememberDrawerState(DrawerValue.Open),
         )
     }
 }
@@ -300,6 +323,10 @@ private fun DrawerContentPreview() {
 @Composable
 private fun DrawerContentEmptyPreview() {
     TranzlateTheme {
-        DrawerContent(recents = emptyList(), onDestinationClick = {})
+        DrawerContent(
+            recents = emptyList(),
+            onDestinationClick = {},
+            drawerState = rememberDrawerState(DrawerValue.Open),
+        )
     }
 }
