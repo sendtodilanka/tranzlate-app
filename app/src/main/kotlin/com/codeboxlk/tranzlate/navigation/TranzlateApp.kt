@@ -89,6 +89,7 @@ fun TranzlateApp(appConfig: AppConfig) {
             drawerState = drawerState,
             drawerContent = {
                 DrawerContent(
+                    drawerState = drawerState,
                     recents = recents,
                     onDestinationClick = { destination ->
                         scope.launch {
