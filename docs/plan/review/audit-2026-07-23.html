@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ගැඹුරු පරීක්ෂණය — Tranzlate · 2026-07-23</title>
+<style>
+:root{
+  --bg:#FAF9F8; --card:#FFFFFF; --ink:#1F1F1F; --ink2:#444746; --line:#C4C7C5;
+  --blue:#0B57D0; --blueBg:#D3E3FD; --red:#B3261E; --redBg:#F9DEDC;
+  --amber:#8A5300; --amberBg:#FDE7C9; --green:#146C2E; --greenBg:#C4EED0;
+  --shadow:0 1px 3px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#131314; --card:#1F1F1F; --ink:#E3E3E3; --ink2:#C4C7C5; --line:#444746;
+    --blue:#A8C7FA; --blueBg:#0842A0; --red:#F2B8B5; --redBg:#8C1D18;
+    --amber:#FFD8A8; --amberBg:#5A3A00; --green:#6DD58C; --greenBg:#0F5223; --shadow:none; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans Sinhala","Iskoola Pota",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  font-size:17px;line-height:1.85;padding-bottom:120px}
+.wrap{max-width:820px;margin:0 auto;padding:0 20px}
+header{padding:48px 0 28px;border-bottom:1px solid var(--line);margin-bottom:12px}
+h1{font-size:31px;line-height:1.4;margin:0 0 10px;letter-spacing:-.3px}
+.sub{color:var(--ink2);font-size:15.5px;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{font-size:13.5px;padding:5px 13px;border-radius:999px;background:var(--card);
+  border:1px solid var(--line);color:var(--ink2)}
+section.rev{background:var(--card);border:1px solid var(--line);border-radius:18px;
+  padding:24px 24px 18px;margin:20px 0;box-shadow:var(--shadow);transition:border-color .2s}
+section.rev.has-comments{border-color:var(--blue);border-width:2px}
+section.rev.approved{border-color:var(--green)}
+h2{font-size:22px;margin:0 0 6px;line-height:1.45}
+h2 .n{color:var(--ink2);font-weight:400;font-size:15px}
+.lead{color:var(--ink2);font-size:15.5px;margin:0 0 14px}
+.item{border-top:1px solid var(--line);padding:16px 0 4px}
+.item:first-of-type{border-top:0}
+.item h3{font-size:17.5px;margin:0 0 6px;line-height:1.5;display:flex;gap:9px;align-items:flex-start}
+.tag{flex:0 0 auto;font-size:12px;font-weight:700;letter-spacing:.4px;padding:3px 9px;
+  border-radius:7px;margin-top:4px;white-space:nowrap}
+.t-red{background:var(--redBg);color:var(--red)} .t-amber{background:var(--amberBg);color:var(--amber)}
+.t-blue{background:var(--blueBg);color:var(--blue)} .t-grey{background:var(--bg);color:var(--ink2);border:1px solid var(--line)}
+.t-green{background:var(--greenBg);color:var(--green)}
+.item p{margin:0 0 10px}
+.why{background:var(--bg);border-radius:12px;padding:12px 15px;font-size:15px;color:var(--ink2);margin:0 0 10px}
+.why b{color:var(--ink)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;
+  background:var(--bg);padding:2px 6px;border-radius:6px;border:1px solid var(--line)}
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.shots figure{margin:0}
+.shots img{width:100%;border-radius:14px;border:1px solid var(--line);display:block}
+.shots figcaption{font-size:13.5px;color:var(--ink2);text-align:center;padding-top:7px}
+ul{margin:0 0 12px;padding-inline-start:22px} li{margin-bottom:7px}
+.sec-actions{display:flex;gap:9px;flex-wrap:wrap;padding-top:16px;margin-top:6px;border-top:1px dashed var(--line)}
+.btn{font:inherit;font-size:14px;padding:8px 15px;border-radius:999px;border:1px solid var(--line);
+  background:var(--bg);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--blue)}
+.btn.approve.on{background:var(--greenBg);color:var(--green);border-color:var(--green)}
+.btn.comment .cnt{display:inline-block;min-width:19px;text-align:center;background:var(--blueBg);
+  color:var(--blue);border-radius:999px;font-size:12.5px;margin-inline-start:5px;padding:0 5px}
+.final{background:var(--card);border:2px solid var(--blue);border-radius:18px;padding:26px;margin:26px 0}
+.big{font:inherit;font-size:16px;font-weight:600;padding:14px 26px;border-radius:999px;border:0;
+  background:var(--blue);color:var(--card);cursor:pointer;width:100%}
+#fab{position:fixed;inset-inline-end:22px;bottom:22px;background:var(--blue);color:var(--card);
+  border:0;border-radius:999px;padding:14px 21px;font:inherit;font-size:15px;cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,.22);z-index:40}
+#panel{position:fixed;inset-block:0;inset-inline-end:0;width:min(430px,100%);background:var(--card);
+  border-inline-start:1px solid var(--line);transform:translateX(110%);transition:transform .25s;
+  z-index:50;display:flex;flex-direction:column}
+#panel.show{transform:none}
+#panel header{padding:18px 20px;margin:0;display:flex;justify-content:space-between;align-items:center}
+#panelBody{overflow:auto;padding:0 20px 24px}
+.cmt{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:11px;font-size:14.5px}
+.cmt.approve{border-color:var(--green);background:var(--greenBg)}
+.cmt .meta{display:flex;justify-content:space-between;gap:9px;font-size:12px;color:var(--ink2);margin-bottom:6px}
+.cmt .q{font-style:italic;color:var(--ink2);border-inline-start:3px solid var(--blue);padding-inline-start:9px;margin-bottom:6px}
+.cmt .ops{display:flex;gap:8px;margin-top:8px}
+.cmt .ops button{font:inherit;font-size:12.5px;padding:3px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink2);cursor:pointer}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
+#overlay.show{display:flex}
+.dlg{background:var(--card);border-radius:20px;padding:22px;width:min(540px,100%)}
+.dlg h3{margin:0 0 4px;font-size:19px}
+#dlgCtx{font-size:13.5px;color:var(--ink2);margin-bottom:10px}
+#dlgQuote{font-style:italic;color:var(--ink2);border-inline-start:3px solid var(--blue);padding-inline-start:10px;margin-bottom:11px;font-size:14.5px}
+#dlgText{width:100%;min-height:130px;font:inherit;font-size:15px;padding:12px;border-radius:12px;
+  border:1px solid var(--line);background:var(--bg);color:var(--ink);resize:vertical}
+.dlg .row{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+#toast{position:fixed;inset-inline-start:50%;bottom:26px;transform:translateX(-50%) translateY(140%);
+  background:var(--ink);color:var(--bg);padding:12px 20px;border-radius:12px;font-size:14.5px;
+  transition:transform .25s;z-index:70}
+#toast.show{transform:translateX(-50%)}
+.hint{font-size:14px;color:var(--ink2);background:var(--blueBg);color:var(--blue);
+  border-radius:12px;padding:12px 16px;margin:16px 0}
+@media(max-width:560px){ .shots{grid-template-columns:1fr} h1{font-size:26px} body{font-size:16px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>ගැඹුරු පරීක්ෂණය — අපේ code එකේ තියෙන ඇත්ත තත්ත්වය</h1>
+  <p class="sub">2026 ජූලි 23 · UI reset එක merge වුණාට පස්සේ (<code>5693c47</code>) මුළු project එකම පරීක්ෂා කළා.</p>
+  <div class="chips">
+    <span class="chip">🔴 දැන්ම හදන්න ඕන — 8</span>
+    <span class="chip">🟠 Brains කලින් — 11</span>
+    <span class="chip">🔵 Standard components — 16</span>
+    <span class="chip">⚪ පිරිසිදු කිරීම් — 11</span>
+  </div>
+</header>
+
+<div class="hint">
+  💬 <b>ඔයාට මෙතනම අදහස් දාන්න පුළුවන්.</b> ඕනෑම කොටසක පහළ තියෙන “අදහසක්” බොත්තම ඔබන්න.
+  වචන ටිකක් select කරලා ඔබනොත් ඒ වචනත් අදහසට එකතු වෙනවා. දාන හැම දෙයක්ම project එකට save වෙනවා —
+  මට කියවන්න පුළුවන්.
+</div>
+
+<!-- ═══════════════ 1 ═══════════════ -->
+<section class="rev" data-sec="a1" data-title="මොකක්ද කළේ">
+  <h2>මොකක්ද කළේ <span class="n">· ක්‍රමය</span></h2>
+  <p class="lead">ඔයා “comprehensive and deep audit එකක්” කියලා ඉල්ලපු නිසා, එකම විදිහට හතර පාරක් බලනවා වෙනුවට
+    <b>වෙන වෙනම කෝණ හතරකින්</b> මුළු code එකම කියෙව්වා.</p>
+
+  <ul>
+    <li><b>කෝණ 1 —</b> “Google ගේ ready-made components තියෙද්දී අපි අතින් හදලා තියෙන්නේ මොනවද?”</li>
+    <li><b>කෝණ 2 —</b> “Android එකේ අලුත්ම නිවැරදි ක්‍රමය මොකක්ද? අපි පරණ/වැරදි ක්‍රමයක් පාවිච්චි කරනවද?”</li>
+    <li><b>කෝණ 3 —</b> “අපේම ලියලා තියෙන නීති (specs) සහ ඇස් නොපෙනෙන අයට app එක පාවිච්චි කරන්න පුළුවන්ද?”</li>
+    <li><b>කෝණ 4 —</b> “ගොඩනැගිල්ලේ ව්‍යුහය, දත්ත, tests — ඒවා හරිද?”</li>
+  </ul>
+
+  <p>ඊට පස්සේ <b>මම හැම බරපතළ එකක්ම මගේම අතින් ආයෙත් තහවුරු කළා</b> — Google ගේ library එකේ මුල් code එක කියවලා,
+    සහ emulator එකේ app එක ඇත්තටම දුවවලා බලලා. ඒ නිසා පහළ තියෙන “🔴 දැන්ම හදන්න ඕන” ඔක්කොම
+    <b>අනුමාන නෙවෙයි — ඇහැට පේන ලෙස ඔප්පු කරපු ඒවා</b>.</p>
+
+  <div class="why">
+    <b>හොඳ ආරංචිය:</b> අත්තිවාරම හරි. Module ව්‍යුහය, පාට තට්ටුව (palette), reusable library තුන,
+    fake engine එක, CI — ඒවා පරීක්ෂා කරලා <b>නිවැරදියි</b> කියලා තහවුරු වුණා. හම්බුණු ප්‍රශ්න
+    ගොඩක් තියෙන්නේ “අන්තිම ස්ථරයේ” — screen එකේ හැසිරීම සහ තවම හදලා නැති brains වලට සූදානම.
+  </div>
+  <div class="sec-actions"></div>
+</section>
+
+<!-- ═══════════════ 2 ═══════════════ -->
+<section class="rev" data-sec="a2" data-title="දැන්ම හදන්න ඕන (8)">
+  <h2>🔴 දැන්ම හදන්න ඕන <span class="n">· 8ක් · මේවා දැන් device එකේ ඇත්තටම වැරදියි</span></h2>
+  <p class="lead">මේ අටම <b>දැන් තියෙන build එකේම</b> user කෙනෙක්ට හම්බවෙන ප්‍රශ්න.</p>
+
+  <div class="item">
+    <h3><span class="tag t-red">1</span> Dark mode එකේ result screen එකේ බොත්තම් <b>නොපෙනේ</b></h3>
+    <p>Result screen එකේ පහළ තියෙන පොඩි icon ටික — කථා කරන්න (🔊), copy කරන්න, ආපහු පෙරළන්න,
+      👍 👎 — dark mode එකේදී <b>කළු background එකේ කළු පාටින්ම</b> render වෙනවා. ඇත්තටම නොපෙනෙන තරම්.</p>
+
+    <div class="shots">
+      <figure><img src="/img/ui3-result-light.png" alt="Light mode result screen"><figcaption>Light — icon පේනවා ✓</figcaption></figure>
+      <figure><img src="/img/ui3-result-dark.png" alt="Dark mode result screen"><figcaption>Dark — icon නොපෙනේ ✗</figcaption></figure>
+    </div>
+
+    <div class="why"><b>ඇයි?</b> Google ගේ Material library එකේ නීතියක් තියෙනවා: “screen එකක් <code>Surface</code>
+      එකක් ඇතුළේ නැත්නම්, icon වල පාට <b>සම්පූර්ණ කළු</b> කියලා හිතාගන්න” (ඒක ඔවුන්ගේ code එකේම ලියලා තියෙනවා).
+      අපේ result screen එක <code>Surface</code> එකක් ඇතුළේ නෑ — හුදෙක් පාට ගාපු කොටුවක්. ඒ නිසා icon ඔක්කොම කළු.
+      Light mode එකේ background එක සුදු නිසා කළු icon නිවැරදි වගේ පෙනුණා — ඒකයි කවුරුත් දැක්කේ නැත්තේ.</p>
+      <b>වැදගත්:</b> අපේ පාට තට්ටුව (palette) වැරදි නෑ. වැරැද්ද තියෙන්නේ ඒ පාට මේ icon වලට <b>කවදාවත් යොදලා නැති</b> එකේ.</div>
+    <p><b>විසඳුම:</b> screen එක Google ගේ <code>Scaffold</code> එකක් ඇතුළට දාන එක. ඒකෙන් මේක automatically හැදෙනවා,
+      ඒ එක්කම පහළ තියෙන 4වෙනි ප්‍රශ්නෙත් හැදෙනවා. ආයෙත් වෙන්නේ නැති වෙන්න dark mode screenshot test එකක් දාන්න ඕන.</p>
+  </div>
+
+  <div class="item">
+    <h3><span class="tag t-red">2</span> Menu එක ඇරලා <b>Back එබුවම app එකම වැහෙනවා</b></h3>
+    <p>වම් පැත්තේ menu (drawer) එක ඇරලා phone එකේ Back එබුවම — menu එක වැහෙන්නේ නෑ,
+      <b>මුළු app එකම වැහිලා home screen එකට යනවා</b>. මම emulator එකේ මේක ඇත්තටම කරලා බැලුවා.</p>
+    <div class="why"><b>ඇයි?</b> Google ගේ menu එකට Back handle කරන කොටස තියෙන්නේ ඔවුන්ගේ
+      <code>ModalDrawerSheet</code> කියන ready-made කොටසේ. අපි ඒක පාවිච්චි කරන්නේ නෑ — අපි menu එකේ ඇතුළත
+      අතින් හදලා. ඒ නිසා Back එබුවම ඒක handle කරන්න කවුරුවත් නෑ.<br>
+      <b>ඒකෙන්ම තව ප්‍රශ්නයක්:</b> menu එක ඇරලා තියෙද්දී app එක වැහුණම, ඊළඟට app එක ඇරෙන්නෙත් <b>menu එක ඇරගෙනම</b>.</div>
+    <p><b>විසඳුම:</b> Google ගේ <code>ModalDrawerSheet</code> එකට මාරු වෙන එක. එතකොට Back හරි යනවා, Android 14+ එකේ
+      “predictive back” animation එකත් නොමිලේ එනවා. (පොඩි සැලකිල්ලක්: අපි දැන් අතින් හදලා තියෙන තල්ලු-කිරීමේ animation
+      එකයි ඔවුන්ගේ එකයි එකට ගැටෙන්න පුළුවන් — ඒ දෙක ගළපන්න ඕන.)</p>
+  </div>
+
+  <div class="item">
+    <h3><span class="tag t-red">3</span> අකුරු 500 ඉක්මවුණාම, ඇස් නොපෙනෙන අයට <b>මොකද කරන්න ඕන කියලා කියන්නේ නෑ</b></h3>
+    <p>අකුරු 501ක් type කළාම තිරයේ පේනවා “text එක කොට කරන්න” කියලා. ඒත් screen reader එකෙන් ඇහෙන්නේ
+      “501 of 500 characters used” විතරයි — <b>මොකද කරන්න ඕන කියලා කියන එකම වාක්‍යය ඇහෙන්නේ නෑ</b>.</p>
+    <div class="why">අපේම නීතියක් තියෙනවා: “හැම වැරදි තැනකදීම ඊළඟට මොකද කරන්නේ කියලා කියන්න ඕන”
+      (no-dead-end rule). මෙතන ඒක කැඩිලා.</div>
+  </div>
+
+  <div class="item">
+    <h3><span class="tag t-red">4</span> පහළින් එන පණිවිඩ (snackbar) <b>navigation bar එකට යටින්</b> එනවා</h3>
+    <p>Result screen එකේයි app shell එකේයි පණිවිඩ පෙට්ටිය phone එකේ පහළ තීරුවට යටින් හැංගෙනවා.
+      Home screen එකේ විතරක් අහම්බෙන් හරි ගිහින් තියෙනවා.</p>
+    <div class="why">Google ගේ <code>Scaffold</code> එක මේක automatically හදනවා (ඔවුන්ගේ code එකේ ඒක තියෙනවා).
+      අපි <code>Scaffold</code> පාවිච්චි කරන්නේ නැති නිසා ඒ ආරක්ෂාව නොමිලේ ලැබෙන්නේ නෑ. → 1වෙනි එකේ විසඳුමෙන්ම හැදෙනවා.</div>
+  </div>
+
+  <div class="item">
+    <h3><span class="tag t-red">5</span> Settings file එක හැදුණොත් <b>app එක ඇරෙන ගමන් crash වෙනවා</b></h3>
+    <p>User ගේ තේරීම් (භාෂා, theme) save කරන file එක කිසියම් හේතුවකින් හැදුණොත් (phone එක storage
+      පිරිලා, බැටරිය ගිහින්, force-stop) — app එක ඇරෙන ගමන් වැහෙනවා. <b>ආපහු හදාගන්න ක්‍රමයක් නෑ</b>;
+      user ට කරන්න තියෙන්නේ app data clear කරන එක විතරයි.</p>
+    <div class="why">Google ගේ documentation එකේම කියනවා “DataStore එක තනියම හැදෙන්නේ නෑ — ඒක app එකේ වගකීමක්” කියලා.
+      අපි ඒ ආරක්ෂාව දාලා නෑ. දාන්න ඕන දෙයක් තියෙනවා (<code>corruptionHandler</code>) — පොඩි වැඩක්.</div>
+  </div>
+
+  <div class="item">
+    <h3><span class="tag t-red">6</span> භාෂාව මාරු කළාම <b>ආයෙත් translate වෙන්නේ නෑ</b></h3>
+    <p>Result එකක් තියෙද්දී භාෂාව මාරු කළොත් (හෝ swap ⇄ ඔබනොත්) — පරණ result එකම එහෙම්මම තියෙනවා,
+      ඒත් උඩ තියෙන භාෂාවේ නම වෙනස් වෙනවා. එතකොට user ට පේන්නේ <b>වැරදි යුගලයක්</b>.</p>
+    <div class="why">අපේ තීරණ ලැයිස්තුවේ <b>D-1</b> කියලා නීතියක් තියෙනවා: “භාෂාව මාරු වුණාම ආපහු translate කරන්න”.
+      ඒක තාම implement කරලා නෑ. (Cache එකෙන් ගන්න නිසා අමතර charge එකක් නෑ — ඒත් ඒකට කලින් 🟠 කොටසේ 1වෙනි එක හදන්න ඕන.)</div>
+  </div>
+
+  <div class="item">
+    <h3><span class="tag t-red">7</span> App එක background එකේ මැරුණම, ආපහු ආවම <b>නොකියාම ආයෙත් translate කරනවා</b></h3>
+    <p>Result screen එකේ ඉද්දී Android එක app එක memory එකෙන් අයින් කළොත් (සාමාන්‍ය දෙයක්), ආපහු ආවම
+      අපි <b>ආයෙත් engine එකට කතා කරනවා</b>.</p>
+    <div class="why">දැන් නම් හානියක් නෑ. ඒත් ගෙවන engine එක (Google Cloud) සම්බන්ධ වුණාම මේකෙන්
+      <b>user ගේ දවසේ කෝටාවෙන් දෙපාරක් කැපෙනවා</b>, සහ අපිට දෙපාරක් බිල් වෙනවා. දැන් හදන එක ලාභයි.</div>
+  </div>
+
+  <div class="item">
+    <h3><span class="tag t-red">8</span> භාෂා යුගලය support නැති වුණාම, දෙන්නේ <b>වැඩක් නැති “Retry” එකක්</b></h3>
+    <p>Support නොකරන භාෂා දෙකක් තෝරගත්තම error එකක් එනවා, ඒත් තියෙන එකම බොත්තම “Retry”.
+      ඒක ඔබන හැම වතාවකම <b>ආයෙත් ආයෙත් එකම error එකම</b> එනවා — Result screen එකේ භාෂාව මාරු කරන්නත් බෑ.
+      මම මේක emulator එකේ ඇත්තටම හම්බ කරගත්තා.</p>
+    <div class="why">නිවැරදි විදිහ: හේතුවට ගැළපෙන බොත්තමක්. “support නෑ” නම් → “වෙන භාෂාවක් තෝරන්න” →
+      භාෂා ලැයිස්තුවට යවන්න.</div>
+  </div>
+  <div class="sec-actions"></div>
+</section>
+
+<!-- ═══════════════ 3 ═══════════════ -->
+<section class="rev" data-sec="a3" data-title="Brains හදන්න කලින් (11)">
+  <h2>🟠 Brains හදන්න කලින් තීරණය කරන්න ඕන <span class="n">· 11ක්</span></h2>
+  <p class="lead">මේවා <b>දැන් කිසි කෙනෙක්ට පේන්නේ නෑ</b> — මොකද engines තාම හදලා නෑ. ඒත් engines හැදුවට පස්සේ
+    මේවා හදන එක <b>ගොඩක් අමාරුයි සහ මිල අධිකයි</b>. ඒ නිසා දැන් හදන එක බුද්ධිමත්.</p>
+
+  <div class="why">
+    <b>දැන් brains 4 කරන්නේ මොකක්ද?</b> ඔක්කොම “ඕකේ” කියලා උත්තර දෙනවා —<br>
+    · Translation → හැම විටම “වැරදුණා” (ඒක හරි, තාම හදලා නෑ)<br>
+    · Access (දායකත්වය) → <b>හැම engine එකක්ම හැමෝටම දෙනවා</b><br>
+    · Usage (සීමා) → <b>ගණන් කරන්නේ නෑ, කවදාවත් සීමාව ඉක්මවන්නේ නෑ</b><br>
+    · Ads → කිසිත් කරන්නේ නෑ<br>
+    · “Internet තියෙනවද?” → <b>හැම විටම “ඔව්”</b><br><br>
+    <b>අනතුර:</b> මේ ඔක්කොම <b>“විවෘත පැත්තට”</b> වැරදෙනවා. ගෙවන Cloud engine එක තෝරගන්න පුළුවන් වුණු
+    දවසේම, නොමිලේ user ලාට <b>සීමාවක් නැතුව ගෙවන engine එක</b> පාවිච්චි කරන්න පුළුවන් වෙනවා.
+  </div>
+
+  <ul>
+    <li><b>Cache එක කලින් බලන්නේ නෑ</b> — දැන් අපි කලින්ම engine එකට කතා කරලා, ඊට පස්සේ තමයි
+      “මේක කලින් තිබුණද?” කියලා බලන්නේ. ඒ නිසා අපේම නීතිය (“cache එකෙන් ආවොත් charge නෑ”) <b>ක්‍රියාත්මක කරන්න බැරි තැනක</b>.</li>
+    <li><b>“දායකත්වය තාම load වෙනවා” කියන තත්ත්වය නෑ</b> — Access brain එකට තියෙන්නේ “ඔව්/නෑ” විතරයි.
+      එතකොට තවම දන්නේ නැති වෙලාවේ තීරණයක් ගන්න වෙනවා — <b>පරණ app එකේ තිබුණු හරියටම එකම bug එක</b>.</li>
+    <li><b>සීමා ගණන් කිරීම “එකවර” වැඩ කරන්නේ නෑ</b> — දෙපාරක් එකවර translate කළොත් ගණන <b>එක පාරයි</b> අඩු වෙන්න පුළුවන්.</li>
+    <li><b>සීමාව ඉක්මවුණාම වැරදි පණිවිඩයක්</b> — “Upgrade කරන්න” වෙනුවට “මොකක්හරි වැරදුණා, connection එක බලන්න” කියලා එනවා.</li>
+    <li><b>“ඔයාට මේකට අයිතියක් නෑ” සහ “ඔයාගේ කෝටාව ඉවරයි” දෙකම එකම උත්තරයක්</b> — වෙන් කරන්න බෑ.</li>
+    <li><b>එකම translation එක දෙපාරක් save වෙන්න පුළුවන්</b> — database එකේ “මේක අනුපිටපත් වෙන්න බෑ” කියන අගුල දාලා නෑ.</li>
+    <li><b>Database version මාරුවීමේ සැලසුමක් නෑ</b> — ඊළඟ පාර database එකේ මොකක්හරි වෙනස් කළොත්,
+      <b>දැනට app එක තියෙන හැමෝටම update එකේදී crash වෙනවා</b>.</li>
+    <li><b>භාෂා ලැයිස්තුව database එකට කවදාවත් ලියන්නේ නෑ</b> — දැන් වැඩ කරන්නේ bundled ලැයිස්තුවෙන්.
+      ඒත් database එකට පළවෙනි පේළිය ලියවුණු ගමන් ලැයිස්තුව <b>ඒ එක භාෂාවට හැකිලෙනවා</b>. “මෑතක පාවිච්චි කළ” කියන කොටසත් කවදාවත් වැඩ කරන්නේ නෑ.</li>
+    <li><b>App එක ඇරෙන පළමු මොහොතේ භාෂා යුගලය “en→fr” විදිහට පෙන්නනවා</b> — ඒ මොහොතේම swap ඔබනොත්,
+      <b>user ගේ ඇත්ත තේරීම මැකිලා</b> en/fr ලියවෙනවා.</li>
+    <li><b>වැරදි “thread pool” එකක</b> — network/database වැඩ CPU වැඩවලට වෙන් කරපු තැනක දුවනවා.</li>
+    <li><b>Settings ලියද්දී වැරදුණොත් crash</b> — භාෂාව මාරු කරද්දී file එකට ලියන්න බැරි වුණොත් අල්ලගන්නේ නෑ.</li>
+  </ul>
+  <div class="sec-actions"></div>
+</section>
+
+<!-- ═══════════════ 4 ═══════════════ -->
+<section class="rev" data-sec="a4" data-title="Standard components (16)">
+  <h2>🔵 Google ගේ ready-made කොටස් <span class="n">· 16ක් · ඔයා ඉල්ලපු දේ</span></h2>
+  <p class="lead">ඔයා කිව්වා “පුළුවන් තරම් Material 3 official components use කරන්න, custom අඩු කරන්න” කියලා.
+    මුළු code එකම ඒ ඇහින් පීරලා බැලුවා.</p>
+
+  <div class="why"><b>මුලින්ම හොඳ පැත්ත:</b> අපි දැනටමත් stock M3 පාවිච්චි කරනවා —
+    menu කවචය, adaptive layout, top bar, ලැයිස්තු පේළි, chips, බොත්තම්, card, divider, පිටපත් තේරීම.
+    <b>ShimmerResult</b> එක custom විදිහටම තියෙන එකත් නිවැරදි කියලා තහවුරු වුණා: Material 3 එකේ
+    ඒ වගේ “skeleton” එකක් <b>ඇත්තටම නෑ</b> (මම library එකේ ඇතුළතම බැලුවා).</div>
+
+  <p><b>ඉතුරු තැන් — වැදගත් පිළිවෙළට:</b></p>
+  <ul>
+    <li><b>Menu (drawer) එක —</b> කවචයයි ඇතුළේ පේළියි දෙකම අතින් හදලා. මේකෙන් තුනක් නැති වෙනවා:
+      (අ) Back බොත්තම (🔴 2), (ආ) <b>“දැන් ඉන්නේ කොහෙද” කියලා පේන්නේ නෑ</b> — menu එකේ තෝරාගත් තැන highlight වෙන්නේ නෑ,
+      (ඇ) screen reader එකට මේවා “tab” කියලා කියන්නේ නෑ.</li>
+    <li><b>Screen කවචය (<code>Scaffold</code>) —</b> Home, Result, shell තුනේම නෑ. 🔴 1 සහ 🔴 4 මේකෙන් හැදෙනවා.</li>
+    <li><b>Scroll කරද්දී top bar එක වෙනස් වීම —</b> දැන් කිසිම bar එකකට ඒක නෑ, ඒ නිසා text එක bar එකට යටින්ම යනවා.
+      <span class="tag t-amber">ඔයාගේ තීරණයක්</span> — අපේ flat design එකට ඒක ඕනද, නැත්නම් දැන් තියෙන පිරිසිදු පෙනුම තියාගමුද?</li>
+    <li><b>Text ලියන කොටුව —</b> “Enter text” කියන placeholder එක screen reader එකට <b>දෙපාරක්</b> කියවෙනවා;
+      සීමාව ඉක්මවුණාම “වැරදියි” කියන තත්ත්වය Android එකට කියන්නේ නෑ.</li>
+    <li><b>භාෂා ලැයිස්තුවේ පේළි —</b> “මේක තෝරලා” කියන එක කෑලි දෙකකින් හදලා (එකට ගැළපෙන ready-made එකක් තියෙනවා);
+      screen reader එකට “100න් 37වෙනි එක” වගේ තැන කියන්නේ නෑ.</li>
+    <li><b>Menu එකේ “මෑතක” පේළි</b> → <code>ListItem</code>; <b>“RECENTS” වගේ මාතෘකා</b> → “මාතෘකාවක්” කියලා සලකුණු කරන්න ඕන.</li>
+    <li><b>Account පේළිය ඔබන්න බෑ</b> — ඒක මළ තැනක්.</li>
+    <li><b>පණිවිඩ පෙට්ටි තුනක්</b> එකට තියෙනවා — එකිනෙක උඩ එන්න පුළුවන්.</li>
+    <li><b>Navigation එකේ කොටසක් නෑ</b> — දැන් වැඩ කරන්නේ අහම්බෙන්. අලුත් screen එකකට තමන්ගේම “මොළයක්” දැම්මොත්,
+      ඒක <b>කවදාවත් clear වෙන්නේ නෑ</b> — පරණ දත්ත රැඳෙනවා.</li>
+    <li><b>App එක ඇරෙන පළමු තත්පරයේ අළු පාට එළියක්</b> — window එකේ background පාට දාලා නෑ, ඒ නිසා Android ගේ default
+      අළු පාට (#FAFAFA / #303030) පේනවා, අපේ පාට නෙවෙයි. Splash screen එකත් නෑ.</li>
+    <li><b>App එකේ භාෂාව phone එකේ settings වලින් තෝරන්න බෑ</b> — fil සහ pt-BR translations තියෙනවා, ඒත් ඒවාට යන්න
+      මුළු phone එකේම භාෂාව මාරු කරන්න වෙනවා.</li>
+    <li><b>User ගේ translation history එක Google backup එකට යනවා</b> — backup නීති template එකෙන් වෙනස් කරලා නෑ.
+      <span class="tag t-amber">පෞද්ගලිකත්වය</span></li>
+    <li><b>Release build එක තාම “හකුළන්නේ” නෑ</b> (issue #5) — code එක ලොකුයි, සැඟවිලා නෑ.</li>
+    <li><b>Menu එකේ “මෑතක” ලැයිස්තුවට මුළු history එකම memory එකට ගන්නවා</b> — 4ක් පෙන්නන්න.</li>
+    <li><b>Icon library එක පරණ අනුවාදයක නවතලා</b> — icon 25ක් වෙනුවෙන් දහස් ගණනක් ගේනවා.</li>
+    <li><b>Status bar icon වල පාට app එකේ theme එකට නෙවෙයි, phone එකේ theme එකට අහුවෙනවා</b> —
+      Settings එකේ light/dark switch එක දැම්මම මේක වැරදෙනවා.</li>
+  </ul>
+  <div class="sec-actions"></div>
+</section>
+
+<!-- ═══════════════ 5 ═══════════════ -->
+<section class="rev" data-sec="a5" data-title="පිරිසිදු කිරීම් · tests (11)">
+  <h2>⚪ පිරිසිදු කිරීම් · tests · ලියකියවිලි <span class="n">· 11ක්</span></h2>
+  <p class="lead">බරපතළ නෑ, ඒත් එකතු වෙනකොට වැඩේ අවුල් කරන ඒවා.</p>
+  <ul>
+    <li><b>Tests වල හිඩැස්</b> — අපේම “ඉවරයි කියන්නේ කවදද” ලැයිස්තුවෙන් හතරක් හරි. නැත්තේ:
+      Maestro (මුළු ගමන automatic පරීක්ෂාව) <b>කිසිසේත්ම නෑ</b>; ඇස් නොපෙනෙන අයට අදාළ automatic පරීක්ෂාවක් නෑ;
+      <b>අකුරු 200% කරලා</b> හෝ dark mode පාට පරීක්ෂා කරන test එකක් නෑ — <b>🔴 1 හසු වෙන්නේ ඒ වගේ එකකින්</b>;
+      database/settings test නෑ; repository test <b>එකක්වත් නෑ</b>.</li>
+    <li><b>ව්‍යුහය රකින automatic පරීක්ෂා දුර්වලයි</b> — ඒවා බලන්නේ “import” පේළි විතරයි. වෙන ක්‍රමයකින් ලිව්වොත් <b>ඒවා පනිනවා</b>.</li>
+    <li><b>එකම logic එක තැන් දෙකක ලියලා</b> — test එකෙන් ඔප්පු වෙන්නේ <b>බොරු පිටපත</b>; ඇත්ත එක test වෙන්නේ නෑ.</li>
+    <li><b>ලියකියවිලි දෙකක් එකිනෙකට පටහැනියි</b> — 👍👎 බොත්තම් “අයින් කරන්න” කියලා එක ලේඛනයක, “තියෙන්න ඕන” කියලා තව එකක.
+      <span class="tag t-amber">ඔයාගේ තීරණයක්</span> — 👍👎 තියාගමුද, අයින් කරමුද?</li>
+    <li><b>වචන (strings) 6ක් නිල ලැයිස්තුවෙන් පිට</b> ගිහින්; fil/pt-BR වලට “පරිවර්තනය නෑ” කියන අනතුරු ඇඟවීම
+      <b>මුළු file එකටම</b> නිශ්ශබ්ද කරලා — ඒ නිසා ඉස්සරහට එකතු කරන අලුත් වචනත් නිශ්ශබ්දව මගහැරෙනවා.</li>
+    <li><b>අකුරු 200% කළාම කැපෙනවා</b> — භාෂා pill දෙකට ස්ථිර උසක් දීලා; “Conversation” වචනය කැපෙනවා.</li>
+    <li><b>App එක ඇරෙනකොට cursor එක text කොටුවට එන්නේ නෑ</b> — Google Translate එකේ එනවා, අපේ specs එකෙත් තියෙනවා.</li>
+    <li><b>White-label හිඩැස්</b> — අලුත් brand එකකට <b>default භාෂා යුගලය මාරු කරන්න බෑ</b> (හදලා තියෙනවා, ඒත් සම්බන්ධ කරලා නෑ);
+      අකුරු සීමාව (500) code එකේම ලියලා, config එකෙන් නෙවෙයි.</li>
+    <li><b>පාවිච්චි නොකරන කොටස්</b> — usage keys, “internet තියෙනවද” මොඩියුලය, availability model එක,
+      elevation/motion tokens, catalog entry 5ක්, blank වුණු library එකක්, gradle setting 3ක්.</li>
+    <li><b>Module දෙකක අවුලක්</b> — paywall (හිස්) එක app එකට සම්බන්ධ කරලා; screen දෙකකට එකම නමයි.</li>
+    <li><b>Project folder එකේ 4.6 MB bugreport zip එකක්</b> ඉතුරු වෙලා, <code>.gitignore</code> එකේ නෑ.</li>
+  </ul>
+  <div class="sec-actions"></div>
+</section>
+
+<!-- ═══════════════ 6 ═══════════════ -->
+<section class="rev" data-sec="a6" data-title="හරියටම තියෙන දේවල්">
+  <h2>✅ පරීක්ෂා කරලා <b>නිවැරදියි</b> කියලා තහවුරු වුණ දේවල්</h2>
+  <p class="lead">මේවා ලියලා තියෙන්නේ ඊළඟ පාර ආයෙත් මේ ගැන හොයන්න ඕන නැති වෙන්න.</p>
+  <ul>
+    <li><b>පාට තට්ටුව (48 roles) නිවැරදියි</b> — GT ගේම පාට, light/dark දෙකේම, contrast හරි.</li>
+    <li><b>Reusable library තුන ඇත්තටම reusable</b> — subscription · ads · consent. වෙන project එකකට ගන්න පුළුවන්.
+      <b>පරණ app එකේ තිබුණු “consent තමන්ම දෙනවා” කියන bug එක ව්‍යුහයෙන්ම හදලා තියෙනවා.</b></li>
+    <li><b>Module ව්‍යුහය (රවුම් 4) හරි</b> — කිසිම feature එකක් brains වලට කෙළින්ම අත ගහන්නේ නෑ.</li>
+    <li><b>Process death (app එක මැරිලා ආපහු ඒම)</b> — screen stack එකයි type කරපු text එකයි නිවැරදිව ආපහු එනවා.</li>
+    <li><b>Clipboard, lifecycle, coroutines — ඔක්කොම අලුත්ම නිවැරදි ක්‍රමය.</b> අන්තරාදායක ක්‍රම (<code>GlobalScope</code> වගේ) <b>එකක්වත් නෑ</b>.</li>
+    <li><b>Keyboard එක එද්දී layout එක හැඩගැහෙන එක</b>, edge-to-edge, RTL භාෂා — නිවැරදියි.</li>
+    <li><b>testTag 17න් 14ක්</b> නිවැරදි නමින්, නිවැරදි බොත්තමේ. ඉතුරු 3 තියෙන්නේ තාම හදලා නැති දේවලට.</li>
+    <li><b>ඇස් නොපෙනෙන අයට කියවෙන පණිවිඩ</b> — “හදිසි” විදිහට කියවෙන්නේ error එකට විතරයි. නිවැරදියි.</li>
+    <li><b>fake engine එකයි prod එකයි දෙකේම සම්බන්ධතා සම්පූර්ණයි</b> — එකක තියෙන දෙයක් අනිකේ නැති තැනක් නෑ.</li>
+    <li><b>හැම UI කෑල්ලකටම light/dark preview තියෙනවා</b>; CI පරීක්ෂා ඇත්ත වැඩ කරනවා; Detekt/Spotless හරි.</li>
+  </ul>
+  <div class="sec-actions"></div>
+</section>
+
+<!-- ═══════════════ 7 ═══════════════ -->
+<section class="rev" data-sec="a7" data-title="වැඩ පිළිවෙළ">
+  <h2>වැඩ පිළිවෙළ — කණ්ඩායම් 5ක් <span class="n">· මගේ නිර්දේශය</span></h2>
+  <p class="lead">හම්බුණු ඔක්කොම එකවර හදන්න යන එක වැරදියි. එකට ගැළපෙන ඒවා එකට කරමු.</p>
+
+  <div class="item">
+    <h3><span class="tag t-red">A</span> “Device එකේ ඇත්තටම වැරදි ඒවා” — <b>මුලින්ම</b></h3>
+    <p>🔴 1, 2, 4 + menu එකයි screen කවචයයි standard M3 වලට මාරු කිරීම.
+      <b>ඇයි එකට?</b> මොකද මේ තුනම හැදෙන්නේ <b>එකම වෙනස් කිරීම් දෙකකින්</b> —
+      <code>Scaffold</code> එකයි <code>ModalDrawerSheet</code> එකයි. ඒ එක්කම menu එකේ “දැන් ඉන්නේ කොහෙද”
+      කියන highlight එකත් නොමිලේ එනවා. Dark mode screenshot test එකකුත් දාන්න ඕන.</p>
+  </div>
+  <div class="item">
+    <h3><span class="tag t-red">B</span> Text feature එකේ ඉතුරු නීති</h3>
+    <p>🔴 3, 6, 7, 8 + text කොටුවේ සහ භාෂා ලැයිස්තුවේ standard components + අකුරු 200% + වචන ලැයිස්තුව.
+      එකම feature එක, එකම spec එක, එකම test වටයක්.</p>
+  </div>
+  <div class="item">
+    <h3><span class="tag t-amber">C</span> Brains හදන්න කලින් — 🟠 ඔක්කොම</h3>
+    <p>මේවා <b>“හැඩය” පිළිබඳ තීරණ</b>. Engines හැදුවට පස්සේ මේවා වෙනස් කරන එකට වැය වෙන්නේ දැන් වැය වෙන එකට වඩා
+      <b>කිහිප ගුණයක්</b>. ඒ නිසා Settings screen එකට කලින් හෝ ඒ එක්කම මේක කරමු.</p>
+  </div>
+  <div class="item">
+    <h3><span class="tag t-blue">D</span> Release එකට සූදානම</h3>
+    <p>Window පාට · splash · app භාෂාව · backup පෞද්ගලිකත්වය · R8 (issue #5) · icon library.
+      එකම PR එකකට ගැළපෙනවා.</p>
+  </div>
+  <div class="item">
+    <h3><span class="tag t-grey">E</span> පිරිසිදු කිරීම</h3>
+    <p>පාවිච්චි නොකරන කොටස්, <code>.gitignore</code>, ලියකියවිලි පටහැනිතාව. අවස්ථාව ලැබෙන විට.</p>
+  </div>
+
+  <div class="why">
+    <b>ඔයාගෙන් තීරණ දෙකක් ඕන:</b><br>
+    1️⃣ Scroll කරද්දී top bar එකට වෙනසක් ඕනද? (දැන් flat · පිරිසිදු. Google Translate එකේ scroll කරද්දී පොඩි වෙනසක් වෙනවා.)<br>
+    2️⃣ Result screen එකේ 👍 👎 බොත්තම් <b>තියාගමුද අයින් කරමුද?</b> (අපේ ලේඛන දෙකක් දෙපැත්තට කියනවා.)
+  </div>
+  <div class="sec-actions"></div>
+</section>
+
+<div class="final" data-sec="audit-final" data-title="මුළු පරීක්ෂණය">
+  <h2 style="margin-top:0">ඊළඟට?</h2>
+  <p>ඔයා “හරි” කිව්වම මම <b>කණ්ඩායම A</b> එකෙන් පටන් ගන්නම් — GitHub issue එකක් අරලා, plan-doc එකක් ලියලා,
+    ඊට පස්සේ code එක. හැම එකක්ම PR එකක්, cross-review එකක්, emulator එකේ දුවවලා බලලා.</p>
+  <p style="color:var(--ink2);font-size:15px">තාක්ෂණික සම්පූර්ණ වාර්තාව (file:line එක්ක):
+    <code>docs/audit/2026-07-23-deep-audit.md</code></p>
+  <button class="big" id="approveAll">✓ හරි — කණ්ඩායම A එකෙන් පටන් ගන්න</button>
+</div>
+
+</div>
+
+<button id="fab">💬 මගේ අදහස් <span id="fabCount">0</span></button>
+
+<aside id="panel">
+  <header><b>මගේ අදහස්</b><button class="btn" id="panelClose">✕</button></header>
+  <div id="panelBody"></div>
+</aside>
+
+<div id="overlay">
+  <div class="dlg">
+    <h3 id="dlgTitle">💬 අදහසක් දාන්න</h3>
+    <div id="dlgCtx"></div>
+    <div id="dlgQuote" style="display:none"></div>
+    <textarea id="dlgText" placeholder="මෙතන ලියන්න…"></textarea>
+    <div class="row">
+      <button class="btn" id="dlgCancel">අයින් කරන්න</button>
+      <button class="btn" id="dlgSave" style="background:var(--blue);color:var(--card);border-color:var(--blue)">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const DOC = 'audit-2026-07-23';
+let comments = [], dlgState = null;
+const overlay=document.getElementById('overlay'), dlgText=document.getElementById('dlgText'),
+      dlgQuote=document.getElementById('dlgQuote'), dlgCtx=document.getElementById('dlgCtx'),
+      dlgTitle=document.getElementById('dlgTitle'), panel=document.getElementById('panel'),
+      panelBody=document.getElementById('panelBody'), fabCount=document.getElementById('fabCount'),
+      toast=document.getElementById('toast');
+
+function showToast(m){ toast.textContent=m; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),2600); }
+function esc(s){ return (s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+async function api(payload){
+  const url='/api/comments?doc='+DOC;
+  const r=await fetch(url, payload?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}:undefined);
+  if(!r.ok) throw new Error('server');
+  return r.json();
+}
+
+async function refresh(){
+  try{ comments=await api(); }catch(e){ showToast('⚠ server එකට කතා කරන්න බෑ — පිටුව reload කරන්න'); return; }
+  fabCount.textContent = comments.filter(c=>c.kind==='comment').length;
+  document.querySelectorAll('[data-sec]').forEach(sec=>{
+    const id=sec.dataset.sec, mine=comments.filter(c=>c.section===id);
+    const cBtn=sec.querySelector('.btn.comment .cnt');
+    if(cBtn) cBtn.textContent=mine.filter(c=>c.kind==='comment').length;
+    if(sec.classList.contains('rev')){
+      sec.classList.toggle('has-comments', mine.some(c=>c.kind==='comment'));
+      sec.classList.toggle('approved', mine.some(c=>c.kind==='approve') && !mine.some(c=>c.kind==='comment'));
+      const aBtn=sec.querySelector('.btn.approve');
+      if(aBtn) aBtn.classList.toggle('on', mine.some(c=>c.kind==='approve'));
+    }
+  });
+  if(!comments.length){ panelBody.innerHTML='<p style="color:var(--ink2);font-size:14px">තාම අදහස් නෑ. කොටසක 💬 බොත්තම ඔබන්න.</p>'; return; }
+  panelBody.innerHTML='';
+  comments.slice().reverse().forEach(c=>{
+    const el=document.createElement('div');
+    el.className='cmt'+(c.kind==='approve'?' approve':'');
+    el.innerHTML=`<div class="meta"><span>${esc(c.section_title||c.section)}</span><span>${c.created_at.replace('T',' · ')}</span></div>
+      ${c.quote?`<div class="q">"${esc(c.quote)}"</div>`:''}
+      <div>${c.kind==='approve'?'✓ ':''}${esc(c.comment)}</div>
+      <div class="ops">${c.kind==='comment'?`<button data-e="${c.id}">වෙනස් කරන්න</button>`:''}<button data-d="${c.id}">මකන්න</button></div>`;
+    el.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',async()=>{ await api({action:'delete',id:+b.dataset.d}); showToast('මැකුවා'); refresh(); }));
+    el.querySelectorAll('[data-e]').forEach(b=>b.addEventListener('click',()=>openDialog({section:c.section,section_title:c.section_title,quote:c.quote,editId:c.id,text:c.comment})));
+    panelBody.appendChild(el);
+  });
+}
+
+function openDialog(st){
+  dlgState=st;
+  dlgTitle.textContent = st.editId ? '✏️ අදහස වෙනස් කරන්න' : '💬 අදහසක් දාන්න';
+  dlgCtx.textContent = 'කොටස: ' + st.section_title;
+  if(st.quote){ dlgQuote.style.display='block'; dlgQuote.textContent='"'+st.quote+'"'; } else dlgQuote.style.display='none';
+  dlgText.value = st.text||'';
+  overlay.classList.add('show'); dlgText.focus();
+}
+document.getElementById('dlgCancel').addEventListener('click',()=>overlay.classList.remove('show'));
+overlay.addEventListener('click',e=>{ if(e.target===overlay) overlay.classList.remove('show'); });
+document.getElementById('dlgSave').addEventListener('click',async()=>{
+  const txt=dlgText.value.trim(); if(!txt){ dlgText.focus(); return; }
+  try{
+    if(dlgState.editId) await api({action:'edit',id:dlgState.editId,comment:txt});
+    else await api({action:'add',section:dlgState.section,section_title:dlgState.section_title,quote:dlgState.quote||'',comment:txt,kind:'comment'});
+    overlay.classList.remove('show'); showToast('✓ Save වුණා — project එකට ලියැවුණා'); refresh();
+  }catch(e){ showToast('⚠ save කරන්න බැරි වුණා — ආයේ try කරන්න'); }
+});
+
+function selectedQuoteIn(sec){
+  const s=window.getSelection();
+  if(!s||s.isCollapsed) return '';
+  const t=s.toString().trim();
+  if(!t||t.length<3) return '';
+  if(sec && !sec.contains(s.anchorNode)) return '';
+  return t.slice(0,600);
+}
+
+document.querySelectorAll('section.rev').forEach(sec=>{
+  const act=sec.querySelector('.sec-actions'), id=sec.dataset.sec, title=sec.dataset.title;
+  const cb=document.createElement('button');
+  cb.className='btn comment'; cb.innerHTML='💬 අදහසක් <span class="cnt">0</span>';
+  cb.addEventListener('click',()=>openDialog({section:id,section_title:title,quote:selectedQuoteIn(sec)}));
+  const ab=document.createElement('button');
+  ab.className='btn approve'; ab.textContent='✓ මේ කොටස හරි';
+  ab.addEventListener('click',async()=>{
+    if(ab.classList.contains('on')){ showToast('දැනටමත් අනුමතයි ✓'); return; }
+    await api({action:'add',section:id,section_title:title,quote:'',comment:'මේ කොටස අනුමතයි',kind:'approve'});
+    showToast('✓ "'+title+'" අනුමතයි'); refresh();
+  });
+  act.append(cb,ab);
+});
+
+document.getElementById('approveAll').addEventListener('click',async()=>{
+  await api({action:'add',section:'audit-final',section_title:'මුළු පරීක්ෂණය',quote:'',comment:'පරීක්ෂණය අනුමතයි — කණ්ඩායම A එකෙන් පටන් ගන්න',kind:'approve'});
+  showToast('🎉 Save වුණා! chat එකේ "බලන්න" කියන්න.'); refresh();
+});
+document.getElementById('fab').addEventListener('click',()=>panel.classList.add('show'));
+document.getElementById('panelClose').addEventListener('click',()=>panel.classList.remove('show'));
+refresh();
+</script>
+</body>
+</html>
