@@ -42,11 +42,15 @@ class MainActivity : ComponentActivity() {
      * androidx pins a configuration-change listener to the FIRST enableEdgeToEdge
      * call and replays that call's styles forever (EdgeToEdge.kt:110-125). A field
      * is what makes that replay correct: the lambda never captures a Boolean, it
-     * reads this, and the composition updates it before each apply. `@Volatile`
-     * because the listener outlives any single composition and may read it from a
-     * different context — which is also why this is a field rather than the
-     * `rememberUpdatedState` the design debate sketched: the holder must belong to
-     * the Activity, like the listener, not to a composition the listener outlives.
+     * reads this, and the composition updates it before each apply.
+     *
+     * A field rather than the `rememberUpdatedState` the design debate sketched,
+     * because the listener outlives any single composition — the holder should
+     * belong to the Activity, like the listener does.
+     *
+     * `@Volatile` is defensive, not known-necessary: every path traced here (the
+     * write from the composition, the replay from the configuration listener) runs
+     * on the main thread. That some path does not — verified data නෑ.
      */
     @Volatile
     private var currentDark: Boolean = false
@@ -75,7 +79,13 @@ class MainActivity : ComponentActivity() {
         // resolves against the SYSTEM night qualifier before any of our code runs.
         // A user whose phone is light but who chose Dark still sees a light splash.
         // Closing that needs a synchronous read in attachBaseContext, i.e. a second
-        // source of truth — tracked separately. Now in Android has the same gap.
+        // source of truth — tracked separately.
+        //
+        // Now in Android has the same gap, and it is checkable rather than asserted:
+        // its splash style is literally named NightAdjusted.Theme.Splash and is split
+        // across app/src/main/res/values/themes.xml and values-night/themes.xml
+        // (windowLightStatusBar true vs false), i.e. adjusted by the resource
+        // qualifier — the system's setting — not by anything the app has stored.
         splashScreen.setKeepOnScreenCondition { viewModel.themeSettings.value == null }
 
         setContent {

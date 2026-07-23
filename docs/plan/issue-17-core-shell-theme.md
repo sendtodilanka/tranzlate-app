@@ -59,13 +59,24 @@ permanently stuck splash. No visible change yet (default is still *system*).
 
 **PR 4 · A3 — wiring only.** *(Split from A4 after the fact: A3 is a pure refactor with no
 behaviour change, A4 is the visible one. Reviewing "the theme, not the system, decides dark" apart
-from "here is a new screen" is easier, and it matches the owner's one-thing-at-a-time rule.)* `TranzlateTheme(darkTheme, dynamicColor)` driven
-`TranzlateTheme` gains a `ThemeSettings` overload driven by the stored preference; the
+from "here is a new screen" is easier, and it matches the owner's one-thing-at-a-time rule.)*
+`TranzlateTheme` is driven by the stored preference; the
 `isSystemInDarkTheme()` branch in `PrimaryActionButton.kt:48` (`TODO(#7)`) is replaced by a colour
 resolved inside the theme, following the `LocalFloatingSurface` precedent — that local's own doc
 already forbids branching on the system flag at a call site. The `ThemeMode → isDark` decision moves
 into `:core:model` as a pure function so it is unit-testable without a Compose host.
 *No behaviour change:* the stored preference is still SYSTEM for everyone.
+*(A `ThemeSettings` overload of `TranzlateTheme` was added here and then removed in PR 5: the activity
+needs the resolved dark flag for the system bars as well as the theme, so it resolves once and passes
+both. A3's shape was wrong and A5 is what showed it.)*
+
+> ⚠️ **AMENDED after this plan was accepted.** The mechanism sketched in this section —
+> `DisposableEffect(darkTheme)` re-applying `SystemBarStyle.auto(…) { darkTheme }` — carries the exact
+> bug a later design debate found: androidx pins a configuration-change listener to the **first**
+> `enableEdgeToEdge` call and replays that call's styles forever, so a **captured** `darkTheme` boolean
+> replays a stale value, and a no-arg call in `onCreate` pins the bars to the system detector. The
+> shipped shape reads a live field instead, and there is no `onCreate` call at all. **Implement from
+> [`issue-17-debate-edge-to-edge.md`](issue-17-debate-edge-to-edge.md), not from the snippet below.**
 
 **PR 5 · A5 + A6 — window chrome + splash.** `DisposableEffect(darkTheme)` re-applying
 `enableEdgeToEdge(statusBarStyle/navigationBarStyle = SystemBarStyle.auto(…) { darkTheme })` so bar
