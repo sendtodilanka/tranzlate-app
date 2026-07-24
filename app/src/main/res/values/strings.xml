@@ -5,10 +5,13 @@
      before ship; MissingTranslation suppressed until that tracked task lands. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="MissingTranslation">
-    <string name="nav_text">Text</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_chat">Chat</string>
     <string name="nav_camera">Camera</string>
-    <string name="nav_history">History</string>
-    <string name="nav_settings">Settings</string>
+
+    <!-- Chat/Dialog ships in v2; the tab shows a coming-soon placeholder (no dead-end). -->
+    <string name="chat_coming_soon_title">Conversation</string>
+    <string name="coming_soon">Coming soon</string>
 
     <!-- Drawer (UI_SPEC §2.3) -->
     <string name="drawer_search">Search</string>

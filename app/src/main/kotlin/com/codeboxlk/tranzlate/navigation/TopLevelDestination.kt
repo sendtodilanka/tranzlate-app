@@ -3,9 +3,8 @@ package com.codeboxlk.tranzlate.navigation
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation3.runtime.NavKey
 import com.codeboxlk.tranzlate.R
@@ -33,6 +32,10 @@ data class LanguagePickerNavKey(
 @Serializable
 data object CameraNavKey : NavKey
 
+/** Conversation/Dialog tab — the feature ships in v2, so it shows a coming-soon placeholder. */
+@Serializable
+data object ChatNavKey : NavKey
+
 @Serializable
 data object HistoryNavKey : NavKey
 
@@ -44,9 +47,10 @@ data object LanguagesNavKey : NavKey
 data object SettingsNavKey : NavKey
 
 /**
- * The 4 MVP top-level destinations (plan §3). Toggle-aware from day 1
- * (plan §4 R2): the shell filters this registry by `AppConfig.featureToggles`,
- * so e.g. a brand without CAMERA simply never registers the entry — no code edits.
+ * The persistent bottom-nav destinations (D-5 rev.2): Home (text) · Chat
+ * (conversation) · Camera. Toggle-aware (plan §4 R2): the shell filters this
+ * registry by `AppConfig.featureToggles`, so a brand without a mode simply never
+ * registers its tab — no code edits. History/Settings are secondary (drawer).
  */
 enum class TopLevelDestination(
     val navKey: NavKey,
@@ -54,8 +58,7 @@ enum class TopLevelDestination(
     val icon: ImageVector,
     val toggle: FeatureToggle,
 ) {
-    TEXT(TextNavKey, R.string.nav_text, Icons.AutoMirrored.Filled.Chat, FeatureToggle.TEXT),
+    HOME(TextNavKey, R.string.nav_home, Icons.Filled.Home, FeatureToggle.TEXT),
+    CHAT(ChatNavKey, R.string.nav_chat, Icons.AutoMirrored.Filled.Chat, FeatureToggle.DIALOG),
     CAMERA(CameraNavKey, R.string.nav_camera, Icons.Filled.PhotoCamera, FeatureToggle.CAMERA),
-    HISTORY(HistoryNavKey, R.string.nav_history, Icons.Filled.History, FeatureToggle.HISTORY),
-    SETTINGS(SettingsNavKey, R.string.nav_settings, Icons.Filled.Settings, FeatureToggle.SETTINGS),
 }

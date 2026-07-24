@@ -2,6 +2,8 @@ package com.codeboxlk.tranzlate.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,11 +47,13 @@ import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.feature.languagepicker.LanguagePickerScreen as OfflineLanguagesScreen
 
 /**
- * The nav mediator (plan §3/§7 + D-5): **Compact = hub model — NO bottom bar**;
- * peers live ON the Home hub (composer / mic / tiles) and secondary
- * destinations in the ☰ modal drawer. Medium keeps the C-13 rail, Expanded the
- * permanent drawer (NavigationSuiteScaffold). All nav logic stays here —
- * features never navigate themselves.
+ * The nav mediator (plan §3/§7 + D-5 rev.2): a persistent bottom
+ * **NavigationBar** (Home / Chat / Camera) on Compact, a rail on Medium, a
+ * permanent drawer on Expanded — all via NavigationSuiteScaffold. The bar shows
+ * only on the top-level tabs; a secondary/detail destination (Settings, Result,
+ * LanguagePicker, History…) uses NavigationSuiteType.None so it gets the full
+ * height. Secondary destinations live in the ☰ modal drawer. All nav logic
+ * stays here — features never navigate themselves.
  */
 @Composable
 @Suppress("LongMethod") // one cohesive nav mediator; splitting hides the shell structure
@@ -91,49 +95,53 @@ fun TranzlateApp(appConfig: AppConfig) {
                 )
             },
         ) {
-            if (windowInfo.isCompact) {
-                // D-5 hub model: no bottom nav bar on Compact.
+            // NavigationSuiteScaffold across all size classes (D-5 rev.2): Compact
+            // = bottom NavigationBar, Medium = rail, Expanded = permanent drawer.
+            // The bar shows ONLY on the top-level tabs — on a secondary/detail
+            // destination the layout is NavigationSuiteType.None, so the screen
+            // gets full height (GT-style detail flow).
+            val onTopLevel = destinations.any { it.navKey == backStack.lastOrNull() }
+            NavigationSuiteScaffold(
+                layoutType =
+                    when {
+                        !onTopLevel -> {
+                            NavigationSuiteType.None
+                        }
+
+                        windowInfo.isExpanded -> {
+                            NavigationSuiteType.NavigationDrawer
+                        }
+
+                        else -> {
+                            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
+                                currentWindowAdaptiveInfo(),
+                            )
+                        }
+                    },
+                navigationSuiteItems = {
+                    destinations.forEach { destination ->
+                        item(
+                            selected = backStack.lastOrNull() == destination.navKey,
+                            onClick = {
+                                if (backStack.lastOrNull() != destination.navKey) {
+                                    backStack.add(destination.navKey)
+                                    // top-level switch = single-entry stack (GT-style)
+                                    while (backStack.size > 1) backStack.removeAt(0)
+                                }
+                            },
+                            icon = { Icon(destination.icon, contentDescription = null) },
+                            label = { Text(stringResource(destination.labelRes)) },
+                            modifier = Modifier.testTag("tt_app_nav_${destination.name.lowercase()}"),
+                        )
+                    }
+                },
+            ) {
                 AppNavDisplay(
                     backStack = backStack,
                     textViewModel = textViewModel,
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onNavigate = ::navigateTo,
                 )
-            } else {
-                NavigationSuiteScaffold(
-                    layoutType =
-                        if (windowInfo.isExpanded) {
-                            NavigationSuiteType.NavigationDrawer
-                        } else {
-                            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
-                                currentWindowAdaptiveInfo(),
-                            )
-                        },
-                    navigationSuiteItems = {
-                        destinations.forEach { destination ->
-                            item(
-                                selected = backStack.lastOrNull() == destination.navKey,
-                                onClick = {
-                                    if (backStack.lastOrNull() != destination.navKey) {
-                                        backStack.add(destination.navKey)
-                                        // top-level switch = single-entry stack (GT-style)
-                                        while (backStack.size > 1) backStack.removeAt(0)
-                                    }
-                                },
-                                icon = { Icon(destination.icon, contentDescription = null) },
-                                label = { Text(stringResource(destination.labelRes)) },
-                                modifier = Modifier.testTag("tt_app_nav_${destination.name.lowercase()}"),
-                            )
-                        }
-                    },
-                ) {
-                    AppNavDisplay(
-                        backStack = backStack,
-                        textViewModel = textViewModel,
-                        onOpenDrawer = { scope.launch { drawerState.open() } },
-                        onNavigate = ::navigateTo,
-                    )
-                }
             }
         }
         SnackbarHost(
@@ -197,7 +205,6 @@ private fun AppNavDisplay(
                         viewModel = textViewModel,
                         onOpenDrawer = onOpenDrawer,
                         onTranslateRequested = { onNavigate(ResultNavKey) },
-                        onOpenCamera = { onNavigate(CameraNavKey) },
                         onPickLanguage = { target ->
                             onNavigate(
                                 LanguagePickerNavKey(forSource = target == LanguagePickerTarget.SOURCE),
@@ -224,6 +231,12 @@ private fun AppNavDisplay(
                     )
                 }
                 entry<CameraNavKey> { CameraScreen() }
+                entry<ChatNavKey> {
+                    ComingSoonScreen(
+                        title = stringResource(R.string.chat_coming_soon_title),
+                        icon = Icons.AutoMirrored.Filled.Chat,
+                    )
+                }
                 entry<HistoryNavKey> { HistoryScreen() }
                 // Drawer "Offline languages" = the :feature:languagepicker
                 // placeholder (download/delete packs) — a different job from the

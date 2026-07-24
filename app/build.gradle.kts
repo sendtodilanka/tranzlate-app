@@ -41,7 +41,7 @@ android {
             buildConfigField("String", "AD_UNIT_INTERSTITIAL", "\"\"")
             buildConfigField("String", "DEFAULT_SOURCE_LANG", "\"en\"")
             buildConfigField("String", "DEFAULT_TARGET_LANG", "\"fr\"")
-            buildConfigField("String", "FEATURES", "\"text,camera,history,settings\"")
+            buildConfigField("String", "FEATURES", "\"text,dialog,camera,history,settings\"")
         }
         // Brand 2 (future, plan §4 — owner's live "French Translator - English" app):
         // create("frenchtranslator") { dimension = "brand";
