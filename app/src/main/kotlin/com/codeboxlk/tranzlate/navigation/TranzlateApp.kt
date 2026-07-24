@@ -2,7 +2,6 @@ package com.codeboxlk.tranzlate.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -21,11 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -47,13 +43,6 @@ import com.codeboxlk.tranzlate.feature.text.ResultScreen
 import com.codeboxlk.tranzlate.feature.text.TextViewModel
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.feature.languagepicker.LanguagePickerScreen as OfflineLanguagesScreen
-
-// UI_SPEC §2.3 drawer motion: the main screen is pushed right, scaled down,
-// corner-rounded and dimmed while the sheet slides in — one continuous,
-// gesture-driven progress (derived from DrawerState's live offset).
-private const val CONTENT_PUSH_FRACTION = 0.6f
-private const val CONTENT_SCALE_DELTA = 0.08f
-private val CONTENT_CORNER_RADIUS = 28.dp
 
 /**
  * The nav mediator (plan §3/§7 + D-5): **Compact = hub model — NO bottom bar**;
@@ -84,8 +73,6 @@ fun TranzlateApp(appConfig: AppConfig) {
         if (backStack.lastOrNull() != key) backStack.add(key)
     }
 
-    val drawerWidthPx = with(LocalDensity.current) { DrawerSheetWidth.toPx() }
-
     Box(modifier = Modifier.fillMaxSize()) {
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -104,69 +91,48 @@ fun TranzlateApp(appConfig: AppConfig) {
                 )
             },
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            // Gesture-driven fraction from the sheet's live offset
-                            // (closed = -width … open = 0); read HERE so drags
-                            // animate the layer without recomposition.
-                            val offset = drawerState.currentOffset
-                            val fraction =
-                                if (offset.isNaN()) 0f else (1f + offset / drawerWidthPx).coerceIn(0f, 1f)
-                            translationX = fraction * drawerWidthPx * CONTENT_PUSH_FRACTION
-                            scaleX = 1f - fraction * CONTENT_SCALE_DELTA
-                            scaleY = 1f - fraction * CONTENT_SCALE_DELTA
-                            if (fraction > 0f) {
-                                shape = RoundedCornerShape(CONTENT_CORNER_RADIUS * fraction)
-                                clip = true
-                            }
+            if (windowInfo.isCompact) {
+                // D-5 hub model: no bottom nav bar on Compact.
+                AppNavDisplay(
+                    backStack = backStack,
+                    textViewModel = textViewModel,
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                    onNavigate = ::navigateTo,
+                )
+            } else {
+                NavigationSuiteScaffold(
+                    layoutType =
+                        if (windowInfo.isExpanded) {
+                            NavigationSuiteType.NavigationDrawer
+                        } else {
+                            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
+                                currentWindowAdaptiveInfo(),
+                            )
                         },
-            ) {
-                if (windowInfo.isCompact) {
-                    // D-5 hub model: no bottom nav bar on Compact.
+                    navigationSuiteItems = {
+                        destinations.forEach { destination ->
+                            item(
+                                selected = backStack.lastOrNull() == destination.navKey,
+                                onClick = {
+                                    if (backStack.lastOrNull() != destination.navKey) {
+                                        backStack.add(destination.navKey)
+                                        // top-level switch = single-entry stack (GT-style)
+                                        while (backStack.size > 1) backStack.removeAt(0)
+                                    }
+                                },
+                                icon = { Icon(destination.icon, contentDescription = null) },
+                                label = { Text(stringResource(destination.labelRes)) },
+                                modifier = Modifier.testTag("tt_app_nav_${destination.name.lowercase()}"),
+                            )
+                        }
+                    },
+                ) {
                     AppNavDisplay(
                         backStack = backStack,
                         textViewModel = textViewModel,
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onNavigate = ::navigateTo,
                     )
-                } else {
-                    NavigationSuiteScaffold(
-                        layoutType =
-                            if (windowInfo.isExpanded) {
-                                NavigationSuiteType.NavigationDrawer
-                            } else {
-                                NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
-                                    currentWindowAdaptiveInfo(),
-                                )
-                            },
-                        navigationSuiteItems = {
-                            destinations.forEach { destination ->
-                                item(
-                                    selected = backStack.lastOrNull() == destination.navKey,
-                                    onClick = {
-                                        if (backStack.lastOrNull() != destination.navKey) {
-                                            backStack.add(destination.navKey)
-                                            // top-level switch = single-entry stack (GT-style)
-                                            while (backStack.size > 1) backStack.removeAt(0)
-                                        }
-                                    },
-                                    icon = { Icon(destination.icon, contentDescription = null) },
-                                    label = { Text(stringResource(destination.labelRes)) },
-                                    modifier = Modifier.testTag("tt_app_nav_${destination.name.lowercase()}"),
-                                )
-                            }
-                        },
-                    ) {
-                        AppNavDisplay(
-                            backStack = backStack,
-                            textViewModel = textViewModel,
-                            onOpenDrawer = { scope.launch { drawerState.open() } },
-                            onNavigate = ::navigateTo,
-                        )
-                    }
                 }
             }
         }
