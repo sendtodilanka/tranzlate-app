@@ -34,18 +34,20 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | A7 | ✅ [#19](https://github.com/sendtodilanka/tranzlate-app/pull/19) | 🔍 | `ResultScreen` + `HomeScreen` → `Scaffold` | `ResultScreen.kt`, `HomeScreen.kt` |
 | A8 | | 🔍 | **Screenshot-test harness** — issue [#20](https://github.com/sendtodilanka/tranzlate-app/issues/20) · roadmap Phase F. දැන් repo එකේ JVM screenshot test එකක් හදන්න ක්‍රමයක් නෑ — ඒ නිසා A7 එකේ bug එක වගේ එකක් ආපහු ආවොත් CI එකෙන් අහුවෙන්නේ නෑ. dark mode විතරක් නෙවෙයි — contrast · RTL · අකුරු 200% (TEST_A11Y gates 11-12) | නව infra (`build-logic`) |
 
-## 🅑 Core / Shell — Navigation shell ⏳ **දැන් කරන කණ්ඩායම**
+## 🅑 Core / Shell — Navigation shell ✅ **සම්පූර්ණයි** (bottom-nav redesign · issue #26)
 
-> **යළි-scope කළා (2026-07-24, issue #26 — D-5 rev.2):** primary navigation = **පහළ `NavigationBar` (Home / Chat / Camera)**; drawer එක **secondary විතරයි** (History · Saved · Offline languages · Settings · Help · About). ඒ නිසා "දැන් ඉන්නේ කොහෙද" කියන **selected-primary-destination state එක bottom bar එකේ — drawer එකේ නෙවෙයි.** "ModalNavigationDrawer = primary nav" කියන framing එක අයින් — drawer එක කවදාවත් primary නෙවෙයි.
+> **D-5 → D-5 rev.2 (2026-07-24/25, issue #26):** primary nav = පහළ `NavigationBar` (**Home / Chat / Camera**) via `NavigationSuiteScaffold`; drawer = **secondary විතරයි** (History · Saved · Offline languages · Settings · Help · About); bar එක **top-level tabs වල විතරයි** — secondary/detail screens (Settings · Result · picker · History) වල `NavigationSuiteType.None` වලින් hide. **FT (Lingo French) app structure එක ගත්තා** (code fresh · GT/M3 skin රඳවගෙන · DECISIONS **D-5 rev.2**). Shipped ↓ B1/B2/B4/B5/B6; **B3 (SnackbarHost) deferred**.
 
 | # | තත්ත්වය | මූ | මොකක්ද | තැන |
 |---|---|---|---|---|
-| B1 | 🔵 [#27](https://github.com/sendtodilanka/tranzlate-app/pull/27) **open** | 🔍 | Menu ඇරලා Back එබුවම app එක වැහෙනවා → `ModalDrawerSheet(drawerState)` | `DrawerContent.kt` |
-| B2 | | 🔍 | **(යළි-scope — D-5 rev.2)** primary "දැන් ඉන්නේ කොහෙද" state එක දැන් bottom `NavigationBar` එකේ. Drawer `NavigationDrawerItem` වලට primary selected-highlight **එපා** — drawer secondary; secondary screen එකකට (History/Settings) ගියාම විතරක් ඒ item එක selected පෙන්නන්න | `DrawerContent.kt:166` |
-| B3 | | 🔍 | Shell එකට `Scaffold` + `SnackbarHostState` **එකක්** (දැන් තුනක්, එකිනෙක උඩ එනවා) | `TranzlateApp.kt:74,87` |
+| B1 | ✅ [#27](https://github.com/sendtodilanka/tranzlate-app/pull/27) | 🔍 | Menu ඇරලා Back එබුවම app එක වැහෙනවා → `ModalDrawerSheet(drawerState)` | `DrawerContent.kt` |
+| B2 | ✅ [#38](https://github.com/sendtodilanka/tranzlate-app/pull/38) | 🔍 | `DrawerRow` (hand-rolled Surface+Row) → M3 `NavigationDrawerItem`. Drawer secondary → `selected=false` (primary "දැන් ඉන්නේ කොහෙද" state එක bottom bar එකේ) | `DrawerContent.kt` |
+| B3 | ⏳ **deferred** (follow-up) | 🔍 | Shell `SnackbarHost` ×1 (දැන් manual `BottomCenter` align). Bottom-nav එකෙන් පස්සේ `NavigationSuiteScaffold` structure එකට **rethink ඕන** — bare `Scaffold` එකක් නෙවෙයි (audit #7) | `TranzlateApp.kt` |
 | B4 | ✅ [#33](https://github.com/sendtodilanka/tranzlate-app/pull/33) | 🔍 | nav3 `rememberViewModelStoreNavEntryDecorator()` නෑ → `lifecycle-viewmodel-navigation3` + decorator | `TranzlateApp.kt` |
+| B5 | ✅ [#35](https://github.com/sendtodilanka/tranzlate-app/pull/35) | 🔍 | Custom "Claude-app" drawer push/scale/round motion → M3 `ModalNavigationDrawer` default (drawer-open status-bar band fix) | `TranzlateApp.kt` |
+| B6 | ✅ [#39](https://github.com/sendtodilanka/tranzlate-app/pull/39) | 👤 | **Bottom `NavigationBar` (Home/Chat/Camera)** via `NavigationSuiteScaffold` (D-5 rev.2) · Chat=coming-soon · **hide-on-secondary** (`NavigationSuiteType.None`) · HomeScreen tiles removed · nav regression tests | `TranzlateApp.kt`, `TopLevelDestination.kt` |
 
-## 🅒 Screens — Text vertical
+## 🅒 Screens — Text vertical ⏳ **දැන් කරන කණ්ඩායම** (🅐 · 🅑 ✅ ඉවරයි)
 
 | # | තත්ත්වය | මූ | මොකක්ද | තැන |
 |---|---|---|---|---|
@@ -85,6 +87,9 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | 2026-07-23 | `installSplashScreen()` — splash screen එක | ⚠️ අඩක් (P2-11 එකේ සඳහන් වුණා, queue එකේ තිබුණේ නෑ) | → **A6** · *පාට* නම් A1 එකෙන්ම හැදුණා ([doc](https://developer.android.com/develop/ui/views/launch/splash-screen): splash එක `windowBackground` ගන්නවා) |
 | 2026-07-23 | Screenshot harness එකට issue + roadmap එකක් ඕන | — | → **A8** · issue [#20](https://github.com/sendtodilanka/tranzlate-app/issues/20) + roadmap Phase F |
 | 2026-07-23 | මේ file එකම stale වෙලා (පරණ අංක, හිස් "ඉවරයි" table) | — | → හදලා (මේ version එක) |
+| 2026-07-24 | UI/UX පිට හැරෙන එක — **FT (Lingo French) app structure** එක reference කරමු | — | → **issue #26** · bottom nav D-5 rev.2 (B5/B6/#38/#37). Structure ගත්තා, code copy නෑ, GT/M3 skin රඳවා |
+| 2026-07-24 | Bottom nav එක secondary/detail screens වලත් පේනවා | ❌ (redesign එකෙන් ආපු එකක්) | → **hide-on-secondary** (`NavigationSuiteType.None`, #39) — owner තෝරගත්තා |
+| 2026-07-25 | androidTest suite එකම **API 36 එකේ fail** (Espresso `InputManager.getInstance`) | ❌ audit-මිස් (infra) | → **issue [#40](https://github.com/sendtodilanka/tranzlate-app/issues/40)** · CI unaffected (ubuntu, no emulator) |
 
 ---
 
@@ -98,3 +103,7 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | A5+A6 | Status/nav bar icon app එකේ theme එකට · splash එක preference එක එනකම් රඳවනවා | [#25](https://github.com/sendtodilanka/tranzlate-app/pull/25) | Stored default එක තාවකාලිකව DARK කරලා end-to-end ඔප්පු කළා: system **light**, app **dark** (`#131314`), status bar clock+icons **`#FFFFFF`** (light) — A5 නැත්නම් ඒවා කළු වෙලා නොපෙනේ. Splash එකේ background අපේ පාට, ඊට පස්සේ Home |
 | A5+A6 | Bars app එකේ theme එකට · splash preference එක එනකම් රඳවනවා | [#25](https://github.com/sendtodilanka/tranzlate-app/pull/25) merged | Design-debate එකෙන් හැඩය තීරණය කළා. `enableEdgeToEdge` **එකයි**, live field එකක් කියවන detector එකක් එක්ක. Stale-listener probe **PASS** (system DARK→LIGHT flip කළත් bars app-dark). Early-call fallback එක ලියලා මැනලා **අයින් කළා** — වෙනසක් නෑ (frame 1ක්, දෙපාරක්) |
 | A7 | Home + Result → `Scaffold` | [#19](https://github.com/sendtodilanka/tranzlate-app/pull/19) — CI green, co-verify ඉවරයි, merge එකට සූදානම් | Icon bounds ඇතුළේ luminance මැනලා: dark `#E3E3E3` · light `#1F1F1F` (කලින් දෙකේම `#000000`, ~1.1:1 → ~14.5:1). Snackbar nav-bar (`y=2337`) එකට උඩින්. Keyboard එකේදී composer `1925→1105`, menu `189-252` තැනේම |
+| B5 · #35 | Drawer motion → M3 default | [#35](https://github.com/sendtodilanka/tranzlate-app/pull/35) merged · A1 co-verify PASS | Device (API 36): drawer content full-bleed + scrim-dim, **no** push/scale/round; status-bar band gone (`#0D0D0E` uniform; gesture-vs-3btn A/B) |
+| B6 · #39 | Bottom nav (Home/Chat/Camera) + hide-on-secondary | [#39](https://github.com/sendtodilanka/tranzlate-app/pull/39) merged (replaced #36) · **A2 cross-model PASS** | insets/back/IME/toggle → material3 1.4.0 source එකට verify. Device: nav on Home, **hidden on Settings**, Chat=coming-soon. (Instrumentation run API 36 එකේ Espresso #40 නිසා block; tests compile) |
+| B2 · #38 | `DrawerRow` → M3 `NavigationDrawerItem` | [#38](https://github.com/sendtodilanka/tranzlate-app/pull/38) merged · co-verify CLEAN | testTags preserved · touch-target 48→56dp · `selected=false` (secondary). Device: M3 pill items |
+| #37 | Docs → D-5 rev.2 (13 docs) | [#37](https://github.com/sendtodilanka/tranzlate-app/pull/37) merged · co-verify F1/F2 fixed | D-5 rev.2 + hide-on-secondary recorded · issue-15 supersede note · `onboarding_complete` pref added |
