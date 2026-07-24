@@ -3,6 +3,7 @@
 > Rule: **no feature spec may contain an open question that gates coded behaviour.** Decisions land here first; specs cite `D-n`.
 > Status: 2026-07-21 · decisions D-0..D-4 confirmed by product owner in session; D-5 added 2026-07-22 (design phase).
 > **2026-07-22: C-2 amended — explicit Translate for all engines (issue #9).**
+> **2026-07-24: D-5 revised → D-5 rev.2 — persistent bottom-nav IA on Compact (Home/Chat/Camera), owner (issue #26).**
 
 ## ⭐ D-0 — NORTH STAR: behave like the Google Translate Android app (governs everything)
 
@@ -35,7 +36,10 @@ The whole app's **behaviour must equal the Google Translate Android app.** GT is
 | D-2 | Tiering for metered Advanced AI (NLP3.5) | **Free = 20/day · Plus = 100/day · Premium = unlimited.** (Limits RemoteConfig-tunable: `limit_free`, `limit_plus`.) |
 | D-3 | Save control on a result | **Star/bookmark icon** (toggles `favourite`). Thumbs removed (was feedback-ambiguous). |
 | D-4 | Interstitial ad policy (free tier) | **Revenue-optimized, AdMob-compliant:** after every **N=2** completed translations, min gap **90s**, daily cap **12**. All three RemoteConfig-tunable (`ad_nth`, `ad_min_gap_s`, `ad_daily_cap`). Never on Back-press / utility navigation / task start. |
-| D-5 | Navigation model (owner, design rounds 5–7, 2026-07-22) | **Compact = hub model, no bottom nav bar.** Peer translation MODES stay one tap away ON the hub itself: Text = the always-visible composer · Voice = the composer mic · Camera + Conversation = canvas quick-action tiles (grid scales as features grow). The ☰ drawer (Claude-app style, push+scale motion) holds SECONDARY destinations (Search, History, Saved, Offline languages, Settings) + Recents + account. History is reclassified as secondary (drawer + Recents), matching the approved design and GT-2026. The old app's failure was hiding peer tasks drawer-only behind an empty canvas — the hub keeps peers visible, preserving the no-hidden-peers principle by different means. **Medium/Expanded keep C-13 adaptive nav (rail / permanent drawer + ListDetail).** Supersedes "bottom NavigationSuiteScaffold on Compact" wherever stated. Contract: `docs/design/UI_SPEC.md`. |
+| D-5 rev.2 | Navigation model — **revised** (owner, issue #26, 2026-07-24) | **Compact = persistent bottom `NavigationBar` (Home / Chat / Camera) via `NavigationSuiteScaffold`.** Home = text translation · Chat = conversation (**deferred to v2** — the tab shows a coming-soon placeholder) · Camera. The ☰ top-bar drawer holds SECONDARY destinations only (History, Saved, Offline languages, Settings, Help, About) + Recents + account — it is never the primary navigation. **Medium = rail · Expanded = permanent drawer** (C-13 adaptive nav via `NavigationSuiteScaffold`, + ListDetail); History/Settings stay drawer-secondary. This is a **deliberate, owner-approved deviation from GT** (which has no phone bottom bar) — treat it like the recorded explicit-Translate deviation (D-0 / C-2), not an error. Contract: `docs/design/UI_SPEC.md`. |
+
+> **D-5 (original, 2026-07-22) — SUPERSEDED by D-5 rev.2 above (issue #26, 2026-07-24); kept for the paper trail:**
+> ~~Compact = hub model, **no bottom nav bar.** Peer translation MODES stay one tap away ON the hub itself: Text = the always-visible composer · Voice = the composer mic · Camera + Conversation = canvas quick-action tiles. The ☰ drawer holds SECONDARY destinations (Search, History, Saved, Offline languages, Settings) + Recents + account. History reclassified as secondary. Medium/Expanded keep C-13 adaptive nav.~~ *(The hub model — and its canvas quick-action tiles instead of a bottom bar — is reversed by rev.2; Chat replaces the deferred Conversation tile as a v2-placeholder tab.)*
 
 ## Defaults table (fresh install)
 

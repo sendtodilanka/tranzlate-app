@@ -322,8 +322,8 @@ Guidance: **enter** with decelerate (`medium2`), **exit** with accelerate (`shor
 - Shape `sm8`; unfocused border `outline`, focused border `primary` 2dp; label/placeholder `onSurfaceVariant`; input text `bodyLarge`/`onSurface`; cursor `primary`.
 - Error: border/label `error`, supporting text `error`. Container transparent (or `surfaceContainerLowest`).
 
-**Navigation (amended 2026-07-22 — DECISIONS D-5)**
-- Compact: HUB model — no bottom nav bar; peer modes live on the hub (composer + quick-action tiles), ☰ drawer = secondary destinations (push+scale motion per UI_SPEC §2.3).
+**Navigation (DECISIONS D-5 rev.2, issue #26 — reverts the 2026-07-22 hub amendment; now back in line with this file's own Adaptive table below, which was never amended)**
+- Compact: bottom `NavigationBar` (Home / Chat / Camera) via `NavigationSuiteScaffold`. The ☰ drawer holds secondary destinations only (History · Saved · Offline languages · Settings · Help · About), push+scale motion per UI_SPEC §2.3.
 - Medium/Expanded: `NavigationSuiteScaffold` adaptivity stays per C-13 (rail → permanent drawer). Never a bare `BottomNavigation`.
 - Container `surfaceContainer`, Level 2. Selected item: filled icon `onSecondaryContainer` on a `secondaryContainer` pill indicator (shape `full`); unselected icon+label `onSurfaceVariant`. Label `labelMedium`.
 

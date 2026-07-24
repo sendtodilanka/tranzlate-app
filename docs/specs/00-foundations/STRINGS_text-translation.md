@@ -202,16 +202,16 @@ Keys shipped by the Home/Composer/Drawer/Result vertical (PR-C). `en` values are
 | `home_greeting_morning` / `_afternoon` / `_evening` | string | `Morning` / `Afternoon` / `Evening` | UI_SPEC §2.1 time-aware greeting |
 | `home_greeting_named` | string | `%1$s, %2$s` | greeting + account name (name slot — no account system yet) |
 | `home_subtitle` | string | `What would you like to translate?` | UI_SPEC §2.1 |
-| `home_tile_conversation` (+`_sub`) · `home_tile_camera` (+`_sub`) | string | `Conversation`/`Two-way talk` · `Camera`/`Point and translate` | canvas quick-action tiles |
+| ~~`home_tile_conversation` (+`_sub`) · `home_tile_camera` (+`_sub`)~~ | string | ~~`Conversation`/`Two-way talk` · `Camera`/`Point and translate`~~ | **REMOVED (issue #26, D-5 rev.2)** — canvas quick-action tiles gone; Conversation→Chat tab, Camera→Camera tab (bottom nav) |
 | `text_guided_mode` / `_voice` / `_tts` / `_conversation` / `_bookmark` / `_more` / `_feedback` | string | "… arrives with the … update" family | EDGE_CASES no-dead-end guided messages for not-yet-built asks |
 | `text_copied` | string | `Copied` | EDGE_CASES §7 copy success feedback |
 | `text_engine_badge_offline` / `_online` / `_advanced` | string | `Offline · instant` / `Online` / `Advanced AI` | UI_SPEC §2.4 engine badge per resolved Engine (C-9) |
 | `text_error_generic_body` | string | `Something went wrong while translating. Please check your connection and try again.` | §2.9 (already proposed NEW there) |
 | `text_error_unsupported_pair` | string | `This language pair isn't supported yet. Try a different language pair.` | UNSUPPORTED_PAIR outcome (G8) |
 | `text_lang_sheet_source_title` / `_target_title` | string | `Translate from` / `Translate to` | interim minimal picker sheet |
-| `drawer_search` / `drawer_history` / `drawer_saved` / `drawer_offline_languages` / `drawer_settings` | string (`:app`) | `Search` / `History` / `Saved` / `Offline languages` / `Settings` | UI_SPEC §2.3 drawer sections |
+| ~~`drawer_search`~~ / `drawer_history` / `drawer_saved` / `drawer_offline_languages` / `drawer_settings` / `drawer_help` / `drawer_about` | string (`:app`) | ~~`Search`~~ / `History` / `Saved` / `Offline languages` / `Settings` / `Help` / `About` | UI_SPEC §2.3 drawer sections (Search retired — never built, issue #26; +Help/About) |
 | `drawer_recents_header` / `drawer_recents_empty` | string (`:app`) | `Recents` / `Your recent translations will appear here` | drawer Recents |
 | `drawer_account_guest` / `drawer_tier_free` | string (`:app`) | `Guest` / `Free` | account row (static until the Access brain) |
-| `app_guided_search` | string (`:app`) | `Search arrives with the history update` | drawer Search guided message |
+| ~~`app_guided_search`~~ | string (`:app`) | ~~`Search arrives with the history update`~~ | **retired** — Search removed from the drawer (issue #26) |
 
 **Reuse decisions applied (C-3):** `cd_translate`, `cd_swap_language`, `button_retry`, `home_edit_no_text_to_translate_warning`, `text_char_counter`, `cd_copy`, `cd_speak`, `cd_favourite`, `text_mode_automatic`, `a11y_translating` — used with the catalogue keys/values above (the contract's older `cd_text_translate`/`cd_text_swap`/`cd_text_speak` spellings defer to these per the C-3 conformance override).

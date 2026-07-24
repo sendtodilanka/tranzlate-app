@@ -32,5 +32,7 @@ State/content transitions `fadeThrough 300ms` · sheet `standardDecelerate 250ms
 | Medium | `NavigationRail` | single column, content max-width 600dp centered |
 | Expanded | permanent drawer | `ListDetailPaneScaffold`: input pane 40% (min 360dp) / result 60% |
 
+> **Note (issue #26):** the **Compact = `NavigationBar` (bottom)** row was the pre-existing target here — it was never touched by the 2026-07-22 hub amendment, and **DECISIONS D-5 rev.2** now confirms it (Home/Chat/Camera). The Medium (rail) / Expanded (permanent drawer) rows stand unchanged.
+
 ## 8. Iconography
 Material Symbols (
