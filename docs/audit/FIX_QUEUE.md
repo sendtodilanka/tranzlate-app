@@ -19,7 +19,7 @@ Bulk edit නෑ.
 
 ---
 
-## 🅐 Core / Shell — Theme
+## 🅐 Core / Shell — Theme ✅ **සම්පූර්ණයි** (A8 harness infra පසුව, #20)
 
 Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`issue-17-core-shell-theme.md`](../plan/issue-17-core-shell-theme.md) (accepted)
 
@@ -28,13 +28,13 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | A1 | ✅ [#18](https://github.com/sendtodilanka/tranzlate-app/pull/18) | 👤 | Window theme: `android:windowBackground` + `android:forceDarkAllowed=false` | `values*/themes.xml`, `values*/colors.xml` |
 | A2 | ✅ [#21](https://github.com/sendtodilanka/tranzlate-app/pull/21) | 🔍 | Theme preference එක: DataStore keys + repository (`SYSTEM`/`LIGHT`/`DARK` + dynamic on/off). **+ corruption handler** — A6 මේ pref එක එනකම් splash එක රඳවන නිසා, file එක හැදුණොත් crash එකක් වෙනුවට **splash එකේම හිරවෙනවා**. ඒ නිසා ඒක මෙතනට ගෙනාවා (කලින් C5) | `TranzlatePreferencesDataSource.kt`, `DataStoreModule.kt:23` |
 | A3 | ✅ [#24](https://github.com/sendtodilanka/tranzlate-app/pull/24) | 🔍 | `TranzlateTheme(darkTheme, dynamicColor)` ඒ preference එකෙන් run කරන එක + `PrimaryActionButton` එකේ `isSystemInDarkTheme()` branch එක අයින් කිරීම (`TODO(#7)`) | `Theme.kt`, `PrimaryActionButton.kt:48` |
-| A4 | ⏳ **දැන් කරන එක — batch එකේ අන්තිම එක** (A5+A6 ට පස්සේ — ඒක තමයි මේ ඔක්කොම ක්‍රියාත්මක කරන switch එක) | 🔍 | **Settings screen** — light / dark / system + dynamic colour toggle (දැන් 32 පේළියේ placeholder එකක්) | `feature/settings` |
+| A4 | ✅ [#31](https://github.com/sendtodilanka/tranzlate-app/pull/31) | 🔍 | **Settings → Appearance** — light/dark/system + dynamic toggle. Device-verified: Dark තෝරද්දී මුළු app+bars live re-theme, persist, API 28 එකේ dynamic row disabled+reason | `feature/settings` |
 | A5 | ✅ [#25](https://github.com/sendtodilanka/tranzlate-app/pull/25) · **API 24·28·29·36 device-verified** (disagree case: app dark + system light → bars follow the app; only API 24 nav bar is the platform's own limit) | 👤 | `MainActivity`: `DisposableEffect(darkTheme)` + **එකම** `enableEdgeToEdge`, styles `SystemBarStyle.auto(l, d) { currentDark }` (⚠️ `enableEdgeToEdge` එකට `detectDarkMode` parameter එකක් **නෑ** — ඒක තියෙන්නේ `SystemBarStyle.auto` එකේ). (`Activity` cast + `SideEffect` ක්‍රමය පාවිච්චි කරන්නේ නෑ.) Design-debate එකෙන් හැඩය තීරණය කළා → [`issue-17-debate-edge-to-edge.md`](../plan/issue-17-debate-edge-to-edge.md) | `MainActivity.kt` |
 | A6 | ✅ [#25](https://github.com/sendtodilanka/tranzlate-app/pull/25) | 👤 | `core-splashscreen` + `setKeepOnScreenCondition` — theme preference එක එනකම් රඳවගන්න (නැත්නම් dark තෝරලා තියෙන කෙනෙකුට **light flash**). API 23+ backport. **සීමාව 1000ms** (Google) | `MainActivity.kt:19` |
 | A7 | ✅ [#19](https://github.com/sendtodilanka/tranzlate-app/pull/19) | 🔍 | `ResultScreen` + `HomeScreen` → `Scaffold` | `ResultScreen.kt`, `HomeScreen.kt` |
 | A8 | | 🔍 | **Screenshot-test harness** — issue [#20](https://github.com/sendtodilanka/tranzlate-app/issues/20) · roadmap Phase F. දැන් repo එකේ JVM screenshot test එකක් හදන්න ක්‍රමයක් නෑ — ඒ නිසා A7 එකේ bug එක වගේ එකක් ආපහු ආවොත් CI එකෙන් අහුවෙන්නේ නෑ. dark mode විතරක් නෙවෙයි — contrast · RTL · අකුරු 200% (TEST_A11Y gates 11-12) | නව infra (`build-logic`) |
 
-## 🅑 Core / Shell — Navigation shell
+## 🅑 Core / Shell — Navigation shell ⏳ **දැන් කරන කණ්ඩායම**
 
 | # | තත්ත්වය | මූ | මොකක්ද | තැන |
 |---|---|---|---|---|
