@@ -6,6 +6,8 @@ date: 2026-07-22
 author: Claude (Opus 4.8) · evidence = Google Translate v10.27 driven on an emulator + Google's own published palette sources
 ---
 
+> **⚠️ Superseded IA note (2026-07-24, issue #26 → DECISIONS D-5 rev.2):** this doc's Home **"tonal quick actions"** (the Conversation/Camera canvas tiles — the component-map row and build step 3) are **reversed**. Those peers are now **bottom-nav tabs** (Home / Chat / Camera), not canvas tiles; the bottom nav also hides on secondary/detail screens (`NavigationSuiteType.None`). The flat design, GT-identical palette, stock-M3 components, and full-screen picker in this doc all still stand.
+
 # Plan — issue #15
 
 > Owner ran Google Translate on the emulator and compared it with our build component-by-component. Outcome: drop the gradient identity, adopt GT's exact colours with the COMPLETE M3 role set, and use stock Material 3 components everywhere M3 has one.
