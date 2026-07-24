@@ -13,8 +13,8 @@
     <string name="settings_dynamic_color_supporting">Use colours from your wallpaper</string>
     <string name="settings_dynamic_color_unavailable">Needs Android 12 or newer</string>
 
-    <!-- a11y (C-4) -->
+    <!-- a11y (C-4). The theme rows and the dynamic-colour row take their accessible
+         name from their own text (selectable/toggleable merge the child Text), so
+         only the icon-only back button needs an explicit contentDescription. -->
     <string name="cd_settings_back">Back</string>
-    <string name="cd_settings_theme_group">Theme</string>
-    <string name="cd_settings_dynamic_color">Dynamic colour</string>
 </resources>

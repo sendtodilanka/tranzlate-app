@@ -7,7 +7,8 @@
 C-3: this catalogue is the key authority. Every `en` value is written fresh here per Material UX
 writing (concise, sentence case, no ending period on labels). No `fil` / `pt-rBR` value is guessed —
 all are flagged **NEEDS-TRANSLATION** (C-12): the keys ship in `values/` now, the translated files are
-queued, and lint is told to expect them per string rather than blanket-suppressed.
+queued, following the codebase convention of omitting an untranslated key (fallback to `en`) rather
+than a blanket lint suppression.
 
 ---
 
@@ -39,8 +40,6 @@ queued, and lint is told to expect them per string rather than blanket-suppresse
 | Key | Status | `en` | Args | Notes |
 |-----|--------|------|------|-------|
 | `cd_settings_back` | NEW | `Back` | — | top-bar navigation icon |
-| `cd_settings_theme_group` | NEW | `Theme` | — | `selectableGroup` label; each row's own text is its accessible name, state via `Role.RadioButton` + `selected` |
-| `cd_settings_dynamic_color` | NEW | `Dynamic colour` | — | switch contentDescription; on/off exposed by `Role.Switch` + `toggleable` state, not baked into the label |
 
 ## 4. testTags (C-1 · `tt_settings_<control>`)
 

@@ -2,33 +2,31 @@ package com.codeboxlk.tranzlate.feature.settings
 
 import com.codeboxlk.tranzlate.core.model.ThemeMode
 import com.codeboxlk.tranzlate.core.model.ThemeSettings
+import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.codeboxlk.tranzlate.domain.repository.ThemePrefsRepository
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 class SettingsViewModelTest {
+    @get:Rule
+    val dispatcherRule = TestDispatcherRule()
+
     private val repo = FakeThemePrefsRepository()
     private lateinit var viewModel: SettingsViewModel
 
+    // Constructed here, not as a field: the rule's starting() sets Dispatchers.Main
+    // before @Before runs, so viewModelScope binds to the test dispatcher. A field
+    // initialiser would run at construction, before the rule, and bind to the real
+    // Main — which does not exist in a JVM unit test.
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         viewModel = SettingsViewModel(repo)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test
