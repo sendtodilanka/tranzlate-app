@@ -8,8 +8,6 @@
     <string name="nav_home">Home</string>
     <string name="nav_chat">Chat</string>
     <string name="nav_camera">Camera</string>
-    <string name="nav_history">History</string>
-    <string name="nav_settings">Settings</string>
 
     <!-- Chat/Dialog ships in v2; the tab shows a coming-soon placeholder (no dead-end). -->
     <string name="chat_coming_soon_title">Conversation</string>

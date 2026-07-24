@@ -31,16 +31,11 @@
     <string name="home_greeting_evening">Evening</string>
     <string name="home_greeting_named">%1$s, %2$s</string>
     <string name="home_subtitle">What would you like to translate?</string>
-    <string name="home_tile_conversation">Conversation</string>
-    <string name="home_tile_conversation_sub">Two-way talk</string>
-    <string name="home_tile_camera">Camera</string>
-    <string name="home_tile_camera_sub">Point and translate</string>
 
     <!-- Guided messages (EDGE_CASES no-dead-end rule: a tap never lands nowhere) -->
     <string name="text_guided_mode">Engine selection arrives with the brains update</string>
     <string name="text_guided_voice">Voice input arrives with the voice update</string>
     <string name="text_guided_tts">Text-to-speech arrives with the voice update</string>
-    <string name="text_guided_conversation">Conversation arrives with the voice update</string>
     <string name="text_guided_bookmark">Saving arrives with the history update</string>
     <string name="text_guided_more">More options arrive in a later update</string>
     <string name="text_guided_feedback">Feedback arrives in a later update</string>

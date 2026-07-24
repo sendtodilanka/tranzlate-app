@@ -47,11 +47,13 @@ import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.feature.languagepicker.LanguagePickerScreen as OfflineLanguagesScreen
 
 /**
- * The nav mediator (plan §3/§7 + D-5): **Compact = hub model — NO bottom bar**;
- * peers live ON the Home hub (composer / mic / tiles) and secondary
- * destinations in the ☰ modal drawer. Medium keeps the C-13 rail, Expanded the
- * permanent drawer (NavigationSuiteScaffold). All nav logic stays here —
- * features never navigate themselves.
+ * The nav mediator (plan §3/§7 + D-5 rev.2): a persistent bottom
+ * **NavigationBar** (Home / Chat / Camera) on Compact, a rail on Medium, a
+ * permanent drawer on Expanded — all via NavigationSuiteScaffold. The bar shows
+ * only on the top-level tabs; a secondary/detail destination (Settings, Result,
+ * LanguagePicker, History…) uses NavigationSuiteType.None so it gets the full
+ * height. Secondary destinations live in the ☰ modal drawer. All nav logic
+ * stays here — features never navigate themselves.
  */
 @Composable
 @Suppress("LongMethod") // one cohesive nav mediator; splitting hides the shell structure
@@ -93,17 +95,28 @@ fun TranzlateApp(appConfig: AppConfig) {
                 )
             },
         ) {
-            // All size classes route through NavigationSuiteScaffold (D-5 rev.2):
-            // Compact = bottom NavigationBar, Medium = rail, Expanded = permanent
-            // drawer — all the M3 adaptive defaults, no custom special-casing.
+            // NavigationSuiteScaffold across all size classes (D-5 rev.2): Compact
+            // = bottom NavigationBar, Medium = rail, Expanded = permanent drawer.
+            // The bar shows ONLY on the top-level tabs — on a secondary/detail
+            // destination the layout is NavigationSuiteType.None, so the screen
+            // gets full height (GT-style detail flow).
+            val onTopLevel = destinations.any { it.navKey == backStack.lastOrNull() }
             NavigationSuiteScaffold(
                 layoutType =
-                    if (windowInfo.isExpanded) {
-                        NavigationSuiteType.NavigationDrawer
-                    } else {
-                        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
-                            currentWindowAdaptiveInfo(),
-                        )
+                    when {
+                        !onTopLevel -> {
+                            NavigationSuiteType.None
+                        }
+
+                        windowInfo.isExpanded -> {
+                            NavigationSuiteType.NavigationDrawer
+                        }
+
+                        else -> {
+                            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
+                                currentWindowAdaptiveInfo(),
+                            )
+                        }
                     },
                 navigationSuiteItems = {
                     destinations.forEach { destination ->
