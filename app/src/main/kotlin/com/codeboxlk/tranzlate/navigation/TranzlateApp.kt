@@ -28,9 +28,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
@@ -211,6 +213,17 @@ private fun AppNavDisplay(
         // it empty and crash. Guarding here covers every destination, not just
         // Settings.
         onBack = { if (backStack.size > 1) backStack.removeLastOrNull() },
+        // NavDisplay's default entryDecorators is only the saveable-state one; a
+        // hiltViewModel() called inside an entry<> would otherwise resolve to the
+        // Activity's ViewModelStore and never be cleared. The ViewModelStore
+        // decorator scopes each entry's ViewModels to the destination and clears
+        // them when it is popped. SettingsScreen is the first entry to acquire its
+        // own ViewModel; the hoisted TextViewModel/DrawerViewModel are unaffected.
+        entryDecorators =
+            listOf(
+                rememberSaveableStateHolderNavEntryDecorator(),
+                rememberViewModelStoreNavEntryDecorator(),
+            ),
         entryProvider =
             entryProvider {
                 entry<TextNavKey> {
