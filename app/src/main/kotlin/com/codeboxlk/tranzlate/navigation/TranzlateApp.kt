@@ -2,6 +2,8 @@ package com.codeboxlk.tranzlate.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -91,49 +93,42 @@ fun TranzlateApp(appConfig: AppConfig) {
                 )
             },
         ) {
-            if (windowInfo.isCompact) {
-                // D-5 hub model: no bottom nav bar on Compact.
+            // All size classes route through NavigationSuiteScaffold (D-5 rev.2):
+            // Compact = bottom NavigationBar, Medium = rail, Expanded = permanent
+            // drawer — all the M3 adaptive defaults, no custom special-casing.
+            NavigationSuiteScaffold(
+                layoutType =
+                    if (windowInfo.isExpanded) {
+                        NavigationSuiteType.NavigationDrawer
+                    } else {
+                        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
+                            currentWindowAdaptiveInfo(),
+                        )
+                    },
+                navigationSuiteItems = {
+                    destinations.forEach { destination ->
+                        item(
+                            selected = backStack.lastOrNull() == destination.navKey,
+                            onClick = {
+                                if (backStack.lastOrNull() != destination.navKey) {
+                                    backStack.add(destination.navKey)
+                                    // top-level switch = single-entry stack (GT-style)
+                                    while (backStack.size > 1) backStack.removeAt(0)
+                                }
+                            },
+                            icon = { Icon(destination.icon, contentDescription = null) },
+                            label = { Text(stringResource(destination.labelRes)) },
+                            modifier = Modifier.testTag("tt_app_nav_${destination.name.lowercase()}"),
+                        )
+                    }
+                },
+            ) {
                 AppNavDisplay(
                     backStack = backStack,
                     textViewModel = textViewModel,
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onNavigate = ::navigateTo,
                 )
-            } else {
-                NavigationSuiteScaffold(
-                    layoutType =
-                        if (windowInfo.isExpanded) {
-                            NavigationSuiteType.NavigationDrawer
-                        } else {
-                            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
-                                currentWindowAdaptiveInfo(),
-                            )
-                        },
-                    navigationSuiteItems = {
-                        destinations.forEach { destination ->
-                            item(
-                                selected = backStack.lastOrNull() == destination.navKey,
-                                onClick = {
-                                    if (backStack.lastOrNull() != destination.navKey) {
-                                        backStack.add(destination.navKey)
-                                        // top-level switch = single-entry stack (GT-style)
-                                        while (backStack.size > 1) backStack.removeAt(0)
-                                    }
-                                },
-                                icon = { Icon(destination.icon, contentDescription = null) },
-                                label = { Text(stringResource(destination.labelRes)) },
-                                modifier = Modifier.testTag("tt_app_nav_${destination.name.lowercase()}"),
-                            )
-                        }
-                    },
-                ) {
-                    AppNavDisplay(
-                        backStack = backStack,
-                        textViewModel = textViewModel,
-                        onOpenDrawer = { scope.launch { drawerState.open() } },
-                        onNavigate = ::navigateTo,
-                    )
-                }
             }
         }
         SnackbarHost(
@@ -197,7 +192,6 @@ private fun AppNavDisplay(
                         viewModel = textViewModel,
                         onOpenDrawer = onOpenDrawer,
                         onTranslateRequested = { onNavigate(ResultNavKey) },
-                        onOpenCamera = { onNavigate(CameraNavKey) },
                         onPickLanguage = { target ->
                             onNavigate(
                                 LanguagePickerNavKey(forSource = target == LanguagePickerTarget.SOURCE),
@@ -224,6 +218,12 @@ private fun AppNavDisplay(
                     )
                 }
                 entry<CameraNavKey> { CameraScreen() }
+                entry<ChatNavKey> {
+                    ComingSoonScreen(
+                        title = stringResource(R.string.chat_coming_soon_title),
+                        icon = Icons.AutoMirrored.Filled.Chat,
+                    )
+                }
                 entry<HistoryNavKey> { HistoryScreen() }
                 // Drawer "Offline languages" = the :feature:languagepicker
                 // placeholder (download/delete packs) — a different job from the

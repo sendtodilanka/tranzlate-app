@@ -4,11 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,9 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,7 +57,6 @@ import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.Motion
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.ui.ComposerCard
-import com.codeboxlk.tranzlate.core.ui.QuickActionButton
 import kotlinx.coroutines.launch
 
 /** Composer growth cap — ~40% of the viewport (UI_SPEC §2.2). */
@@ -75,8 +70,6 @@ private const val COMPOSER_MAX_HEIGHT_FRACTION = 0.4f
  *   (C-2 tap → Translating) — the caller opens the Result screen.
  * @param onPickLanguage the caller opens the full-screen language picker for
  *   the tapped side (issue #15 — the picker is a destination, not a sheet).
- * @param onOpenConversation Conversation action destination; null (no Dialog
- *   vertical yet) falls back to a guided message — never a dead control.
  * @param userName future account-system slot (UI_SPEC greeting "Afternoon,
  *   *Dilanka*") — always null today.
  */
@@ -85,10 +78,8 @@ fun HomeScreen(
     viewModel: TextViewModel,
     onOpenDrawer: () -> Unit,
     onTranslateRequested: () -> Unit,
-    onOpenCamera: () -> Unit,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     modifier: Modifier = Modifier,
-    onOpenConversation: (() -> Unit)? = null,
     userName: String? = null,
 ) {
     val input by viewModel.input.collectAsStateWithLifecycle()
@@ -106,8 +97,6 @@ fun HomeScreen(
         onPickLanguage = onPickLanguage,
         onClearAll = viewModel::onClearAll,
         onOpenDrawer = onOpenDrawer,
-        onOpenCamera = onOpenCamera,
-        onOpenConversation = onOpenConversation,
         modifier = modifier,
     )
 }
@@ -132,9 +121,7 @@ fun HomeContent(
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onClearAll: () -> Unit,
     onOpenDrawer: () -> Unit,
-    onOpenCamera: () -> Unit,
     modifier: Modifier = Modifier,
-    onOpenConversation: (() -> Unit)? = null,
 ) {
     val spacing = LocalSpacing.current
     val scope = rememberCoroutineScope()
@@ -142,7 +129,6 @@ fun HomeContent(
 
     val guidedMode = stringResource(R.string.text_guided_mode)
     val guidedVoice = stringResource(R.string.text_guided_voice)
-    val guidedConversation = stringResource(R.string.text_guided_conversation)
 
     fun showGuided(message: String) {
         scope.launch { snackbarHostState.showSnackbar(message) }
@@ -187,8 +173,6 @@ fun HomeContent(
                         HomeCanvas(
                             greeting = greeting,
                             userName = userName,
-                            onOpenCamera = onOpenCamera,
-                            onOpenConversation = onOpenConversation ?: { showGuided(guidedConversation) },
                         )
                     }
                 }
@@ -331,16 +315,13 @@ private fun CanvasVisibility(
 }
 
 /**
- * Canvas band (UI_SPEC §2.1): sparkle → greeting → subtitle → quick actions.
- * The actions are GT-shaped tonal circles with their label beneath, and the row
- * is built to keep looking intentional as more of them arrive.
+ * Canvas band (UI_SPEC §2.1): sparkle → greeting → subtitle. Peer modes
+ * (Conversation, Camera) now live in the bottom navigation, not on the canvas.
  */
 @Composable
 private fun HomeCanvas(
     greeting: GreetingPeriod,
     userName: String?,
-    onOpenCamera: () -> Unit,
-    onOpenConversation: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
     val periodText =
@@ -386,21 +367,6 @@ private fun HomeCanvas(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(spacing.xl32))
-        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xl32)) {
-            QuickActionButton(
-                label = stringResource(R.string.home_tile_conversation),
-                icon = Icons.Filled.Forum,
-                onClick = onOpenConversation,
-                testTag = "tt_text_tile_conversation",
-            )
-            QuickActionButton(
-                label = stringResource(R.string.home_tile_camera),
-                icon = Icons.Filled.PhotoCamera,
-                onClick = onOpenCamera,
-                testTag = "tt_text_tile_camera",
-            )
-        }
     }
 }
 
@@ -420,7 +386,6 @@ private fun HomeContentEmptyPreview() {
             onPickLanguage = {},
             onClearAll = {},
             onOpenDrawer = {},
-            onOpenCamera = {},
         )
     }
 }
@@ -441,7 +406,6 @@ private fun HomeContentTypingPreview() {
             onPickLanguage = {},
             onClearAll = {},
             onOpenDrawer = {},
-            onOpenCamera = {},
         )
     }
 }
