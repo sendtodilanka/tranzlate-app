@@ -36,10 +36,12 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 
 ## 🅑 Core / Shell — Navigation shell ⏳ **දැන් කරන කණ්ඩායම**
 
+> **යළි-scope කළා (2026-07-24, issue #26 — D-5 rev.2):** primary navigation = **පහළ `NavigationBar` (Home / Chat / Camera)**; drawer එක **secondary විතරයි** (History · Saved · Offline languages · Settings · Help · About). ඒ නිසා "දැන් ඉන්නේ කොහෙද" කියන **selected-primary-destination state එක bottom bar එකේ — drawer එකේ නෙවෙයි.** "ModalNavigationDrawer = primary nav" කියන framing එක අයින් — drawer එක කවදාවත් primary නෙවෙයි.
+
 | # | තත්ත්වය | මූ | මොකක්ද | තැන |
 |---|---|---|---|---|
 | B1 | 🔵 [#27](https://github.com/sendtodilanka/tranzlate-app/pull/27) **open** | 🔍 | Menu ඇරලා Back එබුවම app එක වැහෙනවා → `ModalDrawerSheet(drawerState)` | `DrawerContent.kt` |
-| B2 | | 🔍 | Menu එකේ "දැන් ඉන්නේ කොහෙද" පේන්නේ නෑ → `NavigationDrawerItem` | `DrawerContent.kt:166` |
+| B2 | | 🔍 | **(යළි-scope — D-5 rev.2)** primary "දැන් ඉන්නේ කොහෙද" state එක දැන් bottom `NavigationBar` එකේ. Drawer `NavigationDrawerItem` වලට primary selected-highlight **එපා** — drawer secondary; secondary screen එකකට (History/Settings) ගියාම විතරක් ඒ item එක selected පෙන්නන්න | `DrawerContent.kt:166` |
 | B3 | | 🔍 | Shell එකට `Scaffold` + `SnackbarHostState` **එකක්** (දැන් තුනක්, එකිනෙක උඩ එනවා) | `TranzlateApp.kt:74,87` |
 | B4 | ✅ [#33](https://github.com/sendtodilanka/tranzlate-app/pull/33) | 🔍 | nav3 `rememberViewModelStoreNavEntryDecorator()` නෑ → `lifecycle-viewmodel-navigation3` + decorator | `TranzlateApp.kt` |
 

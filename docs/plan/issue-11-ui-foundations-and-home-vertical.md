@@ -10,6 +10,8 @@ author: Claude (Opus 4.8) · design rounds 1-7 with owner; approved design contr
 
 > **One PR-chain, three issues.** Docs-truth first (so specs and code can't disagree), then the approved UI, runnable on the deterministic **fake** variant. No real engines in scope — the Text screen talks to the `Translator` interface, which the fake variant already satisfies with the golden table.
 
+> **⚠ Superseded IA (2026-07-24, issue #26 — D-5 rev.2):** this plan's Compact information architecture — **canvas quick-action tiles (Conversation · Camera) instead of a bottom nav bar** — is **reversed**. The app now uses a **persistent bottom `NavigationBar` (Home / Chat / Camera)** via `NavigationSuiteScaffold`; the quick-action tiles are removed and the drawer is secondary-only. The composer / result-screen / drawer / motion work described below stays reusable and correct — only the top-level nav shell and the canvas-tiles decision change. See DECISIONS **D-5 rev.2** + `docs/design/UI_SPEC.md` §2.1/§2.3.
+
 ## 1. Stage A — foundations & spec truth (issues #9, #10)
 
 **A1 · C-2 amendment (#9) — behaviour change.** `DECISIONS.md` C-2 currently mandates live-translate for free engines and a button only for metered. Owner decision (2026-07-22): **explicit Translate action for every engine; the result opens on its own screen.** Reconcile in the same commit:

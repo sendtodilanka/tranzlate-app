@@ -13,15 +13,16 @@
 | Elevated panels | Composer, drawer sheet, cards = a **lighter surface step** — light `surfaceContainerLowest` (#FFFFFF), dark `surfaceContainer`. **Separation by lightness**, no border and no shadow; `outlineVariant` hairlines only where no step exists. |
 | Accent discipline | **Exactly one saturated element per screen** (the primary action). Everything else neutral or soft tonal. |
 | **Primary action** | `FilledIconButton` — **light: `primary` fill · dark: `primaryContainer` fill** (in dark, `primary` is a near-white blue that glares on `#131314`; GT uses the deep container tone). The rule lives in `PrimaryActionButton` (`:core:ui`), once. |
-| Icon buttons | Plain M3 `IconButton` — no container, no ring, no bespoke detail. 48dp target, 24dp glyph. Quick actions on the canvas are `FilledTonalIconButton` circles with the label **beneath** (GT parity). |
+| Icon buttons | Plain M3 `IconButton` — no container, no ring, no bespoke detail. 48dp target, 24dp glyph. *(Canvas quick-action circles were removed — Conversation/Camera are bottom-nav tabs now, issue #26.)* |
 | Type | One neutral sans (Roboto/system class) at every level incl. greeting + result; hierarchy by **size + weight** only. Non-Latin scripts pair to Noto (Sinhala result must render in the same visual family). |
 | Shape / rhythm | One radius scale (chips/buttons `full`, cards `md12`–`lg16`, composer + error card `xl28`); 8dp vertical rhythm; no decorative shadows. |
 
 ## 2. Screens
 
-### 2.1 Home hub
-- **Top bar:** stock `CenterAlignedTopAppBar`, transparent container over the page `surface` — ☰ hamburger (opens drawer) · centered **mode chip** `✦ Automatic ▾` (an `AssistChip`) · right = new/clear icon. No bottom nav bar (hub model — official decision record: DECISIONS.md **D-5**; Medium/Expanded keep C-13 rail/drawer).
-- **Canvas** (the band between top bar and composer, content **vertically centred**, re-centres when the IME opens): brand sparkle → greeting (time-aware, e.g. "Afternoon, *Dilanka*" — name in `primary`) → subtitle "What would you like to translate?" → **quick actions** (Conversation · Camera) as GT-style **tonal circles (56dp) with their label beneath**, a row that must scale to 5–6 actions and still look intentional with 2.
+### 2.1 Home (text) — the first bottom-nav destination
+- **Bottom nav:** a persistent M3 `NavigationBar` (Compact) with **Home · Chat · Camera** (Chat = conversation, a v2 coming-soon placeholder). Medium = rail, Expanded = permanent drawer — all via `NavigationSuiteScaffold` (official decision record: DECISIONS.md **D-5 rev.2**; C-13 adaptive dims). This bottom bar is a deliberate, owner-approved deviation from GT's no-phone-bottom-bar hub. **The bar shows only on the top-level tabs** — secondary/detail screens (Settings §2.6, Result §2.4, LanguagePicker, History) drop the bar/rail/drawer via `NavigationSuiteType.None` for full height.
+- **Top bar:** stock `CenterAlignedTopAppBar`, transparent container over the page `surface` — ☰ hamburger (opens the secondary drawer) · centered **mode chip** `✦ Automatic ▾` (an `AssistChip`) · right = new/clear icon.
+- **Canvas** (the band between top bar and composer, content **vertically centred**, re-centres when the IME opens): brand sparkle → greeting (time-aware, e.g. "Afternoon, *Dilanka*" — name in `primary`) → subtitle "What would you like to translate?". **The Conversation/Camera quick-action tiles are removed — they are bottom-nav tabs now** (issue #26); the canvas is just greeting + subtitle above the composer.
 - **First run:** zero history — the canvas must feel complete (no empty-state apology). Recents live in the drawer.
 
 ### 2.2 Composer (always a CARD — owner decision A, 2026-07-22)
@@ -32,10 +33,10 @@ Rationale: our control row carries two language chips + swap + action, so it nee
 - **Primary action:** 🎤 mic when the field is empty → **Translate (➜)** as soon as there is text.
 - **Growth:** grows with content to a max height (~40% of the viewport), then scrolls internally. Sits **directly above the IME**.
 - **Char counter** `12/500` (C-5 format) in the control row / under the text area.
-- **Typing behaviour:** the canvas content (greeting + tiles) **hides as soon as the first character is typed**; it returns when the field is completely empty.
+- **Typing behaviour:** the canvas content (greeting + subtitle) **hides as soon as the first character is typed**; it returns when the field is completely empty.
 
-### 2.3 Navigation drawer
-Claude-app structure: wordmark (sparkle + "Tranzlate") → sections **Search · History · Saved · Offline languages · Settings** (outline icons) → **RECENTS** list (source line + translation line) → account row pinned bottom (avatar, name, email, tier chip "Free"). **No "+ New translation" pill.**
+### 2.3 Navigation drawer (SECONDARY destinations only)
+The drawer is secondary navigation — the primary Home/Chat/Camera switch lives in the bottom nav (§2.1). Claude-app structure: wordmark (sparkle + "Tranzlate") → sections **History · Saved · Offline languages · Settings · Help · About** (outline icons) → **RECENTS** list (source line + translation line) → account row pinned bottom (avatar, name, email, tier chip "Free"). **No "+ New translation" pill.** *(Search was never built — dropped from the drawer, issue #26.)*
 **Motion:** drawer slides in from the left while the main screen is **pushed right, scaled down, corner-rounded and dimmed** — one continuous, gesture-driven motion (predictive-back friendly).
 
 ### 2.4 Result screen (separate reading surface — no composer)
