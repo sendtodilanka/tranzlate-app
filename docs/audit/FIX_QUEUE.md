@@ -41,7 +41,7 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | B1 | 🔵 [#27](https://github.com/sendtodilanka/tranzlate-app/pull/27) **open** | 🔍 | Menu ඇරලා Back එබුවම app එක වැහෙනවා → `ModalDrawerSheet(drawerState)` | `DrawerContent.kt` |
 | B2 | | 🔍 | Menu එකේ "දැන් ඉන්නේ කොහෙද" පේන්නේ නෑ → `NavigationDrawerItem` | `DrawerContent.kt:166` |
 | B3 | | 🔍 | Shell එකට `Scaffold` + `SnackbarHostState` **එකක්** (දැන් තුනක්, එකිනෙක උඩ එනවා) | `TranzlateApp.kt:74,87` |
-| B4 | ⏳ **දැන් LIVE** — A4 (#31) එකේ `SettingsViewModel` තමයි `entry<>` ඇතුළේ `hiltViewModel()` කරන පළවෙනි එක, ඒ නිසා Activity store එකට resolve වෙනවා (stateless නිසා functional හානියක් නෑ, ඒත් clear වෙන්නේ නෑ) | 🔍 | nav3 `rememberViewModelStoreNavEntryDecorator()` නෑ → `lifecycle-viewmodel-navigation3` + decorator | `TranzlateApp.kt` |
+| B4 | ✅ [#33](https://github.com/sendtodilanka/tranzlate-app/pull/33) | 🔍 | nav3 `rememberViewModelStoreNavEntryDecorator()` නෑ → `lifecycle-viewmodel-navigation3` + decorator | `TranzlateApp.kt` |
 
 ## 🅒 Screens — Text vertical
 
