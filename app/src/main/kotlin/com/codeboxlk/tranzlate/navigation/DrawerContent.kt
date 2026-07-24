@@ -32,13 +32,14 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -55,7 +56,7 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Translation
 
-/** Drawer sheet width — the push/scale motion in [TranzlateApp] derives from this. */
+/** Drawer sheet width — inside M3's own 240-360dp range. */
 val DrawerSheetWidth: Dp = 300.dp
 
 /** UI_SPEC §2.3 drawer sections (secondary destinations — D-5). */
@@ -96,9 +97,8 @@ fun DrawerContent(
     // same Vertical+Start shape as the default so nothing else changes.
     // (HomeScreen makes the same choice for the same reason.)
     //
-    // Width stays pinned at 300dp rather than letting the sheet size itself: it is
-    // inside M3's own 240-360dp range, and the push/scale motion in TranzlateApp
-    // reads this same constant to compute its fraction.
+    // Width stays pinned at 300dp rather than letting the sheet size itself — it is
+    // inside M3's own 240-360dp range.
     ModalDrawerSheet(
         drawerState = drawerState,
         drawerContainerColor = LocalFloatingSurface.current,
@@ -184,6 +184,12 @@ fun DrawerContent(
     }
 }
 
+/**
+ * Secondary destination row. D-5 rev.2: the selected PRIMARY state lives in the
+ * bottom nav, so these stay `selected = false` — but M3's `NavigationDrawerItem`
+ * still gives the canonical shape / pill / padding / touch-target for free,
+ * replacing the old hand-rolled Surface + Row.
+ */
 @Composable
 private fun DrawerRow(
     icon: ImageVector,
@@ -191,36 +197,16 @@ private fun DrawerRow(
     destination: DrawerDestination,
     onDestinationClick: (DrawerDestination) -> Unit,
 ) {
-    val spacing = LocalSpacing.current
-    Surface(
+    NavigationDrawerItem(
+        label = { Text(stringResource(labelRes)) },
+        selected = false,
         onClick = { onDestinationClick(destination) },
-        color = Color.Transparent,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        icon = { Icon(icon, contentDescription = null) },
         modifier =
             Modifier
-                .fillMaxWidth()
+                .padding(NavigationDrawerItemDefaults.ItemPadding)
                 .testTag("tt_app_drawer_${destination.name.lowercase()}"),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.md16),
-            modifier =
-                Modifier
-                    .heightIn(min = Dimensions.touchTargetMin)
-                    .padding(horizontal = spacing.md16),
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(Dimensions.iconMd),
-            )
-            Text(
-                text = stringResource(labelRes),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-    }
+    )
 }
 
 /** RECENTS row: source line + translation line (UI_SPEC §2.3) — read-only. */
