@@ -38,8 +38,8 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 
 | # | තත්ත්වය | මූ | මොකක්ද | තැන |
 |---|---|---|---|---|
-| B1 | 🔵 [#27](https://github.com/sendtodilanka/tranzlate-app/pull/27) **open** | 🔍 | Menu ඇරලා Back එබුවම app එක වැහෙනවා → `ModalDrawerSheet(drawerState)` | `DrawerContent.kt` |
-| B2 | | 🔍 | Menu එකේ "දැන් ඉන්නේ කොහෙද" පේන්නේ නෑ → `NavigationDrawerItem` | `DrawerContent.kt:166` |
+| B1 | ✅ [#27](https://github.com/sendtodilanka/tranzlate-app/pull/27) | 🔍 | Menu ඇරලා Back එබුවම app එක වැහෙනවා → `ModalDrawerSheet(drawerState)` | `DrawerContent.kt` |
+| B2 | ⏳ **දැන් කරන එක** | 🔍 | Menu එකේ "දැන් ඉන්නේ කොහෙද" පේන්නේ නෑ → `NavigationDrawerItem` | `DrawerContent.kt:166` |
 | B3 | | 🔍 | Shell එකට `Scaffold` + `SnackbarHostState` **එකක්** (දැන් තුනක්, එකිනෙක උඩ එනවා) | `TranzlateApp.kt:74,87` |
 | B4 | ✅ [#33](https://github.com/sendtodilanka/tranzlate-app/pull/33) | 🔍 | nav3 `rememberViewModelStoreNavEntryDecorator()` නෑ → `lifecycle-viewmodel-navigation3` + decorator | `TranzlateApp.kt` |
 
