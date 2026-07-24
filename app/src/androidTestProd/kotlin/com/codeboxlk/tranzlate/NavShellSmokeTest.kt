@@ -38,6 +38,8 @@ class NavShellSmokeTest {
     fun navShell_drawerNavigatesToSettings() {
         compose.onNodeWithTag("tt_text_menu").performClick()
         compose.onNodeWithTag("tt_app_drawer_settings").performClick()
-        compose.onNodeWithTag("tt_settings_placeholder").assertIsDisplayed()
+        // tt_settings_back is in the top bar, present before the settings load, so
+        // it is the stable marker that navigation reached the Settings screen.
+        compose.onNodeWithTag("tt_settings_back").assertIsDisplayed()
     }
 }

@@ -204,7 +204,13 @@ private fun AppNavDisplay(
 ) {
     NavDisplay(
         backStack = backStack,
-        onBack = { backStack.removeLastOrNull() },
+        // Guard the pop: NavDisplay throws if the back stack is emptied. On a
+        // non-Compact window a top-level switch trims the stack to a single entry
+        // (see the rail's onClick), so a back from that lone destination — now
+        // reachable as a tap via the Settings top-bar arrow — would otherwise leave
+        // it empty and crash. Guarding here covers every destination, not just
+        // Settings.
+        onBack = { if (backStack.size > 1) backStack.removeLastOrNull() },
         entryProvider =
             entryProvider {
                 entry<TextNavKey> {
@@ -244,7 +250,7 @@ private fun AppNavDisplay(
                 // placeholder (download/delete packs) — a different job from the
                 // text vertical's source/target picker above, hence the alias.
                 entry<LanguagesNavKey> { OfflineLanguagesScreen() }
-                entry<SettingsNavKey> { SettingsScreen() }
+                entry<SettingsNavKey> { SettingsScreen(onBack = { backStack.removeLastOrNull() }) }
             },
     )
 }

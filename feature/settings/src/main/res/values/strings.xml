@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Scaffold placeholder strings. Real keys arrive from STRINGS_*.md (C-3 authority).
-     TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR queued before ship. -->
-<resources>
-    <string name="feature_settings_placeholder">Settings</string>
+<!-- Appearance section (issue #30 / #17 A4). Keys are the STRINGS_settings.md
+     catalogue verbatim (C-3 authority). fil + pt-rBR are queued NEEDS-TRANSLATION
+     (C-12) — the keys ship now, translated files follow. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="settings_title">Settings</string>
+    <string name="settings_appearance_header">Appearance</string>
+    <string name="settings_theme_label">Theme</string>
+    <string name="settings_theme_system">System default</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_dynamic_color_label">Dynamic colour</string>
+    <string name="settings_dynamic_color_supporting">Use colours from your wallpaper</string>
+    <string name="settings_dynamic_color_unavailable">Needs Android 12 or newer</string>
+
+    <!-- a11y (C-4). The theme rows and the dynamic-colour row take their accessible
+         name from their own text (selectable/toggleable merge the child Text), so
+         only the icon-only back button needs an explicit contentDescription. -->
+    <string name="cd_settings_back">Back</string>
 </resources>
