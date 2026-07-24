@@ -1,0 +1,79 @@
+package com.codeboxlk.tranzlate.feature.settings
+
+import com.codeboxlk.tranzlate.core.model.ThemeMode
+import com.codeboxlk.tranzlate.core.model.ThemeSettings
+import com.codeboxlk.tranzlate.domain.repository.ThemePrefsRepository
+import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+
+class SettingsViewModelTest {
+    private val repo = FakeThemePrefsRepository()
+    private lateinit var viewModel: SettingsViewModel
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        viewModel = SettingsViewModel(repo)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `selecting a theme mode writes it through the repository`() =
+        runTest {
+            for (mode in ThemeMode.entries) {
+                viewModel.onThemeModeSelected(mode)
+                assertThat(repo.state.value.mode).isEqualTo(mode)
+            }
+        }
+
+    @Test
+    fun `toggling dynamic colour writes it through the repository`() =
+        runTest {
+            viewModel.onDynamicColorChanged(true)
+            assertThat(repo.state.value.dynamicColor).isTrue()
+
+            viewModel.onDynamicColorChanged(false)
+            assertThat(repo.state.value.dynamicColor).isFalse()
+        }
+
+    /**
+     * The screen renders nothing until the first stored value arrives — the
+     * ViewModel must start `null`, not at a default that would flash.
+     */
+    @Test
+    fun `settings start null and then emit the stored value`() =
+        runTest {
+            assertThat(viewModel.settings.value).isNull()
+
+            repo.state.value = ThemeSettings(ThemeMode.DARK, dynamicColor = true)
+
+            assertThat(viewModel.settings.first { it != null }).isEqualTo(repo.state.value)
+        }
+}
+
+private class FakeThemePrefsRepository : ThemePrefsRepository {
+    val state = MutableStateFlow(ThemeSettings.Default)
+    override val settings: Flow<ThemeSettings> = state
+
+    override suspend fun setThemeMode(mode: ThemeMode) {
+        state.value = state.value.copy(mode = mode)
+    }
+
+    override suspend fun setDynamicColor(enabled: Boolean) {
+        state.value = state.value.copy(dynamicColor = enabled)
+    }
+}

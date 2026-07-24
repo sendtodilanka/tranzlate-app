@@ -244,7 +244,7 @@ private fun AppNavDisplay(
                 // placeholder (download/delete packs) — a different job from the
                 // text vertical's source/target picker above, hence the alias.
                 entry<LanguagesNavKey> { OfflineLanguagesScreen() }
-                entry<SettingsNavKey> { SettingsScreen() }
+                entry<SettingsNavKey> { SettingsScreen(onBack = { backStack.removeLastOrNull() }) }
             },
     )
 }
