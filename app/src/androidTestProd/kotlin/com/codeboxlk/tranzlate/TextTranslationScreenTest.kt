@@ -39,7 +39,8 @@ class TextTranslationScreenTest {
     @Test
     fun typeThenTranslate_showsGoldenResult() {
         compose.onNodeWithTag("tt_text_input").performTextInput("Good morning")
-        compose.onNodeWithTag("tt_text_counter").assertTextEquals("12/500") // C-5 exact literal
+        // C-5 exact literal — spaced per the approved design ("0 / 5000" style).
+        compose.onNodeWithTag("tt_text_counter").assertTextEquals("12 / 500")
 
         compose.onNodeWithTag("tt_text_translate_btn").performClick()
 
@@ -51,9 +52,12 @@ class TextTranslationScreenTest {
 
     @Test
     fun blankInput_actionIsMicAndFiresNoTranslation() {
-        // §1.7 row 2 (reconciled): blank input ⇒ the action slot is the mic —
-        // no translate affordance exists, so no translation may fire.
-        compose.onNodeWithTag("tt_text_translate_btn").performClick()
+        // §1.7 row 2: blank input ⇒ the action slot IS the mic. The design swaps
+        // the node itself (mic ⇄ Translate), so the translate affordance is not
+        // merely disabled — it does not exist — and tapping the slot cannot
+        // start a translation.
+        compose.onNodeWithTag("tt_text_translate_btn").assertDoesNotExist()
+        compose.onNodeWithTag("tt_text_mic").performClick()
 
         compose.onNodeWithTag("tt_text_input").assertIsDisplayed() // still on Home
         compose.onAllNodesWithTag("tt_text_loading").assertCountEquals(0)

@@ -11,11 +11,14 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Shell smoke (issue #26, D-5 rev.2): the Home tab renders on Compact WITH the
- * persistent bottom nav (Home / Chat / Camera); Chat is a coming-soon
- * placeholder; the bar hides on a secondary/detail screen; and the ☰ drawer
- * reaches secondary destinations.
- * Runs against the §1.6 FakeTranslateModule (no real engine on any test path).
+ * Shell smoke (D-5 rev.3 — Claude Design "Offline Translator M3"): Home is the
+ * card stack, there is **no bottom bar and no drawer**, and every destination is
+ * reached from the top bar or the cards/rows. Runs against the §1.6
+ * FakeTranslateModule (no real engine on any test path).
+ *
+ * Note: the whole androidTest suite currently fails on API 35+ emulators —
+ * Espresso's `onIdle` calls the removed `InputManager.getInstance` (issue #40).
+ * Run these on an API ≤ 34 image.
  */
 @HiltAndroidTest
 class NavShellSmokeTest {
@@ -31,40 +34,32 @@ class NavShellSmokeTest {
     }
 
     @Test
-    fun navShell_showsHomeByDefault() {
-        compose.onNodeWithTag("tt_text_input").assertIsDisplayed()
-        compose.onNodeWithTag("tt_text_translate_btn").assertIsDisplayed()
+    fun home_showsTheCardStack() {
+        compose.onNodeWithTag("tt_text_card").assertIsDisplayed()
+        compose.onNodeWithTag("tt_home_tool_offline").assertIsDisplayed()
+        compose.onNodeWithTag("tt_home_tool_camera").assertIsDisplayed()
+        compose.onNodeWithTag("tt_home_row_download").assertIsDisplayed()
     }
 
     @Test
-    fun navShell_showsBottomNavOnHome() {
-        compose.onNodeWithTag("tt_app_nav_home").assertIsDisplayed()
-        compose.onNodeWithTag("tt_app_nav_chat").assertIsDisplayed()
-        compose.onNodeWithTag("tt_app_nav_camera").assertIsDisplayed()
+    fun home_hasNoBottomBarAndNoDrawer() {
+        // The design reaches everything from the cards/rows; a regression that
+        // reintroduces either would break the approved layout.
+        compose.onNodeWithTag("tt_app_nav_home").assertDoesNotExist()
+        compose.onNodeWithTag("tt_app_drawer").assertDoesNotExist()
     }
 
     @Test
-    fun navShell_chatTabShowsComingSoon() {
-        compose.onNodeWithTag("tt_app_nav_chat").performClick()
-        compose.onNodeWithTag("tt_coming_soon").assertIsDisplayed()
-    }
-
-    @Test
-    fun navShell_drawerNavigatesToSettings() {
-        compose.onNodeWithTag("tt_text_menu").performClick()
-        compose.onNodeWithTag("tt_app_drawer_settings").performClick()
+    fun home_settingsIconNavigatesToSettings() {
+        compose.onNodeWithTag("tt_home_settings").performClick()
         // tt_settings_back is in the top bar, present before the settings load, so
         // it is the stable marker that navigation reached the Settings screen.
         compose.onNodeWithTag("tt_settings_back").assertIsDisplayed()
     }
 
     @Test
-    fun navShell_hidesBottomNavOnSecondaryScreen() {
-        // D-5 rev.2: the bar is top-level-only. Settings is a secondary
-        // destination (reached via the drawer), so the nav must not be present.
-        compose.onNodeWithTag("tt_text_menu").performClick()
-        compose.onNodeWithTag("tt_app_drawer_settings").performClick()
-        compose.onNodeWithTag("tt_settings_back").assertIsDisplayed()
-        compose.onNodeWithTag("tt_app_nav_home").assertDoesNotExist()
+    fun home_cameraToolNavigatesToCamera() {
+        compose.onNodeWithTag("tt_home_tool_camera").performClick()
+        compose.onNodeWithTag("tt_home_tool_camera").assertDoesNotExist()
     }
 }
