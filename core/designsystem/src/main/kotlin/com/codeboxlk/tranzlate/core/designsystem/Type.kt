@@ -1,22 +1,38 @@
 package com.codeboxlk.tranzlate.core.designsystem
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
  * The approved design (Claude Design · Offline Translator M3) specifies
  * **Roboto Flex**, so it is bundled rather than relying on the device's Roboto:
- * the two differ in proportion and the design is the contract. Variable font —
- * the default axis instance matches the design's `font-variation-settings: normal`.
+ * the two differ in proportion and the design is the contract.
  *
- * DESIGN_SYSTEM §3 type scale — EXACT. All sizes in sp (user font scaling respected).
+ * One resource, one axis instance per weight. A single-entry family would be
+ * baked to 400 and every `FontWeight.Medium` style would silently render as
+ * Regular: Compose only synthesises weight from `FontWeight.W600` upward, so
+ * W500 gets no synthesis and the matcher has nothing else to pick. Declaring the
+ * instances explicitly is what makes Medium actually Medium.
+ * (`variationSettings` needs API 26+; on 24-25 the font falls back to its
+ * default instance, which is the same regular face we would have had anyway.)
  */
-private val RobotoFlex = FontFamily(Font(R.font.roboto_flex))
+@OptIn(ExperimentalTextApi::class)
+private fun robotoFlex(weight: FontWeight) =
+    Font(
+        resId = R.font.roboto_flex,
+        weight = weight,
+        variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
+    )
 
+private val RobotoFlex = FontFamily(robotoFlex(FontWeight.Normal), robotoFlex(FontWeight.Medium))
+
+/** DESIGN_SYSTEM §3 type scale — EXACT. All sizes in sp (user font scaling respected). */
 val TranzlateTypography =
     Typography(
         displayLarge =
