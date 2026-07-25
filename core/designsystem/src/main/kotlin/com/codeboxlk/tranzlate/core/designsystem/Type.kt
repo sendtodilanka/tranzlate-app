@@ -2,21 +2,26 @@ package com.codeboxlk.tranzlate.core.designsystem
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * DESIGN_SYSTEM §3 type scale — EXACT. System default sans (Roboto on most
- * devices); no bundled font in the baseline. A future brand display face applies
- * ONLY to displayLarge/displayMedium/headlineLarge via a displayFontFamily
- * override (§3 note). All sizes in sp (user font scaling respected).
+ * The approved design (Claude Design · Offline Translator M3) specifies
+ * **Roboto Flex**, so it is bundled rather than relying on the device's Roboto:
+ * the two differ in proportion and the design is the contract. Variable font —
+ * the default axis instance matches the design's `font-variation-settings: normal`.
+ *
+ * DESIGN_SYSTEM §3 type scale — EXACT. All sizes in sp (user font scaling respected).
  */
+private val RobotoFlex = FontFamily(Font(R.font.roboto_flex))
+
 val TranzlateTypography =
     Typography(
         displayLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Normal,
                 fontSize = 57.sp,
                 lineHeight = 64.sp,
@@ -24,7 +29,7 @@ val TranzlateTypography =
             ),
         displayMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Normal,
                 fontSize = 45.sp,
                 lineHeight = 52.sp,
@@ -32,7 +37,7 @@ val TranzlateTypography =
             ),
         displaySmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Normal,
                 fontSize = 36.sp,
                 lineHeight = 44.sp,
@@ -40,7 +45,7 @@ val TranzlateTypography =
             ),
         headlineLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Normal,
                 fontSize = 32.sp,
                 lineHeight = 40.sp,
@@ -48,7 +53,7 @@ val TranzlateTypography =
             ),
         headlineMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Normal,
                 fontSize = 28.sp,
                 lineHeight = 36.sp,
@@ -56,7 +61,7 @@ val TranzlateTypography =
             ),
         headlineSmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Normal,
                 fontSize = 24.sp,
                 lineHeight = 32.sp,
@@ -64,7 +69,7 @@ val TranzlateTypography =
             ),
         titleLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Medium,
                 fontSize = 22.sp,
                 lineHeight = 28.sp,
@@ -72,7 +77,7 @@ val TranzlateTypography =
             ),
         titleMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Medium,
                 fontSize = 16.sp,
                 lineHeight = 24.sp,
@@ -80,7 +85,7 @@ val TranzlateTypography =
             ),
         titleSmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
@@ -88,7 +93,7 @@ val TranzlateTypography =
             ),
         bodyLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Normal,
                 fontSize = 16.sp,
                 lineHeight = 24.sp,
@@ -96,7 +101,7 @@ val TranzlateTypography =
             ),
         bodyMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Normal,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
@@ -104,7 +109,7 @@ val TranzlateTypography =
             ),
         bodySmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Normal,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
@@ -112,7 +117,7 @@ val TranzlateTypography =
             ),
         labelLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
@@ -120,7 +125,7 @@ val TranzlateTypography =
             ),
         labelMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Medium,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
@@ -128,7 +133,7 @@ val TranzlateTypography =
             ),
         labelSmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = RobotoFlex,
                 fontWeight = FontWeight.Medium,
                 fontSize = 11.sp,
                 lineHeight = 16.sp,

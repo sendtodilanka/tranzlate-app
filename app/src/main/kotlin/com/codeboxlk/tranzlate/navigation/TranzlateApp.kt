@@ -47,127 +47,27 @@ import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.feature.languagepicker.LanguagePickerScreen as OfflineLanguagesScreen
 
 /**
- * The nav mediator (plan §3/§7 + D-5 rev.2): a persistent bottom
- * **NavigationBar** (Home / Chat / Camera) on Compact, a rail on Medium, a
- * permanent drawer on Expanded — all via NavigationSuiteScaffold. The bar shows
- * only on the top-level tabs; a secondary/detail destination (Settings, Result,
- * LanguagePicker, History…) uses NavigationSuiteType.None so it gets the full
- * height. Secondary destinations live in the ☰ modal drawer. All nav logic
- * stays here — features never navigate themselves.
+ * The nav mediator (D-5 rev.3 — Claude Design "Offline Translator M3"): the
+ * approved design has **no bottom bar and no FAB**; every destination is reached
+ * from the Home card stack's tool cards and list rows, so the shell is just the
+ * NavDisplay. All nav logic stays here — features never navigate themselves.
  */
 @Composable
-@Suppress("LongMethod") // one cohesive nav mediator; splitting hides the shell structure
-fun TranzlateApp(appConfig: AppConfig) {
-    val destinations =
-        remember(appConfig) {
-            TopLevelDestination.entries.filter { it.toggle in appConfig.featureToggles }
-        }
+fun TranzlateApp(
+    @Suppress("UNUSED_PARAMETER") appConfig: AppConfig,
+) {
     val backStack = rememberNavBackStack(TextNavKey)
-    val windowInfo = rememberWindowInfo()
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val guidedSearch = stringResource(R.string.app_guided_search)
-
     val textViewModel: TextViewModel = hiltViewModel()
-    val drawerViewModel: DrawerViewModel = hiltViewModel()
-    val recents by drawerViewModel.recents.collectAsStateWithLifecycle()
 
     fun navigateTo(key: NavKey) {
         if (backStack.lastOrNull() != key) backStack.add(key)
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = {
-                DrawerContent(
-                    drawerState = drawerState,
-                    recents = recents,
-                    onDestinationClick = { destination ->
-                        scope.launch {
-                            drawerState.close()
-                            openDrawerDestination(destination, ::navigateTo) {
-                                snackbarHostState.showSnackbar(guidedSearch)
-                            }
-                        }
-                    },
-                )
-            },
-        ) {
-            // NavigationSuiteScaffold across all size classes (D-5 rev.2): Compact
-            // = bottom NavigationBar, Medium = rail, Expanded = permanent drawer.
-            // The bar shows ONLY on the top-level tabs — on a secondary/detail
-            // destination the layout is NavigationSuiteType.None, so the screen
-            // gets full height (GT-style detail flow).
-            val onTopLevel = destinations.any { it.navKey == backStack.lastOrNull() }
-            NavigationSuiteScaffold(
-                layoutType =
-                    when {
-                        !onTopLevel -> {
-                            NavigationSuiteType.None
-                        }
-
-                        windowInfo.isExpanded -> {
-                            NavigationSuiteType.NavigationDrawer
-                        }
-
-                        else -> {
-                            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(
-                                currentWindowAdaptiveInfo(),
-                            )
-                        }
-                    },
-                navigationSuiteItems = {
-                    destinations.forEach { destination ->
-                        item(
-                            selected = backStack.lastOrNull() == destination.navKey,
-                            onClick = {
-                                if (backStack.lastOrNull() != destination.navKey) {
-                                    backStack.add(destination.navKey)
-                                    // top-level switch = single-entry stack (GT-style)
-                                    while (backStack.size > 1) backStack.removeAt(0)
-                                }
-                            },
-                            icon = { Icon(destination.icon, contentDescription = null) },
-                            label = { Text(stringResource(destination.labelRes)) },
-                            modifier = Modifier.testTag("tt_app_nav_${destination.name.lowercase()}"),
-                        )
-                    }
-                },
-            ) {
-                AppNavDisplay(
-                    backStack = backStack,
-                    textViewModel = textViewModel,
-                    onOpenDrawer = { scope.launch { drawerState.open() } },
-                    onNavigate = ::navigateTo,
-                )
-            }
-        }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
-    }
-}
-
-/**
- * Drawer section → destination mapping (UI_SPEC §2.3): Search has no surface
- * yet → guided message, never a dead row (EDGE_CASES no-dead-end); Saved lives
- * on the History surface (GT-style tabs later).
- */
-private suspend fun openDrawerDestination(
-    destination: DrawerDestination,
-    navigateTo: (NavKey) -> Unit,
-    showSearchGuided: suspend () -> Unit,
-) {
-    when (destination) {
-        DrawerDestination.SEARCH -> showSearchGuided()
-        DrawerDestination.HISTORY -> navigateTo(HistoryNavKey)
-        DrawerDestination.SAVED -> navigateTo(HistoryNavKey)
-        DrawerDestination.OFFLINE_LANGUAGES -> navigateTo(LanguagesNavKey)
-        DrawerDestination.SETTINGS -> navigateTo(SettingsNavKey)
-    }
+    AppNavDisplay(
+        backStack = backStack,
+        textViewModel = textViewModel,
+        onNavigate = ::navigateTo,
+    )
 }
 
 /** The one NavDisplay both size classes share (Nav3 — plan §7 risk isolation). */
@@ -175,7 +75,6 @@ private suspend fun openDrawerDestination(
 private fun AppNavDisplay(
     backStack: androidx.navigation3.runtime.NavBackStack<NavKey>,
     textViewModel: TextViewModel,
-    onOpenDrawer: () -> Unit,
     onNavigate: (NavKey) -> Unit,
 ) {
     NavDisplay(
@@ -203,13 +102,16 @@ private fun AppNavDisplay(
                 entry<TextNavKey> {
                     HomeScreen(
                         viewModel = textViewModel,
-                        onOpenDrawer = onOpenDrawer,
                         onTranslateRequested = { onNavigate(ResultNavKey) },
                         onPickLanguage = { target ->
                             onNavigate(
                                 LanguagePickerNavKey(forSource = target == LanguagePickerTarget.SOURCE),
                             )
                         },
+                        onOpenSettings = { onNavigate(SettingsNavKey) },
+                        onOpenCamera = { onNavigate(CameraNavKey) },
+                        onOpenLanguages = { onNavigate(LanguagesNavKey) },
+                        onOpenConversation = { onNavigate(ChatNavKey) },
                     )
                 }
                 entry<ResultNavKey> {

@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate
 
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -61,6 +62,12 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle =
                 SystemBarStyle.auto(NavigationBarLightScrim, NavigationBarDarkScrim) { currentDark },
         )
+        // The approved design has no 3-button contrast scrim: without this the
+        // system tints the navigation bar (#16171C over a #131314 page) and the
+        // strip reads as a different colour from the page. API 29+.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
