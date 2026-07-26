@@ -21,14 +21,15 @@ of [`docs/audit/FIX_QUEUE.md`](../audit/FIX_QUEUE.md).
 | T-4 | On API < 31 the dynamic-colour row is **shown but disabled, with a supporting line** stating it needs Android 12+ | EDGE_CASES §7: no disabled control without a reason. Hiding it entirely would leave the user wondering why a documented feature is missing. |
 | T-5 | Theme state is hoisted to `MainActivity` (a shell-scoped state holder), not read inside `TranzlateTheme` | The splash (A6) and `enableEdgeToEdge` (A5) both need the resolved value *before* content draws. `:core:designsystem` must not reach for `Activity`/`Window`. |
 | T-6 | The splash is held **only** until the theme preference emits — no timeout hack, no other work gated on it | Google's budget is ≤1000 ms; a single local DataStore read is well inside it. Gating anything else invites startup regressions. |
-| T-7 | `isNavigationBarContrastEnforced` is **not** set | `setNavigationBarContrastEnforced` is `@Deprecated` in android-36's `android.jar` (verified) and has no effect on Android 15+; `enableEdgeToEdge` already manages it on older releases (`EdgeToEdge.kt:392`). |
+| T-7 | ~~`isNavigationBarContrastEnforced` is **not** set~~ → **REVERSED 2026-07-26 (issue #42 / PR #43): it IS set to `false`, guarded to API 29+** | Original reasoning (still factually correct as far as it went): `setNavigationBarContrastEnforced` is `@Deprecated` in android-36's `android.jar` and has no effect on Android 15+; `enableEdgeToEdge` manages it on older releases (`EdgeToEdge.kt:392`). **What that missed:** "managed" is not the same as "off". On the API range where it *does* apply, the platform still enforced a contrast scrim and tinted the navigation bar (#16171C over a #131314 page), so the strip read as a different colour from the card stack. `MainActivity` now sets `window.isNavigationBarContrastEnforced = false` behind a `Build.VERSION_CODES.Q` check — a no-op on the newest releases, the fix on the older ones. |
 
 ## 2. Work order — one PR per step
 
 Each step is independently shippable and independently verifiable on device.
 
-**PR 1 · A1 — window theme.** `android:windowBackground` = `#FAF9F8` / `#131314` (matching
-`Color.kt:31,70`) + `android:forceDarkAllowed=false` in both `values/themes.xml` and
+**PR 1 · A1 — window theme.** `android:windowBackground` = ~~`#FAF9F8`~~ **`#F8FAFD`** *(light value moved
+with `surface` on 2026-07-26, issue #42 — the sync rule is what matters, not the hex)* / `#131314` (matching
+`Color.kt`) + `android:forceDarkAllowed=false` in both `values/themes.xml` and
 `values-night/themes.xml`; fix the comment that already claims this is handled. Also removes the
 wrong Android 12+ splash colour — the platform falls back to `windowBackground` when it is a single
 colour ([splash screen docs](https://developer.android.com/develop/ui/views/launch/splash-screen)).

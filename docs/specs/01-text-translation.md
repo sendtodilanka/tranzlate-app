@@ -3,6 +3,7 @@
 > **Template status:** this is the reference shape for all ~16 feature specs. v1 scored 55%/not-buildable in adversarial review (47 gaps); v2 resolves every blocker by (a) leading with GT-equivalent behaviour, (b) inlining the resolved decisions, (c) delegating shared detail to the 5 foundation docs instead of hand-waving.
 > **Status:** DRAFT v2 · uncommitted · 2026-07-21.
 > **2026-07-22: C-2 amended — explicit Translate for all engines (issue #9).**
+> **2026-07-26: Home's shape is reset by DECISIONS D-5 rev.3** (issue #42 / PR #43) — Home is the approved design's **card stack**, with **no bottom nav, no drawer and no FAB**, and the language chips move out of the input card into a pinned row. §2 and §9 below are updated; the behaviour spine (§0/§1/§4/§5) is unchanged. C-5's counter literal is now **spaced** (`12 / 500`).
 
 ## Foundations this spec builds on (read as one contract)
 | Concern | Source of truth | This spec does NOT redefine it |
@@ -42,17 +43,24 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 | US-9 | offline | Given offline + AUTO, uses offline engine if model present, else `offline_model_missing` guidance with a Download action. |
 | US-10 | a11y | TalkBack: every control labeled (TEST_A11Y_CONTRACT), ≥48dp, state announced. |
 
-## 2. Screen anatomy
-**Compact** (tokens from DESIGN_SYSTEM; layout order fixed):
-`TopAppBar(title) → LanguageBar([source ▾] ⇄ [target ▾]) → ModeChip + counter → InputCard(field, ✕, counter "0/500", [mic ↔ Translate]) → ResultCard(langs+detected, text, [Copy][TTS][Reverse][⭐][⋮]) on its own Result screen`.
-- Input uses `bodyLarge`; result uses `headlineSmall`; spacing `md16` between blocks, `sm8` within (DESIGN_SYSTEM §4).
-- **Explicit Translate action (`tt_text_translate_btn`) in EVERY mode** (C-2 amended 2026-07-22): disabled while the input is blank; the result opens on its own screen with a continuous Compose transition. No live/debounce-fired translation for any engine.
+## 2. Screen anatomy (**updated 2026-07-26 — D-5 rev.3 card stack**; full contract: UI_SPEC §2.1/§2.2)
+**Compact** — pinned header, then a scrolling stack:
+`TopAppBar("Translate", [Pro chip][⚙]) → LanguageRow([source ▾] ⇄ [target ▾])` **pinned (topBar slot, does not scroll)**
+`→ InputCard(field, counter "0 / 500", [mic ⇄ Translate]) → "Tools" → 2×2 tool grid → Download-languages row → Phrasebook/Quotes → Natural-phrasing banner`
+`→ ResultScreen(langs+detected, text, [Copy][TTS][Reverse][⭐][⋮])` on its own destination.
+- Input placeholder + text use `headlineSmall`; result uses `headlineSmall`; supporting lines `bodyMedium`/`labelMedium`. Measurements resolve through tokens (C-14) — Home is the one tracked exception.
+- **Explicit Translate action (`tt_text_translate_btn`) in EVERY mode** (C-2 amended 2026-07-22): the result opens on its own screen with a continuous Compose transition. No live/debounce-fired translation for any engine.
+- **The action slot is a morph, not a disable:** blank input renders `tt_text_mic` and **no** `tt_text_translate_btn` node at all; typing swaps it for the Translate button. Over the char limit the button stays present but disabled with the inline reason.
+- ~~`ModeChip + counter` between the language bar and the input card~~ — **the mode chip has no home in rev.3** (the top bar carries only the Pro chip + Settings). US-5/US-6 cannot be satisfied until it is re-sited; see UI_SPEC §4.
+- ~~`✕` clear inside the input card~~ — removed with the old top bar.
 
-**Medium/Expanded:** `ListDetailPaneScaffold` — input pane | result pane. Pane split + min-widths per DESIGN_SYSTEM adaptive section. Never a stretched single column.
+**Medium/Expanded:** the target is still `ListDetailPaneScaffold` — input pane | result pane, split + min-widths per DESIGN_SYSTEM adaptive section. ⚠ **Not implemented and not designed for the card stack** (D-5 rev.3 open item): the same stack currently renders at every width.
 
 ## 3. Components & interactions (deltas from foundations)
 
 > **testTags follow DECISIONS C-1** — canonical prefix `tt_text_`. The bare names below map 1:1: `tt_text_source`, `tt_text_target`, `tt_text_swap`, `tt_text_mode_chip`, `tt_text_counter`, `tt_text_input`, `tt_text_charcount`, `tt_text_result`, `tt_text_copy`, `tt_text_tts`, `tt_text_reverse`, `tt_text_star`, `tt_text_more`, `tt_text_error_view`, `tt_text_retry`, `tt_text_translate_btn` (ALL modes — C-2 amended 2026-07-22; the former metered-only `tt_text_translate_action` is superseded), `tt_text_limit_sheet`.
+>
+> **Home surface tags (added 2026-07-26, PR #43 — C-1 clarified: `<feature>` = surface, not module):** `tt_text_card` (the input card) · `tt_text_mic` (the blank-state action node — a *different node* from `tt_text_translate_btn`) · `tt_home_settings` · `tt_home_pro` · `tt_home_tool_offline` / `_voice` / `_camera` / `_conversation` · `tt_home_row_download` · `tt_home_phrasebook` · `tt_home_quotes` · `tt_home_phrasing`. **Retired from Home:** `tt_text_menu`, `tt_text_clear`, `tt_text_mode_chip` (no drawer, no clear icon, no mode chip in rev.3) and the shell's `tt_app_nav_*` / `tt_app_drawer*`.
 
 | Element | Component (DESIGN_SYSTEM) | testTag | Spec note |
 |---------|--------------------------|---------|-----------|
@@ -61,7 +69,7 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 | Mode chip | `AssistChip`+menu | `chip_mode` | real ripple/role (fixes badge-disguise bug) |
 | Counter | `Badge`/supporting text | `text_counter` | `usage_counter` string, hidden Premium |
 | Input | `OutlinedTextField` multiline | `input_text` | ✕ trailing = clear; IME action = translate in every mode (mirrors `tt_text_translate_btn`, C-2) |
-| Char counter | supporting text | `text_charcount` | "0/500"; inline `home_edit_dialog_reach_text_limit_*` at limit (rewritten copy, no "Translate Pro") |
+| Char counter | supporting text | `text_charcount` | **"0 / 500"** (C-5, spaced since PR #43); inline `text_over_char_limit` at limit (rewritten copy, no "Translate Pro") |
 | Result text | selectable `Text`, font-scalable | `text_result` | tap → fullscreen reader |
 | Copy | `IconButton` | `btn_copy` | `home_result_option_copy` |
 | TTS | `IconButton` play↔stop | `btn_tts` | |
@@ -95,14 +103,14 @@ RESULT ─lang change→ VALIDATING (D-1 auto re-translate; cache-first)
 ## 7. Non-functional / acceptance gates
 - **a11y & tests:** governed entirely by TEST_A11Y_CONTRACT (fake engine golden outputs, testTags, per-control localized descriptions, focus order, live regions, ≥4.5:1, RTL, 200% scale). **pass/fail gate.**
 - **Localization:** 0 hardcoded strings; all keys in STRINGS catalogue (en/fil/pt-rBR present or flagged NEEDS-TRANSLATION).
-- **Adaptive:** Compact one-pane, Medium/Expanded ListDetail; landscape/multi-window reflow; tokens only, no raw dp.
+- **Adaptive:** Compact one-pane, Medium/Expanded ListDetail; landscape/multi-window reflow; **tokens only, no raw dp (DECISIONS C-14)** — `HomeScreen.kt`'s private literal block is the one tracked exception and a migration item, not a precedent. ⚠ The Medium/Expanded half of this gate is currently unmet (D-5 rev.3 open item).
 - **Offline-first + performance:** translation starts within one frame of the Translate tap (no artificial delay); no cursor jump on recomposition.
 
 ## 8. Edge cases
 empty/whitespace (no translate) · >500 chars: **hard-block the translate transition** (VALIDATING→TRANSLATING gated) + show inline `home_edit_dialog_reach_text_limit_*` copy, input **not truncated** · source==target · unsupported pair · single long word · emoji/RTL · rapid retype (edits alone never fire translation; cache serves repeated requests) · network drop mid-translate · offline model missing (Download CTA) · limit hit mid-session (AUTO continues) · process death restore · paste >limit.
 
 ## 9. Anti-requirements (do NOT carry)
-❌ chat "What can I help with?" framing · ❌ rainbow gradient headline · ❌ NLP3.5 default · ❌ invisible metered status · ❌ silent truncation · ❌ dead text-limit AlertDialog · ❌ full-screen ErrorDialog for transient errors · ❌ drawer-only nav that HIDES peer tasks (D-5 rev.2: the persistent bottom nav — Home/Chat/Camera — keeps peer modes visible; drawer = secondary destinations only) · ❌ "Translate Pro" copy · ❌ Back-press ad · ❌ thumbs-as-save.
+❌ chat "What can I help with?" framing · ❌ rainbow gradient headline · ❌ NLP3.5 default · ❌ invisible metered status · ❌ silent truncation · ❌ dead text-limit AlertDialog · ❌ full-screen ErrorDialog for transient errors · ❌ **nav that HIDES peer tasks** (D-5 rev.3: Home's card stack keeps Offline/Voice/Camera/Conversation visible on the first screen; ~~D-5 rev.2's persistent bottom nav~~ is itself retired — do not re-add a bar or a drawer without a new decision record) · ❌ **a private `dp`/`sp` ladder in a screen file** (C-14) · ❌ "Translate Pro" copy · ❌ Back-press ad · ❌ thumbs-as-save.
 
 ## 10. Deltas from v1 (what the review fixed)
 Open questions **resolved** (D-1..D-4) · GT-equivalent behaviour now the spine · ~~live-translate replaces "always a button" (with metered exception)~~ *(v2 history — superseded 2026-07-22 by the C-2 amendment: explicit Translate for ALL engines, see §0)* · Reverse vs Swap disambiguated · entity/strings/tokens/tests **delegated to foundations** (no hand-waving) · cache-key + meter + reset now exact (DECISIONS).

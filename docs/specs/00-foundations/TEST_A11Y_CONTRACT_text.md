@@ -184,13 +184,14 @@ Namespace convention: `tt_text_*`. සෑම control එකකටම `Modifier.t
 | # | Control | `testTag` | Screen / component | Node type | Notes |
 |---|---------|-----------|--------------------|-----------|-------|
 | 1 | Input text field | `tt_text_input` | `TextInputCard` | `TextField` | editable, multi-line |
-| 2 | Translate button | `tt_text_translate_btn` | `HomeScreen` | `Button` | present in EVERY mode (C-2, amended 2026-07-22). **Morphing action slot (2026-07-22, issue #11 PR-C):** the composer's single primary action carries this tag — 🎤 mic while the input is blank, Translate (➜) once text exists (UI_SPEC §2.2). "Disabled when input blank" is satisfied because **no translate affordance exists when blank** — a tap on the blank-state slot is the mic ask and must fire NO translation; whitespace-only text additionally disables the Translate morph. |
+| 2 | Translate button | `tt_text_translate_btn` | `HomeScreen` | `Button` | present in EVERY mode (C-2, amended 2026-07-22). **Morphing action slot — re-specified 2026-07-26 (issue #42 / PR #43):** the slot is now **two distinct nodes, not one tag with two faces.** Blank input ⇒ only `tt_text_mic` exists and `tt_text_translate_btn` **does not exist** (`assertDoesNotExist`, not `assertIsNotEnabled`); text present ⇒ only `tt_text_translate_btn` exists. That is what makes "no translation can fire from a blank field" structural rather than a disabled-state promise. Over the char limit the button exists but is disabled with the inline reason. ~~2026-07-22 (issue #11 PR-C): the composer's single primary action carries this tag in both states.~~ |
+| 2a | Mic (blank-state action) | `tt_text_mic` | `HomeScreen` | `IconButton`-equivalent (`Surface(onClick)`) | **added 2026-07-26.** Exists only while the input is blank; CD `cd_text_mic`. A tap is the voice ask and must fire NO translation. |
 | 3 | Swap languages | `tt_text_swap` | `MiddleContent` | `IconButton` | src↔tgt |
 | 4 | Source language selector | `tt_text_source_lang` | `MiddleContent` | `Button`/chip | opens `LanguageScreen` |
 | 5 | Target language selector | `tt_text_target_lang` | `MiddleContent` | `Button`/chip | opens `LanguageScreen` |
 | 6 | Mode chip (container) | `tt_text_mode_chip` | `TopAppBar`/sheet | `Button` | opens `TranslationModels` sheet |
 | 6a | Mode chip — per model | `tt_text_mode_chip_{tag}` | bottomSheet | `RadioButton` | `{tag}`∈`AUTO,ML2_MINI,ML2_ONLINE,NLP35` |
-| 7 | Character counter | `tt_text_counter` | `TextInputCard` | text (non-interactive) | `"12/500"` |
+| 7 | Character counter | `tt_text_counter` | `TextInputCard` | text (non-interactive) | ~~`"12/500"`~~ → **`"12 / 500"`** (C-5 amended 2026-07-26 — spaced, per the approved design) |
 | 8 | Copy result | `tt_text_copy` | `ResultCard` | `IconButton` | |
 | 9 | Speak result (TTS) | `tt_text_speak` | `ResultCard` | `IconButton` (toggle) | play/stop state |
 | 10 | Reverse translation | `tt_text_reverse` | `ResultCard`/`SourceCard` | `IconButton` | swaps result→input |
@@ -271,7 +272,7 @@ class TextTranslationScreenTest {
         compose.onNodeWithTag("tt_text_target_lang").assertTextContains("French")
 
         compose.onNodeWithTag("tt_text_input").performTextInput("Good morning")
-        compose.onNodeWithTag("tt_text_counter").assertTextEquals("12/500")
+        compose.onNodeWithTag("tt_text_counter").assertTextEquals("12 / 500")  // C-5, spaced
         compose.onNodeWithTag("tt_text_translate_btn").assertIsEnabled().performClick()
 
         compose.waitUntil(3_000) {
@@ -280,8 +281,10 @@ class TextTranslationScreenTest {
         compose.onNodeWithTag("tt_text_result").assertTextEquals("Bonjour (fake)")  // G1
     }
 
-    @Test fun blankInput_translateDisabled() {
-        compose.onNodeWithTag("tt_text_translate_btn").assertIsNotEnabled()
+    @Test fun blankInput_actionIsMicAndFiresNoTranslation() {   // re-specified 2026-07-26 (§1.7 row 2)
+        compose.onNodeWithTag("tt_text_translate_btn").assertDoesNotExist()
+        compose.onNodeWithTag("tt_text_mic").performClick()
+        compose.onAllNodesWithTag("tt_text_loading").assertCountEquals(0)
     }
 
     @Test fun errorView_retry_recovers() {
@@ -315,7 +318,7 @@ appId: com.codeboxlk.tranzlate.offlinetranslator
 - tapOn: "French"
 - tapOn: { id: "tt_text_input" }
 - inputText: "Good morning"
-- assertVisible: { id: "tt_text_counter", text: "12/500" }
+- assertVisible: { id: "tt_text_counter", text: "12 / 500" }   # C-5 amended 2026-07-26 (spaced)
 - tapOn: { id: "tt_text_translate_btn" }
 - assertVisible: { id: "tt_text_result", text: "Bonjour (fake)" }   # G1
 # 2. copy + speak + star
@@ -347,7 +350,8 @@ appId: com.codeboxlk.tranzlate.offlinetranslator
 | # | Control (`testTag`) | `contentDescription` (en) | String key | Role | State exposure | Min target |
 |---|---------------------|----------------------------|------------|------|----------------|:----------:|
 | 1 | `tt_text_input` | `Text to translate` | `cd_text_input` | `EditableText` | none (editable) | 48dp height |
-| 2 | `tt_text_translate_btn` | `Translate` | `cd_text_translate` | `Button` | `disabled` when blank | 48×48dp |
+| 2 | `tt_text_translate_btn` | `Translate` | `cd_text_translate` → per C-3 use **`cd_translate`** | `Button` | **does not exist when blank** (§1.7 row 2, re-specified 2026-07-26); `disabled` when over the char limit | 48×48dp |
+| 2a | `tt_text_mic` | `Translate by voice` | `cd_text_mic` | `Button` | exists **only** while the input is blank | 48×48dp |
 | 3 | `tt_text_swap` | `Swap source and target languages` | `cd_text_swap` | `Button` | — | 48×48dp |
 | 4 | `tt_text_source_lang` | `Source language, %1$s` | `cd_text_source_lang` | `Button` | `stateDescription`= lang name | 48dp |
 | 5 | `tt_text_target_lang` | `Target language, %1$s` | `cd_text_target_lang` | `Button` | `stateDescription`= lang name | 48dp |
@@ -362,6 +366,8 @@ appId: com.codeboxlk.tranzlate.offlinetranslator
 | 13 | `tt_text_retry` | `Retry translation` | `cd_text_retry` | `Button` | — | 48×48dp |
 | 14 | `tt_text_error_view` | (heading text) `home_result_error_view_title` | existing key | container | `liveRegion=assertive` | n/a |
 | 15 | `tt_text_result` | (the translated text itself) | dynamic | text | `selectable`; no cd override | n/a |
+
+> ⚠ **Known gap on the shipped Home (2026-07-26, issue #42 / PR #43 — record, not a re-spec).** The D-5 rev.3 card stack draws rows **1, 4, 5 and 7** *without* their contentDescriptions: `tt_text_input` (a bare `BasicTextField`), both language pills (visible label only, no `Source language, %1$s`) and `tt_text_counter` (no `%1$d of %2$d characters used`, no `liveRegion`). Row **6** (`tt_text_mode_chip`) has no host at all in rev.3. The keys all still exist (`cd_text_input`, `cd_text_source_lang`, `cd_text_target_lang`, `cd_text_counter`, `cd_text_mode_chip`) — this contract is unchanged and these are **open defects to fix in `HomeScreen.kt`**, not rows to delete. New Home controls that *do* carry a CD: `tt_home_settings` (`cd_home_settings`), `tt_text_mic` (`cd_text_mic`), `tt_text_swap` (`cd_swap_language`).
 
 **Rules that make each a11y row pass/fail-checkable:**
 - සෑම `IconButton` එකකම `contentDescription` **non-empty** විය යුතුයි — automated test: `onAllNodes(hasClickAction()).assertAll(SemanticsMatcher.keyIsDefined(ContentDescription))`. (empty `""` = fail.)
@@ -464,7 +470,7 @@ Verify: TalkBack swipe-right sequence මේ පිළිවෙලට යා ය
 Where this contract conflicts with `DECISIONS.md` canonical conventions, **C-n wins.** Specifically:
 - **C-2 (Translate trigger — amended 2026-07-22, issue #9):** happy-path tests in **EVERY mode** (free and metered) assert a **tap on `tt_text_translate_btn`** — the button now exists in every mode and no translation fires on debounce. ~~free-engine happy-path tests assert **wait-for-result after debounce**, NOT a button tap. `tt_text_translate_action` exists **only** for the metered Advanced-AI path.~~ *(pre-amendment rule, superseded 2026-07-22 — kept struck for history; `tt_text_translate_action` is retired.)*
 - **C-1 testTags:** the `tt_text_*` set here is authoritative; the feature spec references it.
-- **C-5 char counter:** exact rendered value = **`12/500`** (no spaces) — fix any `12/500` assertion.
+- **C-5 char counter (amended 2026-07-26, issue #42 / PR #43):** exact rendered value = **`12 / 500`** (WITH spaces, as drawn in the approved design) — fix any `12/500` assertion. ~~exact rendered value = `12/500` (no spaces).~~
 - **C-6 counter:** `text_metered_counter` = used/limit ("15/20 today").
 - **C-7 Reverse:** post-condition = result text moved to input + languages swapped + re-translated (NOT verbatim-to-input only).
 - **C-11 at-limit:** dismissible **bottom-sheet** (`tt_text_limit_sheet`), NOT a navigated paywall screen; AUTO keeps working.
