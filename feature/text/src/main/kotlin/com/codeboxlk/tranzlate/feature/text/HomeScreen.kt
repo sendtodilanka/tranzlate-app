@@ -69,8 +69,6 @@ import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 
 // ── Design: the owner's Claude Design export "Offline Translator M3" (issue #42)
-// Measured from the approved Claude Design export, 412dp frame. These are the
-// design's own numbers, so they are literals here rather than scale tokens.
 // Measurements come from the design system, never from raw dp/sp. Where the
 // approved design sits off our scale the token wins — the owner compared both
 // renditions and chose the tokenised one, so the scale is the contract and the
@@ -197,8 +195,8 @@ fun HomeContent(
                         Modifier.padding(
                             start = ScreenMargin,
                             end = ScreenMargin,
-                            top = 8.dp,
-                            bottom = 12.dp,
+                            top = spacing.sm8,
+                            bottom = spacing.md16,
                         ),
                 )
             }
@@ -715,7 +713,7 @@ private fun PhrasingBanner(onClick: () -> Unit) {
             Icon(
                 painterResource(DsR.drawable.ic_auto_awesome),
                 contentDescription = null,
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(Dimensions.iconMd),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
