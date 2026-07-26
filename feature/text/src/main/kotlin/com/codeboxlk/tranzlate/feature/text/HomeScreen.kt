@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,22 +60,27 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.codeboxlk.tranzlate.core.designsystem.Dimensions
+import com.codeboxlk.tranzlate.core.designsystem.Elevation
 import com.codeboxlk.tranzlate.core.designsystem.LocalFloatingSurface
+import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 
-// ── Design spec (docs/design/OFFLINE_TRANSLATOR_M3.md) ────────────────────────
-// Measured from the approved Claude Design export, 412dp frame. These are the
-// design's own numbers, so they are literals here rather than scale tokens.
-private val ScreenMargin = 16.dp
-private val SectionGap = 10.dp
-private val CardRadius = 20.dp
-private val InputCardRadius = 28.dp
-private val PillHeight = 48.dp
-private val CircleIconSize = 44.dp
-private val ActionSize = 48.dp
-private val CardShadow = 1.dp
+// ── Design: the owner's Claude Design export "Offline Translator M3" (issue #42)
+// Measurements come from the design system, never from raw dp/sp. Where the
+// approved design sits off our scale the token wins — the owner compared both
+// renditions and chose the tokenised one, so the scale is the contract and the
+// design is the reference for layout, colour and content.
+private val ScreenMargin @Composable get() = LocalSpacing.current.md16 // 16 -> 16 (same)
+private val SectionGap @Composable get() = LocalSpacing.current.sm8 // 10 -> 8
+private val CardRadius @Composable get() = MaterialTheme.shapes.large // 20 -> 16
+private val InputCardRadius @Composable get() = MaterialTheme.shapes.extraLarge // 28 -> 28 (same)
+private val PillHeight = Dimensions.touchTargetMin // 48 -> 48 (same)
+private val CircleIconSize = Dimensions.iconChip // 44 -> 40
+private val ActionSize = Dimensions.touchTargetMin // 48 -> 48 (same)
+private val CardShadow = Elevation.level1 // 1 -> 1 (same)
 
 /**
  * Home — the approved "card stack" (Claude Design · Offline Translator M3):
@@ -130,6 +137,7 @@ fun HomeContent(
     onOpenConversation: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalSpacing.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val guidedVoice = stringResource(R.string.text_guided_voice)
@@ -162,7 +170,7 @@ fun HomeContent(
                         )
                     },
                     actions = {
-                        ProChip(onClick = { guided(guidedPro) })
+                        TokenProChip(onClick = { guided(guidedPro) })
                         IconButton(
                             onClick = onOpenSettings,
                             modifier = Modifier.testTag("tt_home_settings"),
@@ -187,8 +195,8 @@ fun HomeContent(
                         Modifier.padding(
                             start = ScreenMargin,
                             end = ScreenMargin,
-                            top = 8.dp,
-                            bottom = 12.dp,
+                            top = spacing.sm8,
+                            bottom = spacing.md16,
                         ),
                 )
             }
@@ -221,7 +229,7 @@ fun HomeContent(
                     text = stringResource(R.string.home_tools),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp, top = 14.dp),
+                    modifier = Modifier.padding(start = spacing.xs4, top = spacing.md16),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
                     ToolCard(
@@ -299,23 +307,24 @@ fun HomeContent(
 
 /** Pro upsell — a soft 36dp suffix chip, never a blocker (design brief). */
 @Composable
-private fun ProChip(onClick: () -> Unit) {
+private fun TokenProChip(onClick: () -> Unit) {
+    val spacing = LocalSpacing.current
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        modifier = Modifier.height(24.dp).testTag("tt_home_pro"),
+        modifier = Modifier.height(spacing.lg24).testTag("tt_home_pro"),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(start = 10.dp, end = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
+            modifier = Modifier.padding(start = spacing.sm8, end = spacing.md16),
         ) {
             Icon(
                 painterResource(DsR.drawable.ic_workspace_premium),
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(Dimensions.iconSm),
             )
             Text(
                 text = stringResource(R.string.home_pro),
@@ -336,12 +345,19 @@ private fun LanguageRow(
     swapEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalSpacing.current
     Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth(),
     ) {
-        LanguagePill(sourceLabel, onSourceClick, "tt_text_source_lang", Modifier.weight(1f))
+        LanguagePill(
+            label = sourceLabel,
+            contentDescription = stringResource(R.string.cd_text_source_lang, sourceLabel),
+            onClick = onSourceClick,
+            testTag = "tt_text_source_lang",
+            modifier = Modifier.weight(1f),
+        )
         Surface(
             onClick = onSwap,
             enabled = swapEnabled,
@@ -355,27 +371,41 @@ private fun LanguageRow(
                 Icon(
                     painterResource(DsR.drawable.ic_swap_horiz),
                     contentDescription = stringResource(R.string.cd_swap_language),
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(Dimensions.iconMd),
                 )
             }
         }
-        LanguagePill(targetLabel, onTargetClick, "tt_text_target_lang", Modifier.weight(1f))
+        LanguagePill(
+            label = targetLabel,
+            contentDescription = stringResource(R.string.cd_text_target_lang, targetLabel),
+            onClick = onTargetClick,
+            testTag = "tt_text_target_lang",
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
 @Composable
 private fun LanguagePill(
     label: String,
+    contentDescription: String,
     onClick: () -> Unit,
     testTag: String,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalSpacing.current
     Surface(
         onClick = onClick,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = modifier.height(PillHeight).testTag(testTag),
+        modifier =
+            modifier
+                .height(PillHeight)
+                // The visible label is just the language name; TalkBack needs to
+                // hear WHICH side it sets, so the pill carries the description.
+                .semantics(mergeDescendants = true) { this.contentDescription = contentDescription }
+                .testTag(testTag),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -384,15 +414,14 @@ private fun LanguagePill(
         ) {
             Text(
                 text = label,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Icon(
                 painterResource(DsR.drawable.ic_arrow_drop_down),
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(Dimensions.iconSm),
             )
         }
     }
@@ -409,15 +438,26 @@ private fun InputCard(
     onTranslate: () -> Unit,
     onMic: () -> Unit,
 ) {
+    val spacing = LocalSpacing.current
     val hasText = input.isNotBlank()
     val overLimit = input.length > TEXT_CHAR_LIMIT
+    val inputDescription = stringResource(R.string.cd_text_input)
+    val counterDescription = stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT)
     Surface(
-        shape = RoundedCornerShape(InputCardRadius),
+        shape = InputCardRadius,
         color = LocalFloatingSurface.current,
         shadowElevation = CardShadow,
         modifier = Modifier.fillMaxWidth().testTag("tt_text_card"),
     ) {
-        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp)) {
+        Column(
+            modifier =
+                Modifier.padding(
+                    start = spacing.md16,
+                    end = spacing.md16,
+                    top = spacing.lg24,
+                    bottom = spacing.md16,
+                ),
+        ) {
             BasicTextField(
                 value = input,
                 onValueChange = onInputChange,
@@ -431,7 +471,8 @@ private fun InputCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 96.dp)
+                        .heightIn(min = Dimensions.composerInputMinHeight)
+                        .semantics { contentDescription = inputDescription }
                         .testTag("tt_text_input"),
                 decorationBox = { inner ->
                     if (input.isEmpty()) {
@@ -446,7 +487,7 @@ private fun InputCard(
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = spacing.md16),
             ) {
                 Text(
                     text =
@@ -462,7 +503,11 @@ private fun InputCard(
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                    modifier = Modifier.weight(1f).testTag("tt_text_counter"),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .semantics { contentDescription = counterDescription }
+                            .testTag("tt_text_counter"),
                 )
                 if (hasText) {
                     Button(
@@ -478,9 +523,9 @@ private fun InputCard(
                         Icon(
                             painterResource(DsR.drawable.ic_translate),
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(Dimensions.iconSm),
                         )
-                        Spacer(Modifier.size(8.dp))
+                        Spacer(Modifier.size(spacing.sm8))
                         Text(stringResource(R.string.home_translate))
                     }
                 } else {
@@ -495,7 +540,7 @@ private fun InputCard(
                             Icon(
                                 painterResource(DsR.drawable.ic_mic),
                                 contentDescription = stringResource(R.string.cd_text_mic),
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier.size(Dimensions.iconMd),
                             )
                         }
                     }
@@ -517,20 +562,26 @@ private fun ToolCard(
     testTag: String,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalSpacing.current
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(CardRadius),
+        shape = CardRadius,
         color = LocalFloatingSurface.current,
         shadowElevation = CardShadow,
         modifier = modifier.testTag(testTag),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(spacing.md16)) {
             Surface(shape = CircleShape, color = container, modifier = Modifier.size(CircleIconSize)) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = onContainer, modifier = Modifier.size(24.dp))
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = onContainer,
+                        modifier = Modifier.size(Dimensions.iconMd),
+                    )
                 }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(spacing.md16))
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
@@ -558,17 +609,18 @@ private fun ListRowCard(
     onClick: () -> Unit,
     testTag: String,
 ) {
+    val spacing = LocalSpacing.current
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(CardRadius),
+        shape = CardRadius,
         color = LocalFloatingSurface.current,
         shadowElevation = CardShadow,
         modifier = Modifier.fillMaxWidth().testTag(testTag),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(spacing.md16),
+            modifier = Modifier.padding(horizontal = spacing.md16, vertical = spacing.md16),
         ) {
             Surface(
                 shape = CircleShape,
@@ -580,7 +632,7 @@ private fun ListRowCard(
                         icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(Dimensions.iconMd),
                     )
                 }
             }
@@ -614,23 +666,24 @@ private fun MiniCard(
     testTag: String,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalSpacing.current
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(CardRadius),
+        shape = CardRadius,
         color = LocalFloatingSurface.current,
         shadowElevation = CardShadow,
         modifier = modifier.testTag(testTag),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(spacing.md16),
+            modifier = Modifier.padding(spacing.md16),
         ) {
             Icon(
                 icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(Dimensions.iconMd),
             )
             Text(
                 text = label,
@@ -644,22 +697,23 @@ private fun MiniCard(
 /** The AI teaser — a tonal banner, kept soft (design brief: never a blocker). */
 @Composable
 private fun PhrasingBanner(onClick: () -> Unit) {
+    val spacing = LocalSpacing.current
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(CardRadius),
+        shape = CardRadius,
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         modifier = Modifier.fillMaxWidth().testTag("tt_home_phrasing"),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(spacing.md16),
+            modifier = Modifier.padding(spacing.md16),
         ) {
             Icon(
                 painterResource(DsR.drawable.ic_auto_awesome),
                 contentDescription = null,
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(Dimensions.iconMd),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -667,16 +721,16 @@ private fun PhrasingBanner(onClick: () -> Unit) {
                         text = stringResource(R.string.home_phrasing_title),
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    Spacer(Modifier.size(8.dp))
+                    Spacer(Modifier.size(spacing.sm8))
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
+                        shape = MaterialTheme.shapes.extraSmall,
                         color = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ) {
                         Text(
                             text = stringResource(R.string.home_badge_new),
                             style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 8.dp),
+                            modifier = Modifier.padding(horizontal = spacing.sm8),
                         )
                     }
                 }

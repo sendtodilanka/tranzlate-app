@@ -13,7 +13,17 @@ import org.junit.Test
  *     `com.codeboxlk.tranzlate.domain.translate` (TEST_A11Y_CONTRACT :26).
  */
 class KonsistArchitectureTest {
-    private val scope = Konsist.scopeFromProject()
+    /**
+     * `scopeFromProject()` walks the whole checkout, and this project runs
+     * agents in git worktrees under `.claude/worktrees/`. A worktree is a
+     * second copy of every source file, so while one exists each declaration is
+     * found twice and the FROZEN-package gate fails with `[Translator,
+     * Translator]`. Slicing them out keeps the gate about *our* sources.
+     */
+    private val scope =
+        Konsist.scopeFromProject().slice { file ->
+            !file.path.replace('\\', '/').contains("/.claude/worktrees/")
+        }
 
     private fun filesUnder(vararg pathFragments: String) =
         scope.files.filter { file ->
