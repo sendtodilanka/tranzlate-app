@@ -35,7 +35,9 @@
 
 | Key | Status | Type | `en` | `fil` | `pt-rBR` | Args |
 |-----|--------|------|------|-------|----------|------|
-| `text_char_counter` | **NEW** | string | `%1$d/%2$d` | `%1$d/%2$d` | `%1$d/%2$d` | `%1$d` = used, `%2$d` = limit |
+| `text_char_counter` | **NEW** · **AMENDED 2026-07-26** | string | ~~`%1$d/%2$d`~~ → **`%1$d / %2$d`** | same | same | `%1$d` = used, `%2$d` = limit |
+
+> **Spacing amendment (2026-07-26, issue #42 / PR #43 · C-5):** the approved design draws the counter **spaced** — `12 / 500`, not `12/500`. The shipped resource and the shipped assertion (`TextTranslationScreenTest.typeThenTranslate_showsGoldenResult`) both use the spaced form; every spec sentence and test literal must follow. The `%1$d`/`%2$d` argument order and the no-plurals reasoning below are unchanged.
 
 > **Plurals අවශ්‍ය නෑ.** මෙය count එකක් නොව **ratio (used ∕ limit)** එකක්. දෙපැත්තම සංඛ්‍යා — grammatical number agreement නැත; සියලු locale වලට එකම numeric format එක. `limit` සඳහා default `Constants.Defaults.TEXT_LIMIT = 500` (verified `values/strings.xml:272` — "500-character limit per translation").
 
@@ -172,7 +174,7 @@
 
 | key | type | en | fil | pt-rBR | args |
 |-----|------|----|----|--------|------|
-| `text_char_counter` | string | `%1$d/%2$d` → "12/500" (NO spaces, C-5) | reuse | reuse | used,limit |
+| `text_char_counter` | string | ~~`%1$d/%2$d` → "12/500" (NO spaces)~~ → **`%1$d / %2$d` → "12 / 500" (WITH spaces, C-5 amended 2026-07-26)** | reuse | reuse | used,limit |
 | `text_metered_counter` | string | `%1$d/%2$d today` (used/limit, C-6) | NEEDS-TRANSLATION | NEEDS-TRANSLATION | used,limit |
 | `a11y_translating` | string | Translating… | NEEDS-TRANSLATION | NEEDS-TRANSLATION | — |
 | `a11y_result_ready` | string | Translation ready | NEEDS-TRANSLATION | NEEDS-TRANSLATION | — |
@@ -215,3 +217,45 @@ Keys shipped by the Home/Composer/Drawer/Result vertical (PR-C). `en` values are
 | ~~`app_guided_search`~~ | string (`:app`) | ~~`Search arrives with the history update`~~ | **retired** — Search removed from the drawer (issue #26) |
 
 **Reuse decisions applied (C-3):** `cd_translate`, `cd_swap_language`, `button_retry`, `home_edit_no_text_to_translate_warning`, `text_char_counter`, `cd_copy`, `cd_speak`, `cd_favourite`, `text_mode_automatic`, `a11y_translating` — used with the catalogue keys/values above (the contract's older `cd_text_translate`/`cd_text_swap`/`cd_text_speak` spellings defer to these per the C-3 conformance override).
+
+---
+
+## 7. Issue #42 Home card-stack additions (2026-07-26 · PR #43 — C-3 "missing keys get ADDED to STRINGS")
+
+Keys shipped by the D-5 rev.3 Home rebuild. All live in `feature/text/src/main/res/values/strings.xml`; `en` values are the approved Claude Design export's copy, every `fil`/`pt-rBR` cell is **NEEDS TRANSLATION** (tracked content task, C-12 — `tools:ignore="MissingTranslation"` is still the interim guard).
+
+| Key | Type | `en` | Notes |
+|-----|------|------|-------|
+| `home_title` | string | `Translate` | top app bar title (start-aligned) |
+| `home_pro` | string | `Pro` | top-bar upsell chip label |
+| `cd_home_settings` | string | `Settings` | top-bar settings icon CD |
+| `home_tools` | string | `Tools` | section label above the 2×2 grid |
+| `home_translate` | string | `Translate` | the morphed action button's label (distinct from `cd_translate`, which is the CD) |
+| `home_tool_offline` / `_sub` | string | `Offline mode` / `6 languages ready` | ⚠ the subtitle is a **hardcoded count** — must become a real value (or a plural) when the offline manager lands |
+| `home_tool_voice` / `_sub` | string | `Voice` / `Speak and hear it` | |
+| `home_tool_camera` / `_sub` | string | `Camera` / `Signs and menus` | |
+| `home_tool_conversation` / `_sub` | string | `Conversation` / `Two-way talk` | |
+| `home_row_download` / `_sub` | string | `Download languages` / `133 available · 2 updates ready` | ⚠ **hardcoded counts**, same caveat; `·` is `·` in the resource |
+| `home_mini_phrasebook` / `home_mini_quotes` | string | `Phrasebook` / `Quotes` | half-width shortcut cards |
+| `home_phrasing_title` / `_sub` | string | `Natural phrasing` / `Rewrites idioms so they land right` | AI banner |
+| `home_badge_new` | string | `NEW` | banner badge |
+| `home_guided_pro` | string | `Subscriptions arrive with the access update` | EDGE_CASES no-dead-end |
+| `home_guided_phrasebook` | string | `Phrasebook arrives in a later update` | " |
+| `home_guided_quotes` | string | `Saved quotes arrive with the history update` | " |
+| `home_guided_phrasing` | string | `Natural phrasing arrives with the AI update` | " |
+
+**Reused unchanged by the new Home:** `text_input_placeholder`, `cd_swap_language`, `cd_text_mic`, `text_char_counter` (spaced form, §2.2), `text_over_char_limit`, `text_guided_voice`.
+
+**Now ORPHANED — still defined, no longer referenced by any Composable** (verified by `R.string.*` sweep of `:feature:text`, 2026-07-26). None were deleted: they are either owed a new home by the rev.3 redesign or are legitimately reserved for a screen not yet built. **Do not delete without checking the "why" column.**
+
+| Key(s) | Why it is orphaned | Disposition |
+|---|---|---|
+| `home_greeting_morning` / `_afternoon` / `_evening` / `_named` · `home_subtitle` | the greeting canvas is gone — the card stack replaced it | **retire** unless a greeting returns to the design |
+| `text_mode_automatic` · `cd_text_mode_chip` | the mode chip has no home in the rev.3 top bar | **keep** — needed the moment the engine picker is re-sited (UI_SPEC §4) |
+| `cd_text_menu` | drawer removed (D-5 rev.3) | **retire** with the dead drawer files |
+| `cd_text_clear` | the ✕ / new-translation action went with the old top bar | **keep** — the action itself is still owed |
+| `cd_text_input` · `cd_text_counter` · `cd_text_source_lang` · `cd_text_target_lang` | ✅ **attached** — PR [#44](https://github.com/sendtodilanka/tranzlate-app/pull/44) re-attached all four (the field via `semantics`, the counter via `semantics`, both pills via `semantics(mergeDescendants = true)`); verified in a live accessibility-tree dump. *(Briefly unattached in #43 — a real regression, now closed.)* |
+| `cd_translate` | the Translate button now carries a visible `home_translate` label, so it has an accessible name without the CD | **keep** (no regression) — reuse if the button ever becomes icon-only |
+| `cd_text_retry` | Result-screen retry not re-wired to this key | check when FIX_QUEUE C2 lands |
+
+**Shell strings (`app/src/main/res/values/strings.xml`) — orphaned by the same PR, none deleted:** `nav_home` / `nav_chat` / `nav_camera` (no bottom bar) and the whole `drawer_*` + `app_guided_search` family (no drawer). They come out with the dead `DrawerContent.kt` / `TopLevelDestination.kt` files. `chat_coming_soon_title` / `coming_soon` **stay** — Chat is still a destination, now reached from the Conversation tool card.

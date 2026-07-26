@@ -47,7 +47,7 @@ New module structure (per cruxes / CLAUDE Phase 7 split). Build order:
 2. `:data` — Room (re-derive entities + 180-lang catalog + migrations fresh), clients (write to current MLKit/Retrofit API docs), DataStore
 3. Feature by feature (spec-driven, tests alongside — contracts exist)
 4. Integrations (Qonversion, AdMob, Firebase) behind the gateways
-5. Adaptive/nav shell (NavigationSuiteScaffold)
+5. ~~Adaptive/nav shell (NavigationSuiteScaffold)~~ → **nav shell = a bare Nav3 `NavDisplay`; Home's card stack carries the IA** (DECISIONS **D-5 rev.3**, 2026-07-26 · issue #42). Adaptive (Medium/Expanded) layout is a **separate, undesigned** piece of work — do not assume `NavigationSuiteScaffold`.
 
 **Re-derive fresh, verify vs standards (NEVER copy Tranzlate code — Rule 1):** language catalog (verify BCP-47 + capabilities) · entity shapes (design clean) · client integrations (write to current API docs) · strings/copy (rewrite per Material UX writing) · brand direction (redesign per DESIGN_SYSTEM). Tranzlate = suspect reference for behaviour only.
 **Rebuild:** all ViewModels · navigation/IA · subscription/ads/usage layers · onboarding · paywall · every screen.
@@ -62,7 +62,8 @@ a11y gate · NEEDS-TRANSLATION completion (fil/pt-rBR) · adaptive/foldable test
 **Track 1 — protect production (days):** verify whether main (shipped) is hit by the revenue/consent findings (sample AdMob ids, paywall-Idle, consent auto-grant likely affect main too — the crash does NOT). If so, small targeted fixes to main via PR. Keeps revenue/trust intact while the rewrite proceeds.
 
 **Track 2 — clean-room MVP first (then expand):** don't spec+build all 12 at once. Ship a **correct MVP subset**:
-> **MVP = Text + Camera + Language picker + History/Saved + Subscription + core engines (Offline/Standard/Advanced) + adaptive nav shell.**
+> **MVP = Text + Camera + Language picker + History/Saved + Subscription + core engines (Offline/Standard/Advanced) + the nav shell.**
+> *(2026-07-26 · D-5 rev.3: "adaptive nav shell" now means the `NavDisplay` + Home card stack. **History/Saved have no entry point** since the drawer was removed — that has to be part of their build, not an afterthought.)*
 Defer Voice, Dialog, Collections, Download-manager polish to v2. This gets a *correct, shippable* app fastest, proves the new architecture end-to-end, then scales.
 
 ## 4. Effort realism (honest)

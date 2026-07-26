@@ -6,7 +6,9 @@ date: 2026-07-22
 author: Claude (Opus 4.8) · evidence = Google Translate v10.27 driven on an emulator + Google's own published palette sources
 ---
 
-> **⚠️ Superseded IA note (2026-07-24, issue #26 → DECISIONS D-5 rev.2):** this doc's Home **"tonal quick actions"** (the Conversation/Camera canvas tiles — the component-map row and build step 3) are **reversed**. Those peers are now **bottom-nav tabs** (Home / Chat / Camera), not canvas tiles; the bottom nav also hides on secondary/detail screens (`NavigationSuiteType.None`). The flat design, GT-identical palette, stock-M3 components, and full-screen picker in this doc all still stand.
+> **⚠️ Superseded IA note (2026-07-24, issue #26 → DECISIONS D-5 rev.2):** this doc's Home **"tonal quick actions"** (the Conversation/Camera canvas tiles — the component-map row and build step 3) are **reversed**. Those peers became **bottom-nav tabs** (Home / Chat / Camera), not canvas tiles.
+>
+> **⚠️ Superseded AGAIN (2026-07-26, issue #42 / PR #43 → DECISIONS D-5 rev.3):** the bottom nav is gone too — the peers are now **tool cards on Home's card stack** (UI_SPEC §2.1), which is nearer this doc's original tonal-quick-action instinct than rev.2 was. Two more of this plan's outcomes moved with it: **§1's neutral surfaces** (7 roles now take the 1P blue-tinted values — PALETTES "P9 neutral amendment"), and the §2 rows for **top-bar icons / quick actions** (Material Symbols Rounded drawables now, not `material-icons-extended`). **Still standing exactly as written:** the flat design, the GT-Blue accents + error + the 12 `*Fixed` roles, stock-M3-first, and the full-screen language picker. §5's risk 2 ("`surfaceContainerLowest` on a `#FAF9F8` page is a subtle step — verify on device") **materialised**: the answer shipped was a 1dp shadow on the cards plus the cooler `#F8FAFD` page.
 
 # Plan — issue #15
 

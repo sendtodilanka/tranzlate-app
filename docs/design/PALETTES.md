@@ -23,7 +23,40 @@ Owner ran **Google Translate v10.27** beside our build on the emulator and picke
 | 80 | `#A8C7FA` | `#7FCFFF` | `#6DD58C` |
 | 90 | `#D3E3FD` | `#C2E7FF` | `#C4EED0` |
 
-**Light + dark (36 base roles):** identical to the **P1 table below** — accents, surfaces, neutrals, outline, inverse and the error set, hex for hex.
+**Light + dark (36 base roles):** identical to the **P1 table below** — accents, surfaces, neutrals, outline, inverse and the error set, hex for hex. **⚠ Amended 2026-07-26 (issue #42 / PR #43): 7 neutral roles now take the P1 note's blue-tinted "P1b" values instead — see the sub-section immediately below.**
+
+### P9 neutral amendment — the 1P blue-tinted ramp ("P1b"), 2026-07-26 (issue #42 / PR #43)
+
+The owner's Claude Design export "Offline Translator M3" draws **cool, blue-tinted** neutrals, not the warm grey ladder. Those values are **not new research** — the P1 note below (§P1 "Notes" (2)) already recorded the live 1P DB's blue-tinted variant and parked it as **P1b**. This amendment adopts P1b for the roles the design actually uses; everything else stays on the grey ladder.
+
+| Role | Was (P1 grey) | **Now (P1b tinted)** | Where it shows |
+|---|---|---|---|
+| light `background` | `#FAF9F8` | **`#F8FAFD`** | = `surface` |
+| light `surface` | `#FAF9F8` | **`#F8FAFD`** | the page behind the card stack |
+| light `surfaceBright` | `#FAF9F8` | **`#F8FAFD`** | = `surface` |
+| light `surfaceContainerLow` | `#F4F3F2` | **`#F0F4F9`** | — |
+| light `surfaceContainerHigh` | `#E9E8E8` | **`#E9EEF6`** | language pills, swap, Conversation tool circle |
+| dark `surfaceContainer` | `#1F2020` | **`#1E1F20`** | floating card fill (`LocalFloatingSurface`) |
+| dark `surfaceContainerHigh` | `#2A2A2A` | **`#282A2C`** | language pills, swap, Conversation tool circle |
+
+**Deliberately NOT moved:** light `surfaceContainerLowest` `#FFFFFF` (the card fill — the design keeps it pure white), light `surfaceContainer` `#EFEDED`, light `surfaceContainerHighest` `#E3E3E3`, dark `surfaceContainerLow` `#1F1F1F`, and every accent / error / outline / inverse / `*Fixed` role. The result is a **hybrid ladder**, which is intentional: only the roles the design puts on screen were moved, so nothing shifted unseen.
+
+`app/src/main/res/values/colors.xml` `window_background` moved with light `surface` (`#FAF9F8` → `#F8FAFD`) — it must stay in sync because the framework paints it before the first Compose frame.
+
+**Contrast — recomputed 2026-07-26 with the same WCAG 2.x formula. All affected pairs still pass AA, and the light page pairs improved slightly:**
+
+| Pair | Light | Dark |
+|---|---|---|
+| `onSurface` / `surface` | ~~15.67~~ **15.76** ✓ | 14.47 ✓ (unchanged) |
+| `onSurfaceVariant` / `surface` | ~~8.93~~ **8.98** ✓ | 10.90 ✓ (unchanged) |
+| `primary` / `surface` | ~~6.07~~ **6.11** ✓ | 10.80 ✓ (unchanged) |
+| `onSurface` / `surfaceContainerLow` | **14.92** ✓ | 12.84 ✓ (unchanged) |
+| `onSurfaceVariant` / `surfaceContainerLow` | **8.51** ✓ | 9.67 ✓ (unchanged) |
+| `onSurface` / `surfaceContainerHigh` | **14.15** ✓ | **11.22** ✓ |
+| `onSurfaceVariant` / `surfaceContainerHigh` | ~~7.68~~ **8.06** ✓ | ~~8.42~~ **8.45** ✓ |
+| `onSurface` / `surfaceContainer` | 14.13 ✓ (unchanged) | **12.86** ✓ |
+| `onSurfaceVariant` / `surfaceContainer` | 8.05 ✓ (unchanged) | **9.69** ✓ |
+| `primary` / `surfaceContainer` | 5.48 ✓ (unchanged) | **9.60** ✓ |
 
 **The 12 `*Fixed` roles — IDENTICAL in BOTH schemes.** That is what "fixed" means: a colour that survives a light↔dark switch unchanged. Ladder verified in Compose `ColorLightTokens.kt`/`ColorDarkTokens.kt`: Fixed = tone90 · FixedDim = tone80 · onFixed = tone10 · onFixedVariant = tone30.
 
@@ -98,6 +131,7 @@ Google තමන්ගේම apps වල (Gmail/Drive/Chrome static baseline) sh
 
 **Contrast (recomputed, verifier-confirmed):** 14/14 text pairs pass — light onPrimary/primary 6.39 · onSurface/surface 15.67 · dark onPrimary/primary 7.50 · onSurface/surface 14.47 · full list in workflow record. **Sources:** m3.material.io DSM token DB (1P Baseline context) · chromium `ref_color_mixer.cc` (`kColorRefPrimary40=#0B57D0`, `kColorRefPrimary80=#A8C7FA`) · Compose `ColorDarkTokens.kt` role ladder · material-web `_md-sys-color.scss`.
 **Notes:** (1) Compose එකට `surfaceTint = primary` explicit දාන්න. (2) Live 1P DB surface-variant එකක් තියෙනවා (light surface `#FFFFFF` + blue-tinted ladder `#F8FAFD/#F0F4F9/#E9EEF6/#DDE3EA`; dark `#0E0E0E/#1B1B1B/#1E1F20/#282A2C/#333537`) — අපේ pick = Compose-token-structure grey ladder (fidelity to the shipped Compose defaults); blue-tinted variant P1b ලෙස note කර ඇත.
+> **↑ P1b දැන් අර්ධ වශයෙන් shipped (2026-07-26, issue #42 / PR #43).** මේ note එකේ parked කරලා තිබුණු blue-tinted values 7ක් — light `#F8FAFD`/`#F0F4F9`/`#E9EEF6`, dark `#1E1F20`/`#282A2C` — approved Claude Design export එකට ගැලපෙන්න P9 එකට adopt කළා. විස්තර + recomputed contrast: ඉහත **"P9 neutral amendment"** section එක. P1 table එකේ grey values මෙතන as-is තියෙනවා (historical record + theme-preset candidate ලෙස, issue #7).
 
 ## P8 — Tranzlate Teal (cool-mono) — ❌ **RETIRED 2026-07-22 (issue #15)**
 
