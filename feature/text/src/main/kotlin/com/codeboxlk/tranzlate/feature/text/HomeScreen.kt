@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,7 +68,7 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 
-// ── Design spec (docs/design/OFFLINE_TRANSLATOR_M3.md) ────────────────────────
+// ── Design: the owner's Claude Design export "Offline Translator M3" (issue #42)
 // Measured from the approved Claude Design export, 412dp frame. These are the
 // design's own numbers, so they are literals here rather than scale tokens.
 // Measurements come from the design system, never from raw dp/sp. Where the
@@ -351,7 +353,13 @@ private fun LanguageRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth(),
     ) {
-        LanguagePill(sourceLabel, onSourceClick, "tt_text_source_lang", Modifier.weight(1f))
+        LanguagePill(
+            label = sourceLabel,
+            contentDescription = stringResource(R.string.cd_text_source_lang, sourceLabel),
+            onClick = onSourceClick,
+            testTag = "tt_text_source_lang",
+            modifier = Modifier.weight(1f),
+        )
         Surface(
             onClick = onSwap,
             enabled = swapEnabled,
@@ -369,13 +377,20 @@ private fun LanguageRow(
                 )
             }
         }
-        LanguagePill(targetLabel, onTargetClick, "tt_text_target_lang", Modifier.weight(1f))
+        LanguagePill(
+            label = targetLabel,
+            contentDescription = stringResource(R.string.cd_text_target_lang, targetLabel),
+            onClick = onTargetClick,
+            testTag = "tt_text_target_lang",
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
 @Composable
 private fun LanguagePill(
     label: String,
+    contentDescription: String,
     onClick: () -> Unit,
     testTag: String,
     modifier: Modifier = Modifier,
@@ -386,7 +401,13 @@ private fun LanguagePill(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = modifier.height(PillHeight).testTag(testTag),
+        modifier =
+            modifier
+                .height(PillHeight)
+                // The visible label is just the language name; TalkBack needs to
+                // hear WHICH side it sets, so the pill carries the description.
+                .semantics(mergeDescendants = true) { this.contentDescription = contentDescription }
+                .testTag(testTag),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -422,6 +443,8 @@ private fun InputCard(
     val spacing = LocalSpacing.current
     val hasText = input.isNotBlank()
     val overLimit = input.length > TEXT_CHAR_LIMIT
+    val inputDescription = stringResource(R.string.cd_text_input)
+    val counterDescription = stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT)
     Surface(
         shape = InputCardRadius,
         color = LocalFloatingSurface.current,
@@ -451,6 +474,7 @@ private fun InputCard(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = Dimensions.composerInputMinHeight)
+                        .semantics { contentDescription = inputDescription }
                         .testTag("tt_text_input"),
                 decorationBox = { inner ->
                     if (input.isEmpty()) {
@@ -481,7 +505,11 @@ private fun InputCard(
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                    modifier = Modifier.weight(1f).testTag("tt_text_counter"),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .semantics { contentDescription = counterDescription }
+                            .testTag("tt_text_counter"),
                 )
                 if (hasText) {
                     Button(
