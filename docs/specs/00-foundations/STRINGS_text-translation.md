@@ -254,7 +254,7 @@ Keys shipped by the D-5 rev.3 Home rebuild. All live in `feature/text/src/main/r
 | `text_mode_automatic` · `cd_text_mode_chip` | the mode chip has no home in the rev.3 top bar | **keep** — needed the moment the engine picker is re-sited (UI_SPEC §4) |
 | `cd_text_menu` | drawer removed (D-5 rev.3) | **retire** with the dead drawer files |
 | `cd_text_clear` | the ✕ / new-translation action went with the old top bar | **keep** — the action itself is still owed |
-| `cd_text_input` · `cd_text_counter` · `cd_text_source_lang` · `cd_text_target_lang` | ⚠ **a11y regression, not a redesign choice** — the new Home draws the field, the counter and both language pills with **no** contentDescription, so TalkBack reads the pill's visible label and the bare literal "12 / 500" | **fix**: re-attach in `HomeScreen.kt`; TEST_A11Y §2.1 rows 1, 4, 5, 7 are currently unmet |
+| `cd_text_input` · `cd_text_counter` · `cd_text_source_lang` · `cd_text_target_lang` | ✅ **attached** — PR [#44](https://github.com/sendtodilanka/tranzlate-app/pull/44) re-attached all four (the field via `semantics`, the counter via `semantics`, both pills via `semantics(mergeDescendants = true)`); verified in a live accessibility-tree dump. *(Briefly unattached in #43 — a real regression, now closed.)* |
 | `cd_translate` | the Translate button now carries a visible `home_translate` label, so it has an accessible name without the CD | **keep** (no regression) — reuse if the button ever becomes icon-only |
 | `cd_text_retry` | Result-screen retry not re-wired to this key | check when FIX_QUEUE C2 lands |
 

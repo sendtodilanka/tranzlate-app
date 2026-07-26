@@ -275,8 +275,9 @@ Material 3 uses **tonal elevation** (surface color shift via `surfaceTint`) in a
 
 - **Icon set:** Material Symbols (Rounded style, to match the soft brand geometry).
 - **How they ship (settled 2026-07-26, issue #42 / PR #43):** as **vector drawables checked into `core/designsystem/src/main/res/drawable/ic_*.xml`**, drawn with `painterResource(DsR.drawable.ic_*)`. **Not** `material-icons-extended` (10,820 classes in the dex for the ~25 we use — FIX_QUEUE batch 🔵 E) and **not** the ~14.7 MB variable icon font. Adding a glyph = exporting one more `ic_*.xml` from Material Symbols Rounded at the axes below.
+- **Count:** 17 drawables are checked in; **Home draws 15**. `ic_arrow_back` and `ic_close` are checked in ahead of screen 5a and are referenced by nothing yet — expected, not dead assets.
 - **Shipped set (17):** `ic_arrow_back` · `ic_arrow_drop_down` · `ic_auto_awesome` · `ic_chevron_right` · `ic_close` · `ic_cloud_done` · `ic_download_for_offline` · `ic_format_quote` · `ic_forum` · `ic_menu_book` · `ic_mic` · `ic_photo_camera` · `ic_record_voice_over` · `ic_settings` · `ic_swap_horiz` · `ic_translate` · `ic_workspace_premium`.
-- **Migration state:** Home is fully on the drawable set. `:core:ui` (`ResultBlock`) and `:app` (`ComingSoonScreen`, plus the retired drawer files) still import `material-icons-extended` — that dependency comes out with batch 🔵 E, and no NEW code may add an `Icons.*` import.
+- **Migration state:** Home is fully on the drawable set; **everything else is not.** `material-icons-extended` is still declared in **4 modules** (`:app`, `:core:ui`, `:feature:settings`, `:feature:text`) and imported by **11 files** — including the live `SettingsScreen`, `LanguagePickerScreen`, `ResultScreen` and `TranzlateApp` (`Icons.AutoMirrored.Filled.Chat`). Migrating those is batch 🔵 E work, and the dependency cannot be dropped until they are done.
 - **Default grid:** `24.dp` optical size; touch target ≥ `48.dp`.
 - **Axes:** `weight 400`, `grade 0`, `opticalSize 24`, `fill 0` by default.
 - **Filled (`fill 1`) vs outlined (`fill 0`):**
@@ -399,7 +400,7 @@ CompositionLocalProvider(
 - Motion → `Motion.medium2`, `Motion.standardDecelerate`
 
 **Rule (promoted to a binding convention 2026-07-26 — DECISIONS C-14):** no raw hex, `sp` text sizes, or magic `dp` in Composables — **every measurement resolves through a token**: spacing → `LocalSpacing`, fixed sizes → `Dimensions`, corners → `MaterialTheme.shapes` / `TranzlateShapeFull`, elevation → `Elevation.level*`, text → `MaterialTheme.typography`. **When a design's measured value falls off our scale, the token wins** — snap to the nearest token, and if the gap is real, amend §4/§5/§6 once so every screen inherits it. A private `val Foo = 20.dp` ladder inside a feature file is the anti-pattern this rule exists to stop.
-⚠ **Tracked exception:** `feature/text/.../HomeScreen.kt` still carries such a block (`ScreenMargin`, `SectionGap`, `CardRadius`, `InputCardRadius`, `PillHeight`, `CircleIconSize`, `ActionSize`, `CardShadow`) plus inline `dp` and one `15.sp`, documented in-file as "the design's own numbers". It is the only sanctioned exception, and it is a migration item — not a precedent.
+✅ **Every screen complies** as of PR [#44](https://github.com/sendtodilanka/tranzlate-app/pull/44): `HomeScreen.kt` was migrated off its private literal block and now carries zero raw `dp`/`sp` (its `ScreenMargin`/`CardShadow`… names survive only as *aliases* onto `LocalSpacing`/`Elevation`).
 Dynamic color must always fall back to this static palette so API 24–30 renders the brand identity, not gray defaults.
 
 ---

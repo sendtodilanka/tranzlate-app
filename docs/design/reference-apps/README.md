@@ -25,7 +25,7 @@ Gemini's hamburger/mode-chip top bar · Claude's drawer structure + card compose
 
 ## Current Home contract — Claude Design "Offline Translator M3" (owner export, 2026-07-26)
 The owner designed Home directly in Claude Design and exported it; that export, not a third-party app, is the anchor for the shipped card stack: pinned top bar (Translate · Pro chip · Settings) + pinned language pill row → input card whose mic becomes Translate → "Tools" 2×2 tonal grid → Download-languages row → Phrasebook/Quotes mini cards → Natural-phrasing banner. **Roboto Flex** and **Material Symbols Rounded** come from the same export.
-⚠ The export file itself is **not checked into this repo** (`docs/design/claude-design/` still holds the 2026-07-22 round-5 cards, and `HomeScreen.kt` cites a `docs/design/OFFLINE_TRANSLATOR_M3.md` that does not exist). Until it lands, **`docs/design/UI_SPEC.md` §2.1 + the shipped `HomeScreen.kt` are the contract.**
+⚠ The export file itself is **not checked into this repo** (`docs/design/claude-design/` still holds the 2026-07-22 round-5 cards, and the export should be checked in so the contract is reproducible). Until it lands, **`docs/design/UI_SPEC.md` §2.1 + the shipped `HomeScreen.kt` are the contract.**
 
 ## Sibling translator — Lingo French (structural anchor, issue #26) — ❌ SUPERSEDED 2026-07-26
 ~~The owner's sibling Play translator **Lingo French** uses a **persistent bottom navigation bar** — the structural anchor for Tranzlate's **D-5 rev.2** phone IA (Home / Chat / Camera on a bottom `NavigationBar`). We adopt the bottom-nav *structure* only, not its branding. A deliberate deviation from Google Translate's no-phone-bottom-bar hub.~~
