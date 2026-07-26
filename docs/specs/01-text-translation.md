@@ -48,7 +48,7 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 `TopAppBar("Translate", [Pro chip][⚙]) → LanguageRow([source ▾] ⇄ [target ▾])` **pinned (topBar slot, does not scroll)**
 `→ InputCard(field, counter "0 / 500", [mic ⇄ Translate]) → "Tools" → 2×2 tool grid → Download-languages row → Phrasebook/Quotes → Natural-phrasing banner`
 `→ ResultScreen(langs+detected, text, [Copy][TTS][Reverse][⭐][⋮])` on its own destination.
-- Input placeholder + text use `headlineSmall`; result uses `headlineSmall`; supporting lines `bodyMedium`/`labelMedium`. Measurements resolve through tokens (C-14) — Home is the one tracked exception.
+- Input placeholder + text use `headlineSmall`; result uses `headlineSmall`; supporting lines `bodyMedium`/`labelMedium`. Measurements resolve through tokens (C-14) — satisfied by every screen since PR #44.
 - **Explicit Translate action (`tt_text_translate_btn`) in EVERY mode** (C-2 amended 2026-07-22): the result opens on its own screen with a continuous Compose transition. No live/debounce-fired translation for any engine.
 - **The action slot is a morph, not a disable:** blank input renders `tt_text_mic` and **no** `tt_text_translate_btn` node at all; typing swaps it for the Translate button. Over the char limit the button stays present but disabled with the inline reason.
 - ~~`ModeChip + counter` between the language bar and the input card~~ — **the mode chip has no home in rev.3** (the top bar carries only the Pro chip + Settings). US-5/US-6 cannot be satisfied until it is re-sited; see UI_SPEC §4.
@@ -103,7 +103,7 @@ RESULT ─lang change→ VALIDATING (D-1 auto re-translate; cache-first)
 ## 7. Non-functional / acceptance gates
 - **a11y & tests:** governed entirely by TEST_A11Y_CONTRACT (fake engine golden outputs, testTags, per-control localized descriptions, focus order, live regions, ≥4.5:1, RTL, 200% scale). **pass/fail gate.**
 - **Localization:** 0 hardcoded strings; all keys in STRINGS catalogue (en/fil/pt-rBR present or flagged NEEDS-TRANSLATION).
-- **Adaptive:** Compact one-pane, Medium/Expanded ListDetail; landscape/multi-window reflow; **tokens only, no raw dp (DECISIONS C-14)** — `HomeScreen.kt`'s private literal block is the one tracked exception and a migration item, not a precedent. ⚠ The Medium/Expanded half of this gate is currently unmet (D-5 rev.3 open item).
+- **Adaptive:** Compact one-pane, Medium/Expanded ListDetail; landscape/multi-window reflow; **tokens only, no raw dp (DECISIONS C-14 — satisfied since PR #44)** — `HomeScreen.kt` was migrated off its private literal block in PR #44 and now carries zero raw `dp`/`sp`. ⚠ The Medium/Expanded half of this gate is currently unmet (D-5 rev.3 open item).
 - **Offline-first + performance:** translation starts within one frame of the Translate tap (no artificial delay); no cursor jump on recomposition.
 
 ## 8. Edge cases
