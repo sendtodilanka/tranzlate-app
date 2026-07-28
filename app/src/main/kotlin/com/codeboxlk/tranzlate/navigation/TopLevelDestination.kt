@@ -15,10 +15,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object TextNavKey : NavKey
 
-/** Text vertical's reading surface (UI_SPEC §2.4) — pushed by the Home composer, popped by back. */
-@Serializable
-data object ResultNavKey : NavKey
-
 /**
  * Full-screen language picker (issue #15 — replaces the composer's bottom sheet).
  * [forSource] rather than the feature's enum: a nav key must be `@Serializable`,
@@ -28,6 +24,17 @@ data object ResultNavKey : NavKey
 data class LanguagePickerNavKey(
     val forSource: Boolean,
 ) : NavKey
+
+/**
+ * Screen 5a — the text vertical's ONE working surface: typing, the result and
+ * re-editing all happen here, so it replaces the former Result destination.
+ * It is a real destination (not a Home state) so the shell's back stack owns
+ * leaving it: system back, the gesture and the in-screen arrow all resolve
+ * through the same guarded pop, and `NavDisplay` drives the predictive-back
+ * preview and the shared-element morph off it. See `TranzlateApp`.
+ */
+@Serializable
+data object ComposerNavKey : NavKey
 
 @Serializable
 data object CameraNavKey : NavKey

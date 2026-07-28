@@ -46,8 +46,14 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 ## 2. Screen anatomy (**updated 2026-07-26 — D-5 rev.3 card stack**; full contract: UI_SPEC §2.1/§2.2)
 **Compact** — pinned header, then a scrolling stack:
 `TopAppBar("Translate", [Pro chip][⚙]) → LanguageRow([source ▾] ⇄ [target ▾])` **pinned (topBar slot, does not scroll)**
-`→ InputCard(field, counter "0 / 500", [mic ⇄ Translate]) → "Tools" → 2×2 tool grid → Download-languages row → Phrasebook/Quotes → Natural-phrasing banner`
-`→ ResultScreen(langs+detected, text, [Copy][TTS][Reverse][⭐][⋮])` on its own destination.
+`→ InputPreviewCard(placeholder, [mic]) → "Tools" → 2×2 tool grid → Download-languages row → Phrasebook/Quotes → Natural-phrasing banner`
+`→ Composer 5a(back + language pills, source field, [counter | mic ⇄ Translate])` on its own destination.
+
+**Screen 5a (updated 2026-07-28 — issue #46).** Home's input card is a **preview only**: placeholder + voice button, nothing editable and no counter. Both controls open 5a, which is the one surface for typing, the result and re-editing — it **replaced the former Result destination**.
+- **Edit face:** source label + `✕` clear (the Paste chip's mirror — Paste when empty, `✕` once there is text), the field, then `counter | mic ⇄ Translate`.
+- **Read face:** the source text stays in place and stays tappable (tapping returns to editing); the translation lands beneath it in a **tonal result card** — `primaryContainer`, target language in CAPITALS, then speak · copy at the left with bookmark at the right edge. The keyboard drops and the counter and mic/Translate are gone: those exist **only while editing** (owner decision).
+- **No engine badge anywhere** — the engine waterfall is invisible; user-facing engine selection is deferred.
+- Leaving 5a for Home discards the draft; a trip to the language picker and back preserves it.
 - Input placeholder + text use `headlineSmall`; result uses `headlineSmall`; supporting lines `bodyMedium`/`labelMedium`. Measurements resolve through tokens (C-14) — satisfied by every screen since PR #44.
 - **Explicit Translate action (`tt_text_translate_btn`) in EVERY mode** (C-2 amended 2026-07-22): the result opens on its own screen with a continuous Compose transition. No live/debounce-fired translation for any engine.
 - **The action slot is a morph, not a disable:** blank input renders `tt_text_mic` and **no** `tt_text_translate_btn` node at all; typing swaps it for the Translate button. Over the char limit the button stays present but disabled with the inline reason.
@@ -60,7 +66,9 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 
 > **testTags follow DECISIONS C-1** — canonical prefix `tt_text_`. The bare names below map 1:1: `tt_text_source`, `tt_text_target`, `tt_text_swap`, `tt_text_mode_chip`, `tt_text_counter`, `tt_text_input`, `tt_text_charcount`, `tt_text_result`, `tt_text_copy`, `tt_text_tts`, `tt_text_reverse`, `tt_text_star`, `tt_text_more`, `tt_text_error_view`, `tt_text_retry`, `tt_text_translate_btn` (ALL modes — C-2 amended 2026-07-22; the former metered-only `tt_text_translate_action` is superseded), `tt_text_limit_sheet`.
 >
-> **Home surface tags (added 2026-07-26, PR #43 — C-1 clarified: `<feature>` = surface, not module):** `tt_text_card` (the input card) · `tt_text_mic` (the blank-state action node — a *different node* from `tt_text_translate_btn`) · `tt_home_settings` · `tt_home_pro` · `tt_home_tool_offline` / `_voice` / `_camera` / `_conversation` · `tt_home_row_download` · `tt_home_phrasebook` · `tt_home_quotes` · `tt_home_phrasing`. **Retired from Home:** `tt_text_menu`, `tt_text_clear`, `tt_text_mode_chip` (no drawer, no clear icon, no mode chip in rev.3) and the shell's `tt_app_nav_*` / `tt_app_drawer*`.
+> **Home surface tags (added 2026-07-26, PR #43 — C-1 clarified: `<feature>` = surface, not module):** `tt_text_card` (the preview card) · `tt_home_input_preview` (the placeholder) · `tt_home_mic` · `tt_home_settings` · `tt_home_pro` · `tt_home_tool_offline` / `_voice` / `_camera` / `_conversation` · `tt_home_row_download` · `tt_home_phrasebook` · `tt_home_quotes` · `tt_home_phrasing`. **Retired from Home:** `tt_text_menu`, `tt_text_clear`, `tt_text_mode_chip` (no drawer, no clear icon, no mode chip in rev.3) and the shell's `tt_app_nav_*` / `tt_app_drawer*`.
+>
+> **Composer 5a tags (added 2026-07-28, issue #46):** `tt_composer_card` · `tt_composer_back` · `tt_composer_clear` · `tt_composer_paste` · `tt_composer_source` · `tt_text_input` · `tt_text_counter` · `tt_text_mic` · `tt_text_translate_btn` · `tt_text_result_card` · `tt_text_result` · `tt_text_copy` · `tt_text_speak` · `tt_text_star` · `tt_text_error` · `tt_text_retry`. `tt_text_mic` / `tt_text_translate_btn` / `tt_text_counter` moved from Home to 5a with the input itself. **Never rendered (their screen is gone):** `tt_text_reverse`, `tt_text_mode_chip`, `tt_text_more`, `tt_text_tts`, `tt_text_charcount`, `tt_text_error_view`, `tt_text_limit_sheet` — the row-1 list above is the historical catalogue, not the live surface. Their strings are still in the catalogue pending a C-3 reconciliation pass.
 
 | Element | Component (DESIGN_SYSTEM) | testTag | Spec note |
 |---------|--------------------------|---------|-----------|

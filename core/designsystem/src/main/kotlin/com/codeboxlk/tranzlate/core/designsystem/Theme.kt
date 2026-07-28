@@ -45,10 +45,27 @@ fun TranzlateTheme(
         } else {
             PrimaryActionColors(colorScheme.primary, colorScheme.onPrimary)
         }
+    // The container is `primaryContainer` either way; the two content tones swap
+    // which one equals `onPrimaryContainer` between modes — see [ResultCardColors].
+    val resultCardColors =
+        if (darkTheme) {
+            ResultCardColors(
+                container = colorScheme.primaryContainer,
+                label = colorScheme.primary,
+                text = colorScheme.onPrimaryContainer,
+            )
+        } else {
+            ResultCardColors(
+                container = colorScheme.primaryContainer,
+                label = colorScheme.onPrimaryContainer,
+                text = colorScheme.onPrimaryFixed,
+            )
+        }
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
         LocalFloatingSurface provides floatingSurface,
         LocalPrimaryActionColors provides primaryActionColors,
+        LocalResultCardColors provides resultCardColors,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

@@ -24,6 +24,7 @@
     <string name="text_mode_automatic">Automatic</string>
     <string name="cd_text_menu">Open navigation</string>
     <string name="cd_text_clear">New translation</string>
+    <string name="cd_text_edit">Edit text</string>
 
     <!-- Home canvas (UI_SPEC §2.1) -->
     <string name="home_greeting_morning">Morning</string>
@@ -33,6 +34,8 @@
     <string name="home_subtitle">What would you like to translate?</string>
     <string name="home_title">Translate</string>
     <string name="home_pro">Pro</string>
+    <!-- Screen 5a composer (Claude Design export "Offline Translator M3") -->
+    <string name="composer_paste">Paste</string>
     <!-- Home card stack (Claude Design · Offline Translator M3) -->
     <string name="home_tools">Tools</string>
     <string name="home_translate">Translate</string>

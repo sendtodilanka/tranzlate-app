@@ -15,3 +15,8 @@ build/
 *-keystore.properties
 # Claude local
 .claude/settings.local.json
+# Agent worktrees — checkouts of this repo; committing them would nest a copy
+# of the tree inside itself (and they already broke the Konsist scope once).
+.claude/worktrees/
+# Device bug reports pulled while verifying on an emulator
+bugreport-*.zip

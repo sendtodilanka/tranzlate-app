@@ -47,8 +47,7 @@ private const val PREFS_SUBSCRIBE_TIMEOUT_MS = 5_000L
  * - C-2 (amended): translation fires ONLY from [onTranslate] — no debounce path
  *   exists in this class at all.
  * - Input + the last fired request live in [SavedStateHandle] so process death
- *   restores the composer and lets the Result screen replay its request
- *   ([restoreResultIfNeeded]).
+ *   restores the composer and can replay its request ([restoreResultIfNeeded]).
  * - Languages are DataStore-backed prefs (defaults en→fr) via
  *   [TranslatePrefsRepository]; [onSwapLanguages] writes both ids atomically.
  */
@@ -122,13 +121,24 @@ class TextViewModel
         }
 
         /**
-         * Process-death recovery for the Result screen (no-dead-end): the nav
-         * back stack restores the Result entry but [_uiState] restarts at Idle —
-         * replay the persisted last request instead of showing a blank screen.
+         * Process-death recovery (no-dead-end): the back stack restores the 5a
+         * entry but [_uiState] restarts at Idle, so the read face would render a
+         * blank result — replay the persisted last request instead.
+         *
+         * NOT wired up yet. The caller must first establish that the composer was
+         * on its READ face, because on a fresh open Idle is the normal state and
+         * replaying would resurrect the previous translation. Verified failing on
+         * device 2026-07-28; the fix is tracked separately.
          */
         fun restoreResultIfNeeded() {
             if (_uiState.value is TextUiState.Idle) onRetry()
         }
+
+        // ── Contract behaviour with no affordance in the approved 5a design.
+        // [onReverse] (C-7) and [onClearAll] are required by the foundations and
+        // stay covered by TextViewModelTest, but the design's read face carries
+        // only copy/speak/star — so nothing calls them yet. Kept deliberately:
+        // deleting them would drop a documented convention, not dead weight.
 
         /**
          * C-7 Reverse: move the result text into the composer, swap source↔target
@@ -168,6 +178,19 @@ class TextViewModel
 
         fun onSelectTargetLanguage(id: String) {
             viewModelScope.launch { prefs.setTargetLang(id) }
+        }
+
+        /**
+         * Leaving 5a for Home discards the draft — text cleared, any in-flight
+         * translation cancelled, state back to Idle, so Home never shows text the
+         * user already walked away from. Every way out of 5a routes here (the
+         * in-screen arrow and the shell's back guard), so the clearing rule lives
+         * in exactly one place.
+         */
+        fun onComposerDismissed() {
+            translateJob?.cancel()
+            savedStateHandle[KEY_INPUT] = ""
+            _uiState.value = TextUiState.Idle
         }
 
         /** Top-bar new/clear action: composer emptied, canvas returns, state to Idle. */
