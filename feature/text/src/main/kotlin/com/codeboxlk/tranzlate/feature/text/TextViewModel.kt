@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
+import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.FailureReason
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.ModeId
@@ -32,6 +33,8 @@ private const val FALLBACK_TARGET_LANG = "fr"
 const val TEXT_CHAR_LIMIT = 500
 
 private const val KEY_INPUT = "text_input"
+private const val KEY_RESULT_TEXT = "text_result_text"
+private const val KEY_RESULT_ENGINE = "text_result_engine"
 private const val KEY_LAST_TEXT = "text_last_request_text"
 private const val KEY_LAST_SRC = "text_last_request_src"
 private const val KEY_LAST_TGT = "text_last_request_tgt"
@@ -46,8 +49,9 @@ private const val PREFS_SUBSCRIBE_TIMEOUT_MS = 5_000L
  *
  * - C-2 (amended): translation fires ONLY from [onTranslate] — no debounce path
  *   exists in this class at all.
- * - Input + the last fired request live in [SavedStateHandle] so process death
- *   restores the composer and can replay its request ([restoreResultIfNeeded]).
+ * - Input, the last fired request AND the last result live in [SavedStateHandle],
+ *   so process death restores the composer exactly as the user left it —
+ *   without spending another translation to get the text back (issue #48).
  * - Languages are DataStore-backed prefs (defaults en→fr) via
  *   [TranslatePrefsRepository]; [onSwapLanguages] writes both ids atomically.
  */
@@ -82,6 +86,33 @@ class TextViewModel
 
         private val _uiState = MutableStateFlow<TextUiState>(TextUiState.Idle)
         val uiState: StateFlow<TextUiState> = _uiState.asStateFlow()
+
+        /**
+         * The ONE way this class changes state, so what is persisted can never
+         * drift from what is shown. A [TextUiState.Result] is recorded in
+         * [SavedStateHandle]; **every other state erases that record**, and that
+         * is what makes a fresh composer safe — after [onComposerDismissed] there
+         * is nothing left to restore, so a later open cannot resurrect a stale
+         * translation (issue #48).
+         *
+         * Only what cannot be recomputed is stored: the request is already
+         * persisted for Retry and `transliteration` is always null. Input is
+         * capped at [TEXT_CHAR_LIMIT], so the saved-state Bundle stays small.
+         */
+        private var state: TextUiState
+            get() = _uiState.value
+            set(value) {
+                _uiState.value = value
+                savedStateHandle[KEY_RESULT_TEXT] = (value as? TextUiState.Result)?.translatedText
+                savedStateHandle[KEY_RESULT_ENGINE] = (value as? TextUiState.Result)?.engine?.name
+            }
+
+        init {
+            // Process death restarts _uiState at Idle while the composer's own
+            // saveable state correctly restores its READ face — that mismatch is
+            // what rendered a result card with nothing in it (issue #48).
+            restoreResult()?.let { _uiState.value = it }
+        }
 
         /** Computed once per VM from the injectable clock (UI_SPEC §2.1 time-aware greeting). */
         val greeting: GreetingPeriod = greetingPeriodFor(clock.nowMillis(), ZoneId.systemDefault())
@@ -120,20 +151,6 @@ class TextViewModel
             startTranslation(request)
         }
 
-        /**
-         * Process-death recovery (no-dead-end): the back stack restores the 5a
-         * entry but [_uiState] restarts at Idle, so the read face would render a
-         * blank result — replay the persisted last request instead.
-         *
-         * NOT wired up yet. The caller must first establish that the composer was
-         * on its READ face, because on a fresh open Idle is the normal state and
-         * replaying would resurrect the previous translation. Verified failing on
-         * device 2026-07-28; the fix is tracked separately.
-         */
-        fun restoreResultIfNeeded() {
-            if (_uiState.value is TextUiState.Idle) onRetry()
-        }
-
         // ── Contract behaviour with no affordance in the approved 5a design.
         // [onReverse] (C-7) and [onClearAll] are required by the foundations and
         // stay covered by TextViewModelTest, but the design's read face carries
@@ -146,7 +163,7 @@ class TextViewModel
          * swapped, new result = the reverse translation.
          */
         fun onReverse() {
-            val done = _uiState.value as? TextUiState.Result ?: return
+            val done = state as? TextUiState.Result ?: return
             val newSource = done.request.targetLang
             val newTarget = done.request.sourceLang
             savedStateHandle[KEY_INPUT] = done.translatedText
@@ -190,14 +207,14 @@ class TextViewModel
         fun onComposerDismissed() {
             translateJob?.cancel()
             savedStateHandle[KEY_INPUT] = ""
-            _uiState.value = TextUiState.Idle
+            state = TextUiState.Idle
         }
 
         /** Top-bar new/clear action: composer emptied, canvas returns, state to Idle. */
         fun onClearAll() {
             translateJob?.cancel()
             savedStateHandle[KEY_INPUT] = ""
-            _uiState.value = TextUiState.Idle
+            state = TextUiState.Idle
         }
 
         private fun startTranslation(request: TranslateRequest) {
@@ -205,14 +222,14 @@ class TextViewModel
             translateJob?.cancel()
             // Translating is set SYNCHRONOUSLY so the Result screen opens straight
             // into the shimmer (UI_SPEC §2.5) — never a frame of stale state.
-            _uiState.value = TextUiState.Translating(request)
+            state = TextUiState.Translating(request)
             translateJob =
                 viewModelScope.launch {
                     val outcome =
                         withContext(dispatchers.default) {
                             translateText(request.text, request.sourceLang, request.targetLang, request.mode)
                         }
-                    _uiState.value =
+                    state =
                         when (outcome) {
                             is TranslationOutcome.Success -> {
                                 TextUiState.Result(
@@ -243,6 +260,22 @@ class TextViewModel
             savedStateHandle[KEY_LAST_SRC] = request.sourceLang
             savedStateHandle[KEY_LAST_TGT] = request.targetLang
             savedStateHandle[KEY_LAST_MODE] = request.mode.name
+        }
+
+        /** Rebuilds the last [TextUiState.Result] after process death, or null. */
+        private fun restoreResult(): TextUiState.Result? {
+            val text = savedStateHandle.get<String>(KEY_RESULT_TEXT) ?: return null
+            val engine =
+                savedStateHandle.get<String>(KEY_RESULT_ENGINE)?.let { name ->
+                    Engine.entries.firstOrNull { it.name == name }
+                } ?: return null
+            val request = lastRequest() ?: return null
+            return TextUiState.Result(
+                request = request,
+                translatedText = text,
+                transliteration = null,
+                engine = engine,
+            )
         }
 
         private fun lastRequest(): TranslateRequest? {

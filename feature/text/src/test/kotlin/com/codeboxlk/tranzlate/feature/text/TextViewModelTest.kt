@@ -291,24 +291,63 @@ class TextViewModelTest {
 
     // ---- Process-death recovery (SavedStateHandle-backed last request) -------
 
+    /** Issue #48: the result itself is restored — no replay, so no second API call. */
     @Test
-    fun `restoreResultIfNeeded replays the persisted request after process death`() {
+    fun `the result survives process death`() {
+        val handle = SavedStateHandle()
+        val translator = FakeTranslator()
+        val first = viewModel(translator, handle = handle)
+        settle()
+        first.onInputChange("Good morning")
+        first.onTranslate()
+        settle()
+        val before = first.uiState.value as TextUiState.Result
+
+        // "Process death": a NEW ViewModel over the same restored handle.
+        val second = viewModel(translator, handle = handle)
+        settle()
+
+        val after = second.uiState.value
+        assertThat(after).isInstanceOf(TextUiState.Result::class.java)
+        assertThat((after as TextUiState.Result).translatedText).isEqualTo("Bonjour (fake)")
+        assertThat(after.engine).isEqualTo(before.engine)
+        assertThat(after.request).isEqualTo(before.request)
+        // Restored from the record, not re-translated.
+        assertThat(translator.calls).hasSize(1)
+    }
+
+    /**
+     * The trap this fix had to avoid: leaving 5a discards the draft, so the next
+     * composer must open EMPTY even after a kill — never showing the old result.
+     */
+    @Test
+    fun `a dismissed composer leaves nothing to restore`() {
         val handle = SavedStateHandle()
         val first = viewModel(handle = handle)
         settle()
         first.onInputChange("Good morning")
         first.onTranslate()
         settle()
+        first.onComposerDismissed()
 
-        // "Process death": a NEW ViewModel over the same restored handle starts Idle.
         val second = viewModel(handle = handle)
         settle()
+
         assertThat(second.uiState.value).isEqualTo(TextUiState.Idle)
+        assertThat(second.input.value).isEmpty()
+    }
 
-        second.restoreResultIfNeeded()
+    /** Same guarantee for the ✕ clear action. */
+    @Test
+    fun `clearing leaves nothing to restore`() {
+        val handle = SavedStateHandle()
+        val first = viewModel(handle = handle)
         settle()
+        first.onInputChange("Good morning")
+        first.onTranslate()
+        settle()
+        first.onClearAll()
 
-        assertThat(second.uiState.value).isInstanceOf(TextUiState.Result::class.java)
-        assertThat((second.uiState.value as TextUiState.Result).translatedText).isEqualTo("Bonjour (fake)")
+        assertThat(viewModel(handle = handle).uiState.value).isEqualTo(TextUiState.Idle)
     }
 }
