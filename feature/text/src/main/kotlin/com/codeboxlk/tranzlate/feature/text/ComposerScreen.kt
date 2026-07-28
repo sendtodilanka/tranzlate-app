@@ -1,17 +1,18 @@
 package com.codeboxlk.tranzlate.feature.text
 
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -19,7 +20,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.designsystem.Elevation
 import com.codeboxlk.tranzlate.core.designsystem.LocalFloatingSurface
+import com.codeboxlk.tranzlate.core.designsystem.LocalResultCardColors
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.Motion
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateShapeFull
@@ -139,6 +140,7 @@ internal fun ComposerPane(
         onPickLanguage = onPickLanguage,
         onBack = onBack,
         onNotify = onNotify,
+        onClearAll = viewModel::onClearAll,
         cardModifier = cardModifier,
         modifier = modifier,
     )
@@ -159,6 +161,7 @@ internal fun ComposerPaneContent(
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onBack: () -> Unit,
     onNotify: (String) -> Unit,
+    onClearAll: () -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
 ) {
@@ -226,11 +229,31 @@ internal fun ComposerPaneContent(
                         bottom = spacing.md16,
                     ),
             ) {
-                Text(
-                    text = languageLabel(sourceLangId),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = languageLabel(sourceLangId),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Design: the Paste chip's mirror image — once there IS text,
+                    // the affordance in play is discarding it and starting over.
+                    if (input.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                onClearAll()
+                                isEditing = true
+                            },
+                            modifier = Modifier.testTag("tt_composer_clear"),
+                        ) {
+                            Icon(
+                                painterResource(DsR.drawable.ic_close),
+                                contentDescription = stringResource(R.string.cd_text_clear),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
                 if (isEditing) {
                     ComposerEditBody(
                         input = input,
@@ -425,7 +448,16 @@ private fun ColumnScope.ComposerEditBody(
     }
 }
 
-/** Read face: source text → divider → target label + result/shimmer/error → actions. */
+/**
+ * Read face (design: the result is a TONAL CARD nested inside the composer, not
+ * a second half of it). The source text stays where it was and stays tappable —
+ * tapping it returns to editing — and the translation lands underneath in its
+ * own `primaryContainer` card carrying the target language in CAPITALS, then
+ * speak · copy on the left with bookmark pushed to the right edge.
+ *
+ * An Error is deliberately NOT dressed as a result card: error colours on a
+ * primary container fail contrast, and a failure is not a translation.
+ */
 @Composable
 private fun ColumnScope.ComposerReadBody(
     sourceText: String,
@@ -445,31 +477,42 @@ private fun ColumnScope.ComposerReadBody(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onEditRequest)
-                .padding(top = spacing.sm8)
+                // The source line resumes editing, so TalkBack must announce the
+                // action, not just read the text back.
+                .clickable(
+                    onClickLabel = stringResource(R.string.cd_text_edit),
+                    onClick = onEditRequest,
+                ).padding(top = spacing.sm8)
                 .testTag("tt_composer_source"),
-    )
-    HorizontalDivider(
-        color = MaterialTheme.colorScheme.outlineVariant,
-        modifier = Modifier.padding(vertical = spacing.md16),
-    )
-    Text(
-        text = targetLabel,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
     )
     when (uiState) {
         is TextUiState.Translating -> {
-            ShimmerResult(modifier = Modifier.padding(top = spacing.sm8))
+            ResultCard(targetLabel = targetLabel) {
+                ShimmerResult()
+            }
         }
 
         is TextUiState.Result -> {
-            Text(
-                text = uiState.translatedText,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.fillMaxWidth().padding(top = spacing.sm8).testTag("tt_text_result"),
-            )
+            ResultCard(
+                targetLabel = targetLabel,
+                actions = {
+                    ResultAction(DsR.drawable.ic_volume_up, R.string.cd_speak, "tt_text_speak", onSpeak)
+                    ResultAction(DsR.drawable.ic_content_copy, R.string.cd_copy, "tt_text_copy") {
+                        onCopy(uiState.translatedText)
+                    }
+                    // Bookmark sits at the far edge in the design, away from the
+                    // pair that acts on the text itself.
+                    Spacer(Modifier.weight(1f))
+                    ResultAction(DsR.drawable.ic_bookmark, R.string.cd_favourite, "tt_text_star", onStar)
+                },
+            ) {
+                Text(
+                    text = uiState.translatedText,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = LocalResultCardColors.current.text,
+                    modifier = Modifier.fillMaxWidth().testTag("tt_text_result"),
+                )
+            }
         }
 
         is TextUiState.Error -> {
@@ -477,7 +520,7 @@ private fun ColumnScope.ComposerReadBody(
                 text = stringResource(R.string.text_error_generic_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = spacing.sm8).testTag("tt_text_error"),
+                modifier = Modifier.padding(top = spacing.md16).testTag("tt_text_error"),
             )
             TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
                 Text(stringResource(R.string.button_retry))
@@ -489,33 +532,59 @@ private fun ColumnScope.ComposerReadBody(
         } // unreachable: Idle always shows the edit face
     }
     Spacer(Modifier.weight(1f))
-    if (uiState is TextUiState.Result) {
-        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs4)) {
-            IconButton(
-                onClick = { onCopy(uiState.translatedText) },
-                modifier = Modifier.testTag("tt_text_copy"),
-            ) {
-                Icon(
-                    painterResource(DsR.drawable.ic_content_copy),
-                    contentDescription = stringResource(R.string.cd_copy),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = onSpeak, modifier = Modifier.testTag("tt_text_speak")) {
-                Icon(
-                    painterResource(DsR.drawable.ic_volume_up),
-                    contentDescription = stringResource(R.string.cd_speak),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = onStar, modifier = Modifier.testTag("tt_text_star")) {
-                Icon(
-                    painterResource(DsR.drawable.ic_star),
-                    contentDescription = stringResource(R.string.cd_favourite),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+}
+
+/**
+ * The tonal result card. Sits inside the composer card, so it carries no
+ * elevation of its own — the design separates it by tone alone.
+ */
+@Composable
+private fun ResultCard(
+    targetLabel: String,
+    modifier: Modifier = Modifier,
+    actions: (@Composable RowScope.() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    val colors = LocalResultCardColors.current
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = colors.container,
+        modifier = modifier.fillMaxWidth().padding(top = spacing.md16).testTag("tt_text_result_card"),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = spacing.md16, vertical = spacing.sm8)) {
+            Text(
+                text = targetLabel.uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.label,
+            )
+            Spacer(Modifier.height(spacing.xs4))
+            content()
+            if (actions != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(top = spacing.xs4),
+                    content = actions,
                 )
             }
         }
+    }
+}
+
+/** One 48dp action inside the result card — glyph tinted to the card's label tone. */
+@Composable
+private fun ResultAction(
+    @DrawableRes icon: Int,
+    @StringRes description: Int,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.testTag(tag)) {
+        Icon(
+            painterResource(icon),
+            contentDescription = stringResource(description),
+            tint = LocalResultCardColors.current.label,
+        )
     }
 }
 
@@ -546,6 +615,7 @@ private fun ComposerEditPreview() {
                 onPickLanguage = {},
                 onBack = {},
                 onNotify = {},
+                onClearAll = {},
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -581,6 +651,7 @@ private fun ComposerResultPreview() {
                 onPickLanguage = {},
                 onBack = {},
                 onNotify = {},
+                onClearAll = {},
                 modifier = Modifier.fillMaxSize(),
             )
         }

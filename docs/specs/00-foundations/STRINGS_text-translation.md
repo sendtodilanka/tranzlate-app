@@ -193,6 +193,7 @@ Keys shipped by the Home/Composer/Drawer/Result vertical (PR-C). `en` values are
 |-----|------|------|-------|
 | `text_input_placeholder` | string | `Enter text` | UI_SPEC §2.2 composer placeholder (supersedes old-app hint rotation for this surface) |
 | `cd_text_input` | string | `Text to translate` | contract §2.1 row 1 |
+| `cd_text_edit` | string | `Edit text` | 5a read face — the source text is tappable to resume editing (issue #46); TalkBack action label |
 | `cd_text_counter` | string | `%1$d of %2$d characters used` | contract §2.1 row 7 |
 | `cd_text_source_lang` / `cd_text_target_lang` | string | `Source language, %1$s` / `Target language, %1$s` | contract §2.1 rows 4–5 |
 | `cd_text_mic` | string | `Translate by voice` | composer mic morph (voice vertical later) |

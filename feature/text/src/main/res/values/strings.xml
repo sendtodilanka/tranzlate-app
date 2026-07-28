@@ -24,6 +24,7 @@
     <string name="text_mode_automatic">Automatic</string>
     <string name="cd_text_menu">Open navigation</string>
     <string name="cd_text_clear">New translation</string>
+    <string name="cd_text_edit">Edit text</string>
 
     <!-- Home canvas (UI_SPEC §2.1) -->
     <string name="home_greeting_morning">Morning</string>

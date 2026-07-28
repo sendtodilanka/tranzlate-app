@@ -69,9 +69,22 @@ Cost accounting at decision time: A-only code ≈ 39 lines across 2 files (a nav
 ## 3. Build steps
 
 1. **`ComposerScreen.kt`** — the 5a surface: top row (back + the reused language pills, requirement F), then the one card with an edit face and a read face.
-   - Edit face: text field, Paste chip (empty only), counter (requirement G), mic ⇄ Translate.
-   - Read face: source → divider → target → copy · speak · star. No badge, no mic.
+   - Both faces: source language label, with `Paste` when the field is empty and `✕` clear once there is text (the design swaps them the same way it swaps mic ⇄ Translate). `✕` is `onClearAll()`, which had lost its UI when the Result screen went.
+   - Edit face: text field, counter (requirement G), mic ⇄ Translate.
+   - Read face: the source text stays in place and stays tappable to resume editing; the translation lands beneath it in a **tonal result card** (see §3.1). No badge, no mic, no counter, and the keyboard drops — those exist only while editing.
    - `isEditing` is `rememberSaveable` — the shared `uiState` keeps the last result while the user re-edits, so which face shows cannot be derived from `uiState` alone.
+
+### 3.1 The result card (design-measured, corrected 2026-07-28)
+
+The first cut rendered the result as `source → divider → target` inside the same white card. **That was wrong** — the owner pointed back at the export, which is interactive: typing into its frame and pressing Translate reveals the result as a **tonal card nested inside the composer card**. Measured from the export's computed styles:
+
+| | light | dark | token |
+|---|---|---|---|
+| container | `#D3E3FD` | `#0842A0` | `primaryContainer` — exact in both modes |
+| label / icons | `#0842A0` | `#A8C7FA` | `LocalResultCardColors.label` |
+| translation | `#041E49` | `#D3E3FD` | `LocalResultCardColors.text` |
+
+The two content tones are not a single M3 role — which of them equals `onPrimaryContainer` flips between light and dark — so they are expressed as `ResultCardColors`, resolved from the active scheme in `TranzlateTheme` exactly like the existing `LocalPrimaryActionColors`. Geometry: radius `shapes.large`, no elevation (separated by tone alone), target language in **CAPITALS**, translation at `titleLarge`, then speak · copy at the left with bookmark pushed to the right edge. Verified on device: **8/8 colour values exact** against the design in both modes.
 2. **`HomeScreen.kt`** — replace the editable card with a non-editable `InputPreviewCard` (placeholder + mic, both opening 5a). `LanguageRow`/`LanguagePill` become `internal` so 5a reuses the identical pills (requirement F).
 3. **`TextViewModel.kt`** — `onComposerDismissed()` is the single home of requirement D: cancel any in-flight translation, clear the input, reset to `Idle`.
 4. **`TranzlateApp.kt`** — push `ComposerNavKey`; the pop guard routes every exit (arrow, button, gesture) through `onComposerDismissed()`. One `SharedTransitionLayout` at the shell wraps `NavDisplay`; `sharedBounds(..., resizeMode = RemeasureToBounds)` on both the Home preview card and the 5a card is the one morph anchor (requirement H).
@@ -103,15 +116,32 @@ Driven on emulator-5554 against the final build, each step asserted from a `uiau
 | Step | Expected | Result |
 |---|---|---|
 | launch | Home | ✅ |
-| tap "Enter text" | 5a, edit face (**B**) | ✅ |
-| type "Good morning" | counter `12 / 500` (**G**) | ✅ |
+| tap "Enter text" | 5a, edit face, keyboard up (**B**) | ✅ |
+| type "Good morning" | counter `12 / 500`, mic → Translate (**G**) | ✅ |
 | tap the French pill | language picker | ✅ |
 | back | 5a, **text preserved** (**E**) | ✅ |
-| Translate | 5a, read face with the result (**C**) | ✅ |
+| Translate | tonal result card, **keyboard down**, no counter / mic / Translate (**C**) | ✅ |
+| tap the source line | back to the edit face, keyboard up | ✅ |
+| tap `✕` | field cleared, still editing | ✅ |
 | back | Home (**D**) | ✅ |
 | reopen | 5a **empty** (**D**) | ✅ |
 
-Gates: `spotlessCheck` ✅ · `detekt` ✅ · unit tests (`:feature:text`, `:app` incl. Konsist) ✅ · fake + prod debug compile ✅.
+Result-card colours sampled from device screenshots against the export: **8/8 exact**, light and dark. Read-face accessibility tree dumped on device — Back · source/target language · Swap · New translation · the tappable source line (`onClickLabel` = "Edit text") · target label · translation · Read aloud · Copy · Add to favourites, and **no** mic, Translate or counter node.
+
+Gates: `spotlessCheck` ✅ · `detekt` ✅ · unit tests (`:feature:text`, `:app` incl. Konsist) ✅ · fake + prod debug compile ✅ · `androidTest` sources compile ✅ (they cannot run — issue #40).
+
+## 6.1 Co-verify findings and what was done
+
+A pre-merge lens by an agent other than the author returned **OPEN:7, no blocker** — requirements A–H correct, the clearing rule sound on every exit path, the shared-element wiring matched on both sides. Closed since:
+
+| Finding | Action |
+|---|---|
+| `TextTranslationScreenTest` still drove the pre-5a Home (`tt_text_input` etc. on launch) — **major ×2** | Rewritten to open 5a first; a third case now covers requirement D |
+| `ResultBlock.kt` (132 lines) orphaned by deleting the Result screen | Deleted — its only reference was its own preview |
+| `ic_close.xml` unused | Now used — it is the `✕` clear affordance |
+| `docs/specs/01` still described `ResultScreen` "on its own destination" | Rewritten for 5a; live testTags listed, retired ones named |
+| 16 Result-screen string keys with no caller | **Left in place.** C-3 makes the catalogue the authority, so removing keys is a catalogue change; several also back deferred (engine selection) or undecided (👍👎) features. Noted for a C-3 reconciliation pass |
+| gitignore commit has no `Fixes:` trailer | Left — trivial chore, not fix-class |
 
 ## 7. Follow-up (not this issue)
 
