@@ -33,12 +33,19 @@ private const val FALLBACK_TARGET_LANG = "fr"
 const val TEXT_CHAR_LIMIT = 500
 
 private const val KEY_INPUT = "text_input"
+private const val KEY_STATE = "text_state_kind"
 private const val KEY_RESULT_TEXT = "text_result_text"
+private const val KEY_ERROR_REASON = "text_error_reason"
 private const val KEY_RESULT_ENGINE = "text_result_engine"
 private const val KEY_LAST_TEXT = "text_last_request_text"
 private const val KEY_LAST_SRC = "text_last_request_src"
 private const val KEY_LAST_TGT = "text_last_request_tgt"
 private const val KEY_LAST_MODE = "text_last_request_mode"
+
+/** Which face the read side was showing when the process died (issue #48). */
+private const val STATE_TRANSLATING = "translating"
+private const val STATE_RESULT = "result"
+private const val STATE_ERROR = "error"
 
 private const val PREFS_SUBSCRIBE_TIMEOUT_MS = 5_000L
 
@@ -89,10 +96,10 @@ class TextViewModel
 
         /**
          * The ONE way this class changes state, so what is persisted can never
-         * drift from what is shown. A [TextUiState.Result] is recorded in
-         * [SavedStateHandle]; **every other state erases that record**, and that
-         * is what makes a fresh composer safe — after [onComposerDismissed] there
-         * is nothing left to restore, so a later open cannot resurrect a stale
+         * drift from what is shown. **Every** non-Idle state is recorded in
+         * [SavedStateHandle] and Idle erases the record — that erasure is what
+         * makes a fresh composer safe: after [onComposerDismissed] there is
+         * nothing left to restore, so a later open cannot resurrect a stale
          * translation (issue #48).
          *
          * Only what cannot be recomputed is stored: the request is already
@@ -103,21 +110,60 @@ class TextViewModel
             get() = _uiState.value
             set(value) {
                 _uiState.value = value
+                savedStateHandle[KEY_STATE] =
+                    when (value) {
+                        is TextUiState.Translating -> STATE_TRANSLATING
+                        is TextUiState.Result -> STATE_RESULT
+                        is TextUiState.Error -> STATE_ERROR
+                        TextUiState.Idle -> null
+                    }
                 savedStateHandle[KEY_RESULT_TEXT] = (value as? TextUiState.Result)?.translatedText
                 savedStateHandle[KEY_RESULT_ENGINE] = (value as? TextUiState.Result)?.engine?.name
+                savedStateHandle[KEY_ERROR_REASON] = (value as? TextUiState.Error)?.reason?.name
             }
 
-        init {
-            // Process death restarts _uiState at Idle while the composer's own
-            // saveable state correctly restores its READ face — that mismatch is
-            // what rendered a result card with nothing in it (issue #48).
-            restoreResult()?.let { _uiState.value = it }
+        /**
+         * Process death restarts [_uiState] at Idle while the composer's own
+         * saveable state correctly restores its READ face — a face with nothing
+         * on it (issue #48). **Every** face the read side can show has to come
+         * back, not just the successful one: a shimmer and an error card are just
+         * as blank when they go missing.
+         */
+        private fun restoreState() {
+            val rebuilt =
+                when (savedStateHandle.get<String>(KEY_STATE)) {
+                    STATE_RESULT -> restoreResult()?.also { _uiState.value = it } != null
+
+                    STATE_ERROR -> restoreError()?.also { _uiState.value = it } != null
+
+                    // The system interrupted a translation the user asked for and
+                    // never received. Resuming it is honest — reporting a failure
+                    // that never happened is not — and it costs the same single
+                    // call they already asked for, not an extra one.
+                    STATE_TRANSLATING -> lastRequest()?.also(::startTranslation) != null
+
+                    else -> return
+                }
+            // A record we cannot rebuild (an Engine or FailureReason constant
+            // renamed by an app update) would otherwise linger in saved state
+            // until some later transition happened to overwrite it.
+            if (!rebuilt) state = TextUiState.Idle
         }
 
         /** Computed once per VM from the injectable clock (UI_SPEC §2.1 time-aware greeting). */
         val greeting: GreetingPeriod = greetingPeriodFor(clock.nowMillis(), ZoneId.systemDefault())
 
         private var translateJob: Job? = null
+
+        // Kept below translateJob on purpose: restoring an interrupted
+        // translation assigns it, and initializers run in textual order. Today
+        // that is only tidiness — `= null` on a nullable var is elided, verified
+        // in the constructor bytecode (no putfield for this field) — but give
+        // translateJob a non-null default and an init block above it would wipe
+        // the assignment, leaving a live coroutine nothing could cancel.
+        init {
+            restoreState()
+        }
 
         fun onInputChange(value: String) {
             // NEVER truncate (spec-01 §8/§9: "input not truncated", "no silent
@@ -276,6 +322,16 @@ class TextViewModel
                 transliteration = null,
                 engine = engine,
             )
+        }
+
+        /** Rebuilds the last [TextUiState.Error] after process death, or null. */
+        private fun restoreError(): TextUiState.Error? {
+            val reason =
+                savedStateHandle.get<String>(KEY_ERROR_REASON)?.let { name ->
+                    FailureReason.entries.firstOrNull { it.name == name }
+                } ?: return null
+            val request = lastRequest() ?: return null
+            return TextUiState.Error(request, reason)
         }
 
         private fun lastRequest(): TranslateRequest? {
