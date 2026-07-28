@@ -1,8 +1,11 @@
 package com.codeboxlk.tranzlate.navigation
 
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -10,16 +13,18 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
 import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.feature.camera.CameraScreen
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
 import com.codeboxlk.tranzlate.feature.settings.SettingsScreen
+import com.codeboxlk.tranzlate.feature.text.COMPOSER_CARD_SHARED_KEY
+import com.codeboxlk.tranzlate.feature.text.ComposerScreen
 import com.codeboxlk.tranzlate.feature.text.HomeScreen
 import com.codeboxlk.tranzlate.feature.text.LanguagePickerScreen
 import com.codeboxlk.tranzlate.feature.text.LanguagePickerTarget
-import com.codeboxlk.tranzlate.feature.text.ResultScreen
 import com.codeboxlk.tranzlate.feature.text.TextViewModel
 import com.codeboxlk.tranzlate.feature.languagepicker.LanguagePickerScreen as OfflineLanguagesScreen
 
@@ -40,11 +45,14 @@ fun TranzlateApp(
         if (backStack.lastOrNull() != key) backStack.add(key)
     }
 
-    AppNavDisplay(
-        backStack = backStack,
-        textViewModel = textViewModel,
-        onNavigate = ::navigateTo,
-    )
+    SharedTransitionLayout {
+        AppNavDisplay(
+            backStack = backStack,
+            textViewModel = textViewModel,
+            onNavigate = ::navigateTo,
+            sharedScope = this,
+        )
+    }
 }
 
 /** The one NavDisplay both size classes share (Nav3 — plan §7 risk isolation). */
@@ -53,6 +61,7 @@ private fun AppNavDisplay(
     backStack: androidx.navigation3.runtime.NavBackStack<NavKey>,
     textViewModel: TextViewModel,
     onNavigate: (NavKey) -> Unit,
+    sharedScope: SharedTransitionScope,
 ) {
     NavDisplay(
         backStack = backStack,
@@ -62,7 +71,14 @@ private fun AppNavDisplay(
         // reachable as a tap via the Settings top-bar arrow — would otherwise leave
         // it empty and crash. Guarding here covers every destination, not just
         // Settings.
-        onBack = { if (backStack.size > 1) backStack.removeLastOrNull() },
+        onBack = {
+            if (backStack.size > 1) {
+                // Requirement D: leaving 5a discards the draft, whichever way
+                // the user leaves — the button and the system gesture share this.
+                if (backStack.lastOrNull() == ComposerNavKey) textViewModel.onComposerDismissed()
+                backStack.removeLastOrNull()
+            }
+        },
         // NavDisplay's default entryDecorators is only the saveable-state one; a
         // hiltViewModel() called inside an entry<> would otherwise resolve to the
         // Activity's ViewModelStore and never be cleared. The ViewModelStore
@@ -79,7 +95,7 @@ private fun AppNavDisplay(
                 entry<TextNavKey> {
                     HomeScreen(
                         viewModel = textViewModel,
-                        onTranslateRequested = { onNavigate(ResultNavKey) },
+                        onOpenComposer = { onNavigate(ComposerNavKey) },
                         onPickLanguage = { target ->
                             onNavigate(
                                 LanguagePickerNavKey(forSource = target == LanguagePickerTarget.SOURCE),
@@ -89,12 +105,38 @@ private fun AppNavDisplay(
                         onOpenCamera = { onNavigate(CameraNavKey) },
                         onOpenLanguages = { onNavigate(LanguagesNavKey) },
                         onOpenConversation = { onNavigate(ChatNavKey) },
+                        previewCardModifier =
+                            with(sharedScope) {
+                                Modifier.sharedBounds(
+                                    sharedContentState =
+                                        rememberSharedContentState(COMPOSER_CARD_SHARED_KEY),
+                                    animatedVisibilityScope = LocalNavAnimatedContentScope.current,
+                                    resizeMode = SharedTransitionScope.ResizeMode.Companion.RemeasureToBounds,
+                                )
+                            },
                     )
                 }
-                entry<ResultNavKey> {
-                    ResultScreen(
+                entry<ComposerNavKey> {
+                    ComposerScreen(
                         viewModel = textViewModel,
-                        onBack = { backStack.removeLastOrNull() },
+                        onBack = {
+                            textViewModel.onComposerDismissed()
+                            backStack.removeLastOrNull()
+                        },
+                        onPickLanguage = { target ->
+                            onNavigate(
+                                LanguagePickerNavKey(forSource = target == LanguagePickerTarget.SOURCE),
+                            )
+                        },
+                        cardModifier =
+                            with(sharedScope) {
+                                Modifier.sharedBounds(
+                                    sharedContentState =
+                                        rememberSharedContentState(COMPOSER_CARD_SHARED_KEY),
+                                    animatedVisibilityScope = LocalNavAnimatedContentScope.current,
+                                    resizeMode = SharedTransitionScope.ResizeMode.Companion.RemeasureToBounds,
+                                )
+                            },
                     )
                 }
                 entry<LanguagePickerNavKey> { key ->

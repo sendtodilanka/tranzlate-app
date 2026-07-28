@@ -33,6 +33,8 @@
     <string name="home_subtitle">What would you like to translate?</string>
     <string name="home_title">Translate</string>
     <string name="home_pro">Pro</string>
+    <!-- Screen 5a composer (Claude Design export "Offline Translator M3") -->
+    <string name="composer_paste">Paste</string>
     <!-- Home card stack (Claude Design · Offline Translator M3) -->
     <string name="home_tools">Tools</string>
     <string name="home_translate">Translate</string>

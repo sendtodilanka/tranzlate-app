@@ -21,9 +21,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,7 +43,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -54,7 +50,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
@@ -64,6 +59,7 @@ import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.designsystem.Elevation
 import com.codeboxlk.tranzlate.core.designsystem.LocalFloatingSurface
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
+import com.codeboxlk.tranzlate.core.designsystem.TranzlateShapeFull
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
@@ -92,29 +88,29 @@ private val CardShadow = Elevation.level1 // 1 -> 1 (same)
 @Composable
 fun HomeScreen(
     viewModel: TextViewModel,
-    onTranslateRequested: () -> Unit,
+    onOpenComposer: () -> Unit,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
     modifier: Modifier = Modifier,
+    previewCardModifier: Modifier = Modifier,
 ) {
-    val input by viewModel.input.collectAsStateWithLifecycle()
     val sourceLang by viewModel.sourceLang.collectAsStateWithLifecycle()
     val targetLang by viewModel.targetLang.collectAsStateWithLifecycle()
+
     HomeContent(
-        input = input,
         sourceLangId = sourceLang,
         targetLangId = targetLang,
-        onInputChange = viewModel::onInputChange,
-        onTranslate = { if (viewModel.onTranslate()) onTranslateRequested() },
+        onOpenComposer = onOpenComposer,
         onSwapLanguages = viewModel::onSwapLanguages,
         onPickLanguage = onPickLanguage,
         onOpenSettings = onOpenSettings,
         onOpenCamera = onOpenCamera,
         onOpenLanguages = onOpenLanguages,
         onOpenConversation = onOpenConversation,
+        previewCardModifier = previewCardModifier,
         modifier = modifier,
     )
 }
@@ -124,11 +120,9 @@ fun HomeScreen(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Suppress("LongMethod") // one cohesive screen; splitting hides the card-stack order
 fun HomeContent(
-    input: String,
     sourceLangId: String,
     targetLangId: String,
-    onInputChange: (String) -> Unit,
-    onTranslate: () -> Unit,
+    onOpenComposer: () -> Unit,
     onSwapLanguages: () -> Unit,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onOpenSettings: () -> Unit,
@@ -136,6 +130,7 @@ fun HomeContent(
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
     modifier: Modifier = Modifier,
+    previewCardModifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
     val scope = rememberCoroutineScope()
@@ -219,11 +214,10 @@ fun HomeContent(
                         .padding(horizontal = ScreenMargin),
                 verticalArrangement = Arrangement.spacedBy(SectionGap),
             ) {
-                InputCard(
-                    input = input,
-                    onInputChange = onInputChange,
-                    onTranslate = onTranslate,
-                    onMic = { guided(guidedVoice) },
+                InputPreviewCard(
+                    onOpen = onOpenComposer,
+                    onMic = onOpenComposer,
+                    modifier = previewCardModifier,
                 )
                 Text(
                     text = stringResource(R.string.home_tools),
@@ -336,7 +330,7 @@ private fun TokenProChip(onClick: () -> Unit) {
 
 /** Source ⇄ target: two tonal pills either side of a swap button. */
 @Composable
-private fun LanguageRow(
+internal fun LanguageRow(
     sourceLabel: String,
     targetLabel: String,
     onSourceClick: () -> Unit,
@@ -386,7 +380,7 @@ private fun LanguageRow(
 }
 
 @Composable
-private fun LanguagePill(
+internal fun LanguagePill(
     label: String,
     contentDescription: String,
     onClick: () -> Unit,
@@ -428,26 +422,24 @@ private fun LanguagePill(
 }
 
 /**
- * The input card. Per the brief the mic lives in the action row and becomes the
- * filled Translate button as soon as there is text — so there is no FAB.
+ * Requirement A of the 5a brief: Home keeps ONLY the placeholder and the voice
+ * button — no counter, nothing editable. Both taps open the 5a composer (voice
+ * input happens THERE); the card is the shared morph anchor, so it carries the
+ * A/B variants' sharedBounds modifier.
  */
 @Composable
-private fun InputCard(
-    input: String,
-    onInputChange: (String) -> Unit,
-    onTranslate: () -> Unit,
+private fun InputPreviewCard(
+    onOpen: () -> Unit,
     onMic: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
-    val hasText = input.isNotBlank()
-    val overLimit = input.length > TEXT_CHAR_LIMIT
-    val inputDescription = stringResource(R.string.cd_text_input)
-    val counterDescription = stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT)
     Surface(
+        onClick = onOpen,
         shape = InputCardRadius,
         color = LocalFloatingSurface.current,
         shadowElevation = CardShadow,
-        modifier = Modifier.fillMaxWidth().testTag("tt_text_card"),
+        modifier = modifier.fillMaxWidth().testTag("tt_text_card"),
     ) {
         Column(
             modifier =
@@ -458,91 +450,34 @@ private fun InputCard(
                     bottom = spacing.md16,
                 ),
         ) {
-            BasicTextField(
-                value = input,
-                onValueChange = onInputChange,
-                textStyle =
-                    MaterialTheme.typography.headlineSmall.copy(
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { if (hasText) onTranslate() }),
+            Text(
+                text = stringResource(R.string.text_input_placeholder),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = Dimensions.composerInputMinHeight)
-                        .semantics { contentDescription = inputDescription }
-                        .testTag("tt_text_input"),
-                decorationBox = { inner ->
-                    if (input.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.text_input_placeholder),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    inner()
-                },
+                        .testTag("tt_home_input_preview"),
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(top = spacing.md16),
+                modifier = Modifier.fillMaxWidth().padding(top = spacing.sm8),
             ) {
-                Text(
-                    text =
-                        if (overLimit) {
-                            stringResource(R.string.text_over_char_limit, TEXT_CHAR_LIMIT)
-                        } else {
-                            stringResource(R.string.text_char_counter, input.length, TEXT_CHAR_LIMIT)
-                        },
-                    style = MaterialTheme.typography.labelMedium,
-                    color =
-                        if (overLimit) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .semantics { contentDescription = counterDescription }
-                            .testTag("tt_text_counter"),
-                )
-                if (hasText) {
-                    Button(
-                        onClick = onTranslate,
-                        enabled = !overLimit,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ),
-                        modifier = Modifier.height(ActionSize).testTag("tt_text_translate_btn"),
-                    ) {
+                Spacer(Modifier.weight(1f))
+                Surface(
+                    onClick = onMic,
+                    shape = TranzlateShapeFull,
+                    color = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(ActionSize).testTag("tt_home_mic"),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            painterResource(DsR.drawable.ic_translate),
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimensions.iconSm),
+                            painterResource(DsR.drawable.ic_mic),
+                            contentDescription = stringResource(R.string.cd_text_mic),
+                            modifier = Modifier.size(Dimensions.iconMd),
                         )
-                        Spacer(Modifier.size(spacing.sm8))
-                        Text(stringResource(R.string.home_translate))
-                    }
-                } else {
-                    Surface(
-                        onClick = onMic,
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(ActionSize).testTag("tt_text_mic"),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                painterResource(DsR.drawable.ic_mic),
-                                contentDescription = stringResource(R.string.cd_text_mic),
-                                modifier = Modifier.size(Dimensions.iconMd),
-                            )
-                        }
                     }
                 }
             }
@@ -746,34 +681,12 @@ private fun PhrasingBanner(onClick: () -> Unit) {
 
 @PreviewLightDark
 @Composable
-private fun HomeContentEmptyPreview() {
+private fun HomeContentPreview() {
     TranzlateTheme {
         HomeContent(
-            input = "",
             sourceLangId = "en",
             targetLangId = "es",
-            onInputChange = {},
-            onTranslate = {},
-            onSwapLanguages = {},
-            onPickLanguage = {},
-            onOpenSettings = {},
-            onOpenCamera = {},
-            onOpenLanguages = {},
-            onOpenConversation = {},
-        )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun HomeContentTypingPreview() {
-    TranzlateTheme {
-        HomeContent(
-            input = "Good morning",
-            sourceLangId = "en",
-            targetLangId = "es",
-            onInputChange = {},
-            onTranslate = {},
+            onOpenComposer = {},
             onSwapLanguages = {},
             onPickLanguage = {},
             onOpenSettings = {},
