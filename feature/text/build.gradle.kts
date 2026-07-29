@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    implementation(projects.core.config)
     implementation(libs.androidx.compose.material.icons.extended)
 
     testImplementation(projects.core.testing)

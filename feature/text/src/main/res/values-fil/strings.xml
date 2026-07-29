@@ -15,4 +15,11 @@
     <string name="text_error_offline">Wala kang internet. Kumonekta sa internet at subukang muli.</string>
     <string name="text_error_limit_reached">Nagamit mo na ang libreng AI translations ngayong araw. Magre-reset ito sa hatinggabi.</string>
     <string name="text_error_not_entitled">Kailangan ng Pro subscription ang ganitong kalidad ng pagsasalin.</string>
+    <string name="text_ai_meter">AI translations: %1$d/%2$d na lang ngayong araw</string>
+    <string name="limit_sheet_title_quota">Naabot na ang libreng AI limit ngayong araw</string>
+    <string name="limit_sheet_body_quota">Nagamit na ang 5 libreng AI-quality translations mo ngayong araw. Magre-reset sa hatinggabi — o mag-Pro para unlimited.</string>
+    <string name="limit_sheet_title_pro">Kailangan ng Pro ang kalidad na ito</string>
+    <string name="limit_sheet_body_pro">Pro feature ang natural-phrasing AI translations. Gumagana pa rin ang libre mong translations.</string>
+    <string name="limit_sheet_cta">Tingnan ang Pro plans</string>
+    <string name="limit_sheet_dismiss">Hindi muna</string>
 </resources>

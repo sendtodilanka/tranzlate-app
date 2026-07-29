@@ -7,6 +7,7 @@ import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
+import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
 import com.codeboxlk.tranzlate.core.testing.FakeTranslationRepository
 import com.codeboxlk.tranzlate.core.testing.FakeTranslator
 import com.codeboxlk.tranzlate.core.testing.FakeUsagePolicy
@@ -110,6 +111,9 @@ class TextViewModelTest {
             translateText = useCase,
             prefs = prefs,
             languageRepository = FakeLanguageRepository(),
+            usagePolicy = usage,
+            featureAccess = access,
+            config = FakeRemoteConfig(),
             dispatchers = TestDispatcherProvider(dispatcher),
             clock = clock,
             savedStateHandle = handle,

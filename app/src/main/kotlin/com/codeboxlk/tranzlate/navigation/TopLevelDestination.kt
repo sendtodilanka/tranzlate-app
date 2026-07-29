@@ -37,6 +37,9 @@ data class LanguagePickerNavKey(
 data object ComposerNavKey : NavKey
 
 @Serializable
+data object PaywallNavKey : NavKey
+
+@Serializable
 data object CameraNavKey : NavKey
 
 /** Conversation/Dialog tab — the feature ships in v2, so it shows a coming-soon placeholder. */

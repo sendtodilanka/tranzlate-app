@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="paywall_hero">Traduza como um Pro</string>
+    <string name="paywall_benefit_no_ads">Sem anúncios, nunca</string>
+    <string name="paywall_benefit_unlimited_ai">Traduções com qualidade de IA ilimitadas</string>
+    <string name="paywall_benefit_characters">Traduza até 5.000 caracteres de uma vez</string>
+    <string name="paywall_benefit_phrasing">Fraseado natural, como um nativo</string>
+    <string name="paywall_plan_weekly">Semanal</string>
+    <string name="paywall_plan_monthly">Mensal</string>
+    <string name="paywall_plan_yearly">★ Anual</string>
+    <string name="paywall_price_weekly">US$1.99</string>
+    <string name="paywall_price_monthly">US$4.99</string>
+    <string name="paywall_price_yearly">US$29.99</string>
+    <string name="paywall_badge_save">ECONOMIZE ~60%</string>
+    <string name="paywall_trial_line">7 dias de teste grátis</string>
+    <string name="paywall_per_day">Cerca de US$0.08 por dia</string>
+    <string name="paywall_cancel_anytime">Cancele quando quiser no Google Play</string>
+    <string name="paywall_cta_trial">Começar meus 7 dias grátis</string>
+    <string name="paywall_cta_continue">Continuar</string>
+    <string name="paywall_restore">Restaurar compras</string>
+    <string name="paywall_terms">Termos</string>
+    <string name="paywall_privacy">Privacidade</string>
+    <string name="paywall_cd_close">Fechar</string>
+    <string name="paywall_purchase_unavailable">A cobrança ainda não está disponível — nada foi cobrado.</string>
+    <string name="paywall_restore_failed">Não foi possível acessar a loja para restaurar. Tente mais tarde.</string>
+    <string name="paywall_restore_nothing">Nenhuma compra para restaurar nesta conta.</string>
+    <string name="paywall_links_coming">As páginas de Termos e Privacidade chegam antes do lançamento.</string>
+</resources>

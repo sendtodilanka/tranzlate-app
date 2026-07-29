@@ -5,20 +5,25 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
+import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
+import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
+import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
+import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,6 +76,9 @@ class TextViewModel
         private val translateText: TranslateTextUseCase,
         private val prefs: TranslatePrefsRepository,
         languageRepository: LanguageRepository,
+        usagePolicy: UsagePolicy,
+        featureAccess: FeatureAccess,
+        config: RemoteConfigSource,
         private val dispatchers: DispatcherProvider,
         clock: AppClock,
         private val savedStateHandle: SavedStateHandle,
@@ -95,6 +103,23 @@ class TextViewModel
 
         private val _uiState = MutableStateFlow<TextUiState>(TextUiState.Idle)
         val uiState: StateFlow<TextUiState> = _uiState.asStateFlow()
+
+        /** FREE pool cap for the "{left}/{cap}" meter (BUSINESS_MODEL §5 goal-gradient). */
+        val aiCap: Int = config.limitFreeAi()
+
+        /** Live AI-quality quota meter — read-only ask, the Usage brain owns the count. */
+        val aiRemaining: StateFlow<Int> =
+            usagePolicy.remaining.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(PREFS_SUBSCRIBE_TIMEOUT_MS),
+                aiCap,
+            )
+
+        /** PRO hides the meter (unlimited). Loading counts as not-PRO for DISPLAY only. */
+        val isPro: StateFlow<Boolean> =
+            featureAccess.entitlement
+                .map { it is Entitlement.Paid }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(PREFS_SUBSCRIBE_TIMEOUT_MS), false)
 
         /**
          * The ONE way this class changes state, so what is persisted can never
