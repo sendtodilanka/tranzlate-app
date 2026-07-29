@@ -1,5 +1,5 @@
 # Tranzlate — Text Translation: Test + Accessibility Contract (Foundation)
-> **⚠ Superseded in part (2026-07-29, issue #50 / BUSINESS_MODEL.md):** D-2 rev.2 collapses tiers to **FREE + PRO**, and C-10 rev.2 removes user engine selection (the mode chip). **§1.3 is rewritten to rev.2 and matches shipped code (issue #53 PR-3)**; remaining PLUS/PREMIUM or mode-chip references elsewhere (fake usage names, strings, mode-chip tests) are still stale and get theirs with the Usage-brain + paywall batches; on conflict this banner wins.
+> **⚠ Superseded in part (2026-07-29, issue #50 / BUSINESS_MODEL.md):** D-2 rev.2 collapses tiers to **FREE + PRO**, and C-10 rev.2 removes user engine selection (the mode chip). **§1.3 (PR-3) and §1.4 (PR-4) are rewritten to rev.2 and match shipped code**; remaining PLUS/PREMIUM or mode-chip references elsewhere (strings, mode-chip tests) are still stale and get theirs with the paywall batch; on conflict this banner wins.
 
 
 > **Feature:** TEXT TRANSLATION (`HomeScreen` + `ResultScreen` සහ ඒවායේ `TextInputCard`, `SourceCard`, `ResultCard`, `ErrorView` components).
@@ -121,33 +121,44 @@ class FakeFeatureAccess(tier: Tier = Tier.FREE) : FeatureAccess {
 
 **Loading-gate test hook:** `state.value = Entitlement.Loading` කරලා metered call එකක් දෙන්න — gate එක resolve වෙනකම් suspend විය යුතුයි, FREE-විදිහට decide වෙන්න බෑ.
 
-## 1.4 Fake `UsagePolicy` (at-limit / under)
+## 1.4 Fake `UsagePolicy` (at-limit / under) — **rev.2, matches shipped code (issue #53 PR-4)**
 
 ```kotlin
+enum class SpendResult { SPENT, OVER }
 interface UsagePolicy {
-    fun remaining(): Int          // for NLP35 text feature; -1 = unlimited
-    fun isOver(): Boolean
-    fun warningMessage(): String? // "You have N free NLP3.5 translations left today"
-    suspend fun increment()
+    val remaining: Flow<Int>              // FREE pool's live "{left}/5 today" meter
+    suspend fun trySpend(tier: Tier): SpendResult  // ATOMIC check-and-spend — THE gate
+    suspend fun refund(tier: Tier)        // failure returns the spend (success-only constant)
 }
 ```
 
-Fake states — test වලින් inject කරන deterministic scenarios:
+`isOver()`/`increment()` retire — ඒ දෙක වෙන වෙනම තිබීමම double-tap double-spend race එක (4/5 දෙපාරක් pass → 6/5). `warningMessage()` retire — UI එක `remaining` flow එකෙන් string එක derive කරයි. Tier-aware: FREE → `limit_free_ai` pool · PRO → fair-use pool (independent).
 
-| Fake name | `remaining()` | `isOver()` | `warningMessage()` | Use in |
-|-----------|:-------------:|:----------:|--------------------|--------|
-| `FakeUsageUnder` | `5` | false | `"5 free NLP3.5 translations left today"` | happy path, warning banner |
-| `FakeUsageLast` | `1` | false | `"1 free NLP3.5 translation left today"` | pluralization test |
-| `FakeUsageAtLimit` | `0` | true | `null` (paywall replaces) | G11 LimitReached, paywall route |
-| `FakeUsageUnlimited` | `-1` | false | `null` | PLUS/PREMIUM tiers |
+Fake states — test වලින් inject කරන deterministic scenarios (`FakeUsagePolicy(left = N)`):
+
+| Scenario | `left` | `trySpend(FREE)` | Use in |
+|-----------|:------:|:----------------:|--------|
+| Under | `5` | SPENT (meter 4) | happy path, warning banner |
+| Last | `1` | SPENT (meter 0) | pluralization test |
+| AtLimit | `0` | **OVER** | G11 LimitReached, paywall route |
+| Unlimited sentinel | `-1` | SPENT (meter untouched) | legacy unlimited rows |
+
+Spies: `spends` (cache hits must stay 0) · `refunds` (failures must return the spend). `trySpend(PRO)` always SPENT and never moves the FREE meter.
 
 ```kotlin
-class FakeUsagePolicy(private var left: Int, private val cap: Int = 20) : UsagePolicy {
-    override fun remaining() = left
-    override fun isOver() = left == 0
-    override fun warningMessage() =
-        if (left in 1..3) "$left free NLP3.5 translation${if (left==1) "" else "s"} left today" else null
-    override suspend fun increment() { if (left > 0) left-- }
+class FakeUsagePolicy(left: Int, private val cap: Int = 5) : UsagePolicy {
+    var spends = 0; var refunds = 0                      // spies
+    val state = MutableStateFlow(left)
+    override val remaining: Flow<Int> get() = state
+    override suspend fun trySpend(tier: Tier): SpendResult = when {
+        tier == Tier.PRO || state.value == -1 -> { spends++; SpendResult.SPENT }
+        state.value <= 0 -> SpendResult.OVER
+        else -> { spends++; state.value -= 1; SpendResult.SPENT }
+    }
+    override suspend fun refund(tier: Tier) {
+        refunds++
+        if (tier == Tier.FREE && state.value in 0 until cap) state.value += 1
+    }
 }
 ```
 
@@ -206,7 +217,7 @@ Namespace convention: `tt_text_*`. සෑම control එකකටම `Modifier.t
 | 14 | Error view (container) | `tt_text_error_view` | `ErrorView` | container (`liveRegion`) | title + retry |
 | 15 | Result text | `tt_text_result` | `ResultCard` | text (selectable) | golden output rendered here |
 | — | Loading indicator | `tt_text_loading` | `LoadingView` | progress (`liveRegion`) | translating spinner |
-| — | Usage warning banner | `tt_text_usage_warning` | `HomeScreen` | text (`liveRegion` polite) | from `warningMessage()` |
+| — | Usage warning banner | `tt_text_usage_warning` | `HomeScreen` | text (`liveRegion` polite) | UI-derived from the `remaining` flow (rev.2 — `warningMessage()` retired) |
 
 > **Contract:** මේ tag string 17 වෙනස් නොවිය යුතුයි (Maestro + Compose test දෙකම මේවා reference කරයි). tag rename එකක් = breaking change = doc update + PR.
 
@@ -397,7 +408,7 @@ appId: com.codeboxlk.tranzlate.offlinetranslator
 | Translate started | `tt_text_loading` | `Polite` | `Translating…` (`a11y_translating`) |
 | Result ready | `tt_text_result` | `Polite` | `Translation ready: %1$s` (`a11y_result_ready`) — result text |
 | Error | `tt_text_error_view` | `Assertive` | `Translation failed. %1$s` (`a11y_error`) — reason (`Network unavailable` / `Translation error`) |
-| Usage warning | `tt_text_usage_warning` | `Polite` | `%1$s` (`warningMessage()` — e.g. `1 free NLP3.5 translation left today`) |
+| Usage warning | `tt_text_usage_warning` | `Polite` | `%1$s` (UI-derived from `remaining` — e.g. `1 free NLP3.5 translation left today`) |
 | At limit | (paywall) | `Assertive` | `Daily free limit reached` (`a11y_limit_reached`) |
 
 Implement via `Modifier.semantics { liveRegion = LiveRegionMode.Polite/Assertive }`. Assertive **only** for error/limit (interrupts); everything else Polite.

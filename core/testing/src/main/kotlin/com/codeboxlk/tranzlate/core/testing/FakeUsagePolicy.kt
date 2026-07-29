@@ -1,28 +1,54 @@
 package com.codeboxlk.tranzlate.core.testing
 
+import com.codeboxlk.tranzlate.core.model.Tier
+import com.codeboxlk.tranzlate.domain.usage.SpendResult
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * Deterministic Usage fake (TEST_A11Y_CONTRACT §1.4 — verbatim behaviour).
- * Scenario states: Under(left=5) · Last(left=1) · AtLimit(left=0) · Unlimited(left=-1).
+ * Deterministic Usage fake (TEST_A11Y_CONTRACT §1.4 rev.2).
+ * Scenario states: Under(left=5) · Last(left=1) · AtLimit(left=0) ·
+ * Unlimited(left=-1). PRO spends always succeed (the fair-use guard is a
+ * RealUsagePolicy concern) and never touch the FREE meter.
  */
 class FakeUsagePolicy(
-    private var left: Int,
-    @Suppress("unused") private val cap: Int = 20,
+    left: Int,
+    private val cap: Int = 5,
 ) : UsagePolicy {
-    /** Spy: how many times [increment] ran (issue #53 A2 — cache hits must never spend). */
-    var incremented: Int = 0
+    /** Spy: successful spends (issue #53 A2 — cache hits must never spend). */
+    var spends: Int = 0
         private set
 
-    override fun remaining(): Int = left
+    /** Spy: refunds (DECISIONS success-only — failures must return the spend). */
+    var refunds: Int = 0
+        private set
 
-    override fun isOver(): Boolean = left == 0
+    /** Mutable so tests drive the meter directly. */
+    val state: MutableStateFlow<Int> = MutableStateFlow(left)
 
-    override fun warningMessage(): String? =
-        if (left in 1..3) "$left free NLP3.5 translation${if (left == 1) "" else "s"} left today" else null
+    override val remaining: Flow<Int> get() = state
 
-    override suspend fun increment() {
-        incremented++
-        if (left > 0) left--
+    override suspend fun trySpend(tier: Tier): SpendResult =
+        when {
+            tier == Tier.PRO || state.value == -1 -> {
+                spends++
+                SpendResult.SPENT
+            }
+
+            state.value <= 0 -> {
+                SpendResult.OVER
+            }
+
+            else -> {
+                spends++
+                state.value -= 1
+                SpendResult.SPENT
+            }
+        }
+
+    override suspend fun refund(tier: Tier) {
+        refunds++
+        if (tier == Tier.FREE && state.value in 0 until cap) state.value += 1
     }
 }
