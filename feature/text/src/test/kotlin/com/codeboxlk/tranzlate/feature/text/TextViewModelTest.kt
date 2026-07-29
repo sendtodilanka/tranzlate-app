@@ -128,6 +128,31 @@ class TextViewModelTest {
     // ---- issue #68: tap-to-reopen + star-to-save -----------------------------
 
     @Test
+    fun `a favourited result restores with the star FILLED - the first tap must not un-save`() {
+        val repository = FakeTranslationRepository()
+        val handle = SavedStateHandle()
+        val first = viewModel(handle = handle, repository = repository)
+        settle()
+        first.onInputChange("Good morning")
+        first.onTranslate()
+        settle()
+        first.onToggleFavourite()
+        settle()
+        assertThat(repository.saved.single().favourite).isTrue()
+
+        val reborn = viewModel(handle = handle, repository = repository) // process death
+        settle()
+
+        // PR-69 lens OPEN-1: the restore bypassed the setter, the star rendered
+        // unfilled, and the "save" tap silently DELETED the favourite.
+        assertThat(reborn.resultFavourite.value).isTrue()
+
+        reborn.onToggleFavourite() // what a user believing "unsaved" would tap...
+        settle()
+        assertThat(repository.saved.single().favourite).isFalse() // ...now correctly UN-saves
+    }
+
+    @Test
     fun `history pick restores input, pair and the stored result`() {
         val prefs = FakeTranslatePrefsRepository()
         val vm = viewModel(prefs = prefs)

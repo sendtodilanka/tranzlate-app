@@ -179,11 +179,11 @@ class TextViewModel
         private fun restoreState() {
             val rebuilt =
                 when (savedStateHandle.get<String>(KEY_STATE)) {
-                    STATE_RESULT -> restoreResult()?.also { _uiState.value = it } != null
+                    STATE_RESULT -> restoreResult()?.also { state = it } != null
 
-                    STATE_ERROR -> restoreError()?.also { _uiState.value = it } != null
+                    STATE_ERROR -> restoreError()?.also { state = it } != null
 
-                    STATE_LIMIT -> restoreLimit()?.also { _uiState.value = it } != null
+                    STATE_LIMIT -> restoreLimit()?.also { state = it } != null
 
                     // The system interrupted a translation the user asked for and
                     // never received. Resuming it is honest — reporting a failure
