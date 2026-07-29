@@ -65,3 +65,14 @@ Unit: every branch of the diagram produces the exact trace listed. Device: prod 
 `Good morning` en→fr returns a real GOT translation; auto-detect on French input resolves
 `fr` and writes history under the resolved source. Gates: full suite · detekt/spotless ·
 fake+prod assemble · CI. Engine additions never touch the fake variant's golden table.
+
+## Post-lens follow-ups (PR #62 cross-model lens, recorded not lost)
+- **N4:** ML Kit non-English pairs may pivot through English and need the EN model too — the
+  src+tgt downloaded-check could mis-report `ENGINE_ERROR` instead of `MODEL_NOT_DOWNLOADED`
+  for fr→de-without-en. Device-verify when the offline manager (Screen B) lands; if confirmed,
+  require EN for non-EN pairs.
+- **N5:** Language ID can detect tags outside the picker catalog ("haw") which then persist as
+  `Translation.sourceLang` — History's label lookup must fall back to the raw id (verify in the
+  History batch; alternatively treat unknown detects like "und").
+- **N7:** `NET_CAPABILITY_VALIDATED` can false-negative on some AVDs/VPNs → both online tiers
+  skip. Correct-by-semantics (captive portal = offline); watch for smoke flakiness.

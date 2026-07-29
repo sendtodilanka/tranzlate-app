@@ -90,10 +90,30 @@ class RealTranslator internal constructor(
         mode: ModeId,
     ): TranslationOutcome =
         when (mode) {
-            ModeId.AUTO -> waterfall(text, srcLang, tgtLang)
-            ModeId.ML2_MINI -> single(tier1Offline, text, srcLang, tgtLang)
-            ModeId.ML2_ONLINE -> single(tier2FreeOnline, text, srcLang, tgtLang)
-            ModeId.NLP35 -> single(tier3Paid, text, srcLang, tgtLang)
+            ModeId.AUTO -> {
+                waterfall(text, srcLang, tgtLang)
+            }
+
+            ModeId.ML2_MINI -> {
+                single(tier1Offline, text, srcLang, tgtLang)
+            }
+
+            ModeId.ML2_ONLINE -> {
+                single(tier2FreeOnline, text, srcLang, tgtLang)
+            }
+
+            // Keyless brands have no paid tier ANYWHERE — the direct mode gets
+            // the same guard the waterfall has (PR-62 lens OPEN-3), and no
+            // network call ever carries key="".
+            ModeId.NLP35 -> {
+                if (gctConfigured()) {
+                    single(tier3Paid, text, srcLang, tgtLang)
+                } else {
+                    TranslationOutcome.Error(
+                        listOf(EngineAttempt(tier3Paid.engine, AttemptCause.ENGINE_ERROR)),
+                    )
+                }
+            }
         }
 
     private suspend fun single(

@@ -21,7 +21,10 @@ internal suspend fun Call.await(): Response =
                     call: Call,
                     response: Response,
                 ) {
-                    continuation.resume(response)
+                    // Cancel racing the delivery: a resumed-but-never-consumed
+                    // Response must still be closed or the connection leaks
+                    // (PR-62 lens OPEN-1 — the classic bridge leak).
+                    continuation.resume(response) { _, _, _ -> response.close() }
                 }
 
                 override fun onFailure(

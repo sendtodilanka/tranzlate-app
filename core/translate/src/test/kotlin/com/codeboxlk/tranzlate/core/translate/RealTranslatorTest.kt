@@ -87,9 +87,9 @@ class RealTranslatorTest {
 
     @Suppress("LongParameterList")
     private fun translator(
-        tier1: FakeEngine = mlkit(modelMissing),
-        tier2: FakeEngine = got(engineError),
-        tier3: FakeEngine = gct(engineError),
+        tier1: TranslateEngine = mlkit(modelMissing),
+        tier2: TranslateEngine = got(engineError),
+        tier3: TranslateEngine = gct(engineError),
         identified: String? = "en",
         online: Boolean = true,
         gotEnabled: Boolean = true,
@@ -266,6 +266,34 @@ class RealTranslatorTest {
             assertThat(usage.spends).isEqualTo(0)
         }
 
+    @Test
+    fun `cancellation inside the paid tail refunds the spend`() =
+        runTest {
+            val usage = FakeUsagePolicy(left = 5)
+            val cancelling =
+                object : TranslateEngine {
+                    override val engine = Engine.ONLINE_CLOUD_NLP
+
+                    override suspend fun translate(
+                        text: String,
+                        srcLang: String,
+                        tgtLang: String,
+                    ): EngineResult = throw kotlin.coroutines.cancellation.CancellationException("nav-away")
+                }
+
+            var thrown = false
+            try {
+                translator(tier3 = cancelling, usage = usage)
+                    .translate("Good morning", "en", "fr", ModeId.AUTO)
+            } catch (expected: kotlin.coroutines.cancellation.CancellationException) {
+                thrown = true
+            }
+
+            assertThat(thrown).isTrue() // structured cancellation still propagates
+            assertThat(usage.spends).isEqualTo(1)
+            assertThat(usage.refunds).isEqualTo(1) // the dying tail returned the spend
+        }
+
     // ---- Direct modes ----
 
     @Test
@@ -277,6 +305,20 @@ class RealTranslatorTest {
 
             assertThat((outcome as TranslationOutcome.Error).attempts)
                 .containsExactly(EngineAttempt(Engine.OFFLINE_MLKIT, AttemptCause.MODEL_NOT_DOWNLOADED))
+        }
+
+    @Test
+    fun `direct NLP35 on a keyless brand is a guarded error - no call with an empty key`() =
+        runTest {
+            val tier3 = gct(EngineResult.Success("never")) as FakeEngine
+
+            val outcome =
+                translator(tier3 = tier3, gctKey = "")
+                    .translate("Good morning", "en", "fr", ModeId.NLP35)
+
+            assertThat((outcome as TranslationOutcome.Error).attempts)
+                .containsExactly(EngineAttempt(Engine.ONLINE_CLOUD_NLP, AttemptCause.ENGINE_ERROR))
+            assertThat(tier3.calls).isEmpty()
         }
 
     @Test

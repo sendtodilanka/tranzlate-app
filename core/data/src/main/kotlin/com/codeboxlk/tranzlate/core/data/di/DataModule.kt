@@ -2,8 +2,6 @@ package com.codeboxlk.tranzlate.core.data.di
 
 import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
 import com.codeboxlk.tranzlate.core.data.config.StaticRemoteConfigSource
-import com.codeboxlk.tranzlate.core.data.network.ConnectivityMonitor
-import com.codeboxlk.tranzlate.core.data.network.StubConnectivityMonitor
 import com.codeboxlk.tranzlate.core.data.repository.LanguageRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.ThemePrefsRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.TranslatePrefsRepositoryImpl
