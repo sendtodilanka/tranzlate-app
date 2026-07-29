@@ -5,10 +5,12 @@ import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +19,8 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -77,6 +81,11 @@ private val PillHeight = Dimensions.touchTargetMin // 48 -> 48 (same)
 private val CircleIconSize = Dimensions.iconChip // 44 -> 40
 private val ActionSize = Dimensions.touchTargetMin // 48 -> 48 (same)
 private val CardShadow = Elevation.level1 // 1 -> 1 (same)
+
+// Two-pane split (issue #56 frames 1/4): translate zone 2 : tools 3 (≈40/60).
+// A separating hinge overrides both to 1 : 1 (frames 6/7).
+private const val PANE_WEIGHT_PRIMARY = 2f
+private const val PANE_WEIGHT_SECONDARY = 3f
 
 /**
  * Home — the approved "card stack" (Claude Design · Offline Translator M3):
@@ -145,6 +154,93 @@ fun HomeContent(
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
 
+    val layout = rememberAdaptiveLayout()
+    if (layout.expandedWidth) {
+        // Two-pane Home (issue #56, owner-approved frames 1/4/6): left = the
+        // translate zone, right = the tools stack. A separating hinge snaps the
+        // split to 50/50 with a gutter so nothing sits under the fold.
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentWindowInsets = WindowInsets.safeDrawing,
+        ) { contentPadding ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(contentPadding)
+                        .padding(horizontal = LocalSpacing.current.lg24),
+            ) {
+                Column(modifier = Modifier.weight(if (layout.hinged) 1f else PANE_WEIGHT_PRIMARY)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().height(Dimensions.topBarHeight),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_title),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        TokenProChip(onClick = { guided(guidedPro) })
+                        IconButton(
+                            onClick = onOpenSettings,
+                            modifier = Modifier.testTag("tt_home_settings"),
+                        ) {
+                            Icon(
+                                painterResource(DsR.drawable.ic_settings),
+                                contentDescription = stringResource(R.string.cd_home_settings),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    LanguageRow(
+                        sourceLabel = languageLabel(sourceLangId),
+                        targetLabel = languageLabel(targetLangId),
+                        onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
+                        onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
+                        onSwap = onSwapLanguages,
+                        swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
+                        modifier = Modifier.padding(vertical = spacing.sm8),
+                    )
+                    InputPreviewCard(
+                        onOpen = onOpenComposer,
+                        onMic = onOpenComposer,
+                        modifier = previewCardModifier.weight(1f).padding(bottom = ScreenMargin),
+                    )
+                }
+                Spacer(Modifier.width(LocalSpacing.current.lg24))
+                CompositionLocalProvider(LocalOverscrollFactory provides null) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .weight(if (layout.hinged) 1f else PANE_WEIGHT_SECONDARY)
+                                .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(SectionGap),
+                    ) {
+                        ToolsStack(
+                            guided = ::guided,
+                            guidedVoice = guidedVoice,
+                            guidedPhrasebook = guidedPhrasebook,
+                            guidedQuotes = guidedQuotes,
+                            guidedPhrasing = guidedPhrasing,
+                            onOpenCamera = onOpenCamera,
+                            onOpenLanguages = onOpenLanguages,
+                            onOpenConversation = onOpenConversation,
+                        )
+                        Spacer(Modifier.height(ScreenMargin))
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    // Tablet portrait (medium width): the stack itself, centred at a readable width
+    // (C-13 single-column rule) rather than stretched edge to edge.
+    val contentMaxWidth =
+        if (layout.mediumWidth) Modifier.widthIn(max = Dimensions.contentMaxWidthMedium) else Modifier
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -187,12 +283,14 @@ fun HomeContent(
                     onSwap = onSwapLanguages,
                     swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
                     modifier =
-                        Modifier.padding(
-                            start = ScreenMargin,
-                            end = ScreenMargin,
-                            top = spacing.sm8,
-                            bottom = spacing.md16,
-                        ),
+                        contentMaxWidth
+                            .align(Alignment.CenterHorizontally)
+                            .padding(
+                                start = ScreenMargin,
+                                end = ScreenMargin,
+                                top = spacing.sm8,
+                                bottom = spacing.md16,
+                            ),
                 )
             }
         },
@@ -206,97 +304,127 @@ fun HomeContent(
         // including fling, is unchanged).
         CompositionLocalProvider(LocalOverscrollFactory provides null) {
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(contentPadding)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = ScreenMargin),
-                verticalArrangement = Arrangement.spacedBy(SectionGap),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxSize().padding(contentPadding),
             ) {
-                InputPreviewCard(
-                    onOpen = onOpenComposer,
-                    onMic = onOpenComposer,
-                    modifier = previewCardModifier,
-                )
-                Text(
-                    text = stringResource(R.string.home_tools),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = spacing.xs4, top = spacing.md16),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
-                    ToolCard(
-                        icon = painterResource(DsR.drawable.ic_cloud_done),
-                        title = stringResource(R.string.home_tool_offline),
-                        subtitle = stringResource(R.string.home_tool_offline_sub),
-                        container = MaterialTheme.colorScheme.primaryContainer,
-                        onContainer = MaterialTheme.colorScheme.onPrimaryContainer,
-                        onClick = onOpenLanguages,
-                        testTag = "tt_home_tool_offline",
-                        modifier = Modifier.weight(1f),
+                Column(
+                    modifier =
+                        contentMaxWidth
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = ScreenMargin),
+                    verticalArrangement = Arrangement.spacedBy(SectionGap),
+                ) {
+                    InputPreviewCard(
+                        onOpen = onOpenComposer,
+                        onMic = onOpenComposer,
+                        modifier = previewCardModifier,
                     )
-                    ToolCard(
-                        icon = painterResource(DsR.drawable.ic_record_voice_over),
-                        title = stringResource(R.string.home_tool_voice),
-                        subtitle = stringResource(R.string.home_tool_voice_sub),
-                        container = MaterialTheme.colorScheme.secondaryContainer,
-                        onContainer = MaterialTheme.colorScheme.onSecondaryContainer,
-                        onClick = { guided(guidedVoice) },
-                        testTag = "tt_home_tool_voice",
-                        modifier = Modifier.weight(1f),
+                    ToolsStack(
+                        guided = ::guided,
+                        guidedVoice = guidedVoice,
+                        guidedPhrasebook = guidedPhrasebook,
+                        guidedQuotes = guidedQuotes,
+                        guidedPhrasing = guidedPhrasing,
+                        onOpenCamera = onOpenCamera,
+                        onOpenLanguages = onOpenLanguages,
+                        onOpenConversation = onOpenConversation,
                     )
+                    Spacer(Modifier.height(ScreenMargin))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
-                    ToolCard(
-                        icon = painterResource(DsR.drawable.ic_photo_camera),
-                        title = stringResource(R.string.home_tool_camera),
-                        subtitle = stringResource(R.string.home_tool_camera_sub),
-                        container = MaterialTheme.colorScheme.tertiaryContainer,
-                        onContainer = MaterialTheme.colorScheme.onTertiaryContainer,
-                        onClick = onOpenCamera,
-                        testTag = "tt_home_tool_camera",
-                        modifier = Modifier.weight(1f),
-                    )
-                    ToolCard(
-                        icon = painterResource(DsR.drawable.ic_forum),
-                        title = stringResource(R.string.home_tool_conversation),
-                        subtitle = stringResource(R.string.home_tool_conversation_sub),
-                        container = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        onContainer = MaterialTheme.colorScheme.onSurface,
-                        onClick = onOpenConversation,
-                        testTag = "tt_home_tool_conversation",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                ListRowCard(
-                    icon = painterResource(DsR.drawable.ic_download_for_offline),
-                    title = stringResource(R.string.home_row_download),
-                    subtitle = stringResource(R.string.home_row_download_sub),
-                    onClick = onOpenLanguages,
-                    testTag = "tt_home_row_download",
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
-                    MiniCard(
-                        icon = painterResource(DsR.drawable.ic_menu_book),
-                        label = stringResource(R.string.home_mini_phrasebook),
-                        onClick = { guided(guidedPhrasebook) },
-                        testTag = "tt_home_phrasebook",
-                        modifier = Modifier.weight(1f),
-                    )
-                    MiniCard(
-                        icon = painterResource(DsR.drawable.ic_format_quote),
-                        label = stringResource(R.string.home_mini_quotes),
-                        onClick = { guided(guidedQuotes) },
-                        testTag = "tt_home_quotes",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                PhrasingBanner(onClick = { guided(guidedPhrasing) })
-                Spacer(Modifier.height(ScreenMargin))
             }
         }
     }
+}
+
+/** The card stack below the input preview — one home so every window shape reuses it (issue #56). */
+@Composable
+@Suppress("LongParameterList", "LongMethod") // a straight column of the design's cards
+private fun ColumnScope.ToolsStack(
+    guided: (String) -> Unit,
+    guidedVoice: String,
+    guidedPhrasebook: String,
+    guidedQuotes: String,
+    guidedPhrasing: String,
+    onOpenCamera: () -> Unit,
+    onOpenLanguages: () -> Unit,
+    onOpenConversation: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Text(
+        text = stringResource(R.string.home_tools),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = spacing.xs4, top = spacing.md16),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
+        ToolCard(
+            icon = painterResource(DsR.drawable.ic_cloud_done),
+            title = stringResource(R.string.home_tool_offline),
+            subtitle = stringResource(R.string.home_tool_offline_sub),
+            container = MaterialTheme.colorScheme.primaryContainer,
+            onContainer = MaterialTheme.colorScheme.onPrimaryContainer,
+            onClick = onOpenLanguages,
+            testTag = "tt_home_tool_offline",
+            modifier = Modifier.weight(1f),
+        )
+        ToolCard(
+            icon = painterResource(DsR.drawable.ic_record_voice_over),
+            title = stringResource(R.string.home_tool_voice),
+            subtitle = stringResource(R.string.home_tool_voice_sub),
+            container = MaterialTheme.colorScheme.secondaryContainer,
+            onContainer = MaterialTheme.colorScheme.onSecondaryContainer,
+            onClick = { guided(guidedVoice) },
+            testTag = "tt_home_tool_voice",
+            modifier = Modifier.weight(1f),
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
+        ToolCard(
+            icon = painterResource(DsR.drawable.ic_photo_camera),
+            title = stringResource(R.string.home_tool_camera),
+            subtitle = stringResource(R.string.home_tool_camera_sub),
+            container = MaterialTheme.colorScheme.tertiaryContainer,
+            onContainer = MaterialTheme.colorScheme.onTertiaryContainer,
+            onClick = onOpenCamera,
+            testTag = "tt_home_tool_camera",
+            modifier = Modifier.weight(1f),
+        )
+        ToolCard(
+            icon = painterResource(DsR.drawable.ic_forum),
+            title = stringResource(R.string.home_tool_conversation),
+            subtitle = stringResource(R.string.home_tool_conversation_sub),
+            container = MaterialTheme.colorScheme.surfaceContainerHigh,
+            onContainer = MaterialTheme.colorScheme.onSurface,
+            onClick = onOpenConversation,
+            testTag = "tt_home_tool_conversation",
+            modifier = Modifier.weight(1f),
+        )
+    }
+    ListRowCard(
+        icon = painterResource(DsR.drawable.ic_download_for_offline),
+        title = stringResource(R.string.home_row_download),
+        subtitle = stringResource(R.string.home_row_download_sub),
+        onClick = onOpenLanguages,
+        testTag = "tt_home_row_download",
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
+        MiniCard(
+            icon = painterResource(DsR.drawable.ic_menu_book),
+            label = stringResource(R.string.home_mini_phrasebook),
+            onClick = { guided(guidedPhrasebook) },
+            testTag = "tt_home_phrasebook",
+            modifier = Modifier.weight(1f),
+        )
+        MiniCard(
+            icon = painterResource(DsR.drawable.ic_format_quote),
+            label = stringResource(R.string.home_mini_quotes),
+            onClick = { guided(guidedQuotes) },
+            testTag = "tt_home_quotes",
+            modifier = Modifier.weight(1f),
+        )
+    }
+    PhrasingBanner(onClick = { guided(guidedPhrasing) })
 }
 
 /** Pro upsell — a soft 36dp suffix chip, never a blocker (design brief). */
