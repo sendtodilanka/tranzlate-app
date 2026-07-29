@@ -4,8 +4,6 @@ plugins {
 
 dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
-    // Window size class + posture (hinge) for the adaptive layouts (issue #56).
-    implementation(libs.androidx.compose.material3.adaptive)
 
     testImplementation(projects.core.testing)
     testImplementation(libs.junit)

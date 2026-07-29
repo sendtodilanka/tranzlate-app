@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -54,6 +52,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -162,7 +161,6 @@ internal fun ComposerPane(
 @Composable
 // One cohesive 5a surface across every window shape (issue #56);
 // splitting further would hide the edit/result state machine.
-@OptIn(ExperimentalLayoutApi::class)
 @Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun ComposerPaneContent(
     input: String,
@@ -190,11 +188,12 @@ internal fun ComposerPaneContent(
     // Editing vs reading is a UI concern: the shared uiState keeps the last
     // result while the user re-edits, so "which face does the card show" cannot
     // be derived from uiState alone. Saveable → survives rotation and the
-    // language-picker round trip (requirement E). On the permanent two-pane
-    // shape (issue #56) there is no face to switch — both panes are always
-    // live, so this stays true and the read face never mounts.
+    // language-picker round trip (requirement E). The permanent two-pane shape
+    // (issue #56) renders BOTH panes and never consults this — deliberately no
+    // forced write here: a restored Result must not pop the keyboard over what
+    // the user is reading, and rotating out of two-pane must land on the READ
+    // face (co-verify finding 1).
     var isEditing by rememberSaveable { mutableStateOf(uiState is TextUiState.Idle) }
-    if (layout.permanentTwoPane && !isEditing) isEditing = true
 
     // Owner requirement: entering 5a lands ready to type. Choreography matters:
     // the IME inset resizes this pane, so showing the keyboard DURING the
@@ -204,7 +203,13 @@ internal fun ComposerPaneContent(
     // target. Re-entering edit from the result face has no morph — no delay.
     var entryChoreoDone by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(isEditing) {
-        if (isEditing) {
+        // Permanent two-pane never flips isEditing on Translate, so a process-
+        // death restore arrives with isEditing=true AND a result on screen —
+        // popping the keyboard over what the user is reading (co-verify
+        // finding 1, second half). Focus/keyboard belong to entries with
+        // nothing to read.
+        val readingOnTwoPane = layout.permanentTwoPane && uiState !is TextUiState.Idle
+        if (isEditing && !readingOnTwoPane) {
             focusRequester.requestFocus()
             if (!entryChoreoDone) {
                 entryChoreoDone = true
@@ -233,7 +238,17 @@ internal fun ComposerPaneContent(
             modifier =
                 Modifier
                     .clipToBounds()
-                    .then(if (hideTopRow) Modifier.height(0.dp) else Modifier),
+                    .then(
+                        if (hideTopRow) {
+                            // Collapsed visually AND for TalkBack: a 0dp node keeps
+                            // its semantics, so without this the back/pill/swap
+                            // controls stay swipe-reachable while invisible
+                            // (TEST_A11Y contract; co-verify finding 4).
+                            Modifier.height(0.dp).clearAndSetSemantics {}
+                        } else {
+                            Modifier
+                        },
+                    ),
         ) {
             ComposerTopRow(
                 sourceLabel = languageLabel(sourceLangId),

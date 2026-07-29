@@ -1,9 +1,7 @@
 package com.codeboxlk.tranzlate.feature.text
 
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.compose.material3.adaptive.separatingVerticalHingeBounds
 import androidx.compose.runtime.Composable
-import androidx.window.core.layout.WindowSizeClass
+import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 
 /**
  * The one window-shape read both text screens branch on (issue #56 — the
@@ -33,12 +31,13 @@ internal data class AdaptiveLayout(
 
 @Composable
 internal fun rememberAdaptiveLayout(): AdaptiveLayout {
-    val info = currentWindowAdaptiveInfo()
-    val sizeClass = info.windowSizeClass
+    // Derived from the C-13 canonical reader — this file never touches the
+    // window-size-class API directly (co-verify finding 2).
+    val window = rememberWindowInfo()
     return AdaptiveLayout(
-        expandedWidth = sizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND),
-        mediumWidth = sizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND),
-        compactHeight = !sizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND),
-        hinged = info.windowPosture.separatingVerticalHingeBounds.isNotEmpty(),
+        expandedWidth = window.isExpanded,
+        mediumWidth = !window.isCompact,
+        compactHeight = window.heightCompact,
+        hinged = window.hinged,
     )
 }
