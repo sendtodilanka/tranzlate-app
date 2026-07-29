@@ -96,7 +96,9 @@ class TranslateTextUseCase
                 // metered decision — a gate must never fire off Loading-as-FREE.
                 val resolved = featureAccess.awaitResolved()
                 if (!featureAccess.isEngineAllowed(mode)) {
-                    return TranslationOutcome.LimitReached
+                    // A3: access denial is NOT quota — the old LimitReached
+                    // masking told a blocked user they were out of free uses.
+                    return TranslationOutcome.NotEntitled
                 }
                 val tier = if (resolved is Entitlement.Paid) resolved.tier else Tier.FREE
                 // A4: ONE atomic check-and-spend — the only gate. Tier-aware:

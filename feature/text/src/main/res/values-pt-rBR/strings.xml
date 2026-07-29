@@ -13,4 +13,7 @@
          content backlog: text_lang_detect, text_lang_all_header,
          cd_text_lang_search, text_guided_lang_search. Left untranslated on
          purpose — a guessed translation is worse than the en fallback. -->
+    <string name="text_error_offline">Você está offline. Conecte-se à internet e tente novamente.</string>
+    <string name="text_error_limit_reached">Você usou as traduções de IA gratuitas de hoje. Elas voltam à meia-noite.</string>
+    <string name="text_error_not_entitled">Essa qualidade de tradução exige uma assinatura Pro.</string>
 </resources>

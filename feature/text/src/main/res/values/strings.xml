@@ -87,6 +87,9 @@
     <!-- Error states (UI_SPEC §2.5 · EDGE_CASES §7) -->
     <string name="text_error_generic_body">Something went wrong while translating. Please check your connection and try again.</string>
     <string name="text_error_unsupported_pair">This language pair isn\'t supported yet. Try a different language pair.</string>
+    <string name="text_error_offline">You\'re offline. Connect to the internet and try again.</string>
+    <string name="text_error_limit_reached">You\'ve used today\'s free AI translations. They reset at midnight.</string>
+    <string name="text_error_not_entitled">This translation quality needs a Pro subscription.</string>
     <string name="home_edit_no_text_to_translate_warning">Please enter text to translate.</string>
     <string name="button_retry">Retry</string>
     <string name="cd_text_retry">Retry translation</string>

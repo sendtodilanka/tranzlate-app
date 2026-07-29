@@ -1,8 +1,8 @@
 package com.codeboxlk.tranzlate.feature.text
 
 import androidx.lifecycle.SavedStateHandle
+import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
-import com.codeboxlk.tranzlate.core.model.FailureReason
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.testing.FakeClock
@@ -164,7 +164,7 @@ class TextViewModelTest {
 
     @Test
     fun `network failure surfaces Error and retry after recovery reaches Result`() {
-        val translator = FakeTranslator().apply { forcedFailure = FailureReason.NETWORK }
+        val translator = FakeTranslator().apply { forcedFailure = AttemptCause.OFFLINE }
         val vm = viewModel(translator)
         settle()
 
@@ -173,7 +173,7 @@ class TextViewModelTest {
         settle()
 
         val request = TranslateRequest("Good morning", "en", "fr", ModeId.AUTO)
-        assertThat(vm.uiState.value).isEqualTo(TextUiState.Error(request, FailureReason.NETWORK))
+        assertThat(vm.uiState.value).isEqualTo(TextUiState.Error(request, AttemptCause.OFFLINE))
 
         translator.forcedFailure = null // network back
         vm.onRetry()
@@ -341,7 +341,7 @@ class TextViewModelTest {
     @Test
     fun `an error survives process death`() {
         val handle = SavedStateHandle()
-        val translator = FakeTranslator().apply { forcedFailure = FailureReason.NETWORK }
+        val translator = FakeTranslator().apply { forcedFailure = AttemptCause.OFFLINE }
         val first = viewModel(translator, handle = handle)
         settle()
         first.onInputChange("Good morning")
@@ -352,7 +352,7 @@ class TextViewModelTest {
         val after = viewModel(translator, handle = handle).uiState.value
 
         assertThat(after).isInstanceOf(TextUiState.Error::class.java)
-        assertThat((after as TextUiState.Error).reason).isEqualTo(FailureReason.NETWORK)
+        assertThat((after as TextUiState.Error).cause).isEqualTo(AttemptCause.OFFLINE)
     }
 
     /**

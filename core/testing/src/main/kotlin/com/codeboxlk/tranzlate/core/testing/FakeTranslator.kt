@@ -1,7 +1,8 @@
 package com.codeboxlk.tranzlate.core.testing
 
+import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
-import com.codeboxlk.tranzlate.core.model.FailureReason
+import com.codeboxlk.tranzlate.core.model.EngineAttempt
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.translate.Translator
@@ -21,7 +22,7 @@ import com.codeboxlk.tranzlate.domain.translate.Translator
  */
 class FakeTranslator(
     private val golden: Map<GoldenKey, TranslationOutcome> = defaultGolden,
-    var forcedFailure: FailureReason? = null, // test can force NETWORK/ENGINE (G10)
+    var forcedFailure: AttemptCause? = null, // test can force OFFLINE/ENGINE_ERROR (G10)
 ) : Translator {
     data class GoldenKey(
         val text: String,
@@ -41,10 +42,26 @@ class FakeTranslator(
     ): TranslationOutcome {
         val key = GoldenKey(text.trim(), srcLang, tgtLang, mode)
         calls += key
-        forcedFailure?.let { return TranslationOutcome.Error(it) }
-        if (text.isBlank()) return TranslationOutcome.Error(FailureReason.EMPTY_INPUT) // G9
-        return golden[key] ?: TranslationOutcome.Error(FailureReason.UNSUPPORTED_PAIR) // G8
+        forcedFailure?.let {
+            return TranslationOutcome.Error(listOf(EngineAttempt(resolvedEngineFor(mode), it)))
+        }
+        if (text.isBlank()) return TranslationOutcome.EmptyInput // G9 (rev.2: typed, not an attempt)
+        return golden[key] // G8
+            ?: TranslationOutcome.Error(
+                listOf(EngineAttempt(resolvedEngineFor(mode), AttemptCause.UNSUPPORTED_PAIR)),
+            )
     }
+
+    /** C-9 mode→engine map — the attempt trace names the engine that would have run. */
+    private fun resolvedEngineFor(mode: ModeId): Engine =
+        when (mode) {
+            ModeId.AUTO, ModeId.ML2_MINI -> Engine.OFFLINE_MLKIT
+
+            // AUTO resolves offline-first
+            ModeId.ML2_ONLINE -> Engine.ONLINE_GOOGLE
+
+            ModeId.NLP35 -> Engine.ONLINE_CLOUD_NLP
+        }
 
     companion object {
         /** Golden fixture table §1.2 — EXACT. G8–G11 are behaviour rows (no map entry). */
@@ -68,12 +85,12 @@ class FakeTranslator(
                 // G6
                 GoldenKey("こんにちは", "ja", "en", ModeId.NLP35) to
                     TranslationOutcome.Success("Hello (fake)", Engine.ONLINE_CLOUD_NLP),
-                // G7 — src "auto", detect→en, resolves offline-first
+                // G7 — src "auto", detect→en, resolves offline-first (rev.2: detect is typed)
                 GoldenKey("Good morning", "auto", "fr", ModeId.AUTO) to
-                    TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
-                // G8  `நன்றி` ta→en ML2_MINI — intentionally NO row → Error(UNSUPPORTED_PAIR)
-                // G9  blank input — behaviour → Error(EMPTY_INPUT)
-                // G10 `Offline test` — behaviour via forcedFailure=NETWORK → Error(NETWORK)
+                    TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT, detectedSource = "en"),
+                // G8  `நன்றி` ta→en ML2_MINI — intentionally NO row → Error(attempt UNSUPPORTED_PAIR)
+                // G9  blank input — behaviour → EmptyInput (rev.2: validation, not an attempt)
+                // G10 `Offline test` — behaviour via forcedFailure=OFFLINE → Error(attempt OFFLINE)
                 // G11 `Quota text` NLP35 — LimitReached via UsagePolicy (§1.4), not a golden row
             )
     }

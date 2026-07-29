@@ -1,6 +1,8 @@
 package com.codeboxlk.tranzlate.core.translate
 
-import com.codeboxlk.tranzlate.core.model.FailureReason
+import com.codeboxlk.tranzlate.core.model.AttemptCause
+import com.codeboxlk.tranzlate.core.model.Engine
+import com.codeboxlk.tranzlate.core.model.EngineAttempt
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.translate.Translator
@@ -19,12 +21,15 @@ import javax.inject.Singleton
 class RealTranslator
     @Inject
     constructor() : Translator {
-        // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
-        // NO fake/golden behaviour belongs here (prod module).
+        // TODO(#4-brains): real implementation — placeholder reports a one-attempt
+        // trace (AUTO's offline-first head). NO fake/golden behaviour here (prod).
         override suspend fun translate(
             text: String,
             srcLang: String,
             tgtLang: String,
             mode: ModeId,
-        ): TranslationOutcome = TranslationOutcome.Error(FailureReason.ENGINE)
+        ): TranslationOutcome =
+            TranslationOutcome.Error(
+                listOf(EngineAttempt(Engine.OFFLINE_MLKIT, AttemptCause.ENGINE_ERROR)),
+            )
     }

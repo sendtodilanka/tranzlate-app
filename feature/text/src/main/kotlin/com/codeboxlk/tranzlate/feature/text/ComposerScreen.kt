@@ -68,6 +68,7 @@ import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.Motion
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateShapeFull
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
+import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.ui.ShimmerResult
@@ -784,10 +785,23 @@ private fun ColumnScope.ComposerReadBody(
 
         is TextUiState.Error -> {
             Text(
-                text = stringResource(R.string.text_error_generic_body),
+                text = errorBodyFor(uiState.cause),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = spacing.md16).testTag("tt_text_error"),
+            )
+            TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
+                Text(stringResource(R.string.button_retry))
+            }
+        }
+
+        is TextUiState.Limit -> {
+            // Guidance, not an error: nothing failed — the gate answered no.
+            Text(
+                text = limitBodyFor(uiState.notEntitled),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = spacing.md16).testTag("tt_text_limit"),
             )
             TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
                 Text(stringResource(R.string.button_retry))
@@ -804,6 +818,28 @@ private fun ColumnScope.ComposerReadBody(
 /** Length thresholds for the result's auto-size tiers (issue #56, owner v3). */
 private const val RESULT_DISPLAY_MAX_CHARS = 24
 private const val RESULT_HEADLINE_MAX_CHARS = 80
+
+/**
+ * Per-cause copy (issue #53 A3 · EDGE_CASES §4) for the causes that exist
+ * today; the engines phase adds the rest (download CTA, timeout…). Null cause
+ * (empty input) and everything unmapped fall back to the guided generic body.
+ */
+@Composable
+private fun errorBodyFor(cause: AttemptCause?): String =
+    stringResource(
+        when (cause) {
+            AttemptCause.OFFLINE -> R.string.text_error_offline
+            AttemptCause.UNSUPPORTED_PAIR -> R.string.text_error_unsupported_pair
+            else -> R.string.text_error_generic_body
+        },
+    )
+
+/** Limit-face copy: quota vs access denial get DIFFERENT truths (A3). */
+@Composable
+private fun limitBodyFor(notEntitled: Boolean): String =
+    stringResource(
+        if (notEntitled) R.string.text_error_not_entitled else R.string.text_error_limit_reached,
+    )
 
 /** Short → display · medium → headline · long → the portrait titleLarge. */
 @Composable
@@ -859,7 +895,15 @@ private fun ResultPane(
 ) {
     val spacing = LocalSpacing.current
     val colors = LocalResultCardColors.current
-    if (uiState is TextUiState.Error) {
+    // Errors AND limit answers are plain cards — neither is dressed as a result.
+    val plainFace: Pair<String, Boolean>? =
+        when (uiState) {
+            is TextUiState.Error -> errorBodyFor(uiState.cause) to true
+            is TextUiState.Limit -> limitBodyFor(uiState.notEntitled) to false
+            else -> null
+        }
+    if (plainFace != null) {
+        val (body, isError) = plainFace
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = LocalFloatingSurface.current,
@@ -868,10 +912,10 @@ private fun ResultPane(
         ) {
             Column(modifier = Modifier.padding(spacing.md16)) {
                 Text(
-                    text = stringResource(R.string.text_error_generic_body),
+                    text = body,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.testTag("tt_text_error"),
+                    color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(if (isError) "tt_text_error" else "tt_text_limit"),
                 )
                 TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
                     Text(stringResource(R.string.button_retry))
@@ -991,6 +1035,7 @@ private val TextUiState.requestText: String?
             is TextUiState.Translating -> request.text
             is TextUiState.Result -> request.text
             is TextUiState.Error -> request.text
+            is TextUiState.Limit -> request.text
             TextUiState.Idle -> null
         }
 
