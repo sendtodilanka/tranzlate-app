@@ -27,8 +27,9 @@ data class PersistedUsageCounts(
 /**
  * DATA_MODEL `usage.*` typed accessors — keys exact.
  * Semantics (enforced by the Usage/Ads brains, not here):
- *  - advanced_ai_count: today's metered pool, all features share one NLP3.5 pool (D-2);
- *  - reset when device-local date(now) != date(reset_epoch) via AppClock;
+ *  - advanced_ai_count / pro_ai_count / reset_epoch: owned EXCLUSIVELY by
+ *    RealUsagePolicy via readUsage/writeUsage (issue #66) — reset_epoch stores
+ *    the device-local epoch DAY (rev.2); no other accessor may touch them;
  *  - ads_shown_today / ad_last_shown / translations_since_ad: D-4 cap, min-gap, every-Nth.
  */
 @Singleton
@@ -37,10 +38,6 @@ class UsageDataSource
     constructor(
         private val dataStore: DataStore<Preferences>,
     ) {
-        val advancedAiCount: Flow<Int> = dataStore.data.map { it[KEY_ADVANCED_AI_COUNT] ?: 0 }
-
-        val resetEpoch: Flow<Long> = dataStore.data.map { it[KEY_RESET_EPOCH] ?: 0L }
-
         /**
          * One consistent read of the metered-counter facts (issue #66). Catch
          * mirrors the prefs source idiom: an unreadable store reads as empty.
@@ -80,14 +77,6 @@ class UsageDataSource
         val adLastShown: Flow<Long> = dataStore.data.map { it[KEY_AD_LAST_SHOWN] ?: 0L }
 
         val translationsSinceAd: Flow<Int> = dataStore.data.map { it[KEY_TRANSLATIONS_SINCE_AD] ?: 0 }
-
-        suspend fun setAdvancedAiCount(value: Int) {
-            dataStore.edit { it[KEY_ADVANCED_AI_COUNT] = value }
-        }
-
-        suspend fun setResetEpoch(value: Long) {
-            dataStore.edit { it[KEY_RESET_EPOCH] = value }
-        }
 
         suspend fun setAdsShownToday(value: Int) {
             dataStore.edit { it[KEY_ADS_SHOWN_TODAY] = value }

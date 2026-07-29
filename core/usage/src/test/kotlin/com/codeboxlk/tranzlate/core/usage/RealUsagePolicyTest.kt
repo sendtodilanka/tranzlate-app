@@ -198,6 +198,27 @@ class RealUsagePolicyTest {
         }
 
     @Test
+    fun `a throwing save never blocks the gate - fail-open like the load path`() =
+        runTest {
+            val exploding =
+                object : UsagePersistence {
+                    override suspend fun load(): PersistedUsageCounts =
+                        PersistedUsageCounts(0, 0, PersistedUsageCounts.NO_DAY)
+
+                    override suspend fun save(counts: PersistedUsageCounts): Unit =
+                        throw java.io.IOException("disk full")
+                }
+            val policy = RealUsagePolicy(FakeClock(), FixedConfig(free = 2), exploding)
+
+            // The decision stands even though every save explodes.
+            assertThat(policy.trySpend(Tier.FREE)).isEqualTo(SpendResult.SPENT)
+            assertThat(policy.trySpend(Tier.FREE)).isEqualTo(SpendResult.SPENT)
+            assertThat(policy.trySpend(Tier.FREE)).isEqualTo(SpendResult.OVER)
+            policy.refund(Tier.FREE) // must not throw either
+            assertThat(policy.remaining.first()).isEqualTo(1)
+        }
+
+    @Test
     fun `meter starts at the full allowance`() =
         runTest {
             assertThat(

@@ -87,15 +87,28 @@ class RealUsagePolicy
             publish()
         }
 
-        /** Runs under the mutex only. */
+        /**
+         * Runs under the mutex only. A failed WRITE must be as harmless as a
+         * failed read (PR-67 lens OPEN-1): quota protection never blocks or
+         * crashes a translation — the in-memory decision stands and the next
+         * mutation retries the save.
+         */
         private suspend fun persist() {
-            persistence.save(
-                PersistedUsageCounts(
-                    freeSpent = spentFree,
-                    proSpent = spentPro,
-                    dayEpoch = day?.toEpochDay() ?: PersistedUsageCounts.NO_DAY,
-                ),
-            )
+            try {
+                persistence.save(
+                    PersistedUsageCounts(
+                        freeSpent = spentFree,
+                        proSpent = spentPro,
+                        dayEpoch = day?.toEpochDay() ?: PersistedUsageCounts.NO_DAY,
+                    ),
+                )
+            } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                throw rethrown
+            } catch (
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
+            ) {
+                // Disk-full / IO error: fail-open, matching the load path.
+            }
         }
 
         private fun rollOverIfNewDay() {

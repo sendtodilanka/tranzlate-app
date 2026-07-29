@@ -44,8 +44,9 @@ Pre-launch: `fallbackToDestructiveMigration(dropAllTables = true)` — no shippe
 ## Usage (DataStore)
 | Key | Type | Notes |
 |-----|------|-------|
-| `usage.advanced_ai_count` | Int | today's metered count (all features share one NLP3.5 pool — **decision D-2 scope: per-account/day, not per-feature**) |
-| `usage.reset_epoch` | Long | last reset; reset when device-local date(now) ≠ date(reset_epoch) |
+| `usage.advanced_ai_count` | Int | today's FREE-pool spends (all features share one AI pool — **decision D-2 scope: per-account/day, not per-feature**) |
+| `usage.pro_ai_count` | Int | today's PRO fair-use spends (D-2 rev.2 — issue #66) |
+| `usage.reset_epoch` | Long | **rev.2 (issue #66): the device-local epoch DAY of the counters** — reset when `AppClock.today().toEpochDay()` ≠ this; all three keys written in ONE atomic edit, owned exclusively by RealUsagePolicy |
 | `usage.ads_shown_today` | Int | D-4 daily cap |
 | `usage.ad_last_shown` | Long | D-4 min-gap |
 | `usage.translations_since_ad` | Int | D-4 every-Nth |
