@@ -11,4 +11,9 @@ dependencies {
     api(projects.core.model)
     implementation(projects.core.datastore)
     implementation(libs.kotlinx.coroutines.core)
+
+    testImplementation(projects.core.testing)
+    testImplementation(libs.junit)
+    testImplementation(libs.truth)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

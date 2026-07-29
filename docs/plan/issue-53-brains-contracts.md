@@ -62,6 +62,8 @@ interface UsagePolicy {
 ```
 One suspend that checks and spends under a single mutex/DataStore transaction kills the double-tap double-spend race. Midnight reset compares `AppClock.today()` against `usage.reset_epoch` inside the same transaction. `warningMessage()` retires (UI derives it from `remaining`).
 
+**rev.1 (shipped in-PR adjustments):** (1) `trySpend(tier: Tier)` takes the RESOLVED tier — closes PR-58 lens N2: FREE spends the `limit_free_ai` pool, PRO the independent fair-use pool, decided per call from `awaitResolved()`'s return. (2) `refund(tier)` added — DECISIONS' success-only constant survives the atomic-upfront spend: spend at the gate, refund on failure *and* on cancellation (`NonCancellable`), so the net charge lands on success only. (3) Counters are in-process this batch (strictly better than the never-counting placeholder); the DataStore transaction lands with the brains implementation (TODO(#4-brains) in `RealUsagePolicy`).
+
 ### PR 5 — outcome taxonomy (A3)
 ```kotlin
 sealed interface TranslationOutcome {

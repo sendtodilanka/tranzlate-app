@@ -1,13 +1,18 @@
 package com.codeboxlk.tranzlate.domain.translate
 
 import com.codeboxlk.tranzlate.core.common.AppClock
+import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
 import com.codeboxlk.tranzlate.domain.repository.TranslationRepository
+import com.codeboxlk.tranzlate.domain.usage.SpendResult
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /** "auto" sentinel (Translator contract §1.1) — never persisted (DATA_MODEL). */
@@ -16,7 +21,8 @@ private const val AUTO_DETECT_LANG = "auto"
 /**
  * THE single ask-flow encoding (plan §2 `:core:domain`):
  *
- *   Cache read (hit → done, zero cost) → Access check → translate →\n *   Usage +1 on SUCCESS ONLY → history write → Ads ask
+ *   Cache read (hit → done, zero cost) → Access resolve → atomic spend →
+ *   translate → refund on failure → history write → Ads ask
  *
  * APP_STRUCTURE's flow is sequenced HERE once, so no feature can ever re-sequence
  * it (screens just ask; they don't do the work).
@@ -26,8 +32,11 @@ private const val AUTO_DETECT_LANG = "auto"
  *    and the free engines never charge quota, so they never hit the limit gate).
  *  - At-limit metered ask short-circuits to [TranslationOutcome.LimitReached]
  *    BEFORE any engine call (G11) — no quota burn, no network.
- *  - Usage increments once, on engine success only (DECISIONS engineering
- *    constants: never on start, failure).
+ *  - The metered gate is ONE atomic [UsagePolicy.trySpend] on the RESOLVED tier
+ *    (issue #53 A4 — the old check→translate→increment shape let a double-tap
+ *    race 4/5 into 6/5). DECISIONS' success-only constant survives via
+ *    [UsagePolicy.refund]: failure and cancellation return the spend, so the
+ *    net charge lands on success only.
  *  - History write on success only (DATA_MODEL `translation`; drawer Recents,
  *    issue #11): C-8 cache-deduped — an identical normalized tuple is never
  *    inserted twice. Skipped while srcLang is the "auto" sentinel because
@@ -81,19 +90,37 @@ class TranslateTextUseCase
                 }
             }
             val metered = mode == ModeId.NLP35
+            var spentTier: Tier? = null
             if (metered) {
                 // Loading-gate (DATA_MODEL :48): resolve the entitlement BEFORE any
                 // metered decision — a gate must never fire off Loading-as-FREE.
-                featureAccess.awaitResolved()
-                if (!featureAccess.isEngineAllowed(mode) || usagePolicy.isOver()) {
+                val resolved = featureAccess.awaitResolved()
+                if (!featureAccess.isEngineAllowed(mode)) {
                     return TranslationOutcome.LimitReached
                 }
+                val tier = if (resolved is Entitlement.Paid) resolved.tier else Tier.FREE
+                // A4: ONE atomic check-and-spend — the only gate. Tier-aware:
+                // PRO spends against the fair-use pool, never the FREE 5/day.
+                if (usagePolicy.trySpend(tier) == SpendResult.OVER) {
+                    return TranslationOutcome.LimitReached
+                }
+                spentTier = tier
             }
-            val outcome = translator.translate(text, srcLang, tgtLang, mode)
+            val outcome =
+                try {
+                    translator.translate(text, srcLang, tgtLang, mode)
+                } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                    // A cancelled attempt is not a success — return the spend even
+                    // though this scope is dying (hence NonCancellable).
+                    spentTier?.let { withContext(NonCancellable) { usagePolicy.refund(it) } }
+                    throw rethrown
+                }
             if (outcome is TranslationOutcome.Success) {
-                if (metered) usagePolicy.increment()
                 saveToHistory(text, srcLang, tgtLang, outcome)
                 adsCoordinator.onTranslationCompleted()
+            } else {
+                // Success-only net spend (DECISIONS): failure returns the charge.
+                spentTier?.let { usagePolicy.refund(it) }
             }
             return outcome
         }

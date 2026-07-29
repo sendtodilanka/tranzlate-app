@@ -4,6 +4,7 @@ import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.FailureReason
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
@@ -57,7 +58,8 @@ class TranslateTextUseCaseTest {
             val outcome = useCase(usage = usage, ads = ads).invoke("Good morning", "en", "fr", ModeId.NLP35)
 
             assertThat(outcome).isInstanceOf(TranslationOutcome.Success::class.java)
-            assertThat(usage.remaining()).isEqualTo(4) // success-only +1
+            assertThat(usage.state.value).isEqualTo(4) // success-only net spend
+            assertThat(usage.refunds).isEqualTo(0)
             assertThat(ads.completedCount).isEqualTo(1)
         }
 
@@ -70,7 +72,8 @@ class TranslateTextUseCaseTest {
             val outcome = useCase(usage = usage, ads = ads).invoke("Good morning", "en", "fr", ModeId.ML2_MINI)
 
             assertThat(outcome).isInstanceOf(TranslationOutcome.Success::class.java)
-            assertThat(usage.remaining()).isEqualTo(5) // unchanged
+            assertThat(usage.state.value).isEqualTo(5) // unchanged
+            assertThat(usage.spends).isEqualTo(0)
             assertThat(ads.completedCount).isEqualTo(1) // completed translations still ask ads (D-4)
         }
 
@@ -84,7 +87,8 @@ class TranslateTextUseCaseTest {
             val outcome = useCase(translator, usage, ads).invoke("Offline test", "en", "fr", ModeId.ML2_ONLINE)
 
             assertThat(outcome).isEqualTo(TranslationOutcome.Error(FailureReason.NETWORK))
-            assertThat(usage.remaining()).isEqualTo(5)
+            assertThat(usage.state.value).isEqualTo(5)
+            assertThat(usage.spends).isEqualTo(0) // unmetered mode never touched the pool
             assertThat(ads.completedCount).isEqualTo(0)
         }
 
@@ -163,6 +167,35 @@ class TranslateTextUseCaseTest {
             )
             assertThat(ads.completedCount).isEqualTo(1) // flow continues past the failed write
         }
+    // ---- issue #53 A4: atomic spend + success-only via refund ----------------
+
+    @Test
+    fun `metered failure refunds the spend - net zero charge`() =
+        runTest {
+            val translator = FakeTranslator().apply { forcedFailure = FailureReason.NETWORK }
+            val usage = FakeUsagePolicy(left = 5)
+
+            val outcome = useCase(translator, usage).invoke("Offline test", "en", "fr", ModeId.NLP35)
+
+            assertThat(outcome).isEqualTo(TranslationOutcome.Error(FailureReason.NETWORK))
+            assertThat(usage.spends).isEqualTo(1) // gate spent up front (atomic)
+            assertThat(usage.refunds).isEqualTo(1) // failure returned it
+            assertThat(usage.state.value).isEqualTo(5) // net zero (DECISIONS success-only)
+        }
+
+    @Test
+    fun `PRO translates past an exhausted FREE pool (tier-aware gate)`() =
+        runTest {
+            val usage = FakeUsagePolicy(left = 0) // FREE pool empty
+            val access = FakeFeatureAccess(Tier.PRO)
+
+            val outcome = useCase(usage = usage, access = access).invoke("Good morning", "en", "fr", ModeId.NLP35)
+
+            assertThat(outcome).isInstanceOf(TranslationOutcome.Success::class.java)
+            assertThat(usage.spends).isEqualTo(1) // spent from the PRO pool
+            assertThat(usage.state.value).isEqualTo(0) // FREE meter untouched
+        }
+
     // ---- issue #53 A1/A7: the Loading-gate (never decide on Loading) ---------
 
     @Test
@@ -220,7 +253,7 @@ class TranslateTextUseCaseTest {
             assertThat(success.fromCache).isTrue()
             assertThat(success.text).isEqualTo("Bonjour (fake)")
             assertThat(translator.calls).isEmpty() // zero engine calls
-            assertThat(usage.incremented).isEqualTo(0) // zero quota spend
+            assertThat(usage.spends).isEqualTo(0) // zero quota spend
             assertThat(ads.completedCount).isEqualTo(0) // zero ads asks
         }
 

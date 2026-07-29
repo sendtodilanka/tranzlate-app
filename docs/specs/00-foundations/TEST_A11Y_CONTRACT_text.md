@@ -1,5 +1,5 @@
 # Tranzlate — Text Translation: Test + Accessibility Contract (Foundation)
-> **⚠ Superseded in part (2026-07-29, issue #50 / BUSINESS_MODEL.md):** D-2 rev.2 collapses tiers to **FREE + PRO**, and C-10 rev.2 removes user engine selection (the mode chip). **§1.3 is rewritten to rev.2 and matches shipped code (issue #53 PR-3)**; remaining PLUS/PREMIUM or mode-chip references elsewhere (fake usage names, strings, mode-chip tests) are still stale and get theirs with the Usage-brain + paywall batches; on conflict this banner wins.
+> **⚠ Superseded in part (2026-07-29, issue #50 / BUSINESS_MODEL.md):** D-2 rev.2 collapses tiers to **FREE + PRO**, and C-10 rev.2 removes user engine selection (the mode chip). **§1.3 (PR-3) and §1.4 (PR-4) are rewritten to rev.2 and match shipped code**; remaining PLUS/PREMIUM or mode-chip references elsewhere (strings, mode-chip tests) are still stale and get theirs with the paywall batch; on conflict this banner wins.
 
 
 > **Feature:** TEXT TRANSLATION (`HomeScreen` + `ResultScreen` සහ ඒවායේ `TextInputCard`, `SourceCard`, `ResultCard`, `ErrorView` components).
@@ -121,25 +121,29 @@ class FakeFeatureAccess(tier: Tier = Tier.FREE) : FeatureAccess {
 
 **Loading-gate test hook:** `state.value = Entitlement.Loading` කරලා metered call එකක් දෙන්න — gate එක resolve වෙනකම් suspend විය යුතුයි, FREE-විදිහට decide වෙන්න බෑ.
 
-## 1.4 Fake `UsagePolicy` (at-limit / under)
+## 1.4 Fake `UsagePolicy` (at-limit / under) — **rev.2, matches shipped code (issue #53 PR-4)**
 
 ```kotlin
+enum class SpendResult { SPENT, OVER }
 interface UsagePolicy {
-    fun remaining(): Int          // for NLP35 text feature; -1 = unlimited
-    fun isOver(): Boolean
-    fun warningMessage(): String? // "You have N free NLP3.5 translations left today"
-    suspend fun increment()
+    val remaining: Flow<Int>              // FREE pool's live "{left}/5 today" meter
+    suspend fun trySpend(tier: Tier): SpendResult  // ATOMIC check-and-spend — THE gate
+    suspend fun refund(tier: Tier)        // failure returns the spend (success-only constant)
 }
 ```
 
-Fake states — test වලින් inject කරන deterministic scenarios:
+`isOver()`/`increment()` retire — ඒ දෙක වෙන වෙනම තිබීමම double-tap double-spend race එක (4/5 දෙපාරක් pass → 6/5). `warningMessage()` retire — UI එක `remaining` flow එකෙන් string එක derive කරයි. Tier-aware: FREE → `limit_free_ai` pool · PRO → fair-use pool (independent).
 
-| Fake name | `remaining()` | `isOver()` | `warningMessage()` | Use in |
-|-----------|:-------------:|:----------:|--------------------|--------|
-| `FakeUsageUnder` | `5` | false | `"5 free NLP3.5 translations left today"` | happy path, warning banner |
-| `FakeUsageLast` | `1` | false | `"1 free NLP3.5 translation left today"` | pluralization test |
-| `FakeUsageAtLimit` | `0` | true | `null` (paywall replaces) | G11 LimitReached, paywall route |
-| `FakeUsageUnlimited` | `-1` | false | `null` | PLUS/PREMIUM tiers |
+Fake states — test වලින් inject කරන deterministic scenarios (`FakeUsagePolicy(left = N)`):
+
+| Scenario | `left` | `trySpend(FREE)` | Use in |
+|-----------|:------:|:----------------:|--------|
+| Under | `5` | SPENT (meter 4) | happy path, warning banner |
+| Last | `1` | SPENT (meter 0) | pluralization test |
+| AtLimit | `0` | **OVER** | G11 LimitReached, paywall route |
+| Unlimited sentinel | `-1` | SPENT (meter untouched) | legacy unlimited rows |
+
+Spies: `spends` (cache hits must stay 0) · `refunds` (failures must return the spend). `trySpend(PRO)` always SPENT and never moves the FREE meter.
 
 ```kotlin
 class FakeUsagePolicy(private var left: Int, private val cap: Int = 20) : UsagePolicy {
