@@ -291,24 +291,137 @@ class TextViewModelTest {
 
     // ---- Process-death recovery (SavedStateHandle-backed last request) -------
 
+    /** Issue #48: the result itself is restored — no replay, so no second API call. */
     @Test
-    fun `restoreResultIfNeeded replays the persisted request after process death`() {
+    fun `the result survives process death`() {
+        val handle = SavedStateHandle()
+        val translator = FakeTranslator()
+        val first = viewModel(translator, handle = handle)
+        settle()
+        first.onInputChange("Good morning")
+        first.onTranslate()
+        settle()
+        val before = first.uiState.value as TextUiState.Result
+
+        // "Process death": a NEW ViewModel over the same restored handle.
+        val second = viewModel(translator, handle = handle)
+        settle()
+
+        val after = second.uiState.value
+        assertThat(after).isInstanceOf(TextUiState.Result::class.java)
+        assertThat((after as TextUiState.Result).translatedText).isEqualTo("Bonjour (fake)")
+        assertThat(after.engine).isEqualTo(before.engine)
+        assertThat(after.request).isEqualTo(before.request)
+        // Restored from the record, not re-translated.
+        assertThat(translator.calls).hasSize(1)
+    }
+
+    /**
+     * The trap this fix had to avoid: leaving 5a discards the draft, so the next
+     * composer must open EMPTY even after a kill — never showing the old result.
+     */
+    @Test
+    fun `a dismissed composer leaves nothing to restore`() {
         val handle = SavedStateHandle()
         val first = viewModel(handle = handle)
         settle()
         first.onInputChange("Good morning")
         first.onTranslate()
         settle()
+        first.onComposerDismissed()
 
-        // "Process death": a NEW ViewModel over the same restored handle starts Idle.
         val second = viewModel(handle = handle)
         settle()
-        assertThat(second.uiState.value).isEqualTo(TextUiState.Idle)
 
-        second.restoreResultIfNeeded()
+        assertThat(second.uiState.value).isEqualTo(TextUiState.Idle)
+        assertThat(second.input.value).isEmpty()
+    }
+
+    /** The error card and its Retry must come back too — not just a success. */
+    @Test
+    fun `an error survives process death`() {
+        val handle = SavedStateHandle()
+        val translator = FakeTranslator().apply { forcedFailure = FailureReason.NETWORK }
+        val first = viewModel(translator, handle = handle)
+        settle()
+        first.onInputChange("Good morning")
+        first.onTranslate()
+        settle()
+        assertThat(first.uiState.value).isInstanceOf(TextUiState.Error::class.java)
+
+        val after = viewModel(translator, handle = handle).uiState.value
+
+        assertThat(after).isInstanceOf(TextUiState.Error::class.java)
+        assertThat((after as TextUiState.Error).reason).isEqualTo(FailureReason.NETWORK)
+    }
+
+    /**
+     * A translation the system interrupted is resumed, not reported as a failure
+     * that never happened — and the resumed job must still be cancellable, or a
+     * dismissed composer could have a result pushed back into it.
+     */
+    @Test
+    fun `an interrupted translation resumes and stays cancellable`() {
+        val handle = SavedStateHandle()
+        val translator = FakeTranslator()
+        val first = viewModel(translator, handle = handle)
+        settle()
+        first.onInputChange("Good morning")
+        first.onTranslate() // marks Translating, then completes
+        settle()
+        // Rewind the record to the moment before the outcome landed.
+        handle["text_state_kind"] = "translating"
+
+        val second = viewModel(translator, handle = handle)
+        assertThat(second.uiState.value).isInstanceOf(TextUiState.Translating::class.java)
+
+        // Leave 5a while that resumed job is still in flight.
+        second.onComposerDismissed()
         settle()
 
-        assertThat(second.uiState.value).isInstanceOf(TextUiState.Result::class.java)
-        assertThat((second.uiState.value as TextUiState.Result).translatedText).isEqualTo("Bonjour (fake)")
+        assertThat(second.uiState.value).isEqualTo(TextUiState.Idle)
+        assertThat(second.input.value).isEmpty()
+    }
+
+    /** The same race on the first translation rather than a restored one. */
+    @Test
+    fun `dismissing mid-translation cannot push a result back`() {
+        val handle = SavedStateHandle()
+        val vm = viewModel(handle = handle)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        vm.onComposerDismissed() // before the coroutine is allowed to finish
+        settle()
+
+        assertThat(vm.uiState.value).isEqualTo(TextUiState.Idle)
+        assertThat(viewModel(handle = handle).uiState.value).isEqualTo(TextUiState.Idle)
+    }
+
+    /** An unrebuildable record (an enum constant renamed by an update) is dropped, not left. */
+    @Test
+    fun `an unreadable record is cleared instead of lingering`() {
+        val handle = SavedStateHandle()
+        handle["text_state_kind"] = "result"
+        handle["text_result_text"] = "Bonjour (fake)"
+        handle["text_result_engine"] = "AN_ENGINE_THAT_NO_LONGER_EXISTS"
+
+        assertThat(viewModel(handle = handle).uiState.value).isEqualTo(TextUiState.Idle)
+        assertThat(handle.get<String>("text_state_kind")).isNull()
+        assertThat(handle.get<String>("text_result_text")).isNull()
+    }
+
+    /** Same guarantee for the ✕ clear action. */
+    @Test
+    fun `clearing leaves nothing to restore`() {
+        val handle = SavedStateHandle()
+        val first = viewModel(handle = handle)
+        settle()
+        first.onInputChange("Good morning")
+        first.onTranslate()
+        settle()
+        first.onClearAll()
+
+        assertThat(viewModel(handle = handle).uiState.value).isEqualTo(TextUiState.Idle)
     }
 }
