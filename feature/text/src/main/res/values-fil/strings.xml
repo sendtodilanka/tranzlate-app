@@ -1,17 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Filipino — ONLY catalogue-verbatim translations (STRINGS_text-translation.md;
-     never guessed). TODO(NEEDS-TRANSLATION, C-12): every remaining key in
-     values/strings.xml is queued in the tracked content backlog before ship. -->
+<!-- Filipino — FULL parity with values/ (issue #70, C-3/C-12): the first 19
+     values are catalogue-verbatim; the rest were authored in-issue and are
+     queued for native-speaker review before ship (DoD gate 12). -->
 <resources>
+    <!-- Composer -->
+    <string name="text_input_placeholder">Maglagay ng text</string>
+    <string name="cd_text_input">Text na isasalin</string>
     <string name="text_char_counter">%1$d/%2$d</string>
+    <string name="cd_text_counter">%1$d sa %2$d characters na gamit</string>
     <string name="cd_translate">Isalin</string>
     <string name="cd_swap_language">Palitan ang Wika</string>
-    <string name="home_edit_no_text_to_translate_warning">Pakilagay ang text na isasalin.</string>
-    <string name="button_retry">Subukang muli</string>
-    <!-- TODO(NEEDS-TRANSLATION, C-12) issue #15 language-picker keys queued in the
-         content backlog: text_lang_detect, text_lang_all_header,
-         cd_text_lang_search, text_guided_lang_search. Left untranslated on
-         purpose — a guessed translation is worse than the en fallback. -->
+    <string name="cd_text_source_lang">Pinagmulang wika, %1$s</string>
+    <string name="cd_text_target_lang">Target na wika, %1$s</string>
+    <string name="cd_text_mic">Isalin gamit ang boses</string>
+    <string name="cd_text_mode_chip">Translation model, %1$s</string>
+    <string name="text_mode_automatic">Awtomatiko</string>
+    <string name="cd_text_menu">Buksan ang navigation</string>
+    <string name="cd_text_clear">Bagong pagsasalin</string>
+    <string name="cd_text_edit">I-edit ang text</string>
+
+    <!-- Home canvas -->
+    <string name="home_greeting_morning">Umaga</string>
+    <string name="home_greeting_afternoon">Hapon</string>
+    <string name="home_greeting_evening">Gabi</string>
+    <string name="home_greeting_named">%1$s, %2$s</string>
+    <string name="home_subtitle">Ano ang gusto mong isalin?</string>
+    <string name="home_title">Isalin</string>
+    <string name="home_pro">Pro</string>
+    <string name="composer_paste">I-paste</string>
+    <string name="home_tools">Mga Tool</string>
+    <string name="home_translate">Isalin</string>
+    <string name="home_tool_offline">Offline mode</string>
+    <string name="home_tool_offline_sub">6 wika ang handa na</string>
+    <string name="home_tool_voice">Boses</string>
+    <string name="home_tool_voice_sub">Magsalita at pakinggan</string>
+    <string name="home_tool_camera">Camera</string>
+    <string name="home_tool_camera_sub">Mga karatula at menu</string>
+    <string name="home_tool_conversation">Pag-uusap</string>
+    <string name="home_tool_conversation_sub">Dalawang-panig na usapan</string>
+    <string name="home_row_download">Mag-download ng mga wika</string>
+    <string name="home_row_download_sub">133 available · 2 update ang handa</string>
+    <string name="home_mini_phrasebook">Phrasebook</string>
+    <string name="home_mini_quotes">Mga Quote</string>
+    <string name="home_phrasing_title">Natural na pananalita</string>
+    <string name="home_phrasing_sub">Isinusulat muli ang mga idyoma para tumama</string>
+    <string name="home_badge_new">BAGO</string>
+    <string name="cd_home_settings">Mga Setting</string>
+    <string name="home_guided_phrasebook">Darating ang Phrasebook sa susunod na update</string>
+    <string name="home_guided_quotes">Darating ang mga naka-save na quote sa history update</string>
+    <string name="home_guided_phrasing">Darating ang natural na pananalita sa AI update</string>
+
+    <!-- Guided messages -->
+    <string name="text_guided_mode">Darating ang pagpili ng engine sa brains update</string>
+    <string name="text_guided_voice">Darating ang voice input sa voice update</string>
+    <string name="text_guided_tts">Darating ang text-to-speech sa voice update</string>
+    <string name="text_guided_more">Darating ang iba pang opsyon sa susunod na update</string>
+    <string name="text_guided_feedback">Darating ang feedback sa susunod na update</string>
+
+    <!-- Result -->
+    <string name="cd_text_back">Bumalik</string>
+    <string name="cd_favourite">Idagdag sa mga paborito</string>
+    <string name="cd_text_more">Iba pang opsyon</string>
+    <string name="cd_copy">Kopyahin ang pagsasalin</string>
+    <string name="cd_text_copy_source">Kopyahin ang pinagmulang text</string>
+    <string name="cd_speak">Basahin nang malakas ang pagsasalin</string>
+    <string name="cd_text_speak_source">Basahin nang malakas ang pinagmulang text</string>
+    <string name="cd_text_thumb_up">Magandang pagsasalin</string>
+    <string name="cd_text_thumb_down">Hindi magandang pagsasalin</string>
+    <string name="text_copied">Nakopya</string>
+    <string name="text_engine_badge_offline">Offline · agad-agad</string>
+    <string name="text_engine_badge_online">Online</string>
+    <string name="text_engine_badge_advanced">Advanced AI</string>
+    <string name="a11y_translating">Isinasalin…</string>
+
+    <!-- Errors -->
+    <string name="text_error_generic_body">May nangyaring mali habang nagsasalin. Suriin ang koneksyon at subukang muli.</string>
+    <string name="text_error_unsupported_pair">Hindi pa suportado ang pares ng wikang ito. Sumubok ng ibang pares.</string>
     <string name="text_error_offline">Wala kang internet. Kumonekta sa internet at subukang muli.</string>
     <string name="text_error_limit_reached">Nagamit mo na ang libreng AI translations ngayong araw. Magre-reset ito sa hatinggabi.</string>
     <string name="text_error_not_entitled">Kailangan ng Pro subscription ang ganitong kalidad ng pagsasalin.</string>
@@ -22,8 +86,27 @@
     <string name="limit_sheet_body_pro">Pro feature ang natural-phrasing AI translations. Gumagana pa rin ang libre mong translations.</string>
     <string name="limit_sheet_cta">Tingnan ang Pro plans</string>
     <string name="limit_sheet_dismiss">Hindi muna</string>
+    <string name="home_edit_no_text_to_translate_warning">Pakilagay ang text na isasalin.</string>
+    <string name="button_retry">Subukang muli</string>
+    <string name="cd_text_retry">Subukang isalin muli</string>
+
+    <!-- Language picker -->
+    <string name="text_lang_sheet_source_title">Isalin mula sa</string>
+    <string name="text_lang_sheet_target_title">Isalin sa</string>
+    <string name="text_lang_detect">Tuklasin ang wika</string>
+    <string name="text_lang_all_header">Lahat ng wika</string>
+    <string name="cd_text_lang_search">Maghanap ng mga wika</string>
+    <string name="text_guided_lang_search">Darating ang paghahanap ng wika sa search update</string>
+
+    <string name="cd_text_reverse">Baligtarin ang direksyon ng pagsasalin</string>
+    <string name="a11y_result_ready">Handa na ang pagsasalin: %1$s</string>
+    <string name="a11y_error">Nabigo ang pagsasalin. %1$s</string>
+    <string name="text_over_char_limit">Limitado sa %1$d characters bawat pagsasalin. Paikliin ang text.</string>
     <string name="text_star_unavailable">Hindi ito ma-save — hindi natukoy ang wika nito.</string>
     <string name="cd_favourite_remove">Alisin sa naka-save</string>
     <string name="home_row_history">History at naka-save</string>
     <string name="home_row_history_sub">Bawat pagsasalin, isang tap lang</string>
+    <string name="text_paste_empty">Walang laman ang clipboard.</string>
+    <string name="text_swap_needs_detect">Magsalin muna para malaman ang wika bago baligtarin.</string>
+    <string name="cd_text_counter_limit">Naabot na ang %1$d-character na limit</string>
 </resources>

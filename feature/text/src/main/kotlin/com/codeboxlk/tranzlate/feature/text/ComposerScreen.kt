@@ -149,6 +149,7 @@ internal fun ComposerPane(
     val aiRemaining by viewModel.aiRemaining.collectAsStateWithLifecycle()
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val resultFavourite by viewModel.resultFavourite.collectAsStateWithLifecycle()
+    val swapAvailable by viewModel.swapAvailable.collectAsStateWithLifecycle()
     ComposerPaneContent(
         resultFavourite = resultFavourite,
         onToggleFavourite = viewModel::onToggleFavourite,
@@ -162,6 +163,7 @@ internal fun ComposerPane(
         onTranslate = viewModel::onTranslate,
         onRetry = viewModel::onRetry,
         onSwapLanguages = viewModel::onSwapLanguages,
+        swapAvailable = swapAvailable,
         onPickLanguage = onPickLanguage,
         onBack = onBack,
         onNotify = onNotify,
@@ -188,7 +190,8 @@ internal fun ComposerPaneContent(
     onToggleFavourite: () -> Unit = {},
     onTranslate: () -> Boolean,
     onRetry: () -> Unit,
-    onSwapLanguages: () -> Unit,
+    onSwapLanguages: () -> Boolean,
+    swapAvailable: Boolean = true,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onBack: () -> Unit,
     onNotify: (String) -> Unit,
@@ -243,6 +246,16 @@ internal fun ComposerPaneContent(
 
     val guidedVoice = stringResource(R.string.text_guided_voice)
     val guidedTts = stringResource(R.string.text_guided_tts)
+    val pasteEmpty = stringResource(R.string.text_paste_empty)
+    val pasteAction: () -> Unit = {
+        val clip = clipboard.getText()?.text
+        // EDGE_CASES no-dead-end (issue #70): an empty clipboard says so.
+        if (clip.isNullOrEmpty()) onNotify(pasteEmpty) else onInputChange(clip)
+    }
+    val swapNeedsDetect = stringResource(R.string.text_swap_needs_detect)
+    val swapAction: () -> Unit = {
+        if (!onSwapLanguages()) onNotify(swapNeedsDetect)
+    }
     val starUnavailable = stringResource(R.string.text_star_unavailable)
     val starAction: () -> Unit = {
         val starResult = uiState as? TextUiState.Result
@@ -282,8 +295,8 @@ internal fun ComposerPaneContent(
                 onBack = onBack,
                 onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
                 onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
-                onSwap = onSwapLanguages,
-                swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
+                onSwap = swapAction,
+                swapEnabled = swapAvailable,
                 constrainPills = layout.expandedWidth,
             )
         }
@@ -329,13 +342,7 @@ internal fun ComposerPaneContent(
                             input = input,
                             focusRequester = focusRequester,
                             onInputChange = onInputChange,
-                            onPaste = {
-                                clipboard
-                                    .getText()
-                                    ?.text
-                                    ?.takeIf { it.isNotEmpty() }
-                                    ?.let(onInputChange)
-                            },
+                            onPaste = pasteAction,
                             onMic = { onNotify(guidedVoice) },
                             onTranslate = {
                                 if (onTranslate()) keyboard?.hide()
@@ -476,13 +483,7 @@ internal fun ComposerPaneContent(
                         input = input,
                         focusRequester = focusRequester,
                         onInputChange = onInputChange,
-                        onPaste = {
-                            clipboard
-                                .getText()
-                                ?.text
-                                ?.takeIf { it.isNotEmpty() }
-                                ?.let(onInputChange)
-                        },
+                        onPaste = pasteAction,
                         onMic = { onNotify(guidedVoice) },
                         onTranslate = {
                             if (onTranslate()) {
@@ -594,7 +595,12 @@ private fun ColumnScope.ComposerEditBody(
     val hasText = input.isNotBlank()
     val overLimit = input.length > TEXT_CHAR_LIMIT
     val inputDescription = stringResource(R.string.cd_text_input)
-    val counterDescription = stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT)
+    val counterDescription =
+        if (input.length >= TEXT_CHAR_LIMIT) {
+            stringResource(R.string.cd_text_counter_limit, TEXT_CHAR_LIMIT)
+        } else {
+            stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT)
+        }
 
     if (compactLandscape) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -620,8 +626,11 @@ private fun ColumnScope.ComposerEditBody(
                     },
                 modifier =
                     Modifier
-                        .semantics { contentDescription = counterDescription }
-                        .testTag("tt_text_counter"),
+                        .semantics {
+                            contentDescription = counterDescription
+                            // Recorded TalkBack P0-3: hitting the cap announces.
+                            if (input.length >= TEXT_CHAR_LIMIT) liveRegion = LiveRegionMode.Polite
+                        }.testTag("tt_text_counter"),
             )
             if (input.isNotEmpty()) {
                 IconButton(onClick = onClear, modifier = Modifier.testTag("tt_composer_clear")) {
@@ -698,8 +707,10 @@ private fun ColumnScope.ComposerEditBody(
             modifier =
                 Modifier
                     .weight(1f)
-                    .semantics { contentDescription = counterDescription }
-                    .testTag("tt_text_counter"),
+                    .semantics {
+                        contentDescription = counterDescription
+                        if (input.length >= TEXT_CHAR_LIMIT) liveRegion = LiveRegionMode.Polite
+                    }.testTag("tt_text_counter"),
         )
         EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
     }
@@ -816,7 +827,12 @@ private fun ColumnScope.ComposerReadBody(
                     text = uiState.translatedText,
                     style = MaterialTheme.typography.titleLarge,
                     color = LocalResultCardColors.current.text,
-                    modifier = Modifier.fillMaxWidth().testTag("tt_text_result"),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            // C-4 canonical announce: the answer arrives politely.
+                            .semantics { liveRegion = LiveRegionMode.Polite }
+                            .testTag("tt_text_result"),
                 )
             }
             AiMeter(uiState.engine, aiMeter)
@@ -827,7 +843,12 @@ private fun ColumnScope.ComposerReadBody(
                 text = errorBodyFor(uiState.cause),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = spacing.md16).testTag("tt_text_error"),
+                modifier =
+                    Modifier
+                        .padding(top = spacing.md16)
+                        // C-4: a failure interrupts — assertive.
+                        .semantics { liveRegion = LiveRegionMode.Assertive }
+                        .testTag("tt_text_error"),
             )
             TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
                 Text(stringResource(R.string.button_retry))
@@ -840,7 +861,11 @@ private fun ColumnScope.ComposerReadBody(
                 text = limitBodyFor(uiState.notEntitled),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = spacing.md16).testTag("tt_text_limit"),
+                modifier =
+                    Modifier
+                        .padding(top = spacing.md16)
+                        .semantics { liveRegion = LiveRegionMode.Assertive }
+                        .testTag("tt_text_limit"),
             )
             TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
                 Text(stringResource(R.string.button_retry))
@@ -1044,7 +1069,10 @@ private fun ResultPane(
                     text = body,
                     style = MaterialTheme.typography.bodyMedium,
                     color = bodyColor,
-                    modifier = Modifier.testTag(if (isError) "tt_text_error" else "tt_text_limit"),
+                    modifier =
+                        Modifier
+                            .semantics { liveRegion = LiveRegionMode.Assertive }
+                            .testTag(if (isError) "tt_text_error" else "tt_text_limit"),
                 )
                 TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
                     Text(stringResource(R.string.button_retry))
@@ -1080,7 +1108,11 @@ private fun ResultPane(
                             // device, StepBased settled on its minimum for a short
                             // one-liner and never grew (issue #56 research note).
                             style = resultTypeFor(uiState.translatedText).copy(color = colors.text),
-                            modifier = Modifier.fillMaxWidth().testTag("tt_text_result"),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .semantics { liveRegion = LiveRegionMode.Polite }
+                                    .testTag("tt_text_result"),
                         )
                     }
 
@@ -1187,7 +1219,7 @@ private fun ComposerEditPreview() {
                 onInputChange = {},
                 onTranslate = { true },
                 onRetry = {},
-                onSwapLanguages = {},
+                onSwapLanguages = { true },
                 onPickLanguage = {},
                 onBack = {},
                 onNotify = {},
@@ -1223,7 +1255,7 @@ private fun ComposerResultPreview() {
                 onInputChange = {},
                 onTranslate = { true },
                 onRetry = {},
-                onSwapLanguages = {},
+                onSwapLanguages = { true },
                 onPickLanguage = {},
                 onBack = {},
                 onNotify = {},

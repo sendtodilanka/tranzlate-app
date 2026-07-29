@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Configurações</string>
+    <string name="settings_appearance_header">Aparência</string>
+    <string name="settings_theme_label">Tema</string>
+    <string name="settings_theme_system">Padrão do sistema</string>
+    <string name="settings_theme_light">Claro</string>
+    <string name="settings_theme_dark">Escuro</string>
+    <string name="settings_dynamic_color_label">Cor dinâmica</string>
+    <string name="settings_dynamic_color_supporting">Usar cores do seu papel de parede</string>
+    <string name="settings_dynamic_color_unavailable">Requer Android 12 ou mais recente</string>
+    <string name="cd_settings_back">Voltar</string>
+</resources>

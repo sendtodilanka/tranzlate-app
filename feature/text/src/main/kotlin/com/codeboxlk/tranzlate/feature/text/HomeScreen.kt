@@ -109,6 +109,7 @@ fun HomeScreen(
     previewCardModifier: Modifier = Modifier,
 ) {
     val sourceLang by viewModel.sourceLang.collectAsStateWithLifecycle()
+    val swapAvailable by viewModel.swapAvailable.collectAsStateWithLifecycle()
     val targetLang by viewModel.targetLang.collectAsStateWithLifecycle()
 
     HomeContent(
@@ -116,6 +117,7 @@ fun HomeScreen(
         targetLangId = targetLang,
         onOpenComposer = onOpenComposer,
         onSwapLanguages = viewModel::onSwapLanguages,
+        swapAvailable = swapAvailable,
         onPickLanguage = onPickLanguage,
         onOpenSettings = onOpenSettings,
         onOpenPaywall = onOpenPaywall,
@@ -136,7 +138,8 @@ fun HomeContent(
     sourceLangId: String,
     targetLangId: String,
     onOpenComposer: () -> Unit,
-    onSwapLanguages: () -> Unit,
+    onSwapLanguages: () -> Boolean,
+    swapAvailable: Boolean,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenPaywall: () -> Unit,
@@ -154,10 +157,13 @@ fun HomeContent(
     val guidedPhrasebook = stringResource(R.string.home_guided_phrasebook)
     val guidedQuotes = stringResource(R.string.home_guided_quotes)
     val guidedPhrasing = stringResource(R.string.home_guided_phrasing)
+    val swapNeedsDetect = stringResource(R.string.text_swap_needs_detect)
 
     fun guided(message: String) {
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
+
+    val swapAction: () -> Unit = { if (!onSwapLanguages()) guided(swapNeedsDetect) }
 
     val layout = rememberAdaptiveLayout()
     if (layout.expandedWidth) {
@@ -204,8 +210,8 @@ fun HomeContent(
                         targetLabel = languageLabel(targetLangId),
                         onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
                         onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
-                        onSwap = onSwapLanguages,
-                        swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
+                        onSwap = swapAction,
+                        swapEnabled = swapAvailable,
                         modifier = Modifier.padding(vertical = spacing.sm8),
                     )
                     InputPreviewCard(
@@ -286,8 +292,8 @@ fun HomeContent(
                     targetLabel = languageLabel(targetLangId),
                     onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
                     onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
-                    onSwap = onSwapLanguages,
-                    swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
+                    onSwap = swapAction,
+                    swapEnabled = swapAvailable,
                     modifier =
                         contentMaxWidth
                             .align(Alignment.CenterHorizontally)
@@ -831,7 +837,8 @@ private fun HomeContentPreview() {
             sourceLangId = "en",
             targetLangId = "es",
             onOpenComposer = {},
-            onSwapLanguages = {},
+            onSwapLanguages = { true },
+            swapAvailable = true,
             onPickLanguage = {},
             onOpenSettings = {},
             onOpenPaywall = {},

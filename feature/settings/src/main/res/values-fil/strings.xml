@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Mga Setting</string>
+    <string name="settings_appearance_header">Itsura</string>
+    <string name="settings_theme_label">Tema</string>
+    <string name="settings_theme_system">Default ng system</string>
+    <string name="settings_theme_light">Maliwanag</string>
+    <string name="settings_theme_dark">Madilim</string>
+    <string name="settings_dynamic_color_label">Dynamic na kulay</string>
+    <string name="settings_dynamic_color_supporting">Gumamit ng mga kulay mula sa wallpaper mo</string>
+    <string name="settings_dynamic_color_unavailable">Kailangan ng Android 12 o mas bago</string>
+    <string name="cd_settings_back">Bumalik</string>
+</resources>

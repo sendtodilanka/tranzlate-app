@@ -125,6 +125,67 @@ class TextViewModelTest {
 
     private fun settle() = dispatcher.scheduler.advanceUntilIdle()
 
+    // ---- issue #70: swap never writes "auto" into TARGET ---------------------
+
+    @Test
+    fun `swap with a concrete source stays a plain atomic pair write`() {
+        val prefs = FakeTranslatePrefsRepository()
+        val vm = viewModel(prefs = prefs)
+        settle()
+
+        assertThat(vm.onSwapLanguages()).isTrue()
+        settle()
+
+        assertThat(prefs.source.value).isEqualTo("fr")
+        assertThat(prefs.target.value).isEqualTo("en")
+    }
+
+    @Test
+    fun `swap with Detect resolves through the shown result's detected language`() {
+        val prefs = FakeTranslatePrefsRepository().apply { source.value = "auto" }
+        val vm = viewModel(prefs = prefs)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate() // G7 auto->fr detects "en"
+        settle()
+
+        assertThat(vm.onSwapLanguages()).isTrue()
+        settle()
+
+        assertThat(prefs.source.value).isEqualTo("fr")
+        assertThat(prefs.target.value).isEqualTo("en") // the DETECTED id — never "auto"
+    }
+
+    @Test
+    fun `swapAvailable follows Detect state and the shown result`() {
+        val prefs = FakeTranslatePrefsRepository().apply { source.value = "auto" }
+        val vm = viewModel(prefs = prefs)
+        settle()
+        assertThat(vm.swapAvailable.value).isFalse() // Detect + nothing shown
+
+        vm.onInputChange("Good morning")
+        vm.onTranslate() // G7 detects "en"
+        settle()
+        assertThat(vm.swapAvailable.value).isTrue() // the resolve path is now REACHABLE
+
+        prefs.source.value = "en"
+        settle()
+        assertThat(vm.swapAvailable.value).isTrue() // concrete source always can
+    }
+
+    @Test
+    fun `swap with Detect and nothing to resolve reports false and writes nothing`() {
+        val prefs = FakeTranslatePrefsRepository().apply { source.value = "auto" }
+        val vm = viewModel(prefs = prefs)
+        settle()
+
+        assertThat(vm.onSwapLanguages()).isFalse()
+        settle()
+
+        assertThat(prefs.source.value).isEqualTo("auto") // untouched
+        assertThat(prefs.target.value).isEqualTo("fr")
+    }
+
     // ---- issue #68: tap-to-reopen + star-to-save -----------------------------
 
     @Test

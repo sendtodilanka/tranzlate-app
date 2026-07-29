@@ -1,14 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Text-translation feature strings — keys per STRINGS_text-translation.md (C-3
-     key authority). REUSED keys keep the catalogue's verbatim en values; NEW keys
-     (UI_SPEC §2 copy: greeting/subtitle/tiles/guided messages/badges) are added to
-     the catalogue §2.11 in the same PR.
-     TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR carry only the
-     catalogue-verbatim translations; the rest are a tracked content task
-     (backlog before ship — DoD gate 12). MissingTranslation is suppressed until
-     that task lands. -->
-<resources xmlns:tools="http://schemas.android.com/tools"
-    tools:ignore="MissingTranslation">
+     key authority). fil + pt-rBR carry FULL parity (issue #70): 19 catalogue-
+     verbatim values plus in-issue-authored translations flagged for native
+     review (DoD gate 12). MissingTranslation is NOT suppressed — lint guards
+     parity from here on. -->
+<resources>
 
     <!-- Composer (UI_SPEC §2.2) -->
     <string name="text_input_placeholder">Enter text</string>
@@ -119,4 +115,7 @@
     <string name="cd_favourite_remove">Remove from saved</string>
     <string name="home_row_history">History &amp; saved</string>
     <string name="home_row_history_sub">Every translation, one tap away</string>
+    <string name="text_paste_empty">Clipboard is empty.</string>
+    <string name="text_swap_needs_detect">Translate once to detect the language before swapping.</string>
+    <string name="cd_text_counter_limit">%1$d-character limit reached</string>
 </resources>
