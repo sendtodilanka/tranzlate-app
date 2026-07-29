@@ -84,8 +84,8 @@ private val CardShadow = Elevation.level1 // 1 -> 1 (same)
 
 // Two-pane split (issue #56 frames 1/4): translate zone 2 : tools 3 (≈40/60).
 // A separating hinge overrides both to 1 : 1 (frames 6/7).
-private const val PaneWeightPrimary = 2f
-private const val PaneWeightSecondary = 3f
+private const val PANE_WEIGHT_PRIMARY = 2f
+private const val PANE_WEIGHT_SECONDARY = 3f
 
 /**
  * Home — the approved "card stack" (Claude Design · Offline Translator M3):
@@ -172,7 +172,7 @@ fun HomeContent(
                         .padding(contentPadding)
                         .padding(horizontal = LocalSpacing.current.lg24),
             ) {
-                Column(modifier = Modifier.weight(if (layout.hinged) 1f else PaneWeightPrimary)) {
+                Column(modifier = Modifier.weight(if (layout.hinged) 1f else PANE_WEIGHT_PRIMARY)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().height(Dimensions.topBarHeight),
@@ -214,7 +214,7 @@ fun HomeContent(
                     Column(
                         modifier =
                             Modifier
-                                .weight(if (layout.hinged) 1f else PaneWeightSecondary)
+                                .weight(if (layout.hinged) 1f else PANE_WEIGHT_SECONDARY)
                                 .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(SectionGap),
                     ) {

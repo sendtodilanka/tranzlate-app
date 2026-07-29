@@ -6,17 +6,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -47,8 +47,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -79,8 +79,8 @@ import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 
 // Split panes (issue #56 frames 3/5): source/input 2 : result 3; a hinge → 1 : 1.
-private const val PaneWeightInput = 2f
-private const val PaneWeightResult = 3f
+private const val PANE_WEIGHT_INPUT = 2f
+private const val PANE_WEIGHT_RESULT = 3f
 
 /** SharedTransition key for the ONE morph anchor — the input/composer card. */
 const val COMPOSER_CARD_SHARED_KEY = "composer_card"
@@ -264,7 +264,7 @@ internal fun ComposerPaneContent(
                     shadowElevation = Elevation.level1,
                     modifier =
                         cardModifier
-                            .weight(if (layout.hinged) 1f else PaneWeightInput)
+                            .weight(if (layout.hinged) 1f else PANE_WEIGHT_INPUT)
                             .fillMaxHeight()
                             .testTag("tt_composer_card"),
                 ) {
@@ -314,7 +314,7 @@ internal fun ComposerPaneContent(
                     },
                     onSpeak = { onNotify(guidedTts) },
                     onStar = { onNotify(guidedBookmark) },
-                    modifier = Modifier.weight(if (layout.hinged) 1f else PaneWeightResult).fillMaxHeight(),
+                    modifier = Modifier.weight(if (layout.hinged) 1f else PANE_WEIGHT_RESULT).fillMaxHeight(),
                 )
             }
             Spacer(Modifier.height(spacing.md16))
@@ -335,7 +335,7 @@ internal fun ComposerPaneContent(
                     shape = MaterialTheme.shapes.extraLarge,
                     color = LocalFloatingSurface.current,
                     shadowElevation = Elevation.level1,
-                    modifier = cardModifier.weight(PaneWeightInput).fillMaxHeight().testTag("tt_composer_card"),
+                    modifier = cardModifier.weight(PANE_WEIGHT_INPUT).fillMaxHeight().testTag("tt_composer_card"),
                 ) {
                     Column(
                         modifier =
@@ -380,7 +380,7 @@ internal fun ComposerPaneContent(
                     },
                     onSpeak = { onNotify(guidedTts) },
                     onStar = { onNotify(guidedBookmark) },
-                    modifier = Modifier.weight(PaneWeightResult).fillMaxHeight(),
+                    modifier = Modifier.weight(PANE_WEIGHT_RESULT).fillMaxHeight(),
                 )
             }
             Spacer(Modifier.height(spacing.md16))
