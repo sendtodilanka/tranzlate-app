@@ -7,10 +7,16 @@ package com.codeboxlk.tranzlate.core.model
  * contract doc alignment is a tracked follow-up docs PR, plan §9).
  */
 sealed interface TranslationOutcome {
-    /** @property resolvedEngine the engine that actually produced [text] (C-9 resolved form). */
+    /**
+     * @property resolvedEngine the engine that actually produced [text] (C-9 resolved form).
+     * @property fromCache true when the C-8 cache answered and no engine ran -
+     *   by construction such a Success charged no quota and asked no ads
+     *   (issue #53 / A2; ads-on-cache-hit is an open owner decision, default no).
+     */
     data class Success(
         val text: String,
         val resolvedEngine: Engine,
+        val fromCache: Boolean = false,
     ) : TranslationOutcome
 
     data class Error(

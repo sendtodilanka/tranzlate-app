@@ -32,6 +32,15 @@ class TranslationRepositoryImpl
         override fun favourites(): Flow<List<Translation>> =
             translationDao.favourites().map { entities -> entities.map(TranslationEntity::toDomain) }
 
+        override suspend fun cachedAny(
+            sourceText: String,
+            sourceLang: String,
+            targetLang: String,
+        ): Translation? =
+            translationDao
+                .cachedAny(normalizeSourceText(sourceText), sourceLang, targetLang)
+                ?.toDomain()
+
         override suspend fun cached(
             sourceText: String,
             sourceLang: String,

@@ -43,10 +43,32 @@ class FakeTranslationRepository(
         }
     }
 
+    override suspend fun cachedAny(
+        sourceText: String,
+        sourceLang: String,
+        targetLang: String,
+    ): Translation? {
+        val normalized = normalize(sourceText)
+        return store.value
+            .filter { it.sourceText == normalized && it.sourceLang == sourceLang && it.targetLang == targetLang }
+            .maxByOrNull(Translation::createdAt)
+    }
+
     override suspend fun save(translation: Translation): Long {
         check(!failWrites) { "FakeTranslationRepository.failWrites is set" }
+        val normalized = translation.copy(sourceText = normalize(translation.sourceText))
+        // Mirror Room's IGNORE + unique C-8 index (issue #53 A9): a duplicate
+        // tuple loses the race and reports -1, exactly like the real DAO.
+        val duplicate =
+            store.value.any {
+                it.sourceText == normalized.sourceText &&
+                    it.sourceLang == normalized.sourceLang &&
+                    it.targetLang == normalized.targetLang &&
+                    it.engine == normalized.engine
+            }
+        if (duplicate) return -1L
         val id = nextId++
-        store.value = store.value + translation.copy(id = id, sourceText = normalize(translation.sourceText))
+        store.value = store.value + normalized.copy(id = id)
         return id
     }
 

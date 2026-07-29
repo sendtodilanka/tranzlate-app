@@ -13,7 +13,9 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "translation",
     indices = [
-        Index(value = ["source_text", "source_lang", "target_lang", "engine"]),
+        // unique (issue #53 A9): the C-8 dedupe key is enforced by the DB, so a
+        // read-then-insert race cannot produce duplicate rows.
+        Index(value = ["source_text", "source_lang", "target_lang", "engine"], unique = true),
         Index(value = ["favourite"]),
         Index(value = ["created_at"], orders = [Index.Order.DESC]),
     ],
