@@ -48,7 +48,9 @@ The review's core insight: **three of the four brains are permissive stubs, but 
   }
   ```
   (exact shape may be adjusted in-PR; the invariant that cannot move: **callers can always await a resolved value, and nothing defaults to FREE while loading**.)
-- **A7**: `RealFeatureAccess` observes the same `SubscriptionGateway.entitlement` the purchase flow uses — one source of tier truth. Unknown tier strings **fail closed to FREE with a log**, never silently to a paid tier.
+- **A7**: `RealFeatureAccess` observes the same `SubscriptionGateway.entitlement` the purchase flow uses — one source of tier truth. ~~Unknown tier strings **fail closed to FREE with a log**, never silently to a paid tier.~~
+  **rev.1 (PR #58, cross-model lens OPEN-1):** the unknown-string clause was written for the three-tier world, where a wrong guess could grant the *wrong paid tier*. D-2 rev.2 has one paid tier, which inverts the failure analysis: a provider-verified `Paid` is a real purchase, so mapping it to FREE would **strip a paying subscriber** — the worse billing failure. Shipped rule: the string→tier branch is **deleted**, any provider `Paid` → `Paid(PRO)`; there is no unknown-id path left to fail open *or* closed (`EntitlementMapping.kt`, table-tested incl. legacy `"plus"/"premium"` ids).
+  **Engines-phase requirement (lens N1):** a real gateway can hold `Loading` at cold start — the metered gate's `awaitResolved()` needs a bounded wait + error outcome there (EDGE_CASES no-dead-end); safe today only because the NoOp gateway starts resolved.
 - TEST_A11Y_CONTRACT §1.3's fake matrix + the superseded banners get their real rewrite here.
 
 ### PR 4 — Usage contract (A4)
