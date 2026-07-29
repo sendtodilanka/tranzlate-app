@@ -19,6 +19,7 @@ import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.feature.camera.CameraScreen
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
+import com.codeboxlk.tranzlate.feature.paywall.PaywallScreen
 import com.codeboxlk.tranzlate.feature.settings.SettingsScreen
 import com.codeboxlk.tranzlate.feature.text.COMPOSER_CARD_SHARED_KEY
 import com.codeboxlk.tranzlate.feature.text.ComposerScreen
@@ -102,6 +103,7 @@ private fun AppNavDisplay(
                             )
                         },
                         onOpenSettings = { onNavigate(SettingsNavKey) },
+                        onOpenPaywall = { onNavigate(PaywallNavKey) },
                         onOpenCamera = { onNavigate(CameraNavKey) },
                         onOpenLanguages = { onNavigate(LanguagesNavKey) },
                         onOpenConversation = { onNavigate(ChatNavKey) },
@@ -123,6 +125,7 @@ private fun AppNavDisplay(
                             textViewModel.onComposerDismissed()
                             backStack.removeLastOrNull()
                         },
+                        onOpenPaywall = { onNavigate(PaywallNavKey) },
                         onPickLanguage = { target ->
                             onNavigate(
                                 LanguagePickerNavKey(forSource = target == LanguagePickerTarget.SOURCE),
@@ -163,6 +166,12 @@ private fun AppNavDisplay(
                 // placeholder (download/delete packs) — a different job from the
                 // text vertical's source/target picker above, hence the alias.
                 entry<LanguagesNavKey> { OfflineLanguagesScreen() }
+                entry<PaywallNavKey> {
+                    PaywallScreen(
+                        viewModel = hiltViewModel(),
+                        onClose = { backStack.removeLastOrNull() },
+                    )
+                }
                 entry<SettingsNavKey> { SettingsScreen(onBack = { backStack.removeLastOrNull() }) }
             },
     )

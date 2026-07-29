@@ -100,6 +100,7 @@ fun HomeScreen(
     onOpenComposer: () -> Unit,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenPaywall: () -> Unit,
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
@@ -116,6 +117,7 @@ fun HomeScreen(
         onSwapLanguages = viewModel::onSwapLanguages,
         onPickLanguage = onPickLanguage,
         onOpenSettings = onOpenSettings,
+        onOpenPaywall = onOpenPaywall,
         onOpenCamera = onOpenCamera,
         onOpenLanguages = onOpenLanguages,
         onOpenConversation = onOpenConversation,
@@ -135,6 +137,7 @@ fun HomeContent(
     onSwapLanguages: () -> Unit,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenPaywall: () -> Unit,
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
@@ -148,7 +151,6 @@ fun HomeContent(
     val guidedPhrasebook = stringResource(R.string.home_guided_phrasebook)
     val guidedQuotes = stringResource(R.string.home_guided_quotes)
     val guidedPhrasing = stringResource(R.string.home_guided_phrasing)
-    val guidedPro = stringResource(R.string.home_guided_pro)
 
     fun guided(message: String) {
         scope.launch { snackbarHostState.showSnackbar(message) }
@@ -182,7 +184,7 @@ fun HomeContent(
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Spacer(Modifier.weight(1f))
-                        TokenProChip(onClick = { guided(guidedPro) })
+                        TokenProChip(onClick = onOpenPaywall)
                         IconButton(
                             onClick = onOpenSettings,
                             modifier = Modifier.testTag("tt_home_settings"),
@@ -261,7 +263,7 @@ fun HomeContent(
                         )
                     },
                     actions = {
-                        TokenProChip(onClick = { guided(guidedPro) })
+                        TokenProChip(onClick = onOpenPaywall)
                         IconButton(
                             onClick = onOpenSettings,
                             modifier = Modifier.testTag("tt_home_settings"),
@@ -818,6 +820,7 @@ private fun HomeContentPreview() {
             onSwapLanguages = {},
             onPickLanguage = {},
             onOpenSettings = {},
+            onOpenPaywall = {},
             onOpenCamera = {},
             onOpenLanguages = {},
             onOpenConversation = {},

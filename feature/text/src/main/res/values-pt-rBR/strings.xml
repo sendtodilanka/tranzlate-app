@@ -16,4 +16,11 @@
     <string name="text_error_offline">Você está offline. Conecte-se à internet e tente novamente.</string>
     <string name="text_error_limit_reached">Você usou as traduções de IA gratuitas de hoje. Elas voltam à meia-noite.</string>
     <string name="text_error_not_entitled">Essa qualidade de tradução exige uma assinatura Pro.</string>
+    <string name="text_ai_meter">Traduções de IA: restam %1$d/%2$d hoje</string>
+    <string name="limit_sheet_title_quota">Limite diário gratuito de IA atingido</string>
+    <string name="limit_sheet_body_quota">Suas 5 traduções gratuitas com IA de hoje acabaram. Elas voltam à meia-noite — ou assine o Pro para uso ilimitado.</string>
+    <string name="limit_sheet_title_pro">Essa qualidade exige o Pro</string>
+    <string name="limit_sheet_body_pro">Traduções de IA com fraseado natural são um recurso Pro. Suas traduções gratuitas continuam funcionando.</string>
+    <string name="limit_sheet_cta">Ver planos Pro</string>
+    <string name="limit_sheet_dismiss">Agora não</string>
 </resources>

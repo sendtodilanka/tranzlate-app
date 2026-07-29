@@ -27,6 +27,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -52,8 +53,10 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
@@ -101,6 +104,7 @@ fun ComposerScreen(
     viewModel: TextViewModel,
     onBack: () -> Unit,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
+    onOpenPaywall: () -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
 ) {
@@ -119,6 +123,7 @@ fun ComposerScreen(
             viewModel = viewModel,
             onBack = onBack,
             onPickLanguage = onPickLanguage,
+            onOpenPaywall = onOpenPaywall,
             onNotify = onNotify,
             cardModifier = cardModifier,
             modifier = Modifier.fillMaxSize().padding(contentPadding),
@@ -135,16 +140,21 @@ internal fun ComposerPane(
     onNotify: (String) -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
+    onOpenPaywall: () -> Unit = {},
 ) {
     val input by viewModel.input.collectAsStateWithLifecycle()
     val sourceLang by viewModel.sourceLang.collectAsStateWithLifecycle()
     val targetLang by viewModel.targetLang.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val aiRemaining by viewModel.aiRemaining.collectAsStateWithLifecycle()
+    val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     ComposerPaneContent(
         input = input,
         sourceLangId = sourceLang,
         targetLangId = targetLang,
         uiState = uiState,
+        aiMeter = if (isPro) null else aiRemaining to viewModel.aiCap,
+        onOpenPaywall = onOpenPaywall,
         onInputChange = viewModel::onInputChange,
         onTranslate = viewModel::onTranslate,
         onRetry = viewModel::onRetry,
@@ -169,6 +179,8 @@ internal fun ComposerPaneContent(
     targetLangId: String,
     uiState: TextUiState,
     onInputChange: (String) -> Unit,
+    aiMeter: Pair<Int, Int>? = null,
+    onOpenPaywall: () -> Unit = {},
     onTranslate: () -> Boolean,
     onRetry: () -> Unit,
     onSwapLanguages: () -> Unit,
@@ -185,6 +197,10 @@ internal fun ComposerPaneContent(
     val focusRequester = remember { FocusRequester() }
 
     val layout = rememberAdaptiveLayout()
+
+    // Trigger #1 / not-entitled CTA (BUSINESS_MODEL §5 · C-11): the sheet rides
+    // OVER the composer — free engines keep working underneath, never a block.
+    (uiState as? TextUiState.Limit)?.let { LimitSheet(it, onOpenPaywall) }
 
     // Editing vs reading is a UI concern: the shared uiState keeps the last
     // result while the user re-edits, so "which face does the card show" cannot
@@ -320,6 +336,7 @@ internal fun ComposerPaneContent(
                 }
                 Spacer(Modifier.width(spacing.lg24))
                 ResultPane(
+                    aiMeter = aiMeter,
                     targetLabel = languageLabel(targetLangId),
                     uiState = uiState,
                     onRetry = onRetry,
@@ -386,6 +403,7 @@ internal fun ComposerPaneContent(
                 }
                 Spacer(Modifier.width(spacing.md16))
                 ResultPane(
+                    aiMeter = aiMeter,
                     targetLabel = languageLabel(targetLangId),
                     uiState = uiState,
                     onRetry = onRetry,
@@ -472,6 +490,7 @@ internal fun ComposerPaneContent(
                     )
                 } else {
                     ComposerReadBody(
+                        aiMeter = aiMeter,
                         sourceText = uiState.requestText ?: input,
                         targetLabel = languageLabel(targetLangId),
                         uiState = uiState,
@@ -736,6 +755,7 @@ private fun ColumnScope.ComposerReadBody(
     onCopy: (String) -> Unit,
     onSpeak: () -> Unit,
     onStar: () -> Unit,
+    aiMeter: Pair<Int, Int>? = null,
 ) {
     val spacing = LocalSpacing.current
     Text(
@@ -781,6 +801,7 @@ private fun ColumnScope.ComposerReadBody(
                     modifier = Modifier.fillMaxWidth().testTag("tt_text_result"),
                 )
             }
+            AiMeter(uiState.engine, aiMeter)
         }
 
         is TextUiState.Error -> {
@@ -850,6 +871,88 @@ private fun resultTypeFor(text: String) =
         else -> MaterialTheme.typography.titleLarge
     }
 
+/**
+ * BUSINESS_MODEL §5 goal-gradient: the AI-quality meter shows WHILE an
+ * AI-quality result is on screen (FREE users only) — awareness of the meter is
+ * what makes the limit sheet land as expected instead of as a surprise.
+ */
+@Composable
+private fun AiMeter(
+    engine: Engine,
+    meter: Pair<Int, Int>?,
+) {
+    if (meter == null || engine != Engine.ONLINE_CLOUD_NLP) return
+    val (left, cap) = meter
+    Text(
+        text = stringResource(R.string.text_ai_meter, left, cap),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = LocalSpacing.current.sm8).testTag("tt_text_ai_meter"),
+    )
+}
+
+/**
+ * Trigger #1 (C-11) + the not-entitled upgrade CTA (PR-60 lens N2): a
+ * DISMISSIBLE sheet over the composer — never a navigated block, free engines
+ * keep working underneath. Copy differs by kind: quota is "come back tomorrow
+ * or go Pro", denial is "this quality needs Pro".
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun LimitSheet(
+    limit: TextUiState.Limit,
+    onOpenPaywall: () -> Unit,
+) {
+    var dismissed by rememberSaveable(limit) { mutableStateOf(false) }
+    if (dismissed) return
+    val spacing = LocalSpacing.current
+    ModalBottomSheet(
+        onDismissRequest = { dismissed = true },
+        modifier = Modifier.testTag("tt_text_limit_sheet"),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.lg24)
+                    .padding(bottom = spacing.lg24),
+        ) {
+            Text(
+                text =
+                    stringResource(
+                        if (limit.notEntitled) R.string.limit_sheet_title_pro else R.string.limit_sheet_title_quota,
+                    ),
+                style = MaterialTheme.typography.titleLarge,
+                // The gate's answer interrupts a task the user just asked for —
+                // TalkBack hears it without hunting (contract tag-table promise).
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+            )
+            Spacer(Modifier.height(spacing.sm8))
+            Text(
+                text =
+                    stringResource(
+                        if (limit.notEntitled) R.string.limit_sheet_body_pro else R.string.limit_sheet_body_quota,
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(spacing.md16))
+            Button(
+                onClick = onOpenPaywall,
+                modifier = Modifier.fillMaxWidth().testTag("tt_limit_sheet_cta"),
+            ) {
+                Text(stringResource(R.string.limit_sheet_cta))
+            }
+            TextButton(
+                onClick = { dismissed = true },
+                modifier = Modifier.fillMaxWidth().testTag("tt_limit_sheet_dismiss"),
+            ) {
+                Text(stringResource(R.string.limit_sheet_dismiss))
+            }
+        }
+    }
+}
+
 /** Source-language label + the ✕ clear affordance (the Paste chip's mirror). */
 @Composable
 private fun SourceLabelRow(
@@ -887,6 +990,7 @@ private fun SourceLabelRow(
 private fun ResultPane(
     targetLabel: String,
     uiState: TextUiState,
+    aiMeter: Pair<Int, Int>? = null,
     onRetry: () -> Unit,
     onCopy: (String) -> Unit,
     onSpeak: () -> Unit,
@@ -967,6 +1071,7 @@ private fun ResultPane(
                 }
             }
             if (uiState is TextUiState.Result) {
+                AiMeter(uiState.engine, aiMeter)
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     ResultAction(DsR.drawable.ic_volume_up, R.string.cd_speak, "tt_text_speak", onSpeak)
                     ResultAction(DsR.drawable.ic_content_copy, R.string.cd_copy, "tt_text_copy") {

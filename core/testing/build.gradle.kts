@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     api(projects.core.common)
+    api(projects.core.config)
     api(projects.core.domain)
     api(projects.core.model)
     api(libs.kotlinx.coroutines.test)

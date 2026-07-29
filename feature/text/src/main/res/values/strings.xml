@@ -90,6 +90,13 @@
     <string name="text_error_offline">You\'re offline. Connect to the internet and try again.</string>
     <string name="text_error_limit_reached">You\'ve used today\'s free AI translations. They reset at midnight.</string>
     <string name="text_error_not_entitled">This translation quality needs a Pro subscription.</string>
+    <string name="text_ai_meter">AI translations: %1$d/%2$d left today</string>
+    <string name="limit_sheet_title_quota">Daily free AI limit reached</string>
+    <string name="limit_sheet_body_quota">Your 5 free AI-quality translations are used for today. They reset at midnight — or go Pro for unlimited.</string>
+    <string name="limit_sheet_title_pro">This quality needs Pro</string>
+    <string name="limit_sheet_body_pro">Natural-phrasing AI translations are a Pro feature. Your free translations keep working.</string>
+    <string name="limit_sheet_cta">See Pro plans</string>
+    <string name="limit_sheet_dismiss">Not now</string>
     <string name="home_edit_no_text_to_translate_warning">Please enter text to translate.</string>
     <string name="button_retry">Retry</string>
     <string name="cd_text_retry">Retry translation</string>
