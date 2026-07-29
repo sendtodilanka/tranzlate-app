@@ -36,8 +36,5 @@ internal abstract class DataModule {
     abstract fun themePrefsRepository(impl: ThemePrefsRepositoryImpl): ThemePrefsRepository
 
     @Binds
-    abstract fun connectivityMonitor(impl: StubConnectivityMonitor): ConnectivityMonitor
-
-    @Binds
     abstract fun remoteConfigSource(impl: StaticRemoteConfigSource): RemoteConfigSource
 }
