@@ -22,6 +22,12 @@ object Dimensions {
     /** Compact single-pane content max width, centered. */
     val contentMaxWidth: Dp = 480.dp
 
+    /** Medium-window single-column max width (issue #56 — tablet-portrait stack). */
+    val contentMaxWidthMedium: Dp = 600.dp
+
+    /** Standard top bar height (M3 small top app bar). */
+    val topBarHeight: Dp = 64.dp
+
     val sheetPeek: Dp = 56.dp
     val fabSize: Dp = 56.dp
 

@@ -9,16 +9,23 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -52,6 +60,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.designsystem.Elevation
@@ -67,6 +76,10 @@ import com.codeboxlk.tranzlate.core.ui.ShimmerResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
+
+// Split panes (issue #56 frames 3/5): source/input 2 : result 3; a hinge → 1 : 1.
+private const val PaneWeightInput = 2f
+private const val PaneWeightResult = 3f
 
 /** SharedTransition key for the ONE morph anchor — the input/composer card. */
 const val COMPOSER_CARD_SHARED_KEY = "composer_card"
@@ -148,7 +161,10 @@ internal fun ComposerPane(
 
 /** Stateless 5a layout (previewable without DI): top row + the one card. */
 @Composable
-@Suppress("LongMethod") // one cohesive 5a surface; splitting hides the edit/result state machine
+// One cohesive 5a surface across every window shape (issue #56);
+// splitting further would hide the edit/result state machine.
+@OptIn(ExperimentalLayoutApi::class)
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun ComposerPaneContent(
     input: String,
     sourceLangId: String,
@@ -170,11 +186,16 @@ internal fun ComposerPaneContent(
     val clipboard = LocalClipboardManager.current
     val focusRequester = remember { FocusRequester() }
 
+    val layout = rememberAdaptiveLayout()
+
     // Editing vs reading is a UI concern: the shared uiState keeps the last
     // result while the user re-edits, so "which face does the card show" cannot
     // be derived from uiState alone. Saveable → survives rotation and the
-    // language-picker round trip (requirement E).
+    // language-picker round trip (requirement E). On the permanent two-pane
+    // shape (issue #56) there is no face to switch — both panes are always
+    // live, so this stays true and the read face never mounts.
     var isEditing by rememberSaveable { mutableStateOf(uiState is TextUiState.Idle) }
+    if (layout.permanentTwoPane && !isEditing) isEditing = true
 
     // Owner requirement: entering 5a lands ready to type. Choreography matters:
     // the IME inset resizes this pane, so showing the keyboard DURING the
@@ -200,15 +221,177 @@ internal fun ComposerPaneContent(
     val copiedMessage = stringResource(R.string.text_copied)
 
     Column(modifier = modifier) {
-        ComposerTopRow(
-            sourceLabel = languageLabel(sourceLangId),
-            targetLabel = languageLabel(targetLangId),
-            onBack = onBack,
-            onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
-            onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
-            onSwap = onSwapLanguages,
-            swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
-        )
+        // Height-compact landscape + IME: the keyboard owns most of the 412dp —
+        // hide the top row while typing (GT's own landscape behaviour) so the
+        // field keeps a readable height. The system back gesture still works,
+        // and the row returns the moment the keyboard drops. Verified on
+        // device: without this the field measures near zero (issue #56).
+        // No isImeVisible read: in the 412dp-tall landscape the row must go whenever
+        // the user is composing anyway, and the per-frame inset invalidation it
+        // caused is the prime suspect for the field's draw failure (issue #56).
+        val hideTopRow = layout.splitResultOnly && isEditing
+        Box(
+            modifier =
+                Modifier
+                    .clipToBounds()
+                    .then(if (hideTopRow) Modifier.height(0.dp) else Modifier),
+        ) {
+            ComposerTopRow(
+                sourceLabel = languageLabel(sourceLangId),
+                targetLabel = languageLabel(targetLangId),
+                onBack = onBack,
+                onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
+                onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
+                onSwap = onSwapLanguages,
+                swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
+            )
+        }
+        if (hideTopRow) Spacer(Modifier.height(spacing.sm8))
+        if (layout.permanentTwoPane) {
+            // Tablet / unfolded foldable (issue #56, frames 5/7): both panes live
+            // at once — the editable card left, the result pane right. A hinge
+            // snaps the split to 50/50 so nothing renders under the fold.
+            Row(
+                modifier =
+                    Modifier
+                        .padding(horizontal = LocalSpacing.current.md16)
+                        .weight(1f),
+            ) {
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = LocalFloatingSurface.current,
+                    shadowElevation = Elevation.level1,
+                    modifier =
+                        cardModifier
+                            .weight(if (layout.hinged) 1f else PaneWeightInput)
+                            .fillMaxHeight()
+                            .testTag("tt_composer_card"),
+                ) {
+                    Column(
+                        modifier =
+                            Modifier.padding(
+                                start = spacing.md16,
+                                end = spacing.md16,
+                                top = spacing.lg24,
+                                bottom = spacing.md16,
+                            ),
+                    ) {
+                        SourceLabelRow(
+                            label = languageLabel(sourceLangId),
+                            showClear = input.isNotEmpty(),
+                            onClear = {
+                                onClearAll()
+                                focusRequester.requestFocus()
+                            },
+                        )
+                        ComposerEditBody(
+                            input = input,
+                            focusRequester = focusRequester,
+                            onInputChange = onInputChange,
+                            onPaste = {
+                                clipboard
+                                    .getText()
+                                    ?.text
+                                    ?.takeIf { it.isNotEmpty() }
+                                    ?.let(onInputChange)
+                            },
+                            onMic = { onNotify(guidedVoice) },
+                            onTranslate = {
+                                if (onTranslate()) keyboard?.hide()
+                            },
+                        )
+                    }
+                }
+                Spacer(Modifier.width(spacing.lg24))
+                ResultPane(
+                    targetLabel = languageLabel(targetLangId),
+                    uiState = uiState,
+                    onRetry = onRetry,
+                    onCopy = { text ->
+                        clipboard.setText(AnnotatedString(text))
+                        onNotify(copiedMessage)
+                    },
+                    onSpeak = { onNotify(guidedTts) },
+                    onStar = { onNotify(guidedBookmark) },
+                    modifier = Modifier.weight(if (layout.hinged) 1f else PaneWeightResult).fillMaxHeight(),
+                )
+            }
+            Spacer(Modifier.height(spacing.md16))
+            return
+        }
+
+        val showsResult = uiState is TextUiState.Result || uiState is TextUiState.Translating
+        if (layout.splitResultOnly && !isEditing && showsResult) {
+            // Phone landscape read face (issue #56, frame 3): source | result side
+            // by side — no vertical scroll in a 412dp-tall window.
+            Row(
+                modifier =
+                    Modifier
+                        .padding(horizontal = LocalSpacing.current.md16)
+                        .weight(1f),
+            ) {
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = LocalFloatingSurface.current,
+                    shadowElevation = Elevation.level1,
+                    modifier = cardModifier.weight(PaneWeightInput).fillMaxHeight().testTag("tt_composer_card"),
+                ) {
+                    Column(
+                        modifier =
+                            Modifier.padding(
+                                start = spacing.md16,
+                                end = spacing.md16,
+                                top = spacing.lg24,
+                                bottom = spacing.md16,
+                            ),
+                    ) {
+                        SourceLabelRow(
+                            label = languageLabel(sourceLangId),
+                            showClear = input.isNotEmpty(),
+                            onClear = {
+                                onClearAll()
+                                isEditing = true
+                            },
+                        )
+                        Text(
+                            text = uiState.requestText ?: input,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable(
+                                        onClickLabel = stringResource(R.string.cd_text_edit),
+                                        onClick = { isEditing = true },
+                                    ).padding(top = spacing.sm8)
+                                    .testTag("tt_composer_source"),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(spacing.md16))
+                ResultPane(
+                    targetLabel = languageLabel(targetLangId),
+                    uiState = uiState,
+                    onRetry = onRetry,
+                    onCopy = { text ->
+                        clipboard.setText(AnnotatedString(text))
+                        onNotify(copiedMessage)
+                    },
+                    onSpeak = { onNotify(guidedTts) },
+                    onStar = { onNotify(guidedBookmark) },
+                    modifier = Modifier.weight(PaneWeightResult).fillMaxHeight(),
+                )
+            }
+            Spacer(Modifier.height(spacing.md16))
+            return
+        }
+
+        val cardWidth =
+            if (layout.mediumWidth && !layout.expandedWidth) {
+                Modifier.widthIn(max = Dimensions.contentMaxWidthMedium)
+            } else {
+                Modifier
+            }
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = LocalFloatingSurface.current,
@@ -216,6 +399,8 @@ internal fun ComposerPaneContent(
             modifier =
                 cardModifier
                     .padding(horizontal = LocalSpacing.current.md16)
+                    .then(cardWidth)
+                    .align(Alignment.CenterHorizontally)
                     .fillMaxWidth()
                     .weight(1f)
                     .testTag("tt_composer_card"),
@@ -229,31 +414,14 @@ internal fun ComposerPaneContent(
                         bottom = spacing.md16,
                     ),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = languageLabel(sourceLangId),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    // Design: the Paste chip's mirror image — once there IS text,
-                    // the affordance in play is discarding it and starting over.
-                    if (input.isNotEmpty()) {
-                        IconButton(
-                            onClick = {
-                                onClearAll()
-                                isEditing = true
-                            },
-                            modifier = Modifier.testTag("tt_composer_clear"),
-                        ) {
-                            Icon(
-                                painterResource(DsR.drawable.ic_close),
-                                contentDescription = stringResource(R.string.cd_text_clear),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
+                SourceLabelRow(
+                    label = languageLabel(sourceLangId),
+                    showClear = input.isNotEmpty(),
+                    onClear = {
+                        onClearAll()
+                        isEditing = true
+                    },
+                )
                 if (isEditing) {
                     ComposerEditBody(
                         input = input,
@@ -269,10 +437,13 @@ internal fun ComposerPaneContent(
                         onMic = { onNotify(guidedVoice) },
                         onTranslate = {
                             if (onTranslate()) {
-                                isEditing = false
+                                // Two-pane keeps both panes live (issue #56); the
+                                // keyboard still drops so the result pane is unobscured.
+                                if (!layout.permanentTwoPane) isEditing = false
                                 keyboard?.hide()
                             }
                         },
+                        fieldFillsHeight = !layout.splitResultOnly,
                     )
                 } else {
                     ComposerReadBody(
@@ -343,6 +514,11 @@ private fun ColumnScope.ComposerEditBody(
     onPaste: () -> Unit,
     onMic: () -> Unit,
     onTranslate: () -> Unit,
+    // Height-compact landscape (issue #56): a weighted field inside the
+    // IME-animated card measures its inner text viewport down to ~0 and the
+    // text stops drawing (device-verified). Wrap-content + a min height avoids
+    // the pathological chain; a Spacer then pins the action row to the bottom.
+    fieldFillsHeight: Boolean = true,
 ) {
     val spacing = LocalSpacing.current
     val hasText = input.isNotBlank()
@@ -350,6 +526,12 @@ private fun ColumnScope.ComposerEditBody(
     val inputDescription = stringResource(R.string.cd_text_input)
     val counterDescription = stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT)
 
+    val fieldHeight =
+        if (fieldFillsHeight) {
+            Modifier.weight(1f)
+        } else {
+            Modifier.heightIn(min = Dimensions.composerInputMinHeight)
+        }
     BasicTextField(
         value = input,
         onValueChange = onInputChange,
@@ -363,7 +545,7 @@ private fun ColumnScope.ComposerEditBody(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .then(fieldHeight)
                 .padding(top = spacing.sm8)
                 .focusRequester(focusRequester)
                 .semantics { contentDescription = inputDescription }
@@ -390,6 +572,7 @@ private fun ColumnScope.ComposerEditBody(
             Text(stringResource(R.string.composer_paste))
         }
     }
+    if (!fieldFillsHeight) Spacer(Modifier.weight(1f))
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(top = spacing.sm8),
@@ -532,6 +715,123 @@ private fun ColumnScope.ComposerReadBody(
         } // unreachable: Idle always shows the edit face
     }
     Spacer(Modifier.weight(1f))
+}
+
+/** Source-language label + the ✕ clear affordance (the Paste chip's mirror). */
+@Composable
+private fun SourceLabelRow(
+    label: String,
+    showClear: Boolean,
+    onClear: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        if (showClear) {
+            IconButton(onClick = onClear, modifier = Modifier.testTag("tt_composer_clear")) {
+                Icon(
+                    painterResource(DsR.drawable.ic_close),
+                    contentDescription = stringResource(R.string.cd_text_clear),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The standalone result pane for the split shapes (issue #56, frames 3/5/7):
+ * full-height tonal card; the translation AUTO-SIZES (owner decision — short
+ * results render display-sized, long results body-sized, the card never
+ * changes shape; GT behaviour per D-0). An error is not dressed as a result —
+ * plain card, error colours, Retry.
+ */
+@Composable
+private fun ResultPane(
+    targetLabel: String,
+    uiState: TextUiState,
+    onRetry: () -> Unit,
+    onCopy: (String) -> Unit,
+    onSpeak: () -> Unit,
+    onStar: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    val colors = LocalResultCardColors.current
+    if (uiState is TextUiState.Error) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = LocalFloatingSurface.current,
+            shadowElevation = Elevation.level1,
+            modifier = modifier,
+        ) {
+            Column(modifier = Modifier.padding(spacing.md16)) {
+                Text(
+                    text = stringResource(R.string.text_error_generic_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag("tt_text_error"),
+                )
+                TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
+                    Text(stringResource(R.string.button_retry))
+                }
+            }
+        }
+        return
+    }
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = colors.container,
+        modifier = modifier.testTag("tt_text_result_card"),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = spacing.md16, vertical = spacing.md16)) {
+            Text(
+                text = targetLabel.uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.label,
+            )
+            Spacer(Modifier.height(spacing.sm8))
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when (uiState) {
+                    is TextUiState.Translating -> {
+                        ShimmerResult()
+                    }
+
+                    is TextUiState.Result -> {
+                        BasicText(
+                            text = uiState.translatedText,
+                            style =
+                                MaterialTheme.typography.displayMedium.copy(color = colors.text),
+                            autoSize =
+                                TextAutoSize.StepBased(
+                                    minFontSize = MaterialTheme.typography.titleLarge.fontSize,
+                                    maxFontSize = MaterialTheme.typography.displayMedium.fontSize,
+                                ),
+                            modifier = Modifier.fillMaxSize().testTag("tt_text_result"),
+                        )
+                    }
+
+                    else -> {
+                        Unit
+                    } // Idle: the label alone — nothing to read yet
+                }
+            }
+            if (uiState is TextUiState.Result) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    ResultAction(DsR.drawable.ic_volume_up, R.string.cd_speak, "tt_text_speak", onSpeak)
+                    ResultAction(DsR.drawable.ic_content_copy, R.string.cd_copy, "tt_text_copy") {
+                        onCopy(uiState.translatedText)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    ResultAction(DsR.drawable.ic_bookmark, R.string.cd_favourite, "tt_text_star", onStar)
+                }
+            }
+        }
+    }
 }
 
 /**
