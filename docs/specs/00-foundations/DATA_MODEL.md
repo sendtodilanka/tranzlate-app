@@ -47,7 +47,7 @@ Indices: `(source_text, source_lang, target_lang, engine)` for cache lookup; `fa
 | `usage.translations_since_ad` | Int | D-4 every-Nth |
 
 ## Entitlement (from FeatureAccess, not persisted here)
-`Entitlement = Loading | Free | Paid(tier: PLUS | PREMIUM)` — gating always waits for a resolved (non-Loading) value.
+`Entitlement = Loading | Free | Paid(tier: PRO)` — gating always waits for a resolved (non-Loading) value. *(D-2 rev.2, issue #50: PLUS/PREMIUM collapsed to a single PRO tier; the code's `Tier` enum follows in the brains phase.)*
 
 ---
 

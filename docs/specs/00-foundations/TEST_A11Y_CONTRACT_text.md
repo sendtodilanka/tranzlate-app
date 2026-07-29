@@ -1,4 +1,6 @@
 # Tranzlate — Text Translation: Test + Accessibility Contract (Foundation)
+> **⚠ Superseded in part (2026-07-29, issue #50 / BUSINESS_MODEL.md):** every PLUS/PREMIUM three-tier reference below is stale — D-2 rev.2 collapses tiers to **FREE + PRO**, and C-10 rev.2 removes user engine selection (the mode chip). The tier tables/fakes/strings here get their full rewrite when the Access brain + paywall land; until then this banner wins on conflict.
+
 
 > **Feature:** TEXT TRANSLATION (`HomeScreen` + `ResultScreen` සහ ඒවායේ `TextInputCard`, `SourceCard`, `ResultCard`, `ErrorView` components).
 > **Status:** Foundation contract — Phase 5 (Testing) + Adaptive/A11y සඳහා pre-condition එකකි. මෙය implement කරන කවුරුත් මේ contract එකට **conform** විය යුතුයි.
