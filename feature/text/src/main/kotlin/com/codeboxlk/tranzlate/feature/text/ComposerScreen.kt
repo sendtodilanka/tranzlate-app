@@ -243,6 +243,7 @@ internal fun ComposerPaneContent(
                 onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
                 onSwap = onSwapLanguages,
                 swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
+                constrainPills = layout.expandedWidth,
             )
         }
         if (hideTopRow) Spacer(Modifier.height(spacing.sm8))
@@ -485,6 +486,11 @@ internal fun ComposerTopRow(
     onSwap: () -> Unit,
     swapEnabled: Boolean,
     modifier: Modifier = Modifier,
+    // Wide windows (issue #56 frames 2/3/5/7): the pill group stays a compact,
+    // LEFT-ALIGNED cluster instead of stretching edge to edge — pills wider
+    // than the approved frames was the owner-visible diff in the first
+    // identity pass. Compact portrait keeps the shipped full-width pills.
+    constrainPills: Boolean = false,
 ) {
     val spacing = LocalSpacing.current
     Row(
@@ -501,6 +507,12 @@ internal fun ComposerTopRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        val pillsWidth =
+            if (constrainPills) {
+                Modifier.weight(1f, fill = false).widthIn(max = Dimensions.contentMaxWidthMedium)
+            } else {
+                Modifier
+            }
         LanguageRow(
             sourceLabel = sourceLabel,
             targetLabel = targetLabel,
@@ -508,7 +520,7 @@ internal fun ComposerTopRow(
             onTargetClick = onTargetClick,
             onSwap = onSwap,
             swapEnabled = swapEnabled,
-            modifier = Modifier.padding(start = spacing.xs4),
+            modifier = pillsWidth.padding(start = spacing.xs4),
         )
     }
 }
