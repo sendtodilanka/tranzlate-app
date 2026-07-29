@@ -24,4 +24,5 @@
     <string name="paywall_purchase_unavailable">Hindi pa available ang billing — walang siningil.</string>
     <string name="paywall_restore_failed">Hindi maabot ang store para mag-restore. Subukan muli mamaya.</string>
     <string name="paywall_restore_nothing">Walang mai-restore na binili sa account na ito.</string>
+    <string name="paywall_links_coming">Darating ang mga pahina ng Tuntunin at Privacy bago ang release.</string>
 </resources>

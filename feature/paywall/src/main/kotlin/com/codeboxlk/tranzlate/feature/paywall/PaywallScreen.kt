@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
+import kotlinx.coroutines.launch
 
 /** Content column cap — phones fill, tablets centre (C-13 single-column rule). */
 private val CONTENT_MAX_WIDTH = 560.dp
@@ -89,12 +91,15 @@ fun PaywallScreen(
         }
     }
 
+    val linksComing = stringResource(R.string.paywall_links_coming)
+    val scope = rememberCoroutineScope()
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
         containerColor = MaterialTheme.colorScheme.surface,
     ) { padding ->
         PaywallContent(
+            onLinkNotice = { scope.launch { snackbarHostState.showSnackbar(linksComing) } },
             selected = selected,
             purchasing = purchasing,
             onSelect = viewModel::select,
@@ -115,6 +120,7 @@ internal fun PaywallContent(
     onRestore: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    onLinkNotice: () -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     Column(
@@ -224,8 +230,8 @@ internal fun PaywallContent(
                     onClick = onRestore,
                     modifier = Modifier.testTag("tt_paywall_restore"),
                 ) { Text(stringResource(R.string.paywall_restore)) }
-                TextButton(onClick = {}) { Text(stringResource(R.string.paywall_terms)) }
-                TextButton(onClick = {}) { Text(stringResource(R.string.paywall_privacy)) }
+                TextButton(onClick = onLinkNotice) { Text(stringResource(R.string.paywall_terms)) }
+                TextButton(onClick = onLinkNotice) { Text(stringResource(R.string.paywall_privacy)) }
             }
             Spacer(Modifier.height(spacing.lg24))
         }
