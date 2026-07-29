@@ -275,13 +275,25 @@ class TextViewModel
             )
         }
 
-        /** UI_SPEC §2.2 swap ⇄ — one atomic pair write; always available. */
-        fun onSwapLanguages() {
+        /**
+         * UI_SPEC §2.2 swap ⇄ — one atomic pair write. With source = Detect the
+         * target must NEVER become "auto" (issue #70): the swap resolves through
+         * the shown result's detected language, or reports false so the UI can
+         * guide ("translate once first") instead of writing nonsense.
+         */
+        fun onSwapLanguages(): Boolean {
+            val currentSource = sourceLang.value
+            val newTarget =
+                if (currentSource == AUTO_LANG) {
+                    (state as? TextUiState.Result)?.resolvedSourceLang ?: return false
+                } else {
+                    currentSource
+                }
             val newSource = targetLang.value
-            val newTarget = sourceLang.value
             viewModelScope.launch {
                 prefs.setLanguagePair(sourceId = newSource, targetId = newTarget)
             }
+            return true
         }
 
         fun onSelectSourceLanguage(id: String) {

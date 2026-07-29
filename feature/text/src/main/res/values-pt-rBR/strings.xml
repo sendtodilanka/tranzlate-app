@@ -1,18 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Brazilian Portuguese — ONLY catalogue-verbatim translations
-     (STRINGS_text-translation.md; never guessed). TODO(NEEDS-TRANSLATION, C-12):
-     every remaining key in values/strings.xml is queued in the tracked content
-     backlog before ship. -->
+<!-- Brazilian Portuguese — FULL parity with values/ (issue #70, C-3/C-12): the
+     first 19 values are catalogue-verbatim; the rest were authored in-issue and
+     are queued for native-speaker review before ship (DoD gate 12). -->
 <resources>
+    <!-- Composer -->
+    <string name="text_input_placeholder">Digite o texto</string>
+    <string name="cd_text_input">Texto para traduzir</string>
     <string name="text_char_counter">%1$d/%2$d</string>
+    <string name="cd_text_counter">%1$d de %2$d caracteres usados</string>
     <string name="cd_translate">Traduzir</string>
     <string name="cd_swap_language">Trocar Idioma</string>
-    <string name="home_edit_no_text_to_translate_warning">Digite um texto para traduzir.</string>
-    <string name="button_retry">Tentar novamente</string>
-    <!-- TODO(NEEDS-TRANSLATION, C-12) issue #15 language-picker keys queued in the
-         content backlog: text_lang_detect, text_lang_all_header,
-         cd_text_lang_search, text_guided_lang_search. Left untranslated on
-         purpose — a guessed translation is worse than the en fallback. -->
+    <string name="cd_text_source_lang">Idioma de origem, %1$s</string>
+    <string name="cd_text_target_lang">Idioma de destino, %1$s</string>
+    <string name="cd_text_mic">Traduzir por voz</string>
+    <string name="cd_text_mode_chip">Modelo de tradução, %1$s</string>
+    <string name="text_mode_automatic">Automático</string>
+    <string name="cd_text_menu">Abrir navegação</string>
+    <string name="cd_text_clear">Nova tradução</string>
+    <string name="cd_text_edit">Editar texto</string>
+
+    <!-- Home canvas -->
+    <string name="home_greeting_morning">Bom dia</string>
+    <string name="home_greeting_afternoon">Boa tarde</string>
+    <string name="home_greeting_evening">Boa noite</string>
+    <string name="home_greeting_named">%1$s, %2$s</string>
+    <string name="home_subtitle">O que você quer traduzir?</string>
+    <string name="home_title">Traduzir</string>
+    <string name="home_pro">Pro</string>
+    <string name="composer_paste">Colar</string>
+    <string name="home_tools">Ferramentas</string>
+    <string name="home_translate">Traduzir</string>
+    <string name="home_tool_offline">Modo offline</string>
+    <string name="home_tool_offline_sub">6 idiomas prontos</string>
+    <string name="home_tool_voice">Voz</string>
+    <string name="home_tool_voice_sub">Fale e ouça</string>
+    <string name="home_tool_camera">Câmera</string>
+    <string name="home_tool_camera_sub">Placas e cardápios</string>
+    <string name="home_tool_conversation">Conversa</string>
+    <string name="home_tool_conversation_sub">Diálogo em dois idiomas</string>
+    <string name="home_row_download">Baixar idiomas</string>
+    <string name="home_row_download_sub">133 disponíveis · 2 atualizações prontas</string>
+    <string name="home_mini_phrasebook">Frases úteis</string>
+    <string name="home_mini_quotes">Citações</string>
+    <string name="home_phrasing_title">Fraseado natural</string>
+    <string name="home_phrasing_sub">Reescreve expressões para soarem certas</string>
+    <string name="home_badge_new">NOVO</string>
+    <string name="cd_home_settings">Configurações</string>
+    <string name="home_guided_phrasebook">As frases úteis chegam em uma próxima atualização</string>
+    <string name="home_guided_quotes">As citações salvas chegam com a atualização do histórico</string>
+    <string name="home_guided_phrasing">O fraseado natural chega com a atualização de IA</string>
+
+    <!-- Guided messages -->
+    <string name="text_guided_mode">A escolha de mecanismo chega com a atualização dos brains</string>
+    <string name="text_guided_voice">A entrada por voz chega com a atualização de voz</string>
+    <string name="text_guided_tts">A leitura em voz alta chega com a atualização de voz</string>
+    <string name="text_guided_more">Mais opções chegam em uma próxima atualização</string>
+    <string name="text_guided_feedback">O feedback chega em uma próxima atualização</string>
+
+    <!-- Result -->
+    <string name="cd_text_back">Voltar</string>
+    <string name="cd_favourite">Adicionar aos favoritos</string>
+    <string name="cd_text_more">Mais opções</string>
+    <string name="cd_copy">Copiar tradução</string>
+    <string name="cd_text_copy_source">Copiar texto de origem</string>
+    <string name="cd_speak">Ler a tradução em voz alta</string>
+    <string name="cd_text_speak_source">Ler o texto de origem em voz alta</string>
+    <string name="cd_text_thumb_up">Boa tradução</string>
+    <string name="cd_text_thumb_down">Tradução ruim</string>
+    <string name="text_copied">Copiado</string>
+    <string name="text_engine_badge_offline">Offline · instantâneo</string>
+    <string name="text_engine_badge_online">Online</string>
+    <string name="text_engine_badge_advanced">IA avançada</string>
+    <string name="a11y_translating">Traduzindo…</string>
+
+    <!-- Errors -->
+    <string name="text_error_generic_body">Algo deu errado ao traduzir. Verifique sua conexão e tente novamente.</string>
+    <string name="text_error_unsupported_pair">Esse par de idiomas ainda não é suportado. Tente outro par.</string>
     <string name="text_error_offline">Você está offline. Conecte-se à internet e tente novamente.</string>
     <string name="text_error_limit_reached">Você usou as traduções de IA gratuitas de hoje. Elas voltam à meia-noite.</string>
     <string name="text_error_not_entitled">Essa qualidade de tradução exige uma assinatura Pro.</string>
@@ -23,8 +86,27 @@
     <string name="limit_sheet_body_pro">Traduções de IA com fraseado natural são um recurso Pro. Suas traduções gratuitas continuam funcionando.</string>
     <string name="limit_sheet_cta">Ver planos Pro</string>
     <string name="limit_sheet_dismiss">Agora não</string>
+    <string name="home_edit_no_text_to_translate_warning">Digite um texto para traduzir.</string>
+    <string name="button_retry">Tentar novamente</string>
+    <string name="cd_text_retry">Tentar traduzir novamente</string>
+
+    <!-- Language picker -->
+    <string name="text_lang_sheet_source_title">Traduzir de</string>
+    <string name="text_lang_sheet_target_title">Traduzir para</string>
+    <string name="text_lang_detect">Detectar idioma</string>
+    <string name="text_lang_all_header">Todos os idiomas</string>
+    <string name="cd_text_lang_search">Pesquisar idiomas</string>
+    <string name="text_guided_lang_search">A pesquisa de idiomas chega com a atualização de busca</string>
+
+    <string name="cd_text_reverse">Inverter a direção da tradução</string>
+    <string name="a11y_result_ready">Tradução pronta: %1$s</string>
+    <string name="a11y_error">A tradução falhou. %1$s</string>
+    <string name="text_over_char_limit">Limite de %1$d caracteres por tradução. Encurte o texto.</string>
     <string name="text_star_unavailable">Não deu para salvar — o idioma não foi detectado.</string>
     <string name="cd_favourite_remove">Remover das salvas</string>
     <string name="home_row_history">Histórico e salvas</string>
     <string name="home_row_history_sub">Toda tradução a um toque</string>
+    <string name="text_paste_empty">A área de transferência está vazia.</string>
+    <string name="text_swap_needs_detect">Traduza primeiro para detectar o idioma antes de inverter.</string>
+    <string name="cd_text_counter_limit">Limite de %1$d caracteres atingido</string>
 </resources>

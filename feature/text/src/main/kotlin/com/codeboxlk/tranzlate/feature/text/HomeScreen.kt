@@ -136,7 +136,7 @@ fun HomeContent(
     sourceLangId: String,
     targetLangId: String,
     onOpenComposer: () -> Unit,
-    onSwapLanguages: () -> Unit,
+    onSwapLanguages: () -> Boolean,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenPaywall: () -> Unit,
@@ -154,10 +154,13 @@ fun HomeContent(
     val guidedPhrasebook = stringResource(R.string.home_guided_phrasebook)
     val guidedQuotes = stringResource(R.string.home_guided_quotes)
     val guidedPhrasing = stringResource(R.string.home_guided_phrasing)
+    val swapNeedsDetect = stringResource(R.string.text_swap_needs_detect)
 
     fun guided(message: String) {
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
+
+    val swapAction: () -> Unit = { if (!onSwapLanguages()) guided(swapNeedsDetect) }
 
     val layout = rememberAdaptiveLayout()
     if (layout.expandedWidth) {
@@ -204,7 +207,7 @@ fun HomeContent(
                         targetLabel = languageLabel(targetLangId),
                         onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
                         onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
-                        onSwap = onSwapLanguages,
+                        onSwap = swapAction,
                         swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
                         modifier = Modifier.padding(vertical = spacing.sm8),
                     )
@@ -286,7 +289,7 @@ fun HomeContent(
                     targetLabel = languageLabel(targetLangId),
                     onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
                     onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
-                    onSwap = onSwapLanguages,
+                    onSwap = swapAction,
                     swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
                     modifier =
                         contentMaxWidth
@@ -831,7 +834,7 @@ private fun HomeContentPreview() {
             sourceLangId = "en",
             targetLangId = "es",
             onOpenComposer = {},
-            onSwapLanguages = {},
+            onSwapLanguages = { true },
             onPickLanguage = {},
             onOpenSettings = {},
             onOpenPaywall = {},
