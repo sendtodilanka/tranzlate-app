@@ -9,7 +9,9 @@ import androidx.room.RoomDatabase
         TranslationEntity::class,
         LanguageEntity::class,
     ],
-    version = 1,
+    // v2 (issue #53 A9): C-8 cache index became UNIQUE. Pre-launch destructive
+    // migration policy applies (DatabaseModule / DATA_MODEL "Migration policy").
+    version = 2,
     exportSchema = true,
 )
 abstract class TranzlateDatabase : RoomDatabase() {

@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.core.testing
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.FailureReason
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
 import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
@@ -157,5 +158,97 @@ class TranslateTextUseCaseTest {
                 TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
             )
             assertThat(ads.completedCount).isEqualTo(1) // flow continues past the failed write
+        }
+    // ---- issue #53 A2/A9: cache-first read + atomic dedupe ------------------
+
+    @Test
+    fun `cache hit skips the engine, the meter and the ads ask`() =
+        runTest {
+            val translator = FakeTranslator()
+            val usage = FakeUsagePolicy(left = 5)
+            val ads = RecordingAdsCoordinator()
+            val repository = FakeTranslationRepository()
+            repository.save(
+                Translation(
+                    sourceLang = "en",
+                    sourceText = "Good morning",
+                    targetLang = "fr",
+                    targetText = "Bonjour (fake)",
+                    engine = Engine.OFFLINE_MLKIT,
+                    createdAt = 1L,
+                ),
+            )
+            val useCase = useCase(translator = translator, usage = usage, ads = ads, repository = repository)
+
+            val outcome = useCase("Good morning", "en", "fr", ModeId.NLP35)
+
+            val success = outcome as TranslationOutcome.Success
+            assertThat(success.fromCache).isTrue()
+            assertThat(success.text).isEqualTo("Bonjour (fake)")
+            assertThat(translator.calls).isEmpty() // zero engine calls
+            assertThat(usage.incremented).isEqualTo(0) // zero quota spend
+            assertThat(ads.completedCount).isEqualTo(0) // zero ads asks
+        }
+
+    @Test
+    fun `cache read ignores which engine produced the hit`() =
+        runTest {
+            val translator = FakeTranslator()
+            val repository = FakeTranslationRepository()
+            repository.save(
+                Translation(
+                    sourceLang = "en",
+                    sourceText = "Good morning",
+                    targetLang = "fr",
+                    targetText = "Bonjour (cloud)",
+                    engine = Engine.ONLINE_CLOUD_NLP, // a different engine's answer
+                    createdAt = 2L,
+                ),
+            )
+
+            val outcome =
+                useCase(translator = translator, repository = repository)("Good morning", "en", "fr", ModeId.AUTO)
+
+            assertThat((outcome as TranslationOutcome.Success).resolvedEngine).isEqualTo(Engine.ONLINE_CLOUD_NLP)
+            assertThat(translator.calls).isEmpty()
+        }
+
+    @Test
+    fun `auto-detect source skips the cache read and still translates`() =
+        runTest {
+            val translator = FakeTranslator()
+            val repository = FakeTranslationRepository()
+            repository.save(
+                Translation(
+                    sourceLang = "en",
+                    sourceText = "Good morning",
+                    targetLang = "fr",
+                    targetText = "Bonjour (fake)",
+                    engine = Engine.OFFLINE_MLKIT,
+                    createdAt = 1L,
+                ),
+            )
+
+            useCase(translator = translator, repository = repository)("Good morning", "auto", "fr", ModeId.AUTO)
+
+            assertThat(translator.calls).hasSize(1) // pair unknown -> no cache read
+        }
+
+    @Test
+    fun `a duplicate history insert loses to the unique index, not a crash`() =
+        runTest {
+            val repository = FakeTranslationRepository()
+            val row =
+                Translation(
+                    sourceLang = "en",
+                    sourceText = "Good  morning", // un-normalized on purpose
+                    targetLang = "fr",
+                    targetText = "Bonjour (fake)",
+                    engine = Engine.OFFLINE_MLKIT,
+                    createdAt = 1L,
+                )
+            assertThat(repository.save(row)).isGreaterThan(0L)
+            assertThat(repository.save(row.copy(createdAt = 9L))).isEqualTo(-1L) // IGNORE semantics
+            assertThat(repository.saved).hasSize(1)
         }
 }

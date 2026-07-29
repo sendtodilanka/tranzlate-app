@@ -23,6 +23,19 @@ interface TranslationRepository {
         engine: Engine,
     ): Translation?
 
+    /**
+     * Engine-AGNOSTIC cache read (owner's pipeline, 2026-07-29 / issue #53 A2):
+     * any engine's prior answer for the same normalized (text, source, target)
+     * is acceptable - newest wins. The engine-keyed [cached] stays the WRITE-side
+     * dedupe key (C-8); this is the read-side relaxation that makes a repeat
+     * translation cost zero API calls.
+     */
+    suspend fun cachedAny(
+        sourceText: String,
+        sourceLang: String,
+        targetLang: String,
+    ): Translation?
+
     suspend fun save(translation: Translation): Long
 
     /** D-3: star toggles favourite. */

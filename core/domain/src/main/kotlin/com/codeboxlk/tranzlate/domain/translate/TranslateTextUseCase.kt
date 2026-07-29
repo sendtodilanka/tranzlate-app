@@ -16,7 +16,7 @@ private const val AUTO_DETECT_LANG = "auto"
 /**
  * THE single ask-flow encoding (plan §2 `:core:domain`):
  *
- *   Access check → translate → Usage +1 on SUCCESS ONLY → history write → Ads ask
+ *   Cache read (hit → done, zero cost) → Access check → translate →\n *   Usage +1 on SUCCESS ONLY → history write → Ads ask
  *
  * APP_STRUCTURE's flow is sequenced HERE once, so no feature can ever re-sequence
  * it (screens just ask; they don't do the work).
@@ -53,6 +53,33 @@ class TranslateTextUseCase
             tgtLang: String,
             mode: ModeId,
         ): TranslationOutcome {
+            // C-8 CACHE FIRST (issue #53 A2): the read precedes the gate AND the
+            // engine, so a hit charges no quota and spends no API call — the
+            // whole point of D-1's "no meter charge on cache hit", previously
+            // unimplementable because this lookup ran after both. Engine-AGNOSTIC
+            // by owner decision (any prior answer for the pair is acceptable).
+            // Skipped for the "auto" sentinel: the pair is unknown until the
+            // engines phase resolves detection. A hit asks the Ads brain nothing
+            // (open owner decision — conservative default, BUSINESS_MODEL notes).
+            if (srcLang != AUTO_DETECT_LANG) {
+                val hit =
+                    try {
+                        translationRepository.cachedAny(text, srcLang, tgtLang)
+                    } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                        throw rethrown // never break structured cancellation
+                    } catch (
+                        @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
+                    ) {
+                        null // best-effort: a broken cache must never block a translation
+                    }
+                if (hit != null) {
+                    return TranslationOutcome.Success(
+                        text = hit.targetText,
+                        resolvedEngine = hit.engine,
+                        fromCache = true,
+                    )
+                }
+            }
             val metered = mode == ModeId.NLP35
             if (metered && (!featureAccess.isEngineAllowed(mode) || usagePolicy.isOver())) {
                 return TranslationOutcome.LimitReached
