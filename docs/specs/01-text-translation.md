@@ -23,7 +23,7 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 **Match GT:** tap source/target chip → language picker; **⇄ swap** re-translates instantly; **✕ clear** empties input+result; auto source-detection with "%s (Detected)" label; result carries **Copy · TTS · fullscreen · ⭐ Save**; recent languages surface first in the picker. **Deviation (owner-approved 2026-07-22, C-2 amended):** GT's live-as-you-type trigger does **not** apply — every engine translates on the explicit **Translate** action (`tt_text_translate_btn`) and the result opens on its own screen (Compose transition keeps it feeling continuous).
 
 **Tranzlate deltas (layer on, don't break GT UX):**
-1. A **mode chip** (AUTO / Offline / Standard / Advanced AI) — GT has no engine choice; we do.
+1. ~~A **mode chip** (AUTO / Offline / Standard / Advanced AI)~~ — **withdrawn (C-10 rev.2, issue #50): like GT, the user never picks an engine; the waterfall decides.**
 2. **Explicit Translate for ALL engines (C-2 amended 2026-07-22 — D-0 tension resolved):** no engine fires per keystroke or on debounce. Free (Offline, Standard, AUTO) and metered (Advanced AI) alike translate **only** on the explicit Translate action (`tt_text_translate_btn`; IME ⏎ mirrors it), so one quota unit = one intentional translation by construction. The one action is predictable across engines and keeps the editor a large, comfortable composing surface.
 3. Subscription gating + ads per D-2/D-4.
 
@@ -98,8 +98,8 @@ RESULT ─lang change→ VALIDATING (D-1 auto re-translate; cache-first)
 - Cache hit (key per DECISIONS engineering constants) → `RESULT` immediately, **no meter charge**.
 
 ## 5. Behaviour: modes, gating, metering (exact)
-- **Modes offered:** AUTO(default), Offline, Standard, Advanced AI. Default fresh user = **AUTO** (DECISIONS defaults). AUTO fallback = **offline→standard only** (free engines; **never** advanced/metered — C-10), fires on engine failure. If BOTH free engines fail: surface error / offline-missing guidance (§8), **no quota charge**.
-- **Gating (FeatureAccess crux) + limits (D-2):** Advanced AI daily cap — **Free 20 · Plus 100 · Premium ∞** (RemoteConfig `limit_free`/`limit_plus`). Counter increments **once, on engine success only** (DECISIONS). Reset = device-local midnight (DATA_MODEL `usage.reset_epoch`).
+- **Modes (C-10 rev.2, 2026-07-29, issue #50):** the user never picks an engine — mode UI is deferred entirely. AUTO = the whole waterfall **MLKit → GOT → GCT**, with the **GCT tail quota-gated** by the FREE 5/day AI pool (unlimited on PRO). Quota spent + free engines failed → guided outcome (§8) via the C-11 sheet, **never a silent charge**. Cache hits charge nothing (C-8).
+- **Gating (FeatureAccess crux) + limits (D-2 rev.2, issue #50):** Advanced AI daily cap — **FREE 5 · PRO unlimited (hidden fair-use cap)** (RemoteConfig `limit_free_ai`/`limit_pro_fair_use`; BUSINESS_MODEL.md). Counter increments **once, on engine success only** (DECISIONS). Reset = device-local midnight (DATA_MODEL `usage.reset_epoch`).
 - **At limit:** soft dismissible upgrade sheet; AUTO still works via free engines (never a hard block on the whole feature).
 - **Ads (D-4):** interstitial after **every 2nd** completed translation, 90s gap, daily cap 12 (RemoteConfig-tunable). Never on Back/utility nav.
 

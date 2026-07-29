@@ -26,11 +26,11 @@ sealed interface Availability {
 | Axis | Values |
 |------|--------|
 | Connectivity | online · offline |
-| Entitlement | Loading · Free · Plus · Premium |
+| Entitlement | Loading · Free · Pro *(D-2 rev.2, issue #50)* |
 | Source language | offline-capable · online-only · Auto(detect) |
 | Target language | offline-capable · online-only |
 | Download state (offline-capable langs) | downloaded · not-downloaded |
-| Selected engine/mode | AUTO · offline(MLKit) · online-free(GOT) · online-accurate(GCT) |
+| Engine tier the waterfall is at *(no user selection — C-10 rev.2)* | offline(MLKit) · online-free(GOT) · online-accurate(GCT, quota-gated tail) |
 | Usage (metered engine) | under limit · at limit |
 
 ## 3. Translation readiness matrix (the user's example + neighbours)
@@ -54,7 +54,7 @@ sealed interface Availability {
 | `NO_INTERNET_ONLINE_ENGINE` | You're offline. Connect, or switch to a downloaded offline language. | Go online · Offline languages |
 | `OFFLINE_LANG_NOT_DOWNLOADED_OFFLINE` | This language isn't downloaded and you're offline. Connect to download it. | Connect |
 | `ONLINE_ONLY_LANG_OFFLINE` | This language only works online. Go online or pick an offline language. | Pick language |
-| `DAILY_LIMIT_REACHED` | You've used today's Advanced-AI translations. Upgrade, or use a free mode. | Upgrade · Switch mode |
+| `DAILY_LIMIT_REACHED` | You've used today's AI-quality translations. Free engines keep working — upgrade for unlimited AI quality. | Upgrade *(free engines continue automatically — there is no mode to switch, C-10 rev.2)* |
 | `EMPTY_INPUT` | Enter text to translate. | — (button just disabled) |
 | `OVER_CHAR_LIMIT` | Limited to 500 characters per translation. | Upgrade / trim |
 

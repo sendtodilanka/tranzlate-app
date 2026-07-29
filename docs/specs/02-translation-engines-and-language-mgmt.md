@@ -172,7 +172,7 @@ State source-of-truth = `getDownloadedModels()` + in-flight `MutableStateFlow<Se
 ### D-E1 — Engines (product decision)
 Keep **all three** engines: **ML Kit (offline, default) · GOT (free online, broad coverage) · GCT (paid, accurate)**.
 - **GOT = the unofficial `translate_a/single` endpoint — RISK ACCEPTED by product owner** (ToS/reliability documented above; not re-litigated). Kept as the free online tier.
-- Composition / fallback (AUTO): **offline (ML Kit) → free online (GOT) → accurate (GCT)**. Fixed engines selectable directly.
+- Composition / fallback (AUTO): **offline (ML Kit) → free online (GOT) → accurate (GCT)**. ~~Fixed engines selectable directly.~~ **C-10 rev.2 (2026-07-29, issue #50): the user never picks an engine — selection is deferred entirely; the GCT tail is quota-gated (BUSINESS_MODEL.md).**
 
 ### D-E2 — Language UX = SEPARATE picking from downloading (Google-Translate pattern)
 Do **not** put the full language list + download controls on one screen. Two screens, one job each:
