@@ -1,10 +1,12 @@
 package com.codeboxlk.tranzlate
 
 import com.codeboxlk.tranzlate.core.common.AppClock
+import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.common.DefaultDispatcherProvider
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.testing.FakeClock
+import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
 import com.codeboxlk.tranzlate.core.testing.FakeTranslator
 import com.codeboxlk.tranzlate.core.testing.FakeUsagePolicy
@@ -60,4 +62,8 @@ object FakeTranslateModule {
     @Provides
     @Singleton
     fun dispatcherProvider(): DispatcherProvider = DefaultDispatcherProvider()
+
+    @Provides
+    @Singleton
+    fun connectivity(): ConnectivityMonitor = FakeConnectivityMonitor()
 }

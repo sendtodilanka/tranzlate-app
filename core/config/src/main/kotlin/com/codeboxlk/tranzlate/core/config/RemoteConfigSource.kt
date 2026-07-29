@@ -23,6 +23,13 @@ interface RemoteConfigSource {
     fun textLimitFree(): Int
 
     fun textLimitPro(): Int
+
+    /** GOT kill-switch (issue #61) — the unofficial tier can be disabled remotely overnight. */
+    fun gotEnabled(): Boolean
+
+    fun gotTimeoutMs(): Long
+
+    fun gctTimeoutMs(): Long
 }
 
 /** Confirmed product defaults (BUSINESS_MODEL §7 · D-4 · defaults table). */
@@ -34,4 +41,7 @@ object RemoteConfigDefaults {
     const val AD_DAILY_CAP = 12
     const val TEXT_LIMIT_FREE = 500
     const val TEXT_LIMIT_PRO = 5000
+    const val GOT_ENABLED = true
+    const val GOT_TIMEOUT_MS = 10_000L
+    const val GCT_TIMEOUT_MS = 15_000L
 }

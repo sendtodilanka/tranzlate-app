@@ -17,6 +17,9 @@ interface AppConfig {
     /** Qonversion project key (empty until the subscription integration phase). */
     val qonversionKey: String
 
+    /** Cloud Translation v2 API key (white-label per-brand). Empty = GCT tier absent. */
+    val gctApiKey: String
+
     /** Defaults table: fresh-install language pair (en → fr). */
     val defaultSourceLang: String
 

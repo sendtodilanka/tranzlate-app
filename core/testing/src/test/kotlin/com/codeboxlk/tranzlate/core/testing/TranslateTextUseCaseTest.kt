@@ -145,14 +145,15 @@ class TranslateTextUseCaseTest {
         }
 
     @Test
-    fun `auto-detect source is not persisted until detect metadata exists`() =
+    fun `auto-detect persists under the RESOLVED source once detect metadata exists`() =
         runTest {
             val repository = FakeTranslationRepository()
 
             val outcome = useCase(repository = repository).invoke("Good morning", "auto", "fr", ModeId.AUTO) // G7
 
             assertThat(outcome).isInstanceOf(TranslationOutcome.Success::class.java)
-            assertThat(repository.saved).isEmpty() // Translation.sourceLang must be a RESOLVED id
+            val row = repository.saved.single() // issue #61: detectedSource drives the write
+            assertThat(row.sourceLang).isEqualTo("en") // resolved, never the "auto" sentinel
         }
 
     @Test

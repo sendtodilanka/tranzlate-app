@@ -17,6 +17,7 @@ class BuildConfigAppConfig
         override val adUnitBanner: String = BuildConfig.AD_UNIT_BANNER
         override val adUnitInterstitial: String = BuildConfig.AD_UNIT_INTERSTITIAL
         override val qonversionKey: String = BuildConfig.QONVERSION_KEY
+        override val gctApiKey: String = BuildConfig.GCT_API_KEY
         override val defaultSourceLang: String = BuildConfig.DEFAULT_SOURCE_LANG
         override val defaultTargetLang: String = BuildConfig.DEFAULT_TARGET_LANG
         override val featureToggles: Set<FeatureToggle> by lazy {

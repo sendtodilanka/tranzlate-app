@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.di
 
+import android.content.Context
 import com.codeboxlk.ads.AdsConfig
 import com.codeboxlk.ads.AdsGateway
 import com.codeboxlk.ads.NoOpAdsGateway
@@ -12,6 +13,7 @@ import com.codeboxlk.tranzlate.core.access.RealFeatureAccess
 import com.codeboxlk.tranzlate.core.access.SubscriptionPurchaseFlow
 import com.codeboxlk.tranzlate.core.ads.RealAdsCoordinator
 import com.codeboxlk.tranzlate.core.common.AppClock
+import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.common.DefaultDispatcherProvider
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
 import com.codeboxlk.tranzlate.core.config.AppConfig
@@ -27,7 +29,9 @@ import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
 /**
@@ -79,6 +83,16 @@ object TranslateModule {
     @Provides
     @Singleton
     fun appClock(): AppClock = SystemAppClock()
+
+    @Provides
+    @Singleton
+    fun connectivityMonitor(
+        @ApplicationContext context: Context,
+    ): ConnectivityMonitor = AndroidConnectivityMonitor(context)
+
+    @Provides
+    @Singleton
+    fun okHttpClient(): OkHttpClient = OkHttpClient()
 
     @Provides
     @Singleton

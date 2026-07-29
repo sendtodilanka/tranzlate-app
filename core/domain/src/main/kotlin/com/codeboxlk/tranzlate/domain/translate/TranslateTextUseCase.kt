@@ -141,14 +141,18 @@ class TranslateTextUseCase
             tgtLang: String,
             outcome: TranslationOutcome.Success,
         ) {
-            if (srcLang == AUTO_DETECT_LANG) return
+            // Auto-detect persists under the RESOLVED source (issue #61 closes the
+            // recorded "no history on auto" gap); undetected stays unwritten —
+            // Translation.sourceLang must be a resolved id (DATA_MODEL).
+            val resolvedSrcLang =
+                if (srcLang == AUTO_DETECT_LANG) outcome.detectedSource ?: return else srcLang
             try {
                 val duplicate =
-                    translationRepository.cached(text, srcLang, tgtLang, outcome.resolvedEngine)
+                    translationRepository.cached(text, resolvedSrcLang, tgtLang, outcome.resolvedEngine)
                 if (duplicate == null) {
                     translationRepository.save(
                         Translation(
-                            sourceLang = srcLang,
+                            sourceLang = resolvedSrcLang,
                             sourceText = text,
                             targetLang = tgtLang,
                             targetText = outcome.text,
