@@ -19,7 +19,16 @@ internal object DatabaseModule {
     @Singleton
     fun database(
         @ApplicationContext context: Context,
-    ): TranzlateDatabase = Room.databaseBuilder(context, TranzlateDatabase::class.java, "tranzlate.db").build()
+    ): TranzlateDatabase =
+        Room
+            .databaseBuilder(context, TranzlateDatabase::class.java, "tranzlate.db")
+            // ⚠ PRE-LAUNCH ONLY (issue #53 / A8, DATA_MODEL "Migration policy"): with no
+            // policy at all, the first version bump throws for every existing install.
+            // There are no shipped users yet, so a schema change may drop data. This
+            // line MUST be replaced by real Migration objects before the first release
+            // — release-checklist item; grep for fallbackToDestructiveMigration.
+            .fallbackToDestructiveMigration(dropAllTables = true)
+            .build()
 
     @Provides
     fun translationDao(database: TranzlateDatabase): TranslationDao = database.translationDao()

@@ -27,6 +27,10 @@ Indices: `(source_text, source_lang, target_lang, engine)` for cache lookup; `fa
 ### Collections (secondary feature — spec later)
 `collection(id PK, name UNIQUE)` · `collection_translation(collection_id FK, translation_id FK, PK both, CASCADE)` — **migration must dedup names before UNIQUE index** (audit fix).
 
+## Migration policy (issue #53 / A8)
+
+Pre-launch: `fallbackToDestructiveMigration(dropAllTables = true)` — no shipped users, so a schema bump may drop data rather than crash. **Before the first release this flips to real `Migration` objects** (release-checklist item; grep `fallbackToDestructiveMigration`). From that point every `version` bump lands with its `Migration` in the same commit.
+
 ## Preferences (DataStore)
 | Key | Type | Default |
 |-----|------|---------|

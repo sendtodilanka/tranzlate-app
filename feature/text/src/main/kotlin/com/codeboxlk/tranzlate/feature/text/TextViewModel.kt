@@ -272,7 +272,9 @@ class TextViewModel
             translateJob =
                 viewModelScope.launch {
                     val outcome =
-                        withContext(dispatchers.default) {
+                        // io, not default: the engine call becomes network/SDK IO in the
+                        // brains phase (A5) — Default is the CPU-sized pool.
+                        withContext(dispatchers.io) {
                             translateText(request.text, request.sourceLang, request.targetLang, request.mode)
                         }
                     state =
