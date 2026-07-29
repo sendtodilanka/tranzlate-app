@@ -23,4 +23,8 @@
     <string name="limit_sheet_body_pro">Traduções de IA com fraseado natural são um recurso Pro. Suas traduções gratuitas continuam funcionando.</string>
     <string name="limit_sheet_cta">Ver planos Pro</string>
     <string name="limit_sheet_dismiss">Agora não</string>
+    <string name="text_star_unavailable">Não deu para salvar — o idioma não foi detectado.</string>
+    <string name="cd_favourite_remove">Remover das salvas</string>
+    <string name="home_row_history">Histórico e salvas</string>
+    <string name="home_row_history_sub">Toda tradução a um toque</string>
 </resources>

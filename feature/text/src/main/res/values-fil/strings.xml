@@ -22,4 +22,8 @@
     <string name="limit_sheet_body_pro">Pro feature ang natural-phrasing AI translations. Gumagana pa rin ang libre mong translations.</string>
     <string name="limit_sheet_cta">Tingnan ang Pro plans</string>
     <string name="limit_sheet_dismiss">Hindi muna</string>
+    <string name="text_star_unavailable">Hindi ito ma-save — hindi natukoy ang wika nito.</string>
+    <string name="cd_favourite_remove">Alisin sa naka-save</string>
+    <string name="home_row_history">History at naka-save</string>
+    <string name="home_row_history_sub">Bawat pagsasalin, isang tap lang</string>
 </resources>

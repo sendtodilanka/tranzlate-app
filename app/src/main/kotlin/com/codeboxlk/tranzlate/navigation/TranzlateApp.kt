@@ -104,6 +104,7 @@ private fun AppNavDisplay(
                         },
                         onOpenSettings = { onNavigate(SettingsNavKey) },
                         onOpenPaywall = { onNavigate(PaywallNavKey) },
+                        onOpenHistory = { onNavigate(HistoryNavKey) },
                         onOpenCamera = { onNavigate(CameraNavKey) },
                         onOpenLanguages = { onNavigate(LanguagesNavKey) },
                         onOpenConversation = { onNavigate(ChatNavKey) },
@@ -161,7 +162,16 @@ private fun AppNavDisplay(
                         icon = Icons.AutoMirrored.Filled.Chat,
                     )
                 }
-                entry<HistoryNavKey> { HistoryScreen() }
+                entry<HistoryNavKey> {
+                    HistoryScreen(
+                        viewModel = hiltViewModel(),
+                        onBack = { backStack.removeLastOrNull() },
+                        onPick = { translation ->
+                            textViewModel.onHistoryPick(translation)
+                            onNavigate(ComposerNavKey)
+                        },
+                    )
+                }
                 // Drawer "Offline languages" = the :feature:languagepicker
                 // placeholder (download/delete packs) — a different job from the
                 // text vertical's source/target picker above, hence the alias.

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_title">History</string>
+    <string name="history_tab_all">History</string>
+    <string name="history_tab_saved">Naka-save</string>
+    <string name="history_empty">Wala pang mga pagsasalin — magsalin at lalabas dito.</string>
+    <string name="history_saved_empty">Wala pang naka-save — i-tap ang bookmark sa anumang pagsasalin para itago rito.</string>
+    <string name="history_pair">%1$s → %2$s</string>
+    <string name="history_cd_back">Bumalik</string>
+    <string name="history_cd_open">Buksan sa translator</string>
+    <string name="history_cd_save">I-save ang pagsasalin</string>
+    <string name="history_cd_unsave">Alisin sa naka-save</string>
+</resources>
