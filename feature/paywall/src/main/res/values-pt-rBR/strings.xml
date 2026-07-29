@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="feature_paywall_placeholder">Fazer upgrade</string>
     <string name="paywall_hero">Traduza como um Pro</string>
     <string name="paywall_benefit_no_ads">Sem anúncios, nunca</string>
     <string name="paywall_benefit_unlimited_ai">Traduções com qualidade de IA ilimitadas</string>

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="feature_paywall_placeholder">Mag-upgrade</string>
     <string name="paywall_hero">Magsalin na parang Pro</string>
     <string name="paywall_benefit_no_ads">Walang ads, kailanman</string>
     <string name="paywall_benefit_unlimited_ai">Unlimited na AI-quality na pagsasalin</string>
