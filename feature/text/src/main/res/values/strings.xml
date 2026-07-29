@@ -63,7 +63,6 @@
     <string name="text_guided_mode">Engine selection arrives with the brains update</string>
     <string name="text_guided_voice">Voice input arrives with the voice update</string>
     <string name="text_guided_tts">Text-to-speech arrives with the voice update</string>
-    <string name="text_guided_bookmark">Saving arrives with the history update</string>
     <string name="text_guided_more">More options arrive in a later update</string>
     <string name="text_guided_feedback">Feedback arrives in a later update</string>
 
@@ -116,4 +115,8 @@
     <string name="a11y_error">Translation failed. %1$s</string>
     <!-- EDGE_CASES OVER_CHAR_LIMIT — shown inline; input is never truncated (spec-01 §8/§9) -->
     <string name="text_over_char_limit">Limited to %1$d characters per translation. Shorten the text to translate.</string>
+    <string name="text_star_unavailable">Couldn\'t save this one — its language wasn\'t detected.</string>
+    <string name="cd_favourite_remove">Remove from saved</string>
+    <string name="home_row_history">History &amp; saved</string>
+    <string name="home_row_history_sub">Every translation, one tap away</string>
 </resources>

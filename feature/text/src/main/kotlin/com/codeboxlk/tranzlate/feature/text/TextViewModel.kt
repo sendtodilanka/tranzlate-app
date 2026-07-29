@@ -11,10 +11,12 @@ import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
+import com.codeboxlk.tranzlate.domain.repository.TranslationRepository
 import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,6 +36,9 @@ import javax.inject.Inject
 private const val FALLBACK_SOURCE_LANG = "en"
 private const val FALLBACK_TARGET_LANG = "fr"
 
+/** Translator contract §1.1 sentinel — a RESOLVED id is never this. */
+private const val AUTO_LANG = "auto"
+
 /** Defaults table `text_limit` = 500. RemoteConfig-tunable via the brains phase (plan §6 non-goal). */
 const val TEXT_CHAR_LIMIT = 500
 
@@ -43,6 +48,7 @@ private const val KEY_RESULT_TEXT = "text_result_text"
 private const val KEY_ERROR_REASON = "text_error_reason"
 private const val KEY_LIMIT_NOT_ENTITLED = "text_limit_not_entitled"
 private const val KEY_RESULT_ENGINE = "text_result_engine"
+private const val KEY_RESULT_SRC = "text_result_resolved_src"
 private const val KEY_LAST_TEXT = "text_last_request_text"
 private const val KEY_LAST_SRC = "text_last_request_src"
 private const val KEY_LAST_TGT = "text_last_request_tgt"
@@ -72,15 +78,17 @@ private const val PREFS_SUBSCRIBE_TIMEOUT_MS = 5_000L
 @HiltViewModel
 class TextViewModel
     @Inject
+    @Suppress("LongParameterList") // the Text vertical's ONE state holder aggregates the brains' ask-seams
     constructor(
         private val translateText: TranslateTextUseCase,
         private val prefs: TranslatePrefsRepository,
+        private val translationRepository: TranslationRepository,
         languageRepository: LanguageRepository,
         usagePolicy: UsagePolicy,
         featureAccess: FeatureAccess,
         config: RemoteConfigSource,
         private val dispatchers: DispatcherProvider,
-        clock: AppClock,
+        private val clock: AppClock,
         private val savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         /** Composer text — SavedStateHandle-backed (process-death safe). */
@@ -103,6 +111,14 @@ class TextViewModel
 
         private val _uiState = MutableStateFlow<TextUiState>(TextUiState.Idle)
         val uiState: StateFlow<TextUiState> = _uiState.asStateFlow()
+
+        // Declared BEFORE the `state` setter's first use (restoreState runs in
+        // init): a process-death restore crashed on the later declaration
+        // (caught by the resume/unreadable-record tests before it shipped).
+        private val _resultFavourite = MutableStateFlow(false)
+
+        /** Whether the CURRENT result's row is favourited — drives the star icon. */
+        val resultFavourite: StateFlow<Boolean> = _resultFavourite.asStateFlow()
 
         /** FREE pool cap for the "{left}/{cap}" meter (BUSINESS_MODEL §5 goal-gradient). */
         val aiCap: Int = config.limitFreeAi()
@@ -147,6 +163,8 @@ class TextViewModel
                     }
                 savedStateHandle[KEY_RESULT_TEXT] = (value as? TextUiState.Result)?.translatedText
                 savedStateHandle[KEY_RESULT_ENGINE] = (value as? TextUiState.Result)?.engine?.name
+                savedStateHandle[KEY_RESULT_SRC] = (value as? TextUiState.Result)?.resolvedSourceLang
+                refreshResultFavourite(value as? TextUiState.Result)
                 savedStateHandle[KEY_ERROR_REASON] = (value as? TextUiState.Error)?.cause?.name
                 savedStateHandle[KEY_LIMIT_NOT_ENTITLED] = (value as? TextUiState.Limit)?.notEntitled
             }
@@ -316,6 +334,12 @@ class TextViewModel
                                     translatedText = outcome.text,
                                     transliteration = null,
                                     engine = outcome.resolvedEngine,
+                                    resolvedSourceLang =
+                                        if (request.sourceLang == AUTO_LANG) {
+                                            outcome.detectedSource
+                                        } else {
+                                            request.sourceLang
+                                        },
                                 )
                             }
 
@@ -344,6 +368,87 @@ class TextViewModel
                 }
         }
 
+        // ---- issue #68: star-to-save + tap-to-reopen -------------------------
+
+        private fun refreshResultFavourite(result: TextUiState.Result?) {
+            val src = result?.resolvedSourceLang
+            if (result == null || src == null) {
+                _resultFavourite.value = false
+                return
+            }
+            viewModelScope.launch {
+                _resultFavourite.value =
+                    translationRepository
+                        .cached(result.request.text, src, result.request.targetLang, result.engine)
+                        ?.favourite ?: false
+            }
+        }
+
+        /**
+         * Star on the composer result: flips the history row's `favourite`; a
+         * row the history write skipped (rare undetected-auto) is SAVED as a
+         * favourite directly — the star always does something (no dead end).
+         */
+        fun onToggleFavourite() {
+            val result = state as? TextUiState.Result ?: return
+            val src = result.resolvedSourceLang ?: return
+            viewModelScope.launch {
+                val row =
+                    translationRepository.cached(
+                        result.request.text,
+                        src,
+                        result.request.targetLang,
+                        result.engine,
+                    )
+                if (row == null) {
+                    val id =
+                        translationRepository.save(
+                            Translation(
+                                sourceLang = src,
+                                sourceText = result.request.text,
+                                targetLang = result.request.targetLang,
+                                targetText = result.translatedText,
+                                engine = result.engine,
+                                favourite = true,
+                                createdAt = clock.nowMillis(),
+                            ),
+                        )
+                    _resultFavourite.value = id > 0
+                } else {
+                    translationRepository.setFavourite(row.id, !row.favourite)
+                    _resultFavourite.value = !row.favourite
+                }
+            }
+        }
+
+        /**
+         * A History row reopens IN the composer (issue #68): input + pair +
+         * the stored answer — Retry replays through the C-8 cache instantly.
+         */
+        fun onHistoryPick(translation: Translation) {
+            translateJob?.cancel()
+            savedStateHandle[KEY_INPUT] = translation.sourceText
+            viewModelScope.launch {
+                prefs.setLanguagePair(translation.sourceLang, translation.targetLang)
+            }
+            val request =
+                TranslateRequest(
+                    text = translation.sourceText,
+                    sourceLang = translation.sourceLang,
+                    targetLang = translation.targetLang,
+                    mode = ModeId.AUTO,
+                )
+            persistLastRequest(request)
+            state =
+                TextUiState.Result(
+                    request = request,
+                    translatedText = translation.targetText,
+                    transliteration = null,
+                    engine = translation.engine,
+                    resolvedSourceLang = translation.sourceLang,
+                )
+        }
+
         private fun persistLastRequest(request: TranslateRequest) {
             savedStateHandle[KEY_LAST_TEXT] = request.text
             savedStateHandle[KEY_LAST_SRC] = request.sourceLang
@@ -364,6 +469,7 @@ class TextViewModel
                 translatedText = text,
                 transliteration = null,
                 engine = engine,
+                resolvedSourceLang = savedStateHandle.get<String>(KEY_RESULT_SRC),
             )
         }
 

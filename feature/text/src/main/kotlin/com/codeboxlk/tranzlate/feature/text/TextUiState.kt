@@ -47,6 +47,8 @@ sealed interface TextUiState {
         val translatedText: String,
         val transliteration: String?,
         val engine: Engine,
+        /** RESOLVED source (never "auto") — favourite lookups + auto-detect rows (issue #68). */
+        val resolvedSourceLang: String? = null,
     ) : TextUiState
 
     /** @property cause deepest attempt's cause; null = non-engine failure (empty input) → generic copy. */

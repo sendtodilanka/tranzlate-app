@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Scaffold placeholder strings. Real keys arrive from STRINGS_*.md (C-3 authority).
-     TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR queued before ship. -->
 <resources>
-    <string name="feature_history_placeholder">History</string>
+    <string name="history_title">History</string>
+    <string name="history_tab_all">History</string>
+    <string name="history_tab_saved">Saved</string>
+    <string name="history_empty">No translations yet — translate something and it lands here.</string>
+    <string name="history_saved_empty">Nothing saved yet — tap the bookmark on any translation to keep it here.</string>
+    <string name="history_pair">%1$s → %2$s</string>
+    <string name="history_cd_back">Back</string>
+    <string name="history_cd_open">Open in translator</string>
+    <string name="history_cd_save">Save translation</string>
+    <string name="history_cd_unsave">Remove from saved</string>
 </resources>

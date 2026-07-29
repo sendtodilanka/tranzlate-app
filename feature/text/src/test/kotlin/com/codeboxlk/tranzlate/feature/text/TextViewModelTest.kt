@@ -5,6 +5,7 @@ import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
 import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
@@ -97,6 +98,7 @@ class TextViewModelTest {
         handle: SavedStateHandle = SavedStateHandle(),
         usage: FakeUsagePolicy = FakeUsagePolicy(left = 5),
         access: FakeFeatureAccess = FakeFeatureAccess(),
+        repository: FakeTranslationRepository = FakeTranslationRepository(),
     ): TextViewModel {
         val useCase =
             TranslateTextUseCase(
@@ -104,12 +106,13 @@ class TextViewModelTest {
                 access,
                 usage,
                 RecordingAdsCoordinator(),
-                FakeTranslationRepository(),
+                repository,
                 clock,
             )
         return TextViewModel(
             translateText = useCase,
             prefs = prefs,
+            translationRepository = repository,
             languageRepository = FakeLanguageRepository(),
             usagePolicy = usage,
             featureAccess = access,
@@ -121,6 +124,58 @@ class TextViewModelTest {
     }
 
     private fun settle() = dispatcher.scheduler.advanceUntilIdle()
+
+    // ---- issue #68: tap-to-reopen + star-to-save -----------------------------
+
+    @Test
+    fun `history pick restores input, pair and the stored result`() {
+        val prefs = FakeTranslatePrefsRepository()
+        val vm = viewModel(prefs = prefs)
+        settle()
+
+        vm.onHistoryPick(
+            Translation(
+                id = 7,
+                sourceLang = "de",
+                sourceText = "Hallo Welt",
+                targetLang = "en",
+                targetText = "Hello world",
+                engine = Engine.ONLINE_GOOGLE,
+                createdAt = 1L,
+            ),
+        )
+        settle()
+
+        assertThat(vm.input.value).isEqualTo("Hallo Welt")
+        assertThat(prefs.source.value).isEqualTo("de")
+        assertThat(prefs.target.value).isEqualTo("en")
+        val state = vm.uiState.value as TextUiState.Result
+        assertThat(state.translatedText).isEqualTo("Hello world")
+        assertThat(state.resolvedSourceLang).isEqualTo("de")
+    }
+
+    @Test
+    fun `star toggle flips the history row and the icon state follows`() {
+        val repository = FakeTranslationRepository()
+        val vm = viewModel(repository = repository)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate() // G1 en->fr writes the history row
+        settle()
+        assertThat(vm.resultFavourite.value).isFalse()
+
+        vm.onToggleFavourite()
+        settle()
+
+        assertThat(repository.saved.single().favourite).isTrue()
+        assertThat(vm.resultFavourite.value).isTrue()
+
+        vm.onToggleFavourite()
+        settle()
+
+        assertThat(repository.saved.single().favourite).isFalse()
+        assertThat(vm.resultFavourite.value).isFalse()
+    }
 
     // ---- issue #53 A3: the gate's answers get their own face -----------------
 
@@ -211,6 +266,7 @@ class TextViewModelTest {
                 translatedText = "Bonjour (fake)", // G2 exact golden
                 transliteration = null,
                 engine = Engine.OFFLINE_MLKIT,
+                resolvedSourceLang = "en",
             ),
         )
         assertThat(translator.calls.last().mode).isEqualTo(ModeId.AUTO) // spy

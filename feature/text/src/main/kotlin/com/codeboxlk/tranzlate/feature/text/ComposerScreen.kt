@@ -148,7 +148,10 @@ internal fun ComposerPane(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val aiRemaining by viewModel.aiRemaining.collectAsStateWithLifecycle()
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
+    val resultFavourite by viewModel.resultFavourite.collectAsStateWithLifecycle()
     ComposerPaneContent(
+        resultFavourite = resultFavourite,
+        onToggleFavourite = viewModel::onToggleFavourite,
         input = input,
         sourceLangId = sourceLang,
         targetLangId = targetLang,
@@ -181,6 +184,8 @@ internal fun ComposerPaneContent(
     onInputChange: (String) -> Unit,
     aiMeter: Pair<Int, Int>? = null,
     onOpenPaywall: () -> Unit = {},
+    resultFavourite: Boolean = false,
+    onToggleFavourite: () -> Unit = {},
     onTranslate: () -> Boolean,
     onRetry: () -> Unit,
     onSwapLanguages: () -> Unit,
@@ -238,7 +243,11 @@ internal fun ComposerPaneContent(
 
     val guidedVoice = stringResource(R.string.text_guided_voice)
     val guidedTts = stringResource(R.string.text_guided_tts)
-    val guidedBookmark = stringResource(R.string.text_guided_bookmark)
+    val starUnavailable = stringResource(R.string.text_star_unavailable)
+    val starAction: () -> Unit = {
+        val starResult = uiState as? TextUiState.Result
+        if (starResult?.resolvedSourceLang != null) onToggleFavourite() else onNotify(starUnavailable)
+    }
     val copiedMessage = stringResource(R.string.text_copied)
 
     Column(modifier = modifier) {
@@ -337,6 +346,7 @@ internal fun ComposerPaneContent(
                 Spacer(Modifier.width(spacing.lg24))
                 ResultPane(
                     aiMeter = aiMeter,
+                    starFilled = resultFavourite,
                     targetLabel = languageLabel(targetLangId),
                     uiState = uiState,
                     onRetry = onRetry,
@@ -345,7 +355,7 @@ internal fun ComposerPaneContent(
                         onNotify(copiedMessage)
                     },
                     onSpeak = { onNotify(guidedTts) },
-                    onStar = { onNotify(guidedBookmark) },
+                    onStar = starAction,
                     modifier = Modifier.weight(if (layout.hinged) 1f else PANE_WEIGHT_RESULT).fillMaxHeight(),
                 )
             }
@@ -404,6 +414,7 @@ internal fun ComposerPaneContent(
                 Spacer(Modifier.width(spacing.md16))
                 ResultPane(
                     aiMeter = aiMeter,
+                    starFilled = resultFavourite,
                     targetLabel = languageLabel(targetLangId),
                     uiState = uiState,
                     onRetry = onRetry,
@@ -412,7 +423,7 @@ internal fun ComposerPaneContent(
                         onNotify(copiedMessage)
                     },
                     onSpeak = { onNotify(guidedTts) },
-                    onStar = { onNotify(guidedBookmark) },
+                    onStar = starAction,
                     modifier = Modifier.weight(PANE_WEIGHT_RESULT).fillMaxHeight(),
                 )
             }
@@ -491,6 +502,7 @@ internal fun ComposerPaneContent(
                 } else {
                     ComposerReadBody(
                         aiMeter = aiMeter,
+                        starFilled = resultFavourite,
                         sourceText = uiState.requestText ?: input,
                         targetLabel = languageLabel(targetLangId),
                         uiState = uiState,
@@ -501,7 +513,7 @@ internal fun ComposerPaneContent(
                             onNotify(copiedMessage)
                         },
                         onSpeak = { onNotify(guidedTts) },
-                        onStar = { onNotify(guidedBookmark) },
+                        onStar = starAction,
                     )
                 }
             }
@@ -756,6 +768,7 @@ private fun ColumnScope.ComposerReadBody(
     onSpeak: () -> Unit,
     onStar: () -> Unit,
     aiMeter: Pair<Int, Int>? = null,
+    starFilled: Boolean = false,
 ) {
     val spacing = LocalSpacing.current
     Text(
@@ -791,7 +804,12 @@ private fun ColumnScope.ComposerReadBody(
                     // Bookmark sits at the far edge in the design, away from the
                     // pair that acts on the text itself.
                     Spacer(Modifier.weight(1f))
-                    ResultAction(DsR.drawable.ic_bookmark, R.string.cd_favourite, "tt_text_star", onStar)
+                    ResultAction(
+                        if (starFilled) DsR.drawable.ic_bookmark_filled else DsR.drawable.ic_bookmark,
+                        if (starFilled) R.string.cd_favourite_remove else R.string.cd_favourite,
+                        "tt_text_star",
+                        onStar,
+                    )
                 },
             ) {
                 Text(
@@ -991,6 +1009,7 @@ private fun ResultPane(
     targetLabel: String,
     uiState: TextUiState,
     aiMeter: Pair<Int, Int>? = null,
+    starFilled: Boolean = false,
     onRetry: () -> Unit,
     onCopy: (String) -> Unit,
     onSpeak: () -> Unit,
@@ -1078,7 +1097,12 @@ private fun ResultPane(
                         onCopy(uiState.translatedText)
                     }
                     Spacer(Modifier.weight(1f))
-                    ResultAction(DsR.drawable.ic_bookmark, R.string.cd_favourite, "tt_text_star", onStar)
+                    ResultAction(
+                        if (starFilled) DsR.drawable.ic_bookmark_filled else DsR.drawable.ic_bookmark,
+                        if (starFilled) R.string.cd_favourite_remove else R.string.cd_favourite,
+                        "tt_text_star",
+                        onStar,
+                    )
                 }
             }
         }

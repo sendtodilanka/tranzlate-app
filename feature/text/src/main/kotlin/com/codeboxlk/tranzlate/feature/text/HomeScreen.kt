@@ -104,6 +104,7 @@ fun HomeScreen(
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
+    onOpenHistory: () -> Unit,
     modifier: Modifier = Modifier,
     previewCardModifier: Modifier = Modifier,
 ) {
@@ -118,6 +119,7 @@ fun HomeScreen(
         onPickLanguage = onPickLanguage,
         onOpenSettings = onOpenSettings,
         onOpenPaywall = onOpenPaywall,
+        onOpenHistory = onOpenHistory,
         onOpenCamera = onOpenCamera,
         onOpenLanguages = onOpenLanguages,
         onOpenConversation = onOpenConversation,
@@ -141,6 +143,7 @@ fun HomeContent(
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
+    onOpenHistory: () -> Unit,
     modifier: Modifier = Modifier,
     previewCardModifier: Modifier = Modifier,
 ) {
@@ -229,6 +232,7 @@ fun HomeContent(
                             onOpenCamera = onOpenCamera,
                             onOpenLanguages = onOpenLanguages,
                             onOpenConversation = onOpenConversation,
+                            onOpenHistory = onOpenHistory,
                         )
                         Spacer(Modifier.height(ScreenMargin))
                     }
@@ -331,6 +335,7 @@ fun HomeContent(
                         onOpenCamera = onOpenCamera,
                         onOpenLanguages = onOpenLanguages,
                         onOpenConversation = onOpenConversation,
+                        onOpenHistory = onOpenHistory,
                     )
                     Spacer(Modifier.height(ScreenMargin))
                 }
@@ -351,6 +356,7 @@ private fun ColumnScope.ToolsStack(
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
+    onOpenHistory: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
     Text(
@@ -409,6 +415,14 @@ private fun ColumnScope.ToolsStack(
         subtitle = stringResource(R.string.home_row_download_sub),
         onClick = onOpenLanguages,
         testTag = "tt_home_row_download",
+    )
+    // Entry until the drawer hosts History/Saved (issue #68 recorded deviation).
+    ListRowCard(
+        icon = painterResource(DsR.drawable.ic_history),
+        title = stringResource(R.string.home_row_history),
+        subtitle = stringResource(R.string.home_row_history_sub),
+        onClick = onOpenHistory,
+        testTag = "tt_home_row_history",
     )
     Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
         MiniCard(
@@ -821,6 +835,7 @@ private fun HomeContentPreview() {
             onPickLanguage = {},
             onOpenSettings = {},
             onOpenPaywall = {},
+            onOpenHistory = {},
             onOpenCamera = {},
             onOpenLanguages = {},
             onOpenConversation = {},
