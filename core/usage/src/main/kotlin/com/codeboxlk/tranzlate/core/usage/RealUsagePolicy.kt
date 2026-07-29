@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate.core.usage
 
 import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
+import com.codeboxlk.tranzlate.core.datastore.PersistedUsageCounts
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.domain.usage.SpendResult
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
@@ -22,10 +23,10 @@ import javax.inject.Singleton
  * the midnight rollover ([AppClock.today] vs the last-seen date) runs inside
  * the same section so a reset can't interleave a spend.
  *
- * TODO(#4-brains): counters are in-process this batch — process death forgets
- * today's spends (strictly better than the previous placeholder, which never
- * counted at all). The DataStore-transaction persistence lands with the
- * brains implementation phase.
+ * Counters SURVIVE process death (issue #66): the persisted facts load ONCE,
+ * lazily, inside the same mutex — no new races — and every mutation block
+ * ends with one atomic save. An unreadable store falls back to a fresh day
+ * (fail-open once, never a crash: quota protection must not block translation).
  */
 @Singleton
 class RealUsagePolicy
@@ -33,8 +34,10 @@ class RealUsagePolicy
     constructor(
         private val clock: AppClock,
         private val config: RemoteConfigSource,
+        private val persistence: UsagePersistence,
     ) : UsagePolicy {
         private val mutex = Mutex()
+        private var loaded = false
         private var day: LocalDate? = null
         private var spentFree = 0
         private var spentPro = 0
@@ -44,22 +47,55 @@ class RealUsagePolicy
 
         override suspend fun trySpend(tier: Tier): SpendResult =
             mutex.withLock {
+                ensureLoaded()
                 rollOverIfNewDay()
                 val spent = spentOf(tier)
-                if (spent >= capOf(tier)) {
-                    SpendResult.OVER
-                } else {
-                    setSpent(tier, spent + 1)
-                    SpendResult.SPENT
-                }
+                val result =
+                    if (spent >= capOf(tier)) {
+                        SpendResult.OVER
+                    } else {
+                        setSpent(tier, spent + 1)
+                        SpendResult.SPENT
+                    }
+                persist()
+                result
             }
 
         override suspend fun refund(tier: Tier) {
             mutex.withLock {
+                ensureLoaded()
                 rollOverIfNewDay()
                 val spent = spentOf(tier)
                 if (spent > 0) setSpent(tier, spent - 1)
+                persist()
             }
+        }
+
+        /** Runs under the mutex only. First touch pulls the persisted facts. */
+        private suspend fun ensureLoaded() {
+            if (loaded) return
+            val counts = persistence.load()
+            spentFree = counts.freeSpent
+            spentPro = counts.proSpent
+            day =
+                if (counts.dayEpoch == PersistedUsageCounts.NO_DAY) {
+                    null // first run — the rollover below stamps today
+                } else {
+                    LocalDate.ofEpochDay(counts.dayEpoch)
+                }
+            loaded = true
+            publish()
+        }
+
+        /** Runs under the mutex only. */
+        private suspend fun persist() {
+            persistence.save(
+                PersistedUsageCounts(
+                    freeSpent = spentFree,
+                    proSpent = spentPro,
+                    dayEpoch = day?.toEpochDay() ?: PersistedUsageCounts.NO_DAY,
+                ),
+            )
         }
 
         private fun rollOverIfNewDay() {
