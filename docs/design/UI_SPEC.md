@@ -94,10 +94,10 @@ Replaces the interim bottom sheet: a sheet cannot hold ~100 languages plus searc
 **Measurement tokens (DECISIONS C-14):** spacing → `LocalSpacing`, fixed sizes → `Dimensions`, corners → `MaterialTheme.shapes`, elevation → `Elevation`, text → the type scale. Every screen complies as of PR #44 — Home was migrated off its private literal block.
 
 ## 4. Not yet designed (later rounds / can be built from rules)
-Advanced-AI variant of the input card (mode chip `✦ Advanced AI ▾` + `15/20 today` counter — **the mode chip has no home in the rev.3 top bar; it needs one**) · mode-picker sheet · picker search + Recent section · History & Saved · Settings + offline languages (6 row states) · paywall · camera. Build these from the rules above + their feature specs.
+~~Advanced-AI variant of the input card (mode chip + counter) · mode-picker sheet~~ — **retired (C-10 rev.2, issue #50): no engine picker, permanently; the FREE AI meter is "{left}/5 today" per BUSINESS_MODEL.md §5** · picker search + Recent section · History & Saved · Settings + offline languages (6 row states) · paywall · camera. Build these from the rules above + their feature specs.
 
 **Opened by the rev.3 reset (2026-07-26) — needs a design answer, not an implementation guess:**
 - **Entry points lost with the drawer:** History · Saved · Help · About · Recents · the account/tier row (§2.3).
-- **The mode chip** (`tt_text_mode_chip`, `cd_text_mode_chip`, `text_mode_automatic`) — no longer on Home; the engine choice must surface somewhere before the metered path ships (C-2/D-2/US-6 all assume it is visible).
+- ~~**The mode chip** — the engine choice must surface somewhere before the metered path ships~~ — **answered by C-10 rev.2 (issue #50): the engine choice never surfaces; the waterfall decides and the paid tail is quota-gated.**
 - **Clear (✕) / new-translation** — removed from Home with the old top bar (`cd_text_clear`).
 - **Medium / Expanded layout** for the card stack (D-5 rev.3 open item; C-13 nav column on hold).

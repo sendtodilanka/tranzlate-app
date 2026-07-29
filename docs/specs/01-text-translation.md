@@ -23,7 +23,7 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 **Match GT:** tap source/target chip → language picker; **⇄ swap** re-translates instantly; **✕ clear** empties input+result; auto source-detection with "%s (Detected)" label; result carries **Copy · TTS · fullscreen · ⭐ Save**; recent languages surface first in the picker. **Deviation (owner-approved 2026-07-22, C-2 amended):** GT's live-as-you-type trigger does **not** apply — every engine translates on the explicit **Translate** action (`tt_text_translate_btn`) and the result opens on its own screen (Compose transition keeps it feeling continuous).
 
 **Tranzlate deltas (layer on, don't break GT UX):**
-1. A **mode chip** (AUTO / Offline / Standard / Advanced AI) — GT has no engine choice; we do.
+1. ~~A **mode chip** (AUTO / Offline / Standard / Advanced AI)~~ — **withdrawn (C-10 rev.2, issue #50): like GT, the user never picks an engine; the waterfall decides.**
 2. **Explicit Translate for ALL engines (C-2 amended 2026-07-22 — D-0 tension resolved):** no engine fires per keystroke or on debounce. Free (Offline, Standard, AUTO) and metered (Advanced AI) alike translate **only** on the explicit Translate action (`tt_text_translate_btn`; IME ⏎ mirrors it), so one quota unit = one intentional translation by construction. The one action is predictable across engines and keeps the editor a large, comfortable composing surface.
 3. Subscription gating + ads per D-2/D-4.
 
@@ -36,8 +36,8 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 | US-2 | change language | Given a result exists, when I change target via picker, then it **auto re-translates** (D-1) using cache if hit (no meter charge). |
 | US-3 | auto-detect | Given source=Auto, then result header shows `language_detected` ("%1$s (Detected)") with the resolved id stored (never "auto"). |
 | US-4 | swap | Given source≠Auto, when I tap ⇄, then langs swap **and** input↔result text swap + re-translate. Given source=Auto, ⇄ is disabled with `swap_disabled_auto` reason. |
-| US-5 | pick mode | Given the mode chip, when I open+select, then it persists (`prefs.text_mode`) and applies next translate; metered status visible per US-6. |
-| US-6 | see limits first | Given Advanced AI + free/plus, then a live "{used}/{limit} today" counter (D-2) + Premium chip is visible **before** translating; Premium hides it. |
+| US-5 | ~~pick mode~~ | **Withdrawn (C-10 rev.2, issue #50):** there is no mode UI — the waterfall decides; `prefs.text_mode` stays AUTO. |
+| US-6 | see limits first | **Re-scoped (D-2 rev.2, issue #50):** the FREE AI pool meter ("AI translations: {left}/5 today") shows alongside AI-quality results (BUSINESS_MODEL.md §5); hidden on PRO. No mode chip exists. |
 | US-7 | act on result | Copy / TTS(play↔stop) / Reverse / ⭐Save / Add-to-Collection each execute with feedback (see §3 for Reverse vs Swap). |
 | US-8 | recover from failure | Given engine failure, then inline error (`home_result_error_view_title`) + Retry; never a dead end or full-screen dialog. |
 | US-9 | offline | Given offline + AUTO, uses offline engine if model present, else `offline_model_missing` guidance with a Download action. |
@@ -74,8 +74,8 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 |---------|--------------------------|---------|-----------|
 | Source/Target chip | `AssistChip`, ≥48dp | `lang_source`/`lang_target` | opens Language picker (separate spec) |
 | Swap | `IconButton` | `btn_swap` | **Swap** = exchange the two languages (US-4). Disabled on Auto source. |
-| Mode chip | `AssistChip`+menu | `chip_mode` | real ripple/role (fixes badge-disguise bug) |
-| Counter | `Badge`/supporting text | `text_counter` | `usage_counter` string, hidden Premium |
+| ~~Mode chip~~ | — | — | **Withdrawn — C-10 rev.2 (issue #50): no engine picker, permanently** |
+| Counter | `Badge`/supporting text | `text_counter` | C-6 metered counter, hidden on PRO (D-2 rev.2) |
 | Input | `OutlinedTextField` multiline | `input_text` | ✕ trailing = clear; IME action = translate in every mode (mirrors `tt_text_translate_btn`, C-2) |
 | Char counter | supporting text | `text_charcount` | **"0 / 500"** (C-5, spaced since PR #43); inline `text_over_char_limit` at limit (rewritten copy, no "Translate Pro") |
 | Result text | selectable `Text`, font-scalable | `text_result` | tap → fullscreen reader |
@@ -98,8 +98,8 @@ RESULT ─lang change→ VALIDATING (D-1 auto re-translate; cache-first)
 - Cache hit (key per DECISIONS engineering constants) → `RESULT` immediately, **no meter charge**.
 
 ## 5. Behaviour: modes, gating, metering (exact)
-- **Modes offered:** AUTO(default), Offline, Standard, Advanced AI. Default fresh user = **AUTO** (DECISIONS defaults). AUTO fallback = **offline→standard only** (free engines; **never** advanced/metered — C-10), fires on engine failure. If BOTH free engines fail: surface error / offline-missing guidance (§8), **no quota charge**.
-- **Gating (FeatureAccess crux) + limits (D-2):** Advanced AI daily cap — **Free 20 · Plus 100 · Premium ∞** (RemoteConfig `limit_free`/`limit_plus`). Counter increments **once, on engine success only** (DECISIONS). Reset = device-local midnight (DATA_MODEL `usage.reset_epoch`).
+- **Modes (C-10 rev.2, 2026-07-29, issue #50):** the user never picks an engine — mode UI is deferred entirely. AUTO = the whole waterfall **MLKit → GOT → GCT**, with the **GCT tail quota-gated** by the FREE 5/day AI pool (unlimited on PRO). Quota spent + free engines failed → guided outcome (§8) via the C-11 sheet, **never a silent charge**. Cache hits charge nothing (C-8).
+- **Gating (FeatureAccess crux) + limits (D-2 rev.2, issue #50):** Advanced AI daily cap — **FREE 5 · PRO unlimited (hidden fair-use cap)** (RemoteConfig `limit_free_ai`/`limit_pro_fair_use`; BUSINESS_MODEL.md). Counter increments **once, on engine success only** (DECISIONS). Reset = device-local midnight (DATA_MODEL `usage.reset_epoch`).
 - **At limit:** soft dismissible upgrade sheet; AUTO still works via free engines (never a hard block on the whole feature).
 - **Ads (D-4):** interstitial after **every 2nd** completed translation, 90s gap, daily cap 12 (RemoteConfig-tunable). Never on Back/utility nav.
 
