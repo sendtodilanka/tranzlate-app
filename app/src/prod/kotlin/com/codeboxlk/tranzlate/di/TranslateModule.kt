@@ -19,7 +19,9 @@ import com.codeboxlk.tranzlate.core.common.DispatcherProvider
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.translate.RealOfflineModelManager
 import com.codeboxlk.tranzlate.core.translate.RealTranslator
+import com.codeboxlk.tranzlate.core.usage.DataStoreUsagePersistence
 import com.codeboxlk.tranzlate.core.usage.RealUsagePolicy
+import com.codeboxlk.tranzlate.core.usage.UsagePersistence
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
@@ -63,6 +65,10 @@ object TranslateModule {
     @Provides
     @Singleton
     fun usagePolicy(impl: RealUsagePolicy): UsagePolicy = impl
+
+    @Provides
+    @Singleton
+    fun usagePersistence(impl: DataStoreUsagePersistence): UsagePersistence = impl
 
     @Provides
     @Singleton
