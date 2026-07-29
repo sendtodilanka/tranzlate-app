@@ -65,3 +65,24 @@ the clip; IME dismissal re-lays-out and resets it. Portrait never engages the sc
 Landscape Home two-pane (frame 1) · landscape result face source|result split with auto-size
 text (frame 3) · portrait unchanged (224-ink control + the full unit suite green). Tablet and
 foldable AVD verification not yet run — blocked behind this defect only for the edit face.
+
+---
+
+## RESOLUTION (2026-07-29, later the same day)
+
+The defect **stopped reproducing** after two changes landed together, and the landscape edit
+face now renders text + cursor with the IME up (device-verified, multiple fresh flows):
+
+1. `ResultPane`'s `BasicText` + `TextAutoSize.StepBased` was replaced by a plain `Text` with
+   deterministic length tiers (`resultTypeFor`) — StepBased had also been measured settling
+   on its *minimum* size for a short one-liner instead of growing (its own defect, reason
+   enough to drop it).
+2. The card's inner Column gained `fillMaxSize()` and the height-compact edit face was
+   restructured into a single top row (label · counter · ✕ · Translate) + the field —
+   the previous stack overflowed the ~140dp card interior, clipping the action row.
+
+**Causality remains unproven** — the invisible-text repro predates `ResultPane`'s existence
+in one early capture, so "TextAutoSize removal fixed it" cannot be the whole story, and no
+single isolated change flipped it during the hunt. Status: RESOLVED-UNEXPLAINED; if it
+recurs, this log is the starting point. The `TextAutoSize` API stays out of the codebase
+until its min-size behaviour is understood (tracked implicitly by the tier helper's comment).

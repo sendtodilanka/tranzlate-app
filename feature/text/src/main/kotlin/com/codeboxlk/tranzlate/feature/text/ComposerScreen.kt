@@ -22,11 +22,9 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -408,21 +406,25 @@ internal fun ComposerPaneContent(
         ) {
             Column(
                 modifier =
-                    Modifier.padding(
-                        start = spacing.md16,
-                        end = spacing.md16,
-                        top = spacing.lg24,
-                        bottom = spacing.md16,
-                    ),
+                    Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = spacing.md16,
+                            end = spacing.md16,
+                            top = spacing.lg24,
+                            bottom = spacing.md16,
+                        ),
             ) {
-                SourceLabelRow(
-                    label = languageLabel(sourceLangId),
-                    showClear = input.isNotEmpty(),
-                    onClear = {
-                        onClearAll()
-                        isEditing = true
-                    },
-                )
+                if (!(layout.splitResultOnly && isEditing)) {
+                    SourceLabelRow(
+                        label = languageLabel(sourceLangId),
+                        showClear = input.isNotEmpty(),
+                        onClear = {
+                            onClearAll()
+                            isEditing = true
+                        },
+                    )
+                }
                 if (isEditing) {
                     ComposerEditBody(
                         input = input,
@@ -444,7 +446,12 @@ internal fun ComposerPaneContent(
                                 keyboard?.hide()
                             }
                         },
-                        fieldFillsHeight = !layout.splitResultOnly,
+                        compactLandscape = layout.splitResultOnly,
+                        label = languageLabel(sourceLangId),
+                        onClear = {
+                            onClearAll()
+                            isEditing = true
+                        },
                     )
                 } else {
                     ComposerReadBody(
@@ -515,11 +522,14 @@ private fun ColumnScope.ComposerEditBody(
     onPaste: () -> Unit,
     onMic: () -> Unit,
     onTranslate: () -> Unit,
-    // Height-compact landscape (issue #56): a weighted field inside the
-    // IME-animated card measures its inner text viewport down to ~0 and the
-    // text stops drawing (device-verified). Wrap-content + a min height avoids
-    // the pathological chain; a Spacer then pins the action row to the bottom.
-    fieldFillsHeight: Boolean = true,
+    // Height-compact landscape (issue #56): the card has ~140dp of interior —
+    // label row + a min-height field + the action row overflow it and the
+    // actions clip out of reach (device-verified). Compact mode folds label,
+    // counter, clear and the action into ONE top row so the field keeps the
+    // rest.
+    compactLandscape: Boolean = false,
+    label: String = "",
+    onClear: () -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     val hasText = input.isNotBlank()
@@ -527,12 +537,46 @@ private fun ColumnScope.ComposerEditBody(
     val inputDescription = stringResource(R.string.cd_text_input)
     val counterDescription = stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT)
 
-    val fieldHeight =
-        if (fieldFillsHeight) {
-            Modifier.weight(1f)
-        } else {
-            Modifier.heightIn(min = Dimensions.composerInputMinHeight)
+    if (compactLandscape) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text =
+                    if (overLimit) {
+                        stringResource(R.string.text_over_char_limit, TEXT_CHAR_LIMIT)
+                    } else {
+                        stringResource(R.string.text_char_counter, input.length, TEXT_CHAR_LIMIT)
+                    },
+                style = MaterialTheme.typography.labelMedium,
+                color =
+                    if (overLimit) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                modifier =
+                    Modifier
+                        .semantics { contentDescription = counterDescription }
+                        .testTag("tt_text_counter"),
+            )
+            if (input.isNotEmpty()) {
+                IconButton(onClick = onClear, modifier = Modifier.testTag("tt_composer_clear")) {
+                    Icon(
+                        painterResource(DsR.drawable.ic_close),
+                        contentDescription = stringResource(R.string.cd_text_clear),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.width(spacing.sm8))
+            EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
         }
+    }
     BasicTextField(
         value = input,
         onValueChange = onInputChange,
@@ -546,7 +590,7 @@ private fun ColumnScope.ComposerEditBody(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .then(fieldHeight)
+                .weight(1f)
                 .padding(top = spacing.sm8)
                 .focusRequester(focusRequester)
                 .semantics { contentDescription = inputDescription }
@@ -573,7 +617,7 @@ private fun ColumnScope.ComposerEditBody(
             Text(stringResource(R.string.composer_paste))
         }
     }
-    if (!fieldFillsHeight) Spacer(Modifier.weight(1f))
+    if (compactLandscape) return
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(top = spacing.sm8),
@@ -598,35 +642,47 @@ private fun ColumnScope.ComposerEditBody(
                     .semantics { contentDescription = counterDescription }
                     .testTag("tt_text_counter"),
         )
-        if (hasText) {
-            Button(
-                onClick = onTranslate,
-                enabled = !overLimit,
-                modifier = Modifier.height(Dimensions.touchTargetMin).testTag("tt_text_translate_btn"),
-            ) {
+        EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
+    }
+}
+
+/** The one action slot: empty → mic, text → Translate (a morph, never a disable). */
+@Composable
+private fun EditAction(
+    hasText: Boolean,
+    overLimit: Boolean,
+    onMic: () -> Unit,
+    onTranslate: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    if (hasText) {
+        Button(
+            onClick = onTranslate,
+            enabled = !overLimit,
+            modifier = Modifier.height(Dimensions.touchTargetMin).testTag("tt_text_translate_btn"),
+        ) {
+            Icon(
+                painterResource(DsR.drawable.ic_translate),
+                contentDescription = null,
+                modifier = Modifier.size(Dimensions.iconSm),
+            )
+            Spacer(Modifier.size(spacing.sm8))
+            Text(stringResource(R.string.home_translate))
+        }
+    } else {
+        Surface(
+            onClick = onMic,
+            shape = TranzlateShapeFull,
+            color = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(Dimensions.touchTargetMin).testTag("tt_text_mic"),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    painterResource(DsR.drawable.ic_translate),
-                    contentDescription = null,
-                    modifier = Modifier.size(Dimensions.iconSm),
+                    painterResource(DsR.drawable.ic_mic),
+                    contentDescription = stringResource(R.string.cd_text_mic),
+                    modifier = Modifier.size(Dimensions.iconMd),
                 )
-                Spacer(Modifier.size(spacing.sm8))
-                Text(stringResource(R.string.home_translate))
-            }
-        } else {
-            Surface(
-                onClick = onMic,
-                shape = TranzlateShapeFull,
-                color = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(Dimensions.touchTargetMin).testTag("tt_text_mic"),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        painterResource(DsR.drawable.ic_mic),
-                        contentDescription = stringResource(R.string.cd_text_mic),
-                        modifier = Modifier.size(Dimensions.iconMd),
-                    )
-                }
             }
         }
     }
@@ -718,6 +774,19 @@ private fun ColumnScope.ComposerReadBody(
     Spacer(Modifier.weight(1f))
 }
 
+/** Length thresholds for the result's auto-size tiers (issue #56, owner v3). */
+private const val RESULT_DISPLAY_MAX_CHARS = 24
+private const val RESULT_HEADLINE_MAX_CHARS = 80
+
+/** Short → display · medium → headline · long → the portrait titleLarge. */
+@Composable
+private fun resultTypeFor(text: String) =
+    when {
+        text.length <= RESULT_DISPLAY_MAX_CHARS -> MaterialTheme.typography.displayMedium
+        text.length <= RESULT_HEADLINE_MAX_CHARS -> MaterialTheme.typography.headlineMedium
+        else -> MaterialTheme.typography.titleLarge
+    }
+
 /** Source-language label + the ✕ clear affordance (the Paste chip's mirror). */
 @Composable
 private fun SourceLabelRow(
@@ -803,16 +872,15 @@ private fun ResultPane(
                     }
 
                     is TextUiState.Result -> {
-                        BasicText(
+                        Text(
                             text = uiState.translatedText,
-                            style =
-                                MaterialTheme.typography.displayMedium.copy(color = colors.text),
-                            autoSize =
-                                TextAutoSize.StepBased(
-                                    minFontSize = MaterialTheme.typography.titleLarge.fontSize,
-                                    maxFontSize = MaterialTheme.typography.displayMedium.fontSize,
-                                ),
-                            modifier = Modifier.fillMaxSize().testTag("tt_text_result"),
+                            // GT-style auto-size (owner v3): short results render
+                            // display-sized, long ones step down. Deterministic
+                            // length tiers rather than TextAutoSize — measured on
+                            // device, StepBased settled on its minimum for a short
+                            // one-liner and never grew (issue #56 research note).
+                            style = resultTypeFor(uiState.translatedText).copy(color = colors.text),
+                            modifier = Modifier.fillMaxWidth().testTag("tt_text_result"),
                         )
                     }
 
