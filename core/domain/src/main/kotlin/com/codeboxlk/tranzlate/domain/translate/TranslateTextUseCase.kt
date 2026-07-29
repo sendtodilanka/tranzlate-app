@@ -111,8 +111,8 @@ class TranslateTextUseCase
                     translator.translate(text, srcLang, tgtLang, mode)
                 } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                     // A cancelled attempt is not a success — return the spend even
-                    // though this scope is dying (hence NonCancellable).
-                    spentTier?.let { withContext(NonCancellable) { usagePolicy.refund(it) } }
+                    // though this scope is dying.
+                    spentTier?.let { refundSafely(it) }
                     throw rethrown
                 }
             if (outcome is TranslationOutcome.Success) {
@@ -120,10 +120,17 @@ class TranslateTextUseCase
                 adsCoordinator.onTranslationCompleted()
             } else {
                 // Success-only net spend (DECISIONS): failure returns the charge.
-                spentTier?.let { usagePolicy.refund(it) }
+                spentTier?.let { refundSafely(it) }
             }
             return outcome
         }
+
+        /**
+         * BOTH refund paths go through here (PR-59 lens NOTE-1): a refund must
+         * land even when the scope is already cancelled — a contended mutex
+         * inside a cancelled coroutine would otherwise throw and leak the spend.
+         */
+        private suspend fun refundSafely(tier: Tier) = withContext(NonCancellable) { usagePolicy.refund(tier) }
 
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
         private suspend fun saveToHistory(

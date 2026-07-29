@@ -146,12 +146,19 @@ Fake states — test වලින් inject කරන deterministic scenarios (`
 Spies: `spends` (cache hits must stay 0) · `refunds` (failures must return the spend). `trySpend(PRO)` always SPENT and never moves the FREE meter.
 
 ```kotlin
-class FakeUsagePolicy(private var left: Int, private val cap: Int = 20) : UsagePolicy {
-    override fun remaining() = left
-    override fun isOver() = left == 0
-    override fun warningMessage() =
-        if (left in 1..3) "$left free NLP3.5 translation${if (left==1) "" else "s"} left today" else null
-    override suspend fun increment() { if (left > 0) left-- }
+class FakeUsagePolicy(left: Int, private val cap: Int = 5) : UsagePolicy {
+    var spends = 0; var refunds = 0                      // spies
+    val state = MutableStateFlow(left)
+    override val remaining: Flow<Int> get() = state
+    override suspend fun trySpend(tier: Tier): SpendResult = when {
+        tier == Tier.PRO || state.value == -1 -> { spends++; SpendResult.SPENT }
+        state.value <= 0 -> SpendResult.OVER
+        else -> { spends++; state.value -= 1; SpendResult.SPENT }
+    }
+    override suspend fun refund(tier: Tier) {
+        refunds++
+        if (tier == Tier.FREE && state.value in 0 until cap) state.value += 1
+    }
 }
 ```
 
@@ -210,7 +217,7 @@ Namespace convention: `tt_text_*`. සෑම control එකකටම `Modifier.t
 | 14 | Error view (container) | `tt_text_error_view` | `ErrorView` | container (`liveRegion`) | title + retry |
 | 15 | Result text | `tt_text_result` | `ResultCard` | text (selectable) | golden output rendered here |
 | — | Loading indicator | `tt_text_loading` | `LoadingView` | progress (`liveRegion`) | translating spinner |
-| — | Usage warning banner | `tt_text_usage_warning` | `HomeScreen` | text (`liveRegion` polite) | from `warningMessage()` |
+| — | Usage warning banner | `tt_text_usage_warning` | `HomeScreen` | text (`liveRegion` polite) | UI-derived from the `remaining` flow (rev.2 — `warningMessage()` retired) |
 
 > **Contract:** මේ tag string 17 වෙනස් නොවිය යුතුයි (Maestro + Compose test දෙකම මේවා reference කරයි). tag rename එකක් = breaking change = doc update + PR.
 
@@ -401,7 +408,7 @@ appId: com.codeboxlk.tranzlate.offlinetranslator
 | Translate started | `tt_text_loading` | `Polite` | `Translating…` (`a11y_translating`) |
 | Result ready | `tt_text_result` | `Polite` | `Translation ready: %1$s` (`a11y_result_ready`) — result text |
 | Error | `tt_text_error_view` | `Assertive` | `Translation failed. %1$s` (`a11y_error`) — reason (`Network unavailable` / `Translation error`) |
-| Usage warning | `tt_text_usage_warning` | `Polite` | `%1$s` (`warningMessage()` — e.g. `1 free NLP3.5 translation left today`) |
+| Usage warning | `tt_text_usage_warning` | `Polite` | `%1$s` (UI-derived from `remaining` — e.g. `1 free NLP3.5 translation left today`) |
 | At limit | (paywall) | `Assertive` | `Daily free limit reached` (`a11y_limit_reached`) |
 
 Implement via `Modifier.semantics { liveRegion = LiveRegionMode.Polite/Assertive }`. Assertive **only** for error/limit (interrupts); everything else Polite.

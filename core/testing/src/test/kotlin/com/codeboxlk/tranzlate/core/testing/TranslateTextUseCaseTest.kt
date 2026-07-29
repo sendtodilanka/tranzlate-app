@@ -9,8 +9,13 @@ import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
 import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
+import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -181,6 +186,43 @@ class TranslateTextUseCaseTest {
             assertThat(usage.spends).isEqualTo(1) // gate spent up front (atomic)
             assertThat(usage.refunds).isEqualTo(1) // failure returned it
             assertThat(usage.state.value).isEqualTo(5) // net zero (DECISIONS success-only)
+        }
+
+    @Test
+    fun `cancellation mid-translate refunds the spend (NonCancellable path)`() =
+        runTest {
+            val usage = FakeUsagePolicy(left = 5)
+            val entered = CompletableDeferred<Unit>()
+            val hanging =
+                object : Translator {
+                    override suspend fun translate(
+                        text: String,
+                        srcLang: String,
+                        tgtLang: String,
+                        mode: ModeId,
+                    ): TranslationOutcome {
+                        entered.complete(Unit)
+                        awaitCancellation() // in-flight until the caller cancels
+                    }
+                }
+            val uc =
+                TranslateTextUseCase(
+                    hanging,
+                    FakeFeatureAccess(),
+                    usage,
+                    RecordingAdsCoordinator(),
+                    FakeTranslationRepository(),
+                    FakeClock(),
+                )
+
+            val job = launch { uc.invoke("Good morning", "en", "fr", ModeId.NLP35) }
+            entered.await()
+            assertThat(usage.spends).isEqualTo(1) // atomic gate spent before the engine
+
+            job.cancelAndJoin()
+
+            assertThat(usage.refunds).isEqualTo(1) // the dying scope returned it
+            assertThat(usage.state.value).isEqualTo(5) // net zero
         }
 
     @Test
