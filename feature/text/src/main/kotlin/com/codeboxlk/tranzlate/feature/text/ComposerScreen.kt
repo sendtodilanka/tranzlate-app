@@ -904,6 +904,12 @@ private fun ResultPane(
         }
     if (plainFace != null) {
         val (body, isError) = plainFace
+        val bodyColor =
+            if (isError) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = LocalFloatingSurface.current,
@@ -914,7 +920,7 @@ private fun ResultPane(
                 Text(
                     text = body,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = bodyColor,
                     modifier = Modifier.testTag(if (isError) "tt_text_error" else "tt_text_limit"),
                 )
                 TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
