@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -276,10 +277,21 @@ class TextViewModel
         }
 
         /**
+         * Whether swap can act right now (issue #70, lens OPEN-1): a concrete
+         * source always can; Detect can once a result carries its detected
+         * language — the UI's enabled-state reads THIS, so the resolve path is
+         * actually reachable instead of sitting behind a disabled button.
+         */
+        val swapAvailable: StateFlow<Boolean> =
+            combine(sourceLang, uiState) { src, st ->
+                src != AUTO_LANG || (st as? TextUiState.Result)?.resolvedSourceLang != null
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+        /**
          * UI_SPEC §2.2 swap ⇄ — one atomic pair write. With source = Detect the
          * target must NEVER become "auto" (issue #70): the swap resolves through
-         * the shown result's detected language, or reports false so the UI can
-         * guide ("translate once first") instead of writing nonsense.
+         * the shown result's detected language. The false branch is a race
+         * safety-net (result cleared between render and tap) — the UI guides.
          */
         fun onSwapLanguages(): Boolean {
             val currentSource = sourceLang.value

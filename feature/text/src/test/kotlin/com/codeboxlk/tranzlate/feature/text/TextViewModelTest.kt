@@ -157,6 +157,23 @@ class TextViewModelTest {
     }
 
     @Test
+    fun `swapAvailable follows Detect state and the shown result`() {
+        val prefs = FakeTranslatePrefsRepository().apply { source.value = "auto" }
+        val vm = viewModel(prefs = prefs)
+        settle()
+        assertThat(vm.swapAvailable.value).isFalse() // Detect + nothing shown
+
+        vm.onInputChange("Good morning")
+        vm.onTranslate() // G7 detects "en"
+        settle()
+        assertThat(vm.swapAvailable.value).isTrue() // the resolve path is now REACHABLE
+
+        prefs.source.value = "en"
+        settle()
+        assertThat(vm.swapAvailable.value).isTrue() // concrete source always can
+    }
+
+    @Test
     fun `swap with Detect and nothing to resolve reports false and writes nothing`() {
         val prefs = FakeTranslatePrefsRepository().apply { source.value = "auto" }
         val vm = viewModel(prefs = prefs)

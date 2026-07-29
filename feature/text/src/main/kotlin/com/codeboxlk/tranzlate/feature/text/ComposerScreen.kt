@@ -149,6 +149,7 @@ internal fun ComposerPane(
     val aiRemaining by viewModel.aiRemaining.collectAsStateWithLifecycle()
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val resultFavourite by viewModel.resultFavourite.collectAsStateWithLifecycle()
+    val swapAvailable by viewModel.swapAvailable.collectAsStateWithLifecycle()
     ComposerPaneContent(
         resultFavourite = resultFavourite,
         onToggleFavourite = viewModel::onToggleFavourite,
@@ -162,6 +163,7 @@ internal fun ComposerPane(
         onTranslate = viewModel::onTranslate,
         onRetry = viewModel::onRetry,
         onSwapLanguages = viewModel::onSwapLanguages,
+        swapAvailable = swapAvailable,
         onPickLanguage = onPickLanguage,
         onBack = onBack,
         onNotify = onNotify,
@@ -189,6 +191,7 @@ internal fun ComposerPaneContent(
     onTranslate: () -> Boolean,
     onRetry: () -> Unit,
     onSwapLanguages: () -> Boolean,
+    swapAvailable: Boolean = true,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onBack: () -> Unit,
     onNotify: (String) -> Unit,
@@ -293,7 +296,7 @@ internal fun ComposerPaneContent(
                 onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
                 onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
                 onSwap = swapAction,
-                swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
+                swapEnabled = swapAvailable,
                 constrainPills = layout.expandedWidth,
             )
         }

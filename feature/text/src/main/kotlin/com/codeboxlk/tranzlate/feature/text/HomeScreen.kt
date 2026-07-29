@@ -109,6 +109,7 @@ fun HomeScreen(
     previewCardModifier: Modifier = Modifier,
 ) {
     val sourceLang by viewModel.sourceLang.collectAsStateWithLifecycle()
+    val swapAvailable by viewModel.swapAvailable.collectAsStateWithLifecycle()
     val targetLang by viewModel.targetLang.collectAsStateWithLifecycle()
 
     HomeContent(
@@ -116,6 +117,7 @@ fun HomeScreen(
         targetLangId = targetLang,
         onOpenComposer = onOpenComposer,
         onSwapLanguages = viewModel::onSwapLanguages,
+        swapAvailable = swapAvailable,
         onPickLanguage = onPickLanguage,
         onOpenSettings = onOpenSettings,
         onOpenPaywall = onOpenPaywall,
@@ -137,6 +139,7 @@ fun HomeContent(
     targetLangId: String,
     onOpenComposer: () -> Unit,
     onSwapLanguages: () -> Boolean,
+    swapAvailable: Boolean,
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenPaywall: () -> Unit,
@@ -208,7 +211,7 @@ fun HomeContent(
                         onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
                         onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
                         onSwap = swapAction,
-                        swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
+                        swapEnabled = swapAvailable,
                         modifier = Modifier.padding(vertical = spacing.sm8),
                     )
                     InputPreviewCard(
@@ -290,7 +293,7 @@ fun HomeContent(
                     onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
                     onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
                     onSwap = swapAction,
-                    swapEnabled = sourceLangId != DETECT_LANGUAGE_ID,
+                    swapEnabled = swapAvailable,
                     modifier =
                         contentMaxWidth
                             .align(Alignment.CenterHorizontally)
@@ -835,6 +838,7 @@ private fun HomeContentPreview() {
             targetLangId = "es",
             onOpenComposer = {},
             onSwapLanguages = { true },
+            swapAvailable = true,
             onPickLanguage = {},
             onOpenSettings = {},
             onOpenPaywall = {},
