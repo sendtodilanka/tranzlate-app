@@ -92,7 +92,7 @@ No fake countdowns · no hidden auto-renew · no cancellation mazes · no silent
 | `limit_pro_fair_use` | high (unpublished) | Usage brain — abuse guard |
 | `text_limit_free` / `text_limit_pro` | 500 / 5000 | composer counter + Translate gate |
 | `trial_days` | 7 | paywall copy (billing source of truth = Play) |
-| `ad_nth` / `ad_min_gap_s` / `ad_daily_cap` | 2 / 90 / 12 | Ads brain (D-4, unchanged) — **suppressed entirely when `isPaid()`** |
+| `ad_nth` / `ad_min_gap_s` / `ad_daily_cap` | 2 / 90 / 12 | Ads brain (D-4, unchanged) — **suppressed entirely when the entitlement resolves to `Paid(PRO)`** |
 | per-brand product ids | flavor config | `PurchaseFlow` offerings (white-label) |
 
 Quota reset: per-day at local midnight, `AppClock`-driven (D-2 mechanics unchanged).

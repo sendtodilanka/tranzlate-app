@@ -2,15 +2,17 @@ package com.codeboxlk.tranzlate.core.config
 
 /**
  * Remote-tunable values seam (plan §2 `:core:config` — implementation-free).
- * Keys per DECISIONS: `limit_free`, `limit_plus` (D-2), `ad_nth`, `ad_min_gap_s`,
- * `ad_daily_cap` (D-4), `text_limit` (defaults table). The Firebase-backed
- * implementation lands with the brains phase; until then a static source serves
- * [RemoteConfigDefaults].
+ * Keys per BUSINESS_MODEL §7 (D-2 rev.2): `limit_free_ai`, `limit_pro_fair_use`,
+ * `text_limit_free`, `text_limit_pro`, plus `ad_nth`, `ad_min_gap_s`,
+ * `ad_daily_cap` (D-4). The Firebase-backed implementation lands with the
+ * brains phase; until then a static source serves [RemoteConfigDefaults].
  */
 interface RemoteConfigSource {
-    fun limitFree(): Int
+    /** FREE tier's daily AI-quality (GCT/LLM) pool — the counter the paywall shows. */
+    fun limitFreeAi(): Int
 
-    fun limitPlus(): Int
+    /** PRO abuse guard — never marketed, set far above honest use (BUSINESS_MODEL §1). */
+    fun limitProFairUse(): Int
 
     fun adNth(): Int
 
@@ -18,15 +20,18 @@ interface RemoteConfigSource {
 
     fun adDailyCap(): Int
 
-    fun textLimit(): Int
+    fun textLimitFree(): Int
+
+    fun textLimitPro(): Int
 }
 
-/** Confirmed product defaults (D-2 · D-4 · defaults table). */
+/** Confirmed product defaults (BUSINESS_MODEL §7 · D-4 · defaults table). */
 object RemoteConfigDefaults {
-    const val LIMIT_FREE = 20
-    const val LIMIT_PLUS = 100
+    const val LIMIT_FREE_AI = 5
+    const val LIMIT_PRO_FAIR_USE = 2000
     const val AD_NTH = 2
     const val AD_MIN_GAP_SECONDS = 90
     const val AD_DAILY_CAP = 12
-    const val TEXT_LIMIT = 500
+    const val TEXT_LIMIT_FREE = 500
+    const val TEXT_LIMIT_PRO = 5000
 }

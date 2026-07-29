@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.core.testing
 
 import com.codeboxlk.tranzlate.core.model.Engine
+import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.FailureReason
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Translation
@@ -8,6 +9,8 @@ import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
 import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -30,7 +33,8 @@ class TranslateTextUseCaseTest {
         usage: FakeUsagePolicy = FakeUsagePolicy(left = 5),
         ads: RecordingAdsCoordinator = RecordingAdsCoordinator(),
         repository: FakeTranslationRepository = FakeTranslationRepository(),
-    ) = TranslateTextUseCase(translator, FakeFeatureAccess(), usage, ads, repository, FakeClock())
+        access: FakeFeatureAccess = FakeFeatureAccess(),
+    ) = TranslateTextUseCase(translator, access, usage, ads, repository, FakeClock())
 
     @Test
     fun `G11 metered ask at limit short-circuits to LimitReached without engine call`() =
@@ -159,6 +163,36 @@ class TranslateTextUseCaseTest {
             )
             assertThat(ads.completedCount).isEqualTo(1) // flow continues past the failed write
         }
+    // ---- issue #53 A1/A7: the Loading-gate (never decide on Loading) ---------
+
+    @Test
+    fun `metered gate suspends on Loading and only decides once resolved`() =
+        runTest {
+            val access = FakeFeatureAccess().apply { state.value = Entitlement.Loading }
+            val translator = FakeTranslator()
+            val atLimit = FakeUsagePolicy(left = 0)
+            val uc = useCase(translator, atLimit, access = access)
+
+            val pending = async { uc.invoke("Quota text", "en", "fr", ModeId.NLP35) }
+            runCurrent()
+            // Loading is not FREE: no decision, no engine call, nothing returned yet.
+            assertThat(pending.isCompleted).isFalse()
+            assertThat(translator.calls).isEmpty()
+
+            access.state.value = Entitlement.Free
+            assertThat(pending.await()).isEqualTo(TranslationOutcome.LimitReached)
+        }
+
+    @Test
+    fun `free engines never wait on the entitlement (gate is metered-only)`() =
+        runTest {
+            val access = FakeFeatureAccess().apply { state.value = Entitlement.Loading }
+
+            val outcome = useCase(access = access).invoke("Good morning", "en", "fr", ModeId.ML2_MINI)
+
+            assertThat(outcome).isInstanceOf(TranslationOutcome.Success::class.java)
+        }
+
     // ---- issue #53 A2/A9: cache-first read + atomic dedupe ------------------
 
     @Test

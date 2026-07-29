@@ -1,27 +1,34 @@
 package com.codeboxlk.tranzlate.core.access
 
+import com.codeboxlk.subscription.SubscriptionGateway
+import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.ModeId
-import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * ACCESS BRAIN (plan §2 — the one home for entitlement gating).
  *
- * Phase-2 scope: adapt `:lib:subscription` `SubscriptionGateway.entitlement`
- * into [Tier] with the Loading-gate rule (DATA_MODEL :48 — gating always waits
- * for a resolved, non-Loading value).
+ * Adapts `:lib:subscription` [SubscriptionGateway.entitlement] into the domain
+ * [Entitlement] via [toDomain] — the same mapping the purchase flow uses (A7:
+ * one tier source). The Loading-gate rule lives in [awaitResolved]; this class
+ * holds no state of its own.
  */
 @Singleton
 class RealFeatureAccess
     @Inject
-    constructor() : FeatureAccess {
-        // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
-        // Safe defaults: FREE tier, every mode visible (contract §1.3 matrix), not paid.
-        override val tier: Tier = Tier.FREE
+    constructor(
+        gateway: SubscriptionGateway,
+    ) : FeatureAccess {
+        override val entitlement: Flow<Entitlement> = gateway.entitlement.map { it.toDomain() }
 
+        override suspend fun awaitResolved(): Entitlement = entitlement.first { it !is Entitlement.Loading }
+
+        // Contract §1.3 matrix: every tier sees every engine (C-10 rev.2 — AI
+        // quality is metered by the Usage brain, never hidden).
         override fun isEngineAllowed(mode: ModeId): Boolean = true
-
-        override fun isPaid(): Boolean = false
     }

@@ -1,5 +1,5 @@
 # Tranzlate — Text Translation: Test + Accessibility Contract (Foundation)
-> **⚠ Superseded in part (2026-07-29, issue #50 / BUSINESS_MODEL.md):** every PLUS/PREMIUM three-tier reference below is stale — D-2 rev.2 collapses tiers to **FREE + PRO**, and C-10 rev.2 removes user engine selection (the mode chip). The tier tables/fakes/strings here get their full rewrite when the Access brain + paywall land; until then this banner wins on conflict.
+> **⚠ Superseded in part (2026-07-29, issue #50 / BUSINESS_MODEL.md):** D-2 rev.2 collapses tiers to **FREE + PRO**, and C-10 rev.2 removes user engine selection (the mode chip). **§1.3 is rewritten to rev.2 and matches shipped code (issue #53 PR-3)**; remaining PLUS/PREMIUM or mode-chip references elsewhere (fake usage names, strings, mode-chip tests) are still stale and get theirs with the Usage-brain + paywall batches; on conflict this banner wins.
 
 
 > **Feature:** TEXT TRANSLATION (`HomeScreen` + `ResultScreen` සහ ඒවායේ `TextInputCard`, `SourceCard`, `ResultCard`, `ErrorView` components).
@@ -92,31 +92,34 @@ class FakeTranslator(
 
 > **Rule:** මේ table එකට row එකක් add කරන්නේ නම්, `defaultGolden` map එකට **identical** entry එකක් add කළ යුතුයි. Test එකකට tuple එකක් වෙනස් කරන්න බෑ — new row add කරන්න.
 
-## 1.3 Fake `FeatureAccess` (Free / Plus / Premium)
+## 1.3 Fake `FeatureAccess` (Free / Pro) — **rev.2, matches shipped code (issue #53 PR-3)**
 
 ```kotlin
 interface FeatureAccess {
-    val tier: Tier                        // FREE, PLUS, PREMIUM
-    fun isEngineAllowed(engine: Engine): Boolean
-    fun isPaid(): Boolean
+    val entitlement: Flow<Entitlement>    // Loading | Free | Paid(PRO)
+    suspend fun awaitResolved(): Entitlement   // first non-Loading — the only legal gate input
+    fun isEngineAllowed(mode: ModeId): Boolean // visibility only — metering is the Usage brain's
 }
-enum class Tier { FREE, PLUS, PREMIUM }
+enum class Tier { FREE, PRO }
 ```
 
-Fake matrix (deterministic):
+Fake matrix (deterministic, two-tier — D-2 rev.2):
 
-| Tier | maps to `EntitlementState` | AUTO | ML2_MINI | ML2_ONLINE | NLP35 | isPaid |
-|------|----------------------------|:----:|:--------:|:----------:|:-----:|:------:|
-| `FREE` | `NOT_SUBSCRIBED` | ✓ | ✓ | ✓ | ✓ (usage-limited 20/day) | false |
-| `PLUS` | `PLUS` | ✓ | ✓ | ✓ | ✓ (unlimited) | true |
-| `PREMIUM` | `PREMIUM` | ✓ | ✓ | ✓ | ✓ (unlimited) | true |
+| Tier | `entitlement` resolves to | sees every engine | AI quality (GCT/LLM) |
+|------|---------------------------|:-----------------:|----------------------|
+| `FREE` | `Entitlement.Free` | ✓ | usage-limited **5/day** (`limit_free_ai`) |
+| `PRO` | `Entitlement.Paid(PRO)` | ✓ | unlimited (fair-use guard only) |
 
 ```kotlin
-class FakeFeatureAccess(override var tier: Tier = Tier.FREE) : FeatureAccess {
-    override fun isEngineAllowed(engine: Engine) = true          // all tiers see all engines
-    override fun isPaid() = tier != Tier.FREE
+class FakeFeatureAccess(tier: Tier = Tier.FREE) : FeatureAccess {
+    val state = MutableStateFlow(if (tier == Tier.FREE) Entitlement.Free else Entitlement.Paid(Tier.PRO))
+    override val entitlement get() = state                     // set state = Loading to test the gate
+    override suspend fun awaitResolved() = state.first { it !is Entitlement.Loading }
+    override fun isEngineAllowed(mode: ModeId) = true          // all tiers see all engines
 }
 ```
+
+**Loading-gate test hook:** `state.value = Entitlement.Loading` කරලා metered call එකක් දෙන්න — gate එක resolve වෙනකම් suspend විය යුතුයි, FREE-විදිහට decide වෙන්න බෑ.
 
 ## 1.4 Fake `UsagePolicy` (at-limit / under)
 

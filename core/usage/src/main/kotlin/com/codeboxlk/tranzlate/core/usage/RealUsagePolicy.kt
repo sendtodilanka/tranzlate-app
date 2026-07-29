@@ -21,7 +21,7 @@ class RealUsagePolicy
     ) : UsagePolicy {
         // TODO(#4-brains): real implementation — placeholder returns Error(ENGINE) / safe defaults.
         // Safe defaults: full free allowance, never over, no warning, no-op increment.
-        override fun remaining(): Int = RemoteConfigDefaults.LIMIT_FREE
+        override fun remaining(): Int = RemoteConfigDefaults.LIMIT_FREE_AI
 
         override fun isOver(): Boolean = false
 

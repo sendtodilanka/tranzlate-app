@@ -7,17 +7,18 @@ import javax.inject.Singleton
 
 /**
  * TODO(#4-brains): real implementation — placeholder returns safe defaults.
- * Firebase-Remote-Config-backed source (keys `limit_free`, `limit_plus`,
- * `ad_nth`, `ad_min_gap_s`, `ad_daily_cap`, `text_limit`) lands with the brains
- * phase; until then the confirmed D-2/D-4 defaults serve.
+ * Firebase-Remote-Config-backed source (keys `limit_free_ai`, `limit_pro_fair_use`,
+ * `ad_nth`, `ad_min_gap_s`, `ad_daily_cap`, `text_limit_free`, `text_limit_pro`)
+ * lands with the brains phase; until then the confirmed BUSINESS_MODEL §7
+ * defaults serve.
  */
 @Singleton
 class StaticRemoteConfigSource
     @Inject
     constructor() : RemoteConfigSource {
-        override fun limitFree(): Int = RemoteConfigDefaults.LIMIT_FREE
+        override fun limitFreeAi(): Int = RemoteConfigDefaults.LIMIT_FREE_AI
 
-        override fun limitPlus(): Int = RemoteConfigDefaults.LIMIT_PLUS
+        override fun limitProFairUse(): Int = RemoteConfigDefaults.LIMIT_PRO_FAIR_USE
 
         override fun adNth(): Int = RemoteConfigDefaults.AD_NTH
 
@@ -25,5 +26,7 @@ class StaticRemoteConfigSource
 
         override fun adDailyCap(): Int = RemoteConfigDefaults.AD_DAILY_CAP
 
-        override fun textLimit(): Int = RemoteConfigDefaults.TEXT_LIMIT
+        override fun textLimitFree(): Int = RemoteConfigDefaults.TEXT_LIMIT_FREE
+
+        override fun textLimitPro(): Int = RemoteConfigDefaults.TEXT_LIMIT_PRO
     }

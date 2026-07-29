@@ -1,18 +1,28 @@
 package com.codeboxlk.tranzlate.core.testing
 
+import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * Deterministic Access fake (TEST_A11Y_CONTRACT §1.3 matrix): all tiers see all
- * engines (NLP35 is usage-limited for FREE via UsagePolicy, not access-blocked);
- * isPaid = tier != FREE.
+ * engines (AI quality is usage-limited for FREE via UsagePolicy, not
+ * access-blocked). Starts resolved — set [state] to [Entitlement.Loading] to
+ * exercise the Loading-gate.
  */
 class FakeFeatureAccess(
-    override var tier: Tier = Tier.FREE,
+    tier: Tier = Tier.FREE,
 ) : FeatureAccess {
-    override fun isEngineAllowed(mode: ModeId): Boolean = true
+    /** Mutable so tests can drive Loading → resolved transitions. */
+    val state: MutableStateFlow<Entitlement> =
+        MutableStateFlow(if (tier == Tier.FREE) Entitlement.Free else Entitlement.Paid(Tier.PRO))
 
-    override fun isPaid(): Boolean = tier != Tier.FREE
+    override val entitlement: MutableStateFlow<Entitlement> get() = state
+
+    override suspend fun awaitResolved(): Entitlement = state.first { it !is Entitlement.Loading }
+
+    override fun isEngineAllowed(mode: ModeId): Boolean = true
 }

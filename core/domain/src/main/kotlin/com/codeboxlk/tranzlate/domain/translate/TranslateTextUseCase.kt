@@ -81,8 +81,13 @@ class TranslateTextUseCase
                 }
             }
             val metered = mode == ModeId.NLP35
-            if (metered && (!featureAccess.isEngineAllowed(mode) || usagePolicy.isOver())) {
-                return TranslationOutcome.LimitReached
+            if (metered) {
+                // Loading-gate (DATA_MODEL :48): resolve the entitlement BEFORE any
+                // metered decision — a gate must never fire off Loading-as-FREE.
+                featureAccess.awaitResolved()
+                if (!featureAccess.isEngineAllowed(mode) || usagePolicy.isOver()) {
+                    return TranslationOutcome.LimitReached
+                }
             }
             val outcome = translator.translate(text, srcLang, tgtLang, mode)
             if (outcome is TranslationOutcome.Success) {
