@@ -1,8 +1,8 @@
 package com.codeboxlk.tranzlate.core.testing
 
+import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Entitlement
-import com.codeboxlk.tranzlate.core.model.FailureReason
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.model.Translation
@@ -85,13 +85,13 @@ class TranslateTextUseCaseTest {
     @Test
     fun `failure increments nothing and never asks ads`() =
         runTest {
-            val translator = FakeTranslator().apply { forcedFailure = FailureReason.NETWORK }
+            val translator = FakeTranslator().apply { forcedFailure = AttemptCause.OFFLINE }
             val usage = FakeUsagePolicy(left = 5)
             val ads = RecordingAdsCoordinator()
 
             val outcome = useCase(translator, usage, ads).invoke("Offline test", "en", "fr", ModeId.ML2_ONLINE)
 
-            assertThat(outcome).isEqualTo(TranslationOutcome.Error(FailureReason.NETWORK))
+            assertThat((outcome as TranslationOutcome.Error).primaryCause).isEqualTo(AttemptCause.OFFLINE)
             assertThat(usage.state.value).isEqualTo(5)
             assertThat(usage.spends).isEqualTo(0) // unmetered mode never touched the pool
             assertThat(ads.completedCount).isEqualTo(0)
@@ -136,7 +136,7 @@ class TranslateTextUseCaseTest {
     @Test
     fun `failure writes no history row`() =
         runTest {
-            val translator = FakeTranslator().apply { forcedFailure = FailureReason.NETWORK }
+            val translator = FakeTranslator().apply { forcedFailure = AttemptCause.OFFLINE }
             val repository = FakeTranslationRepository()
 
             useCase(translator, repository = repository).invoke("Offline test", "en", "fr", ModeId.ML2_ONLINE)
@@ -177,12 +177,12 @@ class TranslateTextUseCaseTest {
     @Test
     fun `metered failure refunds the spend - net zero charge`() =
         runTest {
-            val translator = FakeTranslator().apply { forcedFailure = FailureReason.NETWORK }
+            val translator = FakeTranslator().apply { forcedFailure = AttemptCause.OFFLINE }
             val usage = FakeUsagePolicy(left = 5)
 
             val outcome = useCase(translator, usage).invoke("Offline test", "en", "fr", ModeId.NLP35)
 
-            assertThat(outcome).isEqualTo(TranslationOutcome.Error(FailureReason.NETWORK))
+            assertThat((outcome as TranslationOutcome.Error).primaryCause).isEqualTo(AttemptCause.OFFLINE)
             assertThat(usage.spends).isEqualTo(1) // gate spent up front (atomic)
             assertThat(usage.refunds).isEqualTo(1) // failure returned it
             assertThat(usage.state.value).isEqualTo(5) // net zero (DECISIONS success-only)
@@ -236,6 +236,18 @@ class TranslateTextUseCaseTest {
             assertThat(outcome).isInstanceOf(TranslationOutcome.Success::class.java)
             assertThat(usage.spends).isEqualTo(1) // spent from the PRO pool
             assertThat(usage.state.value).isEqualTo(0) // FREE meter untouched
+        }
+
+    @Test
+    fun `access denial is NotEntitled - never masked as LimitReached`() =
+        runTest {
+            val access = FakeFeatureAccess().apply { engineAllowed = false }
+            val usage = FakeUsagePolicy(left = 5)
+
+            val outcome = useCase(usage = usage, access = access).invoke("Good morning", "en", "fr", ModeId.NLP35)
+
+            assertThat(outcome).isEqualTo(TranslationOutcome.NotEntitled)
+            assertThat(usage.spends).isEqualTo(0) // denial happens before any spend
         }
 
     // ---- issue #53 A1/A7: the Loading-gate (never decide on Loading) ---------

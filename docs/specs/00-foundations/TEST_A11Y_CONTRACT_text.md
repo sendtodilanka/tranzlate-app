@@ -33,11 +33,14 @@ enum class Engine { AUTO, ML2_MINI, ML2_ONLINE, NLP35 }
 
 sealed interface TranslationOutcome {
     data class Success(val text: String, val resolvedEngine: Engine) : TranslationOutcome
-    data class Error(val reason: FailureReason) : TranslationOutcome
+    data class Error(val attempts: List<EngineAttempt>) : TranslationOutcome  // rev.2: waterfall trace
+    data object EmptyInput : TranslationOutcome    // rev.2: validation, not an attempt
+    data object NotEntitled : TranslationOutcome   // rev.2: access denial ≠ quota
     data object LimitReached : TranslationOutcome
 }
 
-enum class FailureReason { NETWORK, ENGINE, UNSUPPORTED_PAIR, EMPTY_INPUT }
+data class EngineAttempt(val engine: Engine, val cause: AttemptCause)
+enum class AttemptCause { MODEL_NOT_DOWNLOADED, OFFLINE, TIMEOUT, UNSUPPORTED_PAIR, ENGINE_ERROR, SKIPPED_NO_QUOTA, SKIPPED_SOURCE_UNKNOWN }
 
 interface Translator {
     /** Deterministic in tests. srcLang/tgtLang are BCP-47 ("en","fr","zh"); "auto" = detect. */
@@ -55,19 +58,19 @@ interface Translator {
 ```kotlin
 class FakeTranslator(
     private val golden: Map<GoldenKey, TranslationOutcome> = defaultGolden,
-    var forcedFailure: FailureReason? = null,   // test can force NETWORK/ENGINE
+    var forcedFailure: AttemptCause? = null,    // test can force OFFLINE/ENGINE_ERROR
 ) : Translator {
 
-    data class GoldenKey(val text: String, val src: String, val tgt: String, val engine: Engine)
+    data class GoldenKey(val text: String, val src: String, val tgt: String, val mode: ModeId)
 
-    val calls = mutableListOf<GoldenKey>()      // spy: assert engine actually invoked
+    val calls = mutableListOf<GoldenKey>()      // spy: assert mode actually invoked
 
-    override suspend fun translate(text, src, tgt, engine): TranslationOutcome {
-        val key = GoldenKey(text.trim(), src, tgt, engine)
+    override suspend fun translate(text, src, tgt, mode): TranslationOutcome {
+        val key = GoldenKey(text.trim(), src, tgt, mode)
         calls += key
-        forcedFailure?.let { return TranslationOutcome.Error(it) }
-        if (text.isBlank()) return TranslationOutcome.Error(FailureReason.EMPTY_INPUT)
-        return golden[key] ?: TranslationOutcome.Error(FailureReason.UNSUPPORTED_PAIR)
+        forcedFailure?.let { return TranslationOutcome.Error(listOf(EngineAttempt(engineFor(mode), it))) }
+        if (text.isBlank()) return TranslationOutcome.EmptyInput
+        return golden[key] ?: TranslationOutcome.Error(listOf(EngineAttempt(engineFor(mode), UNSUPPORTED_PAIR)))
     }
 }
 ```
@@ -85,9 +88,9 @@ class FakeTranslator(
 | G5 | `Hello world` | en | de | ML2_MINI | `Hallo Welt (fake)` | ML2_MINI | Success |
 | G6 | `こんにちは` | ja | en | NLP35 | `Hello (fake)` | NLP35 | Success |
 | G7 | `Good morning` | auto | fr | AUTO | `Bonjour (fake)` | ML2_MINI | Success (detect→en) |
-| G8 | `நன்றி` | ta | en | ML2_MINI | *(no golden row)* | — | Error(UNSUPPORTED_PAIR) |
-| G9 | `` (empty) | en | fr | any | — | — | Error(EMPTY_INPUT) |
-| G10 | `Offline test` | en | fr | ML2_ONLINE | *(forcedFailure=NETWORK)* | — | Error(NETWORK) |
+| G8 | `நன்றி` | ta | en | ML2_MINI | *(no golden row)* | — | Error(attempt UNSUPPORTED_PAIR) |
+| G9 | `` (empty) | en | fr | any | — | — | EmptyInput (rev.2 — typed, not an attempt) |
+| G10 | `Offline test` | en | fr | ML2_ONLINE | *(forcedFailure=OFFLINE)* | — | Error(attempt OFFLINE) |
 | G11 | `Quota text` | en | fr | NLP35 | — | — | LimitReached (via UsagePolicy, §1.4) |
 
 > **Rule:** මේ table එකට row එකක් add කරන්නේ නම්, `defaultGolden` map එකට **identical** entry එකක් add කළ යුතුයි. Test එකකට tuple එකක් වෙනස් කරන්න බෑ — new row add කරන්න.
@@ -118,6 +121,8 @@ class FakeFeatureAccess(tier: Tier = Tier.FREE) : FeatureAccess {
     override fun isEngineAllowed(mode: ModeId) = true          // all tiers see all engines
 }
 ```
+
+*(the shipped fake adds a `engineAllowed` test hook so the `NotEntitled` contract test can flip visibility — matrix default stays all-true)*
 
 **Loading-gate test hook:** `state.value = Entitlement.Loading` කරලා metered call එකක් දෙන්න — gate එක resolve වෙනකම් suspend විය යුතුයි, FREE-විදිහට decide වෙන්න බෑ.
 
@@ -215,6 +220,7 @@ Namespace convention: `tt_text_*`. සෑම control එකකටම `Modifier.t
 | 12 | More menu | `tt_text_more_menu` | `ResultCard` | `IconButton` | opens dropdown |
 | 13 | Retry | `tt_text_retry` | `ErrorView` | `Button` | re-runs last request |
 | 14 | Error view (container) | `tt_text_error_view` | `ErrorView` | container (`liveRegion`) | title + retry |
+| — | Limit face (quota / access) | `tt_text_limit` | `ComposerScreen` | text (`liveRegion` assertive) | additive rev.2 (issue #53 PR-5): LimitReached / NotEntitled guidance — NOT an error view |
 | 15 | Result text | `tt_text_result` | `ResultCard` | text (selectable) | golden output rendered here |
 | — | Loading indicator | `tt_text_loading` | `LoadingView` | progress (`liveRegion`) | translating spinner |
 | — | Usage warning banner | `tt_text_usage_warning` | `HomeScreen` | text (`liveRegion` polite) | UI-derived from the `remaining` flow (rev.2 — `warningMessage()` retired) |
@@ -264,11 +270,11 @@ any ──clearInput──▶ Idle
     assertThat(vm.state.value).isEqualTo(State.LimitSheet)
 }
 
-@Test fun `network failure emits Error(NETWORK) and retry replays`() = runTest {
-    val t = FakeTranslator().apply { forcedFailure = FailureReason.NETWORK }
+@Test fun `offline failure emits Error(attempt OFFLINE) and retry replays`() = runTest {
+    val t = FakeTranslator().apply { forcedFailure = AttemptCause.OFFLINE }
     val vm = viewModel(translator = t)
     vm.onInput("Offline test"); vm.onTranslate(Engine.ML2_ONLINE)
-    assertThat((vm.state.value as State.Error).reason).isEqualTo(FailureReason.NETWORK)
+    assertThat((vm.state.value as State.Error).cause).isEqualTo(AttemptCause.OFFLINE)
     t.forcedFailure = null                                    // network back
     vm.onRetry()
     assertThat(vm.state.value).isInstanceOf(State.Result::class.java)
@@ -304,7 +310,7 @@ class TextTranslationScreenTest {
     }
 
     @Test fun errorView_retry_recovers() {
-        // FakeTranslator forcedFailure=NETWORK injected via test module override
+        // FakeTranslator forcedFailure=OFFLINE injected via test module override
         compose.onNodeWithTag("tt_text_input").performTextInput("Offline test")
         compose.onNodeWithTag("tt_text_translate_btn").performClick()
         compose.onNodeWithTag("tt_text_error_view").assertIsDisplayed()

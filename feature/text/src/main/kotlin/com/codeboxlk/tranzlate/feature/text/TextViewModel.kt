@@ -5,8 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
+import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
-import com.codeboxlk.tranzlate.core.model.FailureReason
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
@@ -36,6 +36,7 @@ private const val KEY_INPUT = "text_input"
 private const val KEY_STATE = "text_state_kind"
 private const val KEY_RESULT_TEXT = "text_result_text"
 private const val KEY_ERROR_REASON = "text_error_reason"
+private const val KEY_LIMIT_NOT_ENTITLED = "text_limit_not_entitled"
 private const val KEY_RESULT_ENGINE = "text_result_engine"
 private const val KEY_LAST_TEXT = "text_last_request_text"
 private const val KEY_LAST_SRC = "text_last_request_src"
@@ -46,6 +47,7 @@ private const val KEY_LAST_MODE = "text_last_request_mode"
 private const val STATE_TRANSLATING = "translating"
 private const val STATE_RESULT = "result"
 private const val STATE_ERROR = "error"
+private const val STATE_LIMIT = "limit"
 
 private const val PREFS_SUBSCRIBE_TIMEOUT_MS = 5_000L
 
@@ -115,11 +117,13 @@ class TextViewModel
                         is TextUiState.Translating -> STATE_TRANSLATING
                         is TextUiState.Result -> STATE_RESULT
                         is TextUiState.Error -> STATE_ERROR
+                        is TextUiState.Limit -> STATE_LIMIT
                         TextUiState.Idle -> null
                     }
                 savedStateHandle[KEY_RESULT_TEXT] = (value as? TextUiState.Result)?.translatedText
                 savedStateHandle[KEY_RESULT_ENGINE] = (value as? TextUiState.Result)?.engine?.name
-                savedStateHandle[KEY_ERROR_REASON] = (value as? TextUiState.Error)?.reason?.name
+                savedStateHandle[KEY_ERROR_REASON] = (value as? TextUiState.Error)?.cause?.name
+                savedStateHandle[KEY_LIMIT_NOT_ENTITLED] = (value as? TextUiState.Limit)?.notEntitled
             }
 
         /**
@@ -136,6 +140,8 @@ class TextViewModel
 
                     STATE_ERROR -> restoreError()?.also { _uiState.value = it } != null
 
+                    STATE_LIMIT -> restoreLimit()?.also { _uiState.value = it } != null
+
                     // The system interrupted a translation the user asked for and
                     // never received. Resuming it is honest — reporting a failure
                     // that never happened is not — and it costs the same single
@@ -144,7 +150,7 @@ class TextViewModel
 
                     else -> return
                 }
-            // A record we cannot rebuild (an Engine or FailureReason constant
+            // A record we cannot rebuild (an Engine or AttemptCause constant
             // renamed by an app update) would otherwise linger in saved state
             // until some later transition happened to overwrite it.
             if (!rebuilt) state = TextUiState.Idle
@@ -289,15 +295,25 @@ class TextViewModel
                             }
 
                             is TranslationOutcome.Error -> {
-                                TextUiState.Error(request, outcome.reason)
+                                TextUiState.Error(request, outcome.primaryCause)
                             }
 
-                            // Unreachable while the only selectable mode is AUTO
-                            // (C-10 — AUTO never meters). The dismissible LimitSheet
-                            // (C-11) ships with the brains phase; until then surface
-                            // the guided error path rather than a dead end.
+                            TranslationOutcome.EmptyInput -> {
+                                TextUiState.Error(request, cause = null)
+                            }
+
+                            // A3: the old `LimitReached → generic ENGINE error`
+                            // masking dies here — the gate's answers get their own
+                            // face (and NotEntitled ≠ LimitReached). Both are
+                            // unreachable while the only selectable mode is AUTO
+                            // (C-10 — AUTO never meters); the C-11 sheet lands
+                            // with the paywall.
                             TranslationOutcome.LimitReached -> {
-                                TextUiState.Error(request, FailureReason.ENGINE)
+                                TextUiState.Limit(request)
+                            }
+
+                            TranslationOutcome.NotEntitled -> {
+                                TextUiState.Limit(request, notEntitled = true)
                             }
                         }
                 }
@@ -326,14 +342,25 @@ class TextViewModel
             )
         }
 
-        /** Rebuilds the last [TextUiState.Error] after process death, or null. */
+        /**
+         * Rebuilds the last [TextUiState.Error] after process death, or null.
+         * A cause-less error face (empty input) intentionally doesn't survive
+         * death — the user retypes anyway.
+         */
         private fun restoreError(): TextUiState.Error? {
-            val reason =
+            val cause =
                 savedStateHandle.get<String>(KEY_ERROR_REASON)?.let { name ->
-                    FailureReason.entries.firstOrNull { it.name == name }
+                    AttemptCause.entries.firstOrNull { it.name == name }
                 } ?: return null
             val request = lastRequest() ?: return null
-            return TextUiState.Error(request, reason)
+            return TextUiState.Error(request, cause)
+        }
+
+        /** Rebuilds the last [TextUiState.Limit] after process death, or null. */
+        private fun restoreLimit(): TextUiState.Limit? {
+            val notEntitled = savedStateHandle.get<Boolean>(KEY_LIMIT_NOT_ENTITLED) ?: return null
+            val request = lastRequest() ?: return null
+            return TextUiState.Limit(request, notEntitled)
         }
 
         private fun lastRequest(): TranslateRequest? {

@@ -24,5 +24,8 @@ class FakeFeatureAccess(
 
     override suspend fun awaitResolved(): Entitlement = state.first { it !is Entitlement.Loading }
 
-    override fun isEngineAllowed(mode: ModeId): Boolean = true
+    /** Matrix default: every tier sees every engine. Hook for the NotEntitled contract test. */
+    var engineAllowed: Boolean = true
+
+    override fun isEngineAllowed(mode: ModeId): Boolean = engineAllowed
 }

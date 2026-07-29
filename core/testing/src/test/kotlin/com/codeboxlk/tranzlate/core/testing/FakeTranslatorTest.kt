@@ -1,7 +1,8 @@
 package com.codeboxlk.tranzlate.core.testing
 
+import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
-import com.codeboxlk.tranzlate.core.model.FailureReason
+import com.codeboxlk.tranzlate.core.model.EngineAttempt
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.google.common.truth.Truth.assertThat
@@ -49,7 +50,9 @@ class FakeTranslatorTest {
         runTest {
             val outcome = translator.translate("Good morning", "auto", "fr", ModeId.AUTO)
 
-            assertThat((outcome as TranslationOutcome.Success).text).isEqualTo("Bonjour (fake)")
+            val success = outcome as TranslationOutcome.Success
+            assertThat(success.text).isEqualTo("Bonjour (fake)")
+            assertThat(success.detectedSource).isEqualTo("en") // rev.2: detect is typed
         }
 
     @Test
@@ -57,24 +60,32 @@ class FakeTranslatorTest {
         runTest {
             val outcome = translator.translate("நன்றி", "ta", "en", ModeId.ML2_MINI)
 
-            assertThat(outcome).isEqualTo(TranslationOutcome.Error(FailureReason.UNSUPPORTED_PAIR))
+            assertThat(outcome).isEqualTo(
+                TranslationOutcome.Error(
+                    listOf(EngineAttempt(Engine.OFFLINE_MLKIT, AttemptCause.UNSUPPORTED_PAIR)),
+                ),
+            )
         }
 
     @Test
-    fun `G9 blank input is EMPTY_INPUT for any engine`() =
+    fun `G9 blank input is the typed EmptyInput outcome for any engine`() =
         runTest {
             val outcome = translator.translate("", "en", "fr", ModeId.ML2_MINI)
 
-            assertThat(outcome).isEqualTo(TranslationOutcome.Error(FailureReason.EMPTY_INPUT))
+            assertThat(outcome).isEqualTo(TranslationOutcome.EmptyInput) // rev.2: not an attempt
         }
 
     @Test
-    fun `G10 forcedFailure NETWORK overrides golden lookup and can recover`() =
+    fun `G10 forcedFailure OFFLINE overrides golden lookup and can recover`() =
         runTest {
-            translator.forcedFailure = FailureReason.NETWORK
+            translator.forcedFailure = AttemptCause.OFFLINE
 
             val failed = translator.translate("Offline test", "en", "fr", ModeId.ML2_ONLINE)
-            assertThat(failed).isEqualTo(TranslationOutcome.Error(FailureReason.NETWORK))
+            assertThat(failed).isEqualTo(
+                TranslationOutcome.Error(
+                    listOf(EngineAttempt(Engine.ONLINE_GOOGLE, AttemptCause.OFFLINE)),
+                ),
+            ) // the trace names the engine that would have run
 
             translator.forcedFailure = null // network back → retry replays (contract §1.8)
             val retried = translator.translate("Good morning", "en", "fr", ModeId.ML2_MINI)

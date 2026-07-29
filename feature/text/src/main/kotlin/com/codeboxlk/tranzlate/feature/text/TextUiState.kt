@@ -1,7 +1,7 @@
 package com.codeboxlk.tranzlate.feature.text
 
+import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
-import com.codeboxlk.tranzlate.core.model.FailureReason
 import com.codeboxlk.tranzlate.core.model.ModeId
 
 /** Which composer chip opened the language picker sheet. */
@@ -49,8 +49,19 @@ sealed interface TextUiState {
         val engine: Engine,
     ) : TextUiState
 
+    /** @property cause deepest attempt's cause; null = non-engine failure (empty input) → generic copy. */
     data class Error(
         val request: TranslateRequest,
-        val reason: FailureReason,
+        val cause: AttemptCause?,
+    ) : TextUiState
+
+    /**
+     * The metered gate said no (issue #53 A3): quota exhausted, or — with
+     * [notEntitled] — access denial. Distinct from [Error]: nothing failed,
+     * so it renders as guidance, not an error card. C-11 sheet lands with paywall.
+     */
+    data class Limit(
+        val request: TranslateRequest,
+        val notEntitled: Boolean = false,
     ) : TextUiState
 }

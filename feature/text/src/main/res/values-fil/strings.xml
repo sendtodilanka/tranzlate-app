@@ -12,4 +12,7 @@
          content backlog: text_lang_detect, text_lang_all_header,
          cd_text_lang_search, text_guided_lang_search. Left untranslated on
          purpose — a guessed translation is worse than the en fallback. -->
+    <string name="text_error_offline">Wala kang internet. Kumonekta sa internet at subukang muli.</string>
+    <string name="text_error_limit_reached">Nagamit mo na ang libreng AI translations ngayong araw. Magre-reset ito sa hatinggabi.</string>
+    <string name="text_error_not_entitled">Kailangan ng Pro subscription ang ganitong kalidad ng pagsasalin.</string>
 </resources>
