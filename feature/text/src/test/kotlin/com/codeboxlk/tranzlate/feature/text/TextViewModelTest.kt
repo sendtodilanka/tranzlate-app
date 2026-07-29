@@ -94,12 +94,14 @@ class TextViewModelTest {
         prefs: FakeTranslatePrefsRepository = FakeTranslatePrefsRepository(),
         clock: FakeClock = FakeClock(),
         handle: SavedStateHandle = SavedStateHandle(),
+        usage: FakeUsagePolicy = FakeUsagePolicy(left = 5),
+        access: FakeFeatureAccess = FakeFeatureAccess(),
     ): TextViewModel {
         val useCase =
             TranslateTextUseCase(
                 translator,
-                FakeFeatureAccess(),
-                FakeUsagePolicy(left = 5),
+                access,
+                usage,
                 RecordingAdsCoordinator(),
                 FakeTranslationRepository(),
                 clock,
@@ -115,6 +117,56 @@ class TextViewModelTest {
     }
 
     private fun settle() = dispatcher.scheduler.advanceUntilIdle()
+
+    // ---- issue #53 A3: the gate's answers get their own face -----------------
+
+    @Test
+    fun `at-limit metered ask lands on the Limit face - not a generic error`() {
+        val prefs = FakeTranslatePrefsRepository().apply { mode.value = ModeId.NLP35 }
+        val vm = viewModel(prefs = prefs, usage = FakeUsagePolicy(left = 0))
+        settle()
+        vm.onInputChange("Quota text")
+
+        vm.onTranslate()
+        settle()
+
+        val state = vm.uiState.value
+        assertThat(state).isInstanceOf(TextUiState.Limit::class.java)
+        assertThat((state as TextUiState.Limit).notEntitled).isFalse()
+    }
+
+    @Test
+    fun `denied engine lands on the not-entitled Limit face`() {
+        val prefs = FakeTranslatePrefsRepository().apply { mode.value = ModeId.NLP35 }
+        val access = FakeFeatureAccess().apply { engineAllowed = false }
+        val vm = viewModel(prefs = prefs, access = access)
+        settle()
+        vm.onInputChange("Good morning")
+
+        vm.onTranslate()
+        settle()
+
+        val state = vm.uiState.value
+        assertThat(state).isInstanceOf(TextUiState.Limit::class.java)
+        assertThat((state as TextUiState.Limit).notEntitled).isTrue()
+    }
+
+    @Test
+    fun `Limit face survives process death like every other face`() {
+        val handle = SavedStateHandle()
+        val prefs = FakeTranslatePrefsRepository().apply { mode.value = ModeId.NLP35 }
+        val first = viewModel(prefs = prefs, handle = handle, usage = FakeUsagePolicy(left = 0))
+        settle()
+        first.onInputChange("Quota text")
+        first.onTranslate()
+        settle()
+        assertThat(first.uiState.value).isInstanceOf(TextUiState.Limit::class.java)
+
+        val second = viewModel(handle = handle) // fresh VM, same saved state
+        settle()
+
+        assertThat(second.uiState.value).isInstanceOf(TextUiState.Limit::class.java)
+    }
 
     // ---- Blank input (G9 / contract §1.9 adapted to amended C-2) -------------
 

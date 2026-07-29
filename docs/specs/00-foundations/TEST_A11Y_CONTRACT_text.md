@@ -61,14 +61,14 @@ class FakeTranslator(
     var forcedFailure: AttemptCause? = null,    // test can force OFFLINE/ENGINE_ERROR
 ) : Translator {
 
-    data class GoldenKey(val text: String, val src: String, val tgt: String, val engine: Engine)
+    data class GoldenKey(val text: String, val src: String, val tgt: String, val mode: ModeId)
 
-    val calls = mutableListOf<GoldenKey>()      // spy: assert engine actually invoked
+    val calls = mutableListOf<GoldenKey>()      // spy: assert mode actually invoked
 
-    override suspend fun translate(text, src, tgt, engine): TranslationOutcome {
-        val key = GoldenKey(text.trim(), src, tgt, engine)
+    override suspend fun translate(text, src, tgt, mode): TranslationOutcome {
+        val key = GoldenKey(text.trim(), src, tgt, mode)
         calls += key
-        forcedFailure?.let { return TranslationOutcome.Error(it) }
+        forcedFailure?.let { return TranslationOutcome.Error(listOf(EngineAttempt(engineFor(mode), it))) }
         if (text.isBlank()) return TranslationOutcome.EmptyInput
         return golden[key] ?: TranslationOutcome.Error(listOf(EngineAttempt(engineFor(mode), UNSUPPORTED_PAIR)))
     }
