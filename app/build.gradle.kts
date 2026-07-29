@@ -37,6 +37,7 @@ android {
             manifestPlaceholders["admobAppId"] = admobAppId
             buildConfigField("String", "ADMOB_APP_ID", "\"$admobAppId\"")
             buildConfigField("String", "QONVERSION_KEY", "\"\"")
+            buildConfigField("String", "GCT_API_KEY", "\"\"")
             buildConfigField("String", "AD_UNIT_BANNER", "\"\"")
             buildConfigField("String", "AD_UNIT_INTERSTITIAL", "\"\"")
             buildConfigField("String", "DEFAULT_SOURCE_LANG", "\"en\"")
@@ -78,6 +79,7 @@ dependencies {
     // Engine dimension (plan §6): prod brains vs the fake binding module.
     // Classpath-absence guarantee — fake APKs carry no brain/:lib:* classes at all.
     "prodImplementation"(projects.core.translate)
+    "prodImplementation"(libs.okhttp)
     "prodImplementation"(projects.core.access)
     "prodImplementation"(projects.core.usage)
     "prodImplementation"(projects.core.ads)

@@ -37,6 +37,12 @@ class RealUsagePolicyTest {
         override fun textLimitFree(): Int = 500
 
         override fun textLimitPro(): Int = 5000
+
+        override fun gotEnabled(): Boolean = true
+
+        override fun gotTimeoutMs(): Long = 10_000L
+
+        override fun gctTimeoutMs(): Long = 15_000L
     }
 
     @Test

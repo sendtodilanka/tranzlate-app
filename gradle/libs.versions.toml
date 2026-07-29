@@ -18,7 +18,9 @@ coreSplashscreen = "1.0.1"
 navigation3 = "1.1.4"
 coroutines = "1.11.0"
 kotlinxSerialization = "1.11.0"
-mlkitTranslate = "17.0.3" # catalog-pin only (plan §1) — not yet a dependency; engines land in phase 2
+mlkitTranslate = "17.0.3"
+mlkitLanguageId = "17.0.6"
+okhttp = "4.12.0"
 desugarJdkLibs = "2.1.5"
 coreKtx = "1.19.0"
 junit = "4.13.2"
@@ -88,6 +90,8 @@ androidx-work-runtime = { group = "androidx.work", name = "work-runtime-ktx", ve
 
 # MLKit (catalog-pin only — phase 2)
 mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
+mlkit-language-id = { group = "com.google.mlkit", name = "language-id", version.ref = "mlkitLanguageId" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 
 # Desugaring
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }

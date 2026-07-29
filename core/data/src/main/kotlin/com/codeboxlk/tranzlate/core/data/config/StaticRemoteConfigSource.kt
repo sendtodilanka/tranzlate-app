@@ -29,4 +29,10 @@ class StaticRemoteConfigSource
         override fun textLimitFree(): Int = RemoteConfigDefaults.TEXT_LIMIT_FREE
 
         override fun textLimitPro(): Int = RemoteConfigDefaults.TEXT_LIMIT_PRO
+
+        override fun gotEnabled(): Boolean = RemoteConfigDefaults.GOT_ENABLED
+
+        override fun gotTimeoutMs(): Long = RemoteConfigDefaults.GOT_TIMEOUT_MS
+
+        override fun gctTimeoutMs(): Long = RemoteConfigDefaults.GCT_TIMEOUT_MS
     }
