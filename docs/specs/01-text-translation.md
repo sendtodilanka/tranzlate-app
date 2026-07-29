@@ -36,8 +36,8 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 | US-2 | change language | Given a result exists, when I change target via picker, then it **auto re-translates** (D-1) using cache if hit (no meter charge). |
 | US-3 | auto-detect | Given source=Auto, then result header shows `language_detected` ("%1$s (Detected)") with the resolved id stored (never "auto"). |
 | US-4 | swap | Given source≠Auto, when I tap ⇄, then langs swap **and** input↔result text swap + re-translate. Given source=Auto, ⇄ is disabled with `swap_disabled_auto` reason. |
-| US-5 | pick mode | Given the mode chip, when I open+select, then it persists (`prefs.text_mode`) and applies next translate; metered status visible per US-6. |
-| US-6 | see limits first | Given Advanced AI + free/plus, then a live "{used}/{limit} today" counter (D-2) + Premium chip is visible **before** translating; Premium hides it. |
+| US-5 | ~~pick mode~~ | **Withdrawn (C-10 rev.2, issue #50):** there is no mode UI — the waterfall decides; `prefs.text_mode` stays AUTO. |
+| US-6 | see limits first | **Re-scoped (D-2 rev.2, issue #50):** the FREE AI pool meter ("AI translations: {left}/5 today") shows alongside AI-quality results (BUSINESS_MODEL.md §5); hidden on PRO. No mode chip exists. |
 | US-7 | act on result | Copy / TTS(play↔stop) / Reverse / ⭐Save / Add-to-Collection each execute with feedback (see §3 for Reverse vs Swap). |
 | US-8 | recover from failure | Given engine failure, then inline error (`home_result_error_view_title`) + Retry; never a dead end or full-screen dialog. |
 | US-9 | offline | Given offline + AUTO, uses offline engine if model present, else `offline_model_missing` guidance with a Download action. |
@@ -74,8 +74,8 @@ Behave like the **Google Translate Android app** text tab, then layer Tranzlate 
 |---------|--------------------------|---------|-----------|
 | Source/Target chip | `AssistChip`, ≥48dp | `lang_source`/`lang_target` | opens Language picker (separate spec) |
 | Swap | `IconButton` | `btn_swap` | **Swap** = exchange the two languages (US-4). Disabled on Auto source. |
-| Mode chip | `AssistChip`+menu | `chip_mode` | real ripple/role (fixes badge-disguise bug) |
-| Counter | `Badge`/supporting text | `text_counter` | `usage_counter` string, hidden Premium |
+| ~~Mode chip~~ | — | — | **Withdrawn — C-10 rev.2 (issue #50): no engine picker, permanently** |
+| Counter | `Badge`/supporting text | `text_counter` | C-6 metered counter, hidden on PRO (D-2 rev.2) |
 | Input | `OutlinedTextField` multiline | `input_text` | ✕ trailing = clear; IME action = translate in every mode (mirrors `tt_text_translate_btn`, C-2) |
 | Char counter | supporting text | `text_charcount` | **"0 / 500"** (C-5, spaced since PR #43); inline `text_over_char_limit` at limit (rewritten copy, no "Translate Pro") |
 | Result text | selectable `Text`, font-scalable | `text_result` | tap → fullscreen reader |

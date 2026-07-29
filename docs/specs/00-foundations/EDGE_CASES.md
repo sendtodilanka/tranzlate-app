@@ -42,7 +42,7 @@ sealed interface Availability {
 | offline | offline | **no (online-only)** | — | — | 🚫 Blocked · "this language needs internet" → **[Go online] / [Pick another]** |
 | **offline** | **online (GOT/GCT)** | — | — | — | 🚫 Blocked · "you're offline" → **[Go online]** or **[Switch to a downloaded language]** |
 | online | any | — | — | — | ✅ **Ready** |
-| online | GCT (metered) | — | — | **at limit** (Free/Plus) | 🚫 Blocked · "daily limit reached" → **[Upgrade] / [Switch to free mode]** |
+| online | GCT tail (quota-gated) | — | — | **at limit** (FREE) | 🚫 GCT tail skipped · free engines already ran automatically (C-10 rev.2 — no mode to switch) → C-11 sheet · **[Upgrade]** |
 | — | metered | — | — | entitlement **Loading** | ⏳ wait (resolve first, don't block/allow on stale) |
 
 > The user's exact case: **offline + online-only language selected → translate disabled, clear reason + action.** ✅ · **offline + already-downloaded → Ready.** ✅

@@ -60,6 +60,6 @@ Indices: `(source_text, source_lang, target_lang, engine)` for cache lookup; `fa
 | ML2_MINI | `OFFLINE_MLKIT` |
 | ML2_ONLINE | `ONLINE_GOOGLE` |
 | NLP35 | `ONLINE_CLOUD_NLP` |
-| AUTO | resolves among **free** engines only → `OFFLINE_MLKIT` or `ONLINE_GOOGLE` (never `ONLINE_CLOUD_NLP` — C-10) |
+| AUTO | resolves through the whole waterfall → `OFFLINE_MLKIT` → `ONLINE_GOOGLE` → `ONLINE_CLOUD_NLP`, where the paid tail is **quota-gated** by the FREE 5/day pool (unlimited on PRO) — C-10 rev.2, issue #50 |
 
 **Cache (C-8):** `Translation.source_text` is **stored normalized** = `trim + collapse internal whitespace, case-preserved`. Lookup = index `(source_text, source_lang, target_lang, engine)` on that normalized value. **No sha, no separate cache_key column.**

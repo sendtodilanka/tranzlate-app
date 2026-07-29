@@ -47,7 +47,7 @@ Issue [#17](https://github.com/sendtodilanka/tranzlate-app/issues/17) · plan [`
 | # | තත්ත්වය | මූ | මොකක්ද | තැන |
 |---|---|---|---|---|
 | B7 | | 🔍 | **Dead code**: `DrawerContent.kt` · `DrawerViewModel.kt` · `TopLevelDestination.kt` තව `:app` එකේ තියෙනවා, ඒත් `TranzlateApp.kt` එකෙන් **reference වෙන්නේ නෑ** (ඉතුරු වෙලා තියෙන්නේ stale comment එකක් විතරයි). ඒවත් එක්කම orphan strings: `nav_home`/`nav_chat`/`nav_camera` · `drawer_*` · `app_guided_search` | `:app` navigation package + `values/strings.xml` |
-| B8 | | 🔍 | **Entry point නැති destinations**: History · Saved · Help · About · Recents · account/tier row — drawer එක යද්දී ඒවට දොරක් නෑ. **Mode chip (engine picker) එකටත් දොරක් නෑ** — C-2/D-2/US-6 ඔක්කොම ඒක පේනවා කියලා උපකල්පනය කරනවා. Bar/drawer එකක් ආපහු දාලා විසඳන්න **එපා** — අලුත් decision record එකක් ඕන | UI_SPEC §4 |
+| B8 | | 🔍 | **Entry point නැති destinations**: History · Saved · Help · About · Recents · account/tier row — drawer එක යද්දී ඒවට දොරක් නෑ. ~~Mode chip (engine picker) එකටත් දොරක් නෑ~~ — **විසඳුණා (C-10 rev.2, issue #50): picker එකක් කවදාවත් නෑ, waterfall එක තීරණය කරනවා.** අනිත් destinations වලට bar/drawer එකක් ආපහු දාලා විසඳන්න **එපා** — අලුත් decision record එකක් ඕන | UI_SPEC §4 |
 | B9 | | 🔍 | **Medium/Expanded design නෑ** — rev.3 phone-first; හැම width එකකම එකම stack එක render වෙනවා. C-13 එකේ nav column එක on-hold, `material3-adaptive-navigation-suite` dependency එක දැන් unused | DECISIONS D-5 rev.3 open item |
 
 | # | තත්ත්වය | මූ | මොකක්ද | තැන |

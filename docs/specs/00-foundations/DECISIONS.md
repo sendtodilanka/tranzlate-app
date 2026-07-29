@@ -21,7 +21,7 @@ The whole app's **behaviour must equal the Google Translate Android app.** GT is
 | Offline | download language packs; full offline use |
 | Saved / History | starred "Saved" + history list |
 
-**Layering rule:** Tranzlate-specific additions — the 4 selectable engines (AUTO/Offline/Standard/Advanced-AI), subscription tiers, ads — **layer on top of** GT-equivalent core UX and must **not** break it.
+**Layering rule:** Tranzlate-specific additions — the engine waterfall (invisible to the user — C-10 rev.2), subscription tiers (FREE/PRO — D-2 rev.2), ads — **layer on top of** GT-equivalent core UX and must **not** break it.
 
 **✅ Tension RESOLVED (owner decision 2026-07-22, issue #9):** GT translates **live as you type** for its (free, unlimited) engine; Tranzlate's **Advanced AI (NLP3.5) is metered** (D-2), so per-keystroke translation would burn quota. The earlier split rule (live-translate for free engines, debounce/affordance for metered) is **superseded**. Resolution: **every engine — free and metered — uses an explicit Translate action (`tt_text_translate_btn`); the result opens on its own screen** (a Compose transition makes it feel continuous). This is an **intentional, owner-approved deviation from GT's live-typing**, for three reasons: (1) **one predictable action across all engines** — no mode-dependent behaviour switch; (2) a **large, comfortable editor** — the input screen is for composing, the result screen for reading; (3) **zero per-keystroke quota risk** — one quota unit = one intentional translation, by construction. See C-2 for the binding convention.
 
