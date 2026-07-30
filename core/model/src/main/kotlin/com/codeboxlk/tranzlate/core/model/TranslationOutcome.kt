@@ -16,6 +16,21 @@ enum class AttemptCause {
     SKIPPED_SOURCE_UNKNOWN,
 }
 
+/** A `SKIPPED_*` cause is a non-attempt — the waterfall never called the engine. */
+val AttemptCause.isSkip: Boolean
+    get() =
+        when (this) {
+            AttemptCause.SKIPPED_NO_QUOTA, AttemptCause.SKIPPED_SOURCE_UNKNOWN -> true
+
+            // exhaustive `when` forces review when a cause is added
+            AttemptCause.MODEL_NOT_DOWNLOADED,
+            AttemptCause.OFFLINE,
+            AttemptCause.TIMEOUT,
+            AttemptCause.UNSUPPORTED_PAIR,
+            AttemptCause.ENGINE_ERROR,
+            -> false
+        }
+
 /** One engine's failed or skipped try — the error dialog's raw material (A3). */
 data class EngineAttempt(
     val engine: Engine,
@@ -56,8 +71,16 @@ sealed interface TranslationOutcome {
             require(attempts.isNotEmpty()) { "an Error must carry at least one attempt" }
         }
 
-        /** The last (deepest) attempt's cause — what single-line UI surfaces. */
-        val primaryCause: AttemptCause get() = attempts.last().cause
+        /**
+         * The deepest attempt the waterfall ACTUALLY ran — the last non-skip
+         * cause, so a `SKIPPED_*` tail (e.g. a quota-gated GCT that was never
+         * called) never masks the real failure the single-line UI must act on
+         * (issue #94, debate-ruled). Falls back to the last entry only when
+         * every attempt was skipped (AUTO-undetected + kill-switched GOT +
+         * no quota).
+         */
+        val primaryCause: AttemptCause
+            get() = attempts.lastOrNull { !it.cause.isSkip }?.cause ?: attempts.last().cause
     }
 
     /** Blank/whitespace ask — input validation, never an engine attempt (G9). */
