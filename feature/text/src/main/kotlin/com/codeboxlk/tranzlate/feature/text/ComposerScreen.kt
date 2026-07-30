@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -285,10 +286,23 @@ internal fun ComposerPaneContent(
         // No isImeVisible read: in the 412dp-tall landscape the row must go whenever
         // the user is composing anyway, and the per-frame inset invalidation it
         // caused is the prime suspect for the field's draw failure (issue #56).
-        val hideTopRow = layout.splitResultOnly && isEditing
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        val imeVisible = WindowInsets.isImeVisible
+        // Issue #86 (owner): the row hides ONLY while the keyboard owns the
+        // height — dismissing the IME must bring back the ONLY back affordance.
+        val hideTopRow = layout.splitResultOnly && isEditing && imeVisible
+        // Issue #86: on MEDIUM portrait the top row joins the card's centred cap.
+        val topRowCap =
+            if (layout.mediumWidth && !layout.expandedWidth) {
+                Modifier
+                    .widthIn(max = Dimensions.contentMaxWidthMedium)
+                    .align(Alignment.CenterHorizontally)
+            } else {
+                Modifier
+            }
         Box(
             modifier =
-                Modifier
+                topRowCap
                     .clipToBounds()
                     .then(
                         if (hideTopRow) {
@@ -481,7 +495,14 @@ internal fun ComposerPaneContent(
                         .padding(
                             start = spacing.md16,
                             end = spacing.md16,
-                            top = spacing.lg24,
+                            // Issue #86: with the IME up in the short landscape
+                            // shape every dp belongs to the field.
+                            top =
+                                if (layout.splitResultOnly && isEditing && imeVisible) {
+                                    spacing.sm8
+                                } else {
+                                    spacing.lg24
+                                },
                             bottom = spacing.md16,
                         ),
             ) {
@@ -511,6 +532,7 @@ internal fun ComposerPaneContent(
                             }
                         },
                         compactLandscape = layout.splitResultOnly,
+                        minimalIme = layout.splitResultOnly && imeVisible,
                         label = languageLabel(sourceLangId),
                         onClear = {
                             onClearAll()
@@ -592,6 +614,45 @@ internal fun ComposerTopRow(
     }
 }
 
+/** THE input field — one definition for every edit-face arrangement (issue #86). */
+@Composable
+private fun ComposerField(
+    input: String,
+    hasText: Boolean,
+    focusRequester: FocusRequester,
+    onInputChange: (String) -> Unit,
+    onTranslate: () -> Unit,
+    inputDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    BasicTextField(
+        value = input,
+        onValueChange = onInputChange,
+        textStyle =
+            MaterialTheme.typography.headlineSmall.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+            ),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+        keyboardActions = KeyboardActions(onSend = { if (hasText) onTranslate() }),
+        modifier =
+            modifier
+                .focusRequester(focusRequester)
+                .semantics { contentDescription = inputDescription }
+                .testTag("tt_text_input"),
+        decorationBox = { inner ->
+            if (input.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.text_input_placeholder),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            inner()
+        },
+    )
+}
+
 /** Edit face: field → Paste chip (empty only) → counter + mic/Translate. */
 @Composable
 private fun ColumnScope.ComposerEditBody(
@@ -607,6 +668,10 @@ private fun ColumnScope.ComposerEditBody(
     // counter, clear and the action into ONE top row so the field keeps the
     // rest.
     compactLandscape: Boolean = false,
+    // Issue #86 (owner): with the IME up in the short landscape shape there was
+    // ~0dp to type in — this mode is field + action ONLY; the chrome returns
+    // the moment the keyboard drops.
+    minimalIme: Boolean = false,
     label: String = "",
     onClear: () -> Unit = {},
 ) {
@@ -620,6 +685,26 @@ private fun ColumnScope.ComposerEditBody(
         } else {
             stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT)
         }
+
+    if (minimalIme) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f),
+        ) {
+            ComposerField(
+                input = input,
+                hasText = hasText,
+                focusRequester = focusRequester,
+                onInputChange = onInputChange,
+                onTranslate = onTranslate,
+                inputDescription = inputDescription,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
+            Spacer(Modifier.width(spacing.sm8))
+            EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
+        }
+        return
+    }
 
     if (compactLandscape) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -664,34 +749,18 @@ private fun ColumnScope.ComposerEditBody(
             EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
         }
     }
-    BasicTextField(
-        value = input,
-        onValueChange = onInputChange,
-        textStyle =
-            MaterialTheme.typography.headlineSmall.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-            ),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-        keyboardActions = KeyboardActions(onSend = { if (hasText) onTranslate() }),
+    ComposerField(
+        input = input,
+        hasText = hasText,
+        focusRequester = focusRequester,
+        onInputChange = onInputChange,
+        onTranslate = onTranslate,
+        inputDescription = inputDescription,
         modifier =
             Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(top = spacing.sm8)
-                .focusRequester(focusRequester)
-                .semantics { contentDescription = inputDescription }
-                .testTag("tt_text_input"),
-        decorationBox = { inner ->
-            if (input.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.text_input_placeholder),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            inner()
-        },
+                .padding(top = spacing.sm8),
     )
     if (input.isEmpty()) {
         TextButton(onClick = onPaste, modifier = Modifier.testTag("tt_composer_paste")) {
