@@ -142,19 +142,27 @@ class RealOfflineModelManager internal constructor(
         // ownership AND its coroutine before we touch the model.
         activeDownloads.remove(languageTag)?.cancel()
         setTransient(languageTag, OfflineModelState.Deleting)
-        try {
-            store.delete(languageTag)
-        } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
-            throw rethrown
-        } catch (
-            @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
-        ) {
-            // Deleting something absent (or a cancelled download's partial
-            // state) is success by outcome — the refresh below tells truth.
-        } finally {
-            refreshDownloaded()
-            clearTransient(languageTag)
-        }
+        // PR-83 lens OPEN-1: the delete itself must ALSO outlive the caller —
+        // a nav-away mid-delete cancelled the caller-scoped coroutine before
+        // the finally could clear, stranding a dead-end Deleting spinner in
+        // the singleton forever. Same medicine as download(): manager scope,
+        // and the sync clear runs BEFORE any suspending refresh.
+        downloadScope
+            .launch {
+                try {
+                    store.delete(languageTag)
+                } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                    throw rethrown
+                } catch (
+                    @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
+                ) {
+                    // Deleting something absent (or a cancelled download's partial
+                    // state) is success by outcome — the refresh below tells truth.
+                } finally {
+                    clearTransient(languageTag)
+                    refreshDownloaded()
+                }
+            }.join()
     }
 
     private fun owns(

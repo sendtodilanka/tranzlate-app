@@ -80,6 +80,51 @@ class RealOfflineModelManagerTest {
         }
 
     @Test
+    fun `a caller's death mid-delete never strands the Deleting spinner`() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val store =
+                object : ModelStore by FakeStore() {
+                    override suspend fun downloadedTags(): Set<String> = setOf("fr")
+
+                    override suspend fun delete(tag: String) {
+                        gate.await() // park the delete so the caller can die mid-flight
+                    }
+
+                    override fun capableTags(): Set<String> = setOf("fr")
+                }
+            val manager = RealOfflineModelManager(store, backgroundScope)
+
+            val screen = launch { manager.delete("fr") }
+            runCurrent()
+            screen.cancel() // nav-away mid-delete (PR-83 lens OPEN-1)
+            runCurrent()
+            gate.complete(Unit)
+            runCurrent()
+
+            // Never a dead-end spinner: the manager-scoped finally cleared it.
+            assertThat(manager.modelStates().first()["fr"])
+                .isNotEqualTo(OfflineModelState.Deleting)
+        }
+
+    @Test
+    fun `a second download tap while one is in flight is a no-op`() =
+        runTest {
+            val store = FakeStore()
+            val manager = RealOfflineModelManager(store, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+            manager.download("fr") // double tap — the guard's no-suspension window
+            runCurrent()
+            store.downloadGate.complete(Unit)
+            runCurrent()
+
+            assertThat(store.committed).containsExactly("fr") // one store call chain
+            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloaded)
+        }
+
+    @Test
     fun `a completed download publishes Downloaded through its own ownership`() =
         runTest {
             val store = FakeStore()
