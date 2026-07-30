@@ -4,6 +4,7 @@ import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.common.DefaultDispatcherProvider
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
+import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
@@ -13,6 +14,7 @@ import com.codeboxlk.tranzlate.core.testing.FakeUsagePolicy
 import com.codeboxlk.tranzlate.di.TranslateModule
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
+import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
 import dagger.Module
@@ -66,4 +68,15 @@ object FakeTranslateModule {
     @Provides
     @Singleton
     fun connectivity(): ConnectivityMonitor = FakeConnectivityMonitor()
+
+    @Provides
+    @Singleton
+    fun offlineModelManager(): OfflineModelManager =
+        object : OfflineModelManager {
+            override fun modelStates() = kotlinx.coroutines.flow.flowOf(emptyMap<String, OfflineModelState>())
+
+            override suspend fun download(languageTag: String) = Unit
+
+            override suspend fun delete(languageTag: String) = Unit
+        }
 }

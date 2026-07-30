@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="feature_languagepicker_placeholder">Tagapili ng wika</string>
+    <string name="offline_title">Offline na pagsasalin</string>
+    <string name="offline_subtitle">Mag-download ng mga wika para magsalin nang walang internet (~30MB bawat isa)</string>
+    <string name="offline_loading">Nilo-load ang mga wika…</string>
+    <string name="offline_state_available">Puwedeng i-download</string>
+    <string name="offline_state_downloading">Dina-download… maaaring tumagal nang isang minuto</string>
+    <string name="offline_state_downloaded">Na-download na</string>
+    <string name="offline_state_deleting">Inaalis…</string>
+    <string name="offline_state_failed">Nabigo ang download — i-tap para subukang muli</string>
+    <string name="offline_cd_back">Bumalik</string>
+    <string name="offline_cd_download">I-download ang %1$s</string>
+    <string name="offline_cd_stop">Itigil ang pag-download ng %1$s</string>
+    <string name="offline_cd_delete">Burahin ang %1$s</string>
+    <string name="offline_cd_retry">Subukang i-download muli ang %1$s</string>
 </resources>

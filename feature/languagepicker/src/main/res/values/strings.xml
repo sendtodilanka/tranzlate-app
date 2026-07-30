@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Scaffold placeholder strings. Real keys arrive from STRINGS_*.md (C-3 authority).
-     TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR queued before ship. -->
 <resources>
-    <string name="feature_languagepicker_placeholder">Language picker</string>
+    <string name="offline_title">Offline translation</string>
+    <string name="offline_subtitle">Download languages to translate without internet (~30MB each)</string>
+    <string name="offline_loading">Loading languages…</string>
+    <string name="offline_state_available">Available to download</string>
+    <string name="offline_state_downloading">Downloading… this can take a minute</string>
+    <string name="offline_state_downloaded">Downloaded</string>
+    <string name="offline_state_deleting">Removing…</string>
+    <string name="offline_state_failed">Download failed — tap to retry</string>
+    <string name="offline_cd_back">Back</string>
+    <string name="offline_cd_download">Download %1$s</string>
+    <string name="offline_cd_stop">Stop downloading %1$s</string>
+    <string name="offline_cd_delete">Delete %1$s</string>
+    <string name="offline_cd_retry">Retry downloading %1$s</string>
 </resources>
