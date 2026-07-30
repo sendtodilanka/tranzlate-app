@@ -11,10 +11,10 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Shell smoke (D-5 rev.3 — Claude Design "Offline Translator M3"): Home is the
- * card stack, there is **no bottom bar and no drawer**, and every destination is
- * reached from the top bar or the cards/rows. Runs against the §1.6
- * FakeTranslateModule (no real engine on any test path).
+ * Shell smoke (D-5 rev.3 + issue #74): Home is the card stack with NO bottom
+ * bar; the app DRAWER exists behind Home's menu button (closed by default,
+ * opens on tap). Runs against the §1.6 FakeTranslateModule (no real engine on
+ * any test path).
  *
  * Note: the whole androidTest suite currently fails on API 35+ emulators —
  * Espresso's `onIdle` calls the removed `InputManager.getInstance` (issue #40).
@@ -42,11 +42,14 @@ class NavShellSmokeTest {
     }
 
     @Test
-    fun home_hasNoBottomBarAndNoDrawer() {
-        // The design reaches everything from the cards/rows; a regression that
-        // reintroduces either would break the approved layout.
+    fun home_hasNoBottomBarAndDrawerStartsClosed() {
         compose.onNodeWithTag("tt_app_nav_home").assertDoesNotExist()
+        // PR-75 lens O2: the old "no drawer" assertion passed only because a
+        // CLOSED ModalDrawerSheet is unplaced — assert the real contract instead:
+        // closed by default, OPENS from Home's menu button.
         compose.onNodeWithTag("tt_app_drawer").assertDoesNotExist()
+        compose.onNodeWithTag("tt_home_menu").performClick()
+        compose.onNodeWithTag("tt_app_drawer").assertIsDisplayed()
     }
 
     @Test

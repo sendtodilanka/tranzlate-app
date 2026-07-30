@@ -61,6 +61,10 @@ fun TranzlateApp(
     // close the sheet first so the nav transition isn't hidden behind it.
     ModalNavigationDrawer(
         drawerState = drawerState,
+        // Home-only (PR-75 lens O1): an edge-swipe on a pushed screen would be a
+        // third way out of 5a that skips onComposerDismissed (Requirement D) and
+        // could stack a duplicate Composer via a Recents pick.
+        gesturesEnabled = backStack.lastOrNull() == TextNavKey || drawerState.isOpen,
         drawerContent = {
             DrawerContent(
                 drawerState = drawerState,
