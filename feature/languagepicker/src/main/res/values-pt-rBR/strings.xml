@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="feature_languagepicker_placeholder">Seletor de idiomas</string>
+    <string name="offline_title">Tradução offline</string>
+    <string name="offline_subtitle">Baixe idiomas para traduzir sem internet (~30MB cada)</string>
+    <string name="offline_loading">Carregando idiomas…</string>
+    <string name="offline_state_available">Disponível para baixar</string>
+    <string name="offline_state_downloading">Baixando… pode levar um minuto</string>
+    <string name="offline_state_downloaded">Baixado</string>
+    <string name="offline_state_deleting">Removendo…</string>
+    <string name="offline_state_failed">Falha no download — toque para tentar de novo</string>
+    <string name="offline_cd_back">Voltar</string>
+    <string name="offline_cd_download">Baixar %1$s</string>
+    <string name="offline_cd_stop">Parar o download de %1$s</string>
+    <string name="offline_cd_delete">Excluir %1$s</string>
+    <string name="offline_cd_retry">Tentar baixar %1$s novamente</string>
 </resources>

@@ -19,6 +19,7 @@ import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.feature.camera.CameraScreen
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
+import com.codeboxlk.tranzlate.feature.languagepicker.OfflineLanguagesScreen
 import com.codeboxlk.tranzlate.feature.paywall.PaywallScreen
 import com.codeboxlk.tranzlate.feature.settings.SettingsScreen
 import com.codeboxlk.tranzlate.feature.text.COMPOSER_CARD_SHARED_KEY
@@ -27,7 +28,6 @@ import com.codeboxlk.tranzlate.feature.text.HomeScreen
 import com.codeboxlk.tranzlate.feature.text.LanguagePickerScreen
 import com.codeboxlk.tranzlate.feature.text.LanguagePickerTarget
 import com.codeboxlk.tranzlate.feature.text.TextViewModel
-import com.codeboxlk.tranzlate.feature.languagepicker.LanguagePickerScreen as OfflineLanguagesScreen
 
 /**
  * The nav mediator (D-5 rev.3 — Claude Design "Offline Translator M3"): the
@@ -175,7 +175,12 @@ private fun AppNavDisplay(
                 // Drawer "Offline languages" = the :feature:languagepicker
                 // placeholder (download/delete packs) — a different job from the
                 // text vertical's source/target picker above, hence the alias.
-                entry<LanguagesNavKey> { OfflineLanguagesScreen() }
+                entry<LanguagesNavKey> {
+                    OfflineLanguagesScreen(
+                        viewModel = hiltViewModel(),
+                        onBack = { backStack.removeLastOrNull() },
+                    )
+                }
                 entry<PaywallNavKey> {
                     PaywallScreen(
                         viewModel = hiltViewModel(),
