@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.Flow
 interface TranslationRepository {
     fun history(): Flow<List<Translation>>
 
+    /** Newest [limit] rows — the drawer's Recents (issue #76: DB-limited, not in-memory). */
+    fun recent(limit: Int): Flow<List<Translation>>
+
     fun favourites(): Flow<List<Translation>>
 
     /** C-8 cache-first lookup; [sourceText] may be un-normalized — impl normalizes. */

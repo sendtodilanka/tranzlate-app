@@ -25,6 +25,9 @@ class FakeTranslationRepository(
 
     override fun history(): Flow<List<Translation>> = store.map { it.sortedByDescending(Translation::createdAt) }
 
+    override fun recent(limit: Int): Flow<List<Translation>> =
+        store.map { it.sortedByDescending(Translation::createdAt).take(limit) }
+
     override fun favourites(): Flow<List<Translation>> =
         store.map { list -> list.filter(Translation::favourite).sortedByDescending(Translation::createdAt) }
 

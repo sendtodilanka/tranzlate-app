@@ -112,6 +112,7 @@ fun HomeScreen(
 ) {
     val sourceLang by viewModel.sourceLang.collectAsStateWithLifecycle()
     val swapAvailable by viewModel.swapAvailable.collectAsStateWithLifecycle()
+    val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val targetLang by viewModel.targetLang.collectAsStateWithLifecycle()
 
     HomeContent(
@@ -123,6 +124,7 @@ fun HomeScreen(
         onPickLanguage = onPickLanguage,
         onOpenSettings = onOpenSettings,
         onOpenPaywall = onOpenPaywall,
+        showProChip = !isPro,
         onOpenDrawer = onOpenDrawer,
         onOpenCamera = onOpenCamera,
         onOpenLanguages = onOpenLanguages,
@@ -145,6 +147,7 @@ fun HomeContent(
     onPickLanguage: (LanguagePickerTarget) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenPaywall: () -> Unit,
+    showProChip: Boolean = true,
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
@@ -204,7 +207,7 @@ fun HomeContent(
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Spacer(Modifier.weight(1f))
-                        TokenProChip(onClick = onOpenPaywall)
+                        if (showProChip) TokenProChip(onClick = onOpenPaywall)
                         IconButton(
                             onClick = onOpenSettings,
                             modifier = Modifier.testTag("tt_home_settings"),
@@ -292,7 +295,7 @@ fun HomeContent(
                         )
                     },
                     actions = {
-                        TokenProChip(onClick = onOpenPaywall)
+                        if (showProChip) TokenProChip(onClick = onOpenPaywall)
                         IconButton(
                             onClick = onOpenSettings,
                             modifier = Modifier.testTag("tt_home_settings"),

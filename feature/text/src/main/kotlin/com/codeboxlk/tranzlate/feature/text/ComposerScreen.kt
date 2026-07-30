@@ -823,6 +823,7 @@ private fun ColumnScope.ComposerReadBody(
                     )
                 },
             ) {
+                val resultAnnounce = stringResource(R.string.a11y_result_ready, uiState.translatedText)
                 Text(
                     text = uiState.translatedText,
                     style = MaterialTheme.typography.titleLarge,
@@ -830,15 +831,19 @@ private fun ColumnScope.ComposerReadBody(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            // C-4 canonical announce: the answer arrives politely.
-                            .semantics { liveRegion = LiveRegionMode.Polite }
-                            .testTag("tt_text_result"),
+                            // C-4 canonical announce, FORMATTED (issue #76): TalkBack
+                            // hears "Translation ready: …", sighted users see the text.
+                            .semantics {
+                                liveRegion = LiveRegionMode.Polite
+                                contentDescription = resultAnnounce
+                            }.testTag("tt_text_result"),
                 )
             }
             AiMeter(uiState.engine, aiMeter)
         }
 
         is TextUiState.Error -> {
+            val readErrorAnnounce = stringResource(R.string.a11y_error, errorBodyFor(uiState.cause))
             Text(
                 text = errorBodyFor(uiState.cause),
                 style = MaterialTheme.typography.bodyMedium,
@@ -846,9 +851,11 @@ private fun ColumnScope.ComposerReadBody(
                 modifier =
                     Modifier
                         .padding(top = spacing.md16)
-                        // C-4: a failure interrupts — assertive.
-                        .semantics { liveRegion = LiveRegionMode.Assertive }
-                        .testTag("tt_text_error"),
+                        // C-4: a failure interrupts — assertive, formatted.
+                        .semantics {
+                            liveRegion = LiveRegionMode.Assertive
+                            contentDescription = readErrorAnnounce
+                        }.testTag("tt_text_error"),
             )
             TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
                 Text(stringResource(R.string.button_retry))
@@ -1052,6 +1059,7 @@ private fun ResultPane(
         }
     if (plainFace != null) {
         val (body, isError) = plainFace
+        val paneErrorAnnounce = stringResource(R.string.a11y_error, body)
         val bodyColor =
             if (isError) {
                 MaterialTheme.colorScheme.error
@@ -1071,8 +1079,10 @@ private fun ResultPane(
                     color = bodyColor,
                     modifier =
                         Modifier
-                            .semantics { liveRegion = LiveRegionMode.Assertive }
-                            .testTag(if (isError) "tt_text_error" else "tt_text_limit"),
+                            .semantics {
+                                liveRegion = LiveRegionMode.Assertive
+                                if (isError) contentDescription = paneErrorAnnounce
+                            }.testTag(if (isError) "tt_text_error" else "tt_text_limit"),
                 )
                 TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
                     Text(stringResource(R.string.button_retry))
@@ -1100,6 +1110,8 @@ private fun ResultPane(
                     }
 
                     is TextUiState.Result -> {
+                        val paneResultAnnounce =
+                            stringResource(R.string.a11y_result_ready, uiState.translatedText)
                         Text(
                             text = uiState.translatedText,
                             // GT-style auto-size (owner v3): short results render
@@ -1111,8 +1123,10 @@ private fun ResultPane(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .semantics { liveRegion = LiveRegionMode.Polite }
-                                    .testTag("tt_text_result"),
+                                    .semantics {
+                                        liveRegion = LiveRegionMode.Polite
+                                        contentDescription = paneResultAnnounce
+                                    }.testTag("tt_text_result"),
                         )
                     }
 

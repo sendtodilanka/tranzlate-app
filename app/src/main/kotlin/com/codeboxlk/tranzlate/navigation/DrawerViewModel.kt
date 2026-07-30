@@ -28,7 +28,6 @@ class DrawerViewModel
     ) : ViewModel() {
         val recents: StateFlow<List<Translation>> =
             translationRepository
-                .history()
-                .map { history -> history.take(RECENTS_LIMIT) }
+                .recent(RECENTS_LIMIT)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyList())
     }
