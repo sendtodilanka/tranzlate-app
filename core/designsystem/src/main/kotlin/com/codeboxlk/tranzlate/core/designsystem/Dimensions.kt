@@ -19,10 +19,24 @@ object Dimensions {
     val borderThin: Dp = 1.dp
     val borderThick: Dp = 2.dp
 
-    /** Compact single-pane content max width, centered. */
-    val contentMaxWidth: Dp = 480.dp
+    /**
+     * M3 breakpoint margin, compact windows (<600dp) — 16dp
+     * (m3.material.io/foundations/layout/breakpoints, issue #88).
+     */
+    val screenMarginCompact: Dp = 16.dp
 
-    /** Medium-window single-column max width (issue #56 — tablet-portrait stack). */
+    /**
+     * M3 breakpoint margin, medium+ windows (600dp+) — 24dp. Single-pane
+     * screens FILL the window at this margin (owner + M3, issue #88);
+     * never re-introduce a centred max-width cap for pane content.
+     */
+    val screenMarginMedium: Dp = 24.dp
+
+    /**
+     * 5a landscape pills-cluster max width — a CONTROL cluster, not pane
+     * content (owner, issue #56: the pills must not stretch edge to edge).
+     * The one legitimate width cap left after issue #88.
+     */
     val contentMaxWidthMedium: Dp = 600.dp
 
     /** Standard top bar height (M3 small top app bar). */

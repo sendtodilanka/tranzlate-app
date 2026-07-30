@@ -419,7 +419,7 @@ Dynamic color must always fall back to this static palette so API 24–30 render
 
 **ListDetailPaneScaffold panes:** list/input pane **min 360dp**; detail/result pane **min 400dp**; default split **40 / 60** (list : detail). Below the combined min → collapse to single-pane with navigation.
 
-**Fixed dimension tokens** (`Dimensions.kt`): `touchTargetMin=48dp` · `iconSm=20dp` `iconMd=24dp` `iconLg=32dp` · `borderThin=1dp` `borderThick=2dp` · `contentMaxWidth=480dp` · `sheetPeek=56dp` · `fabSize=56dp`.
+**Fixed dimension tokens** (`Dimensions.kt`): `touchTargetMin=48dp` · `iconSm=20dp` `iconMd=24dp` `iconLg=32dp` · `borderThin=1dp` `borderThick=2dp` · `screenMarginCompact=16dp` `screenMarginMedium=24dp` (M3 breakpoint margins — issue #88: single-pane screens FILL the window at the margin; no centred max-width caps for pane content; the one surviving cap is the 5a landscape pills cluster `contentMaxWidthMedium=600dp`, a control cluster) · `sheetPeek=56dp` · `fabSize=56dp`. Screens read the margin via `adaptiveScreenMargin()` / `adaptiveMarginShim()` (`:core:ui`, C-13).
 
 ## Alpha tokens (state opacity)
 

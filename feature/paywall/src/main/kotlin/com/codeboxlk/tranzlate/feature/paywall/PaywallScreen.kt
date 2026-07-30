@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -46,9 +45,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import kotlinx.coroutines.launch
-
-/** Content column cap — phones fill, tablets centre (C-13 single-column rule). */
-private val CONTENT_MAX_WIDTH = 560.dp
 
 /** §4 visual anchoring: the Yearly card is deliberately wider than its siblings. */
 private const val YEARLY_CARD_WEIGHT = 1.4f
@@ -130,7 +126,9 @@ internal fun PaywallContent(
         Column(
             modifier =
                 Modifier
-                    .widthIn(max = CONTENT_MAX_WIDTH)
+                    // Issue #88 (owner + M3 breakpoints): fill the width — the
+                    // lg24 side padding already equals the medium margin.
+                    .fillMaxWidth()
                     .padding(horizontal = spacing.lg24),
         ) {
             // Play policy: always dismissible, and the ✕ comes first in traversal.

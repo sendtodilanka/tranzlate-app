@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -65,6 +64,8 @@ import com.codeboxlk.tranzlate.core.designsystem.LocalFloatingSurface
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateShapeFull
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
+import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
+import com.codeboxlk.tranzlate.core.ui.adaptiveScreenMargin
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 
@@ -247,10 +248,11 @@ fun HomeContent(
         return
     }
 
-    // Tablet portrait (medium width): the stack itself, centred at a readable width
-    // (C-13 single-column rule) rather than stretched edge to edge.
-    val contentMaxWidth =
-        if (layout.mediumWidth) Modifier.widthIn(max = Dimensions.contentMaxWidthMedium) else Modifier
+    // Issue #88 (owner + M3 breakpoints): single-pane screens FILL the window —
+    // the only thing that widens past compact is the margin, 16dp -> 24dp.
+    // (This path serves compact + medium portrait; expanded returned above.)
+    val screenMargin = adaptiveScreenMargin()
+    val barShim = adaptiveMarginShim()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -267,10 +269,10 @@ fun HomeContent(
                     ),
             ) {
                 TopAppBar(
-                    // Issue #86: the bar joins the SAME centred cap as the content —
-                    // a full-bleed title over a 600dp column read as broken margins
-                    // on portrait tablets/foldables (owner screenshot).
-                    modifier = contentMaxWidth.align(Alignment.CenterHorizontally),
+                    // Issue #88: the bar's own 16dp insets + this shim land the
+                    // title and actions exactly on the M3 margin (16/24dp), so
+                    // the bar and the full-width content stay one frame.
+                    modifier = Modifier.padding(horizontal = barShim),
                     title = {
                         Text(
                             text = stringResource(R.string.home_title),
@@ -300,11 +302,11 @@ fun HomeContent(
                     onSwap = swapAction,
                     swapEnabled = swapAvailable,
                     modifier =
-                        contentMaxWidth
-                            .align(Alignment.CenterHorizontally)
+                        Modifier
+                            .fillMaxWidth()
                             .padding(
-                                start = ScreenMargin,
-                                end = ScreenMargin,
+                                start = screenMargin,
+                                end = screenMargin,
                                 top = spacing.sm8,
                                 bottom = spacing.md16,
                             ),
@@ -326,10 +328,11 @@ fun HomeContent(
             ) {
                 Column(
                     modifier =
-                        contentMaxWidth
+                        Modifier
+                            .fillMaxWidth()
                             .fillMaxHeight()
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = ScreenMargin),
+                            .padding(horizontal = screenMargin),
                     verticalArrangement = Arrangement.spacedBy(SectionGap),
                 ) {
                     InputPreviewCard(
