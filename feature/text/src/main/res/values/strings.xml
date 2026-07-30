@@ -57,7 +57,6 @@
     <!-- Guided messages (EDGE_CASES no-dead-end rule: a tap never lands nowhere) -->
     <string name="text_guided_mode">Engine selection arrives with the brains update</string>
     <string name="text_guided_voice">Voice input arrives with the voice update</string>
-    <string name="text_guided_tts">Text-to-speech arrives with the voice update</string>
     <string name="text_guided_more">More options arrive in a later update</string>
     <string name="text_guided_feedback">Feedback arrives in a later update</string>
 

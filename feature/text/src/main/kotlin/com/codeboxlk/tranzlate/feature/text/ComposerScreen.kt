@@ -252,7 +252,6 @@ internal fun ComposerPaneContent(
     }
 
     val guidedVoice = stringResource(R.string.text_guided_voice)
-    val guidedTts = stringResource(R.string.text_guided_tts)
     val pasteEmpty = stringResource(R.string.text_paste_empty)
     val pasteAction: () -> Unit = {
         val clip = clipboard.getText()?.text
@@ -1167,25 +1166,15 @@ private fun ResultPane(
             }
             if (uiState is TextUiState.Result) {
                 AiMeter(uiState.engine, aiMeter)
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    ResultAction(
-                        if (speaking) DsR.drawable.ic_stop else DsR.drawable.ic_volume_up,
-                        if (speaking) R.string.cd_speak_stop else R.string.cd_speak,
-                        "tt_text_speak",
-                        onSpeak,
-                    )
-                    ResultAction(DsR.drawable.ic_content_copy, R.string.cd_copy, "tt_text_copy") {
-                        onCopy(uiState.translatedText)
-                    }
-                    ResultAction(DsR.drawable.ic_swap_horiz, R.string.cd_text_reverse, "tt_text_reverse", onReverse)
-                    Spacer(Modifier.weight(1f))
-                    ResultAction(
-                        if (starFilled) DsR.drawable.ic_bookmark_filled else DsR.drawable.ic_bookmark,
-                        if (starFilled) R.string.cd_favourite_remove else R.string.cd_favourite,
-                        "tt_text_star",
-                        onStar,
-                    )
-                }
+                PaneResultActions(
+                    translatedText = uiState.translatedText,
+                    speaking = speaking,
+                    starFilled = starFilled,
+                    onSpeak = onSpeak,
+                    onCopy = onCopy,
+                    onReverse = onReverse,
+                    onStar = onStar,
+                )
             }
         }
     }
@@ -1241,6 +1230,39 @@ private fun ResultAction(
             painterResource(icon),
             contentDescription = stringResource(description),
             tint = LocalResultCardColors.current.label,
+        )
+    }
+}
+
+/** The pane's result-action row (extracted — PR-85 CI complexity gate). */
+@Suppress("LongParameterList") // one callback per action, by design
+@Composable
+private fun PaneResultActions(
+    translatedText: String,
+    speaking: Boolean,
+    starFilled: Boolean,
+    onSpeak: () -> Unit,
+    onCopy: (String) -> Unit,
+    onReverse: () -> Unit,
+    onStar: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        ResultAction(
+            if (speaking) DsR.drawable.ic_stop else DsR.drawable.ic_volume_up,
+            if (speaking) R.string.cd_speak_stop else R.string.cd_speak,
+            "tt_text_speak",
+            onSpeak,
+        )
+        ResultAction(DsR.drawable.ic_content_copy, R.string.cd_copy, "tt_text_copy") {
+            onCopy(translatedText)
+        }
+        ResultAction(DsR.drawable.ic_swap_horiz, R.string.cd_text_reverse, "tt_text_reverse", onReverse)
+        Spacer(Modifier.weight(1f))
+        ResultAction(
+            if (starFilled) DsR.drawable.ic_bookmark_filled else DsR.drawable.ic_bookmark,
+            if (starFilled) R.string.cd_favourite_remove else R.string.cd_favourite,
+            "tt_text_star",
+            onStar,
         )
     }
 }

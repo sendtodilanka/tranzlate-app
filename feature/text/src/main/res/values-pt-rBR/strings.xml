@@ -52,7 +52,6 @@
     <!-- Guided messages -->
     <string name="text_guided_mode">A escolha de mecanismo chega com a atualização dos brains</string>
     <string name="text_guided_voice">A entrada por voz chega com a atualização de voz</string>
-    <string name="text_guided_tts">A leitura em voz alta chega com a atualização de voz</string>
     <string name="text_guided_more">Mais opções chegam em uma próxima atualização</string>
     <string name="text_guided_feedback">O feedback chega em uma próxima atualização</string>
 

@@ -52,7 +52,6 @@
     <!-- Guided messages -->
     <string name="text_guided_mode">Darating ang pagpili ng engine sa brains update</string>
     <string name="text_guided_voice">Darating ang voice input sa voice update</string>
-    <string name="text_guided_tts">Darating ang text-to-speech sa voice update</string>
     <string name="text_guided_more">Darating ang iba pang opsyon sa susunod na update</string>
     <string name="text_guided_feedback">Darating ang feedback sa susunod na update</string>
 
