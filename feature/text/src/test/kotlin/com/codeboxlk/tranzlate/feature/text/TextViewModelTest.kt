@@ -118,6 +118,7 @@ class TextViewModelTest {
         ) = Unit
     }
 
+    @Suppress("LongParameterList") // the test builder aggregates one fake per seam
     private fun viewModel(
         translator: FakeTranslator = FakeTranslator(),
         prefs: FakeTranslatePrefsRepository = FakeTranslatePrefsRepository(),
