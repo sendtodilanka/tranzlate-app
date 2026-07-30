@@ -26,6 +26,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -104,7 +106,7 @@ fun HomeScreen(
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
-    onOpenHistory: () -> Unit,
+    onOpenDrawer: () -> Unit,
     modifier: Modifier = Modifier,
     previewCardModifier: Modifier = Modifier,
 ) {
@@ -121,7 +123,7 @@ fun HomeScreen(
         onPickLanguage = onPickLanguage,
         onOpenSettings = onOpenSettings,
         onOpenPaywall = onOpenPaywall,
-        onOpenHistory = onOpenHistory,
+        onOpenDrawer = onOpenDrawer,
         onOpenCamera = onOpenCamera,
         onOpenLanguages = onOpenLanguages,
         onOpenConversation = onOpenConversation,
@@ -146,7 +148,7 @@ fun HomeContent(
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
-    onOpenHistory: () -> Unit,
+    onOpenDrawer: () -> Unit,
     modifier: Modifier = Modifier,
     previewCardModifier: Modifier = Modifier,
 ) {
@@ -188,6 +190,15 @@ fun HomeContent(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().height(Dimensions.topBarHeight),
                     ) {
+                        IconButton(
+                            onClick = onOpenDrawer,
+                            modifier = Modifier.testTag("tt_home_menu"),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Menu,
+                                contentDescription = stringResource(R.string.cd_text_menu),
+                            )
+                        }
                         Text(
                             text = stringResource(R.string.home_title),
                             style = MaterialTheme.typography.titleLarge,
@@ -238,7 +249,6 @@ fun HomeContent(
                             onOpenCamera = onOpenCamera,
                             onOpenLanguages = onOpenLanguages,
                             onOpenConversation = onOpenConversation,
-                            onOpenHistory = onOpenHistory,
                         )
                         Spacer(Modifier.height(ScreenMargin))
                     }
@@ -267,6 +277,15 @@ fun HomeContent(
             ) {
                 TopAppBar(
                     title = {
+                        IconButton(
+                            onClick = onOpenDrawer,
+                            modifier = Modifier.testTag("tt_home_menu"),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Menu,
+                                contentDescription = stringResource(R.string.cd_text_menu),
+                            )
+                        }
                         Text(
                             text = stringResource(R.string.home_title),
                             style = MaterialTheme.typography.titleLarge,
@@ -341,7 +360,6 @@ fun HomeContent(
                         onOpenCamera = onOpenCamera,
                         onOpenLanguages = onOpenLanguages,
                         onOpenConversation = onOpenConversation,
-                        onOpenHistory = onOpenHistory,
                     )
                     Spacer(Modifier.height(ScreenMargin))
                 }
@@ -362,7 +380,6 @@ private fun ColumnScope.ToolsStack(
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
-    onOpenHistory: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
     Text(
@@ -421,14 +438,6 @@ private fun ColumnScope.ToolsStack(
         subtitle = stringResource(R.string.home_row_download_sub),
         onClick = onOpenLanguages,
         testTag = "tt_home_row_download",
-    )
-    // Entry until the drawer hosts History/Saved (issue #68 recorded deviation).
-    ListRowCard(
-        icon = painterResource(DsR.drawable.ic_history),
-        title = stringResource(R.string.home_row_history),
-        subtitle = stringResource(R.string.home_row_history_sub),
-        onClick = onOpenHistory,
-        testTag = "tt_home_row_history",
     )
     Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
         MiniCard(
@@ -842,7 +851,7 @@ private fun HomeContentPreview() {
             onPickLanguage = {},
             onOpenSettings = {},
             onOpenPaywall = {},
-            onOpenHistory = {},
+            onOpenDrawer = {},
             onOpenCamera = {},
             onOpenLanguages = {},
             onOpenConversation = {},

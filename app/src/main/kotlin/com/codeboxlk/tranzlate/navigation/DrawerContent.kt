@@ -135,7 +135,8 @@ fun DrawerContent(
                         .weight(1f)
                         .verticalScroll(rememberScrollState()),
             ) {
-                DrawerRow(Icons.Outlined.Search, R.string.drawer_search, DrawerDestination.SEARCH, onDestinationClick)
+                // SEARCH row returns with the search feature (issue #74 recorded
+                // deviation) — a row that closes the drawer into nothing is a dead end.
                 DrawerRow(
                     Icons.Outlined.History,
                     R.string.drawer_history,
