@@ -77,6 +77,7 @@ import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.ui.ShimmerResult
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
+import com.codeboxlk.tranzlate.core.ui.adaptiveScreenMargin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
@@ -293,18 +294,14 @@ internal fun ComposerPaneContent(
         @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
         val splitImeVisible = layout.splitResultOnly && WindowInsets.isImeVisible
         val hideTopRow = isEditing && splitImeVisible
-        // Issue #88 (owner + M3): medium portrait fills the width — the
-        // 16dp-based top row shifts by the margin shim so back + pills land
-        // on the 24dp M3 margin. Landscape keeps its #56 device-tuned frame.
-        val topRowFrame =
-            if (layout.mediumWidth && !layout.expandedWidth) {
-                Modifier.padding(horizontal = adaptiveMarginShim())
-            } else {
-                Modifier
-            }
+        // Issue #92 (debate-ruled): the 16dp-based top row shifts by the margin
+        // shim in EVERY non-compact shape (shim = margin − 16, so 0dp on
+        // phones) — back + pills land exactly on the pane/card edge because
+        // the shim and the pane margins read the same token.
         Box(
             modifier =
-                topRowFrame
+                Modifier
+                    .padding(horizontal = adaptiveMarginShim())
                     .clipToBounds()
                     .then(
                         if (hideTopRow) {
@@ -337,7 +334,9 @@ internal fun ComposerPaneContent(
             Row(
                 modifier =
                     Modifier
-                        .padding(horizontal = LocalSpacing.current.md16)
+                        // Issue #92: M3 expanded margin (24dp) via the canonical
+                        // reader; the top row's shim keeps back/pills on this edge.
+                        .padding(horizontal = adaptiveScreenMargin())
                         .weight(1f),
             ) {
                 Surface(
@@ -408,7 +407,9 @@ internal fun ComposerPaneContent(
             Row(
                 modifier =
                     Modifier
-                        .padding(horizontal = LocalSpacing.current.md16)
+                        // Issue #92: M3 expanded margin (24dp) via the canonical
+                        // reader; the top row's shim keeps back/pills on this edge.
+                        .padding(horizontal = adaptiveScreenMargin())
                         .weight(1f),
             ) {
                 Surface(
@@ -449,7 +450,7 @@ internal fun ComposerPaneContent(
                         )
                     }
                 }
-                Spacer(Modifier.width(spacing.md16))
+                Spacer(Modifier.width(spacing.lg24)) // Issue #92: M3 pane spacer = 24dp
                 ResultPane(
                     aiMeter = aiMeter,
                     starFilled = resultFavourite,
@@ -471,15 +472,10 @@ internal fun ComposerPaneContent(
             return
         }
 
-        // Issue #88 (owner + M3): the card fills the width — only the margin
-        // widens on medium portrait (16dp -> 24dp); landscape keeps the #56
-        // device-tuned 16dp frame.
-        val cardMargin =
-            if (layout.mediumWidth && !layout.expandedWidth) {
-                Dimensions.screenMarginMedium
-            } else {
-                LocalSpacing.current.md16
-            }
+        // Issue #92 (ruling principle: margin + shim read the SAME token at
+        // every width): 16dp compact, 24dp otherwise — the edit-face card edge
+        // stays on the shifted top row's back/pills line in landscape too.
+        val cardMargin = adaptiveScreenMargin()
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = LocalFloatingSurface.current,
