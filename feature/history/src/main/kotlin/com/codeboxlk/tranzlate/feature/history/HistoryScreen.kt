@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,6 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -209,17 +213,21 @@ private fun SwipeableHistoryRow(
     onPick: (Translation) -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    // PR-81 lens O1: confirmValueChange is captured ONCE by the state — without
+    // rememberUpdatedState the closure freezes the first composition's row and a
+    // second consecutive save-swipe silently no-ops on the stale favourite.
+    val currentRow by rememberUpdatedState(translation)
     val state =
         rememberSwipeToDismissBoxState(
             confirmValueChange = { value ->
                 when (value) {
                     SwipeToDismissBoxValue.StartToEnd -> {
-                        onToggleFavourite(translation)
+                        onToggleFavourite(currentRow)
                         false // toggle: snap back, row stays
                     }
 
                     SwipeToDismissBoxValue.EndToStart -> {
-                        onDelete(translation)
+                        onDelete(currentRow)
                         true // dismiss: the row leaves (Undo re-inserts)
                     }
 
@@ -269,7 +277,30 @@ private fun SwipeableHistoryRow(
             }
         },
     ) {
-        Surface(color = MaterialTheme.colorScheme.surface) {
+        // PR-81 lens O2: swipes are invisible to TalkBack/switch access — the
+        // destructive delete needs a first-class accessibility action.
+        val deleteLabel = stringResource(R.string.history_action_delete)
+        val saveLabel =
+            stringResource(
+                if (translation.favourite) R.string.history_cd_unsave else R.string.history_cd_save,
+            )
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            modifier =
+                Modifier.semantics {
+                    customActions =
+                        listOf(
+                            CustomAccessibilityAction(deleteLabel) {
+                                onDelete(translation)
+                                true
+                            },
+                            CustomAccessibilityAction(saveLabel) {
+                                onToggleFavourite(translation)
+                                true
+                            },
+                        )
+                },
+        ) {
             HistoryRow(
                 translation = translation,
                 onToggleFavourite = onToggleFavourite,

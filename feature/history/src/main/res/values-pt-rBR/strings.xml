@@ -12,4 +12,5 @@
     <string name="history_filter_all">Todas</string>
     <string name="history_deleted">Tradução excluída</string>
     <string name="history_undo">Desfazer</string>
+    <string name="history_action_delete">Excluir tradução</string>
 </resources>

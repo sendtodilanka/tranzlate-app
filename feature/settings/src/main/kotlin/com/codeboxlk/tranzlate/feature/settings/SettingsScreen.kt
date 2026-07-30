@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.feature.settings
 
 import android.os.Build
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -126,8 +127,7 @@ fun SettingsContent(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = Dimensions.touchTargetMin)
-                        .selectable(
-                            selected = false,
+                        .clickable(
                             role = Role.Button,
                             onClick = onOpenHistory,
                         ).padding(horizontal = spacing.lg24)

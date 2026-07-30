@@ -13,6 +13,4 @@
     <string name="chat_coming_soon_title">Conversation</string>
     <string name="coming_soon">Coming soon</string>
 
-    <!-- Drawer (UI_SPEC §2.3) -->
-    <string name="app_guided_search">Search arrives with the history update</string>
 </resources>

@@ -12,4 +12,5 @@
     <string name="history_filter_all">Lahat</string>
     <string name="history_deleted">Nabura ang pagsasalin</string>
     <string name="history_undo">I-undo</string>
+    <string name="history_action_delete">Burahin ang pagsasalin</string>
 </resources>
