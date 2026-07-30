@@ -90,6 +90,7 @@ class TextViewModel
         config: RemoteConfigSource,
         private val dispatchers: DispatcherProvider,
         private val clock: AppClock,
+        private val speaker: ResultSpeaker,
         private val savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         /** Composer text — SavedStateHandle-backed (process-death safe). */
@@ -254,29 +255,6 @@ class TextViewModel
         // deleting them would drop a documented convention, not dead weight.
 
         /**
-         * C-7 Reverse: move the result text into the composer, swap source↔target
-         * and re-translate. Post-condition: input == prior result, languages
-         * swapped, new result = the reverse translation.
-         */
-        fun onReverse() {
-            val done = state as? TextUiState.Result ?: return
-            val newSource = done.request.targetLang
-            val newTarget = done.request.sourceLang
-            savedStateHandle[KEY_INPUT] = done.translatedText
-            viewModelScope.launch {
-                prefs.setLanguagePair(sourceId = newSource, targetId = newTarget)
-            }
-            startTranslation(
-                TranslateRequest(
-                    text = done.translatedText,
-                    sourceLang = newSource,
-                    targetLang = newTarget,
-                    mode = textMode.value,
-                ),
-            )
-        }
-
-        /**
          * Whether swap can act right now (issue #70, lens OPEN-1): a concrete
          * source always can; Detect can once a result carries its detected
          * language — the UI's enabled-state reads THIS, so the resolve path is
@@ -324,6 +302,7 @@ class TextViewModel
          * in exactly one place.
          */
         fun onComposerDismissed() {
+            speaker.stop()
             translateJob?.cancel()
             savedStateHandle[KEY_INPUT] = ""
             state = TextUiState.Idle
@@ -406,6 +385,51 @@ class TextViewModel
                         .cached(result.request.text, src, result.request.targetLang, result.engine)
                         ?.favourite ?: false
             }
+        }
+
+        // ---- issue #84: result actions — speak + reverse ---------------------
+
+        /** True while TTS reads the result — the speak button's play ⇄ stop state. */
+        val speaking: StateFlow<Boolean> get() = speaker.speaking
+
+        /**
+         * Toggle: reading → stop; idle → read the RESULT in the target language.
+         * False = engine/language unavailable (UI guides — no dead end).
+         */
+        fun onSpeak(): Boolean {
+            val result = state as? TextUiState.Result ?: return false
+            if (speaker.speaking.value) {
+                speaker.stop()
+                return true
+            }
+            return speaker.speak(result.translatedText, result.request.targetLang)
+        }
+
+        /**
+         * C-7 reverse (owner, FT behaviour observed): the RESULT becomes the
+         * input, the pair swaps, and it re-translates. Auto-detect reverses
+         * through the RESOLVED source; unresolved → false (UI guides).
+         */
+        fun onReverse(): Boolean {
+            val result = state as? TextUiState.Result ?: return false
+            val newTarget =
+                result.resolvedSourceLang
+                    ?: result.request.sourceLang.takeIf { it != AUTO_LANG }
+                    ?: return false
+            val newSource = result.request.targetLang
+            speaker.stop() // a reverse restarts the flow — never keep old audio
+            savedStateHandle[KEY_INPUT] = result.translatedText
+            viewModelScope.launch { prefs.setLanguagePair(newSource, newTarget) }
+            val request =
+                TranslateRequest(
+                    text = result.translatedText,
+                    sourceLang = newSource,
+                    targetLang = newTarget,
+                    mode = ModeId.AUTO,
+                )
+            persistLastRequest(request)
+            startTranslation(request)
+            return true
         }
 
         /**

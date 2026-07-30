@@ -106,4 +106,6 @@
     <string name="text_paste_empty">Walang laman ang clipboard.</string>
     <string name="text_swap_needs_detect">Magsalin muna para malaman ang wika bago baligtarin.</string>
     <string name="cd_text_counter_limit">Naabot na ang %1$d-character na limit</string>
+    <string name="cd_speak_stop">Itigil ang pagbabasa</string>
+    <string name="text_tts_unavailable">Hindi available ang speech para sa wikang ito sa device na ito.</string>
 </resources>

@@ -115,4 +115,6 @@
     <string name="text_paste_empty">Clipboard is empty.</string>
     <string name="text_swap_needs_detect">Translate once to detect the language before swapping.</string>
     <string name="cd_text_counter_limit">%1$d-character limit reached</string>
+    <string name="cd_speak_stop">Stop reading</string>
+    <string name="text_tts_unavailable">Speech isn\'t available for this language on this device.</string>
 </resources>

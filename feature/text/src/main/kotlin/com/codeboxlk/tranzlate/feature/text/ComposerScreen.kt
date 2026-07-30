@@ -150,9 +150,13 @@ internal fun ComposerPane(
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val resultFavourite by viewModel.resultFavourite.collectAsStateWithLifecycle()
     val swapAvailable by viewModel.swapAvailable.collectAsStateWithLifecycle()
+    val speaking by viewModel.speaking.collectAsStateWithLifecycle()
     ComposerPaneContent(
         resultFavourite = resultFavourite,
         onToggleFavourite = viewModel::onToggleFavourite,
+        speaking = speaking,
+        onSpeakToggle = viewModel::onSpeak,
+        onReverseRequest = viewModel::onReverse,
         input = input,
         sourceLangId = sourceLang,
         targetLangId = targetLang,
@@ -188,6 +192,9 @@ internal fun ComposerPaneContent(
     onOpenPaywall: () -> Unit = {},
     resultFavourite: Boolean = false,
     onToggleFavourite: () -> Unit = {},
+    speaking: Boolean = false,
+    onSpeakToggle: () -> Boolean = { false },
+    onReverseRequest: () -> Boolean = { false },
     onTranslate: () -> Boolean,
     onRetry: () -> Unit,
     onSwapLanguages: () -> Boolean,
@@ -255,6 +262,13 @@ internal fun ComposerPaneContent(
     val swapNeedsDetect = stringResource(R.string.text_swap_needs_detect)
     val swapAction: () -> Unit = {
         if (!onSwapLanguages()) onNotify(swapNeedsDetect)
+    }
+    val ttsUnavailable = stringResource(R.string.text_tts_unavailable)
+    val speakAction: () -> Unit = {
+        if (!onSpeakToggle()) onNotify(ttsUnavailable)
+    }
+    val reverseAction: () -> Unit = {
+        if (!onReverseRequest()) onNotify(swapNeedsDetect) // same truth: needs a detected language
     }
     val starUnavailable = stringResource(R.string.text_star_unavailable)
     val starAction: () -> Unit = {
@@ -354,6 +368,8 @@ internal fun ComposerPaneContent(
                 ResultPane(
                     aiMeter = aiMeter,
                     starFilled = resultFavourite,
+                    speaking = speaking,
+                    onReverse = reverseAction,
                     targetLabel = languageLabel(targetLangId),
                     uiState = uiState,
                     onRetry = onRetry,
@@ -361,7 +377,7 @@ internal fun ComposerPaneContent(
                         clipboard.setText(AnnotatedString(text))
                         onNotify(copiedMessage)
                     },
-                    onSpeak = { onNotify(guidedTts) },
+                    onSpeak = speakAction,
                     onStar = starAction,
                     modifier = Modifier.weight(if (layout.hinged) 1f else PANE_WEIGHT_RESULT).fillMaxHeight(),
                 )
@@ -422,6 +438,8 @@ internal fun ComposerPaneContent(
                 ResultPane(
                     aiMeter = aiMeter,
                     starFilled = resultFavourite,
+                    speaking = speaking,
+                    onReverse = reverseAction,
                     targetLabel = languageLabel(targetLangId),
                     uiState = uiState,
                     onRetry = onRetry,
@@ -429,7 +447,7 @@ internal fun ComposerPaneContent(
                         clipboard.setText(AnnotatedString(text))
                         onNotify(copiedMessage)
                     },
-                    onSpeak = { onNotify(guidedTts) },
+                    onSpeak = speakAction,
                     onStar = starAction,
                     modifier = Modifier.weight(PANE_WEIGHT_RESULT).fillMaxHeight(),
                 )
@@ -504,6 +522,8 @@ internal fun ComposerPaneContent(
                     ComposerReadBody(
                         aiMeter = aiMeter,
                         starFilled = resultFavourite,
+                        speaking = speaking,
+                        onReverse = reverseAction,
                         sourceText = uiState.requestText ?: input,
                         targetLabel = languageLabel(targetLangId),
                         uiState = uiState,
@@ -513,7 +533,7 @@ internal fun ComposerPaneContent(
                             clipboard.setText(AnnotatedString(text))
                             onNotify(copiedMessage)
                         },
-                        onSpeak = { onNotify(guidedTts) },
+                        onSpeak = speakAction,
                         onStar = starAction,
                     )
                 }
@@ -780,6 +800,8 @@ private fun ColumnScope.ComposerReadBody(
     onStar: () -> Unit,
     aiMeter: Pair<Int, Int>? = null,
     starFilled: Boolean = false,
+    speaking: Boolean = false,
+    onReverse: () -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     Text(
@@ -808,10 +830,16 @@ private fun ColumnScope.ComposerReadBody(
             ResultCard(
                 targetLabel = targetLabel,
                 actions = {
-                    ResultAction(DsR.drawable.ic_volume_up, R.string.cd_speak, "tt_text_speak", onSpeak)
+                    ResultAction(
+                        if (speaking) DsR.drawable.ic_stop else DsR.drawable.ic_volume_up,
+                        if (speaking) R.string.cd_speak_stop else R.string.cd_speak,
+                        "tt_text_speak",
+                        onSpeak,
+                    )
                     ResultAction(DsR.drawable.ic_content_copy, R.string.cd_copy, "tt_text_copy") {
                         onCopy(uiState.translatedText)
                     }
+                    ResultAction(DsR.drawable.ic_swap_horiz, R.string.cd_text_reverse, "tt_text_reverse", onReverse)
                     // Bookmark sits at the far edge in the design, away from the
                     // pair that acts on the text itself.
                     Spacer(Modifier.weight(1f))
@@ -1042,6 +1070,8 @@ private fun ResultPane(
     uiState: TextUiState,
     aiMeter: Pair<Int, Int>? = null,
     starFilled: Boolean = false,
+    speaking: Boolean = false,
+    onReverse: () -> Unit = {},
     onRetry: () -> Unit,
     onCopy: (String) -> Unit,
     onSpeak: () -> Unit,
@@ -1138,10 +1168,16 @@ private fun ResultPane(
             if (uiState is TextUiState.Result) {
                 AiMeter(uiState.engine, aiMeter)
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    ResultAction(DsR.drawable.ic_volume_up, R.string.cd_speak, "tt_text_speak", onSpeak)
+                    ResultAction(
+                        if (speaking) DsR.drawable.ic_stop else DsR.drawable.ic_volume_up,
+                        if (speaking) R.string.cd_speak_stop else R.string.cd_speak,
+                        "tt_text_speak",
+                        onSpeak,
+                    )
                     ResultAction(DsR.drawable.ic_content_copy, R.string.cd_copy, "tt_text_copy") {
                         onCopy(uiState.translatedText)
                     }
+                    ResultAction(DsR.drawable.ic_swap_horiz, R.string.cd_text_reverse, "tt_text_reverse", onReverse)
                     Spacer(Modifier.weight(1f))
                     ResultAction(
                         if (starFilled) DsR.drawable.ic_bookmark_filled else DsR.drawable.ic_bookmark,

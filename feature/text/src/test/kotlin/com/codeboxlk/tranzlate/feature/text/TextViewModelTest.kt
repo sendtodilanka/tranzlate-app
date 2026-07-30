@@ -50,6 +50,33 @@ class TextViewModelTest {
         }
     }
 
+    private class FakeResultSpeaker : ResultSpeaker {
+        val state = kotlinx.coroutines.flow.MutableStateFlow(false)
+        override val speaking: kotlinx.coroutines.flow.StateFlow<Boolean> = state
+        var speaks = 0
+            private set
+        var stops = 0
+            private set
+        var available = true
+        var lastLanguage: String? = null
+
+        override fun speak(
+            text: String,
+            languageTag: String,
+        ): Boolean {
+            if (!available) return false
+            speaks++
+            lastLanguage = languageTag
+            state.value = true
+            return true
+        }
+
+        override fun stop() {
+            stops++
+            state.value = false
+        }
+    }
+
     private class FakeTranslatePrefsRepository : TranslatePrefsRepository {
         val source = MutableStateFlow("en")
         val target = MutableStateFlow("fr")
@@ -99,6 +126,7 @@ class TextViewModelTest {
         usage: FakeUsagePolicy = FakeUsagePolicy(left = 5),
         access: FakeFeatureAccess = FakeFeatureAccess(),
         repository: FakeTranslationRepository = FakeTranslationRepository(),
+        speaker: FakeResultSpeaker = FakeResultSpeaker(),
     ): TextViewModel {
         val useCase =
             TranslateTextUseCase(
@@ -119,6 +147,7 @@ class TextViewModelTest {
             config = FakeRemoteConfig(),
             dispatchers = TestDispatcherProvider(dispatcher),
             clock = clock,
+            speaker = speaker,
             savedStateHandle = handle,
         )
     }
@@ -184,6 +213,91 @@ class TextViewModelTest {
 
         assertThat(prefs.source.value).isEqualTo("auto") // untouched
         assertThat(prefs.target.value).isEqualTo("fr")
+    }
+
+    // ---- issue #84: result actions — reverse + speak -------------------------
+
+    @Test
+    fun `reverse makes the result the input, swaps the pair and re-translates`() {
+        val prefs = FakeTranslatePrefsRepository()
+        val vm = viewModel(prefs = prefs)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate() // G1 en->fr "Bonjour (fake)"
+        settle()
+
+        assertThat(vm.onReverse()).isTrue()
+        settle()
+
+        assertThat(vm.input.value).isEqualTo("Bonjour (fake)") // C-7: result becomes input
+        assertThat(prefs.source.value).isEqualTo("fr")
+        assertThat(prefs.target.value).isEqualTo("en")
+        val state = vm.uiState.value
+        assertThat(state).isInstanceOf(TextUiState.Result::class.java)
+        assertThat((state as TextUiState.Result).request.sourceLang).isEqualTo("fr")
+    }
+
+    @Test
+    fun `reverse through auto-detect uses the RESOLVED source`() {
+        val prefs = FakeTranslatePrefsRepository().apply { source.value = "auto" }
+        val vm = viewModel(prefs = prefs)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate() // G7 detects "en"
+        settle()
+
+        assertThat(vm.onReverse()).isTrue()
+        settle()
+
+        assertThat(prefs.source.value).isEqualTo("fr")
+        assertThat(prefs.target.value).isEqualTo("en") // the DETECTED id, never "auto"
+    }
+
+    @Test
+    fun `speak toggles play and stop through the seam`() {
+        val speaker = FakeResultSpeaker()
+        val vm = viewModel(speaker = speaker)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        settle()
+
+        assertThat(vm.onSpeak()).isTrue() // play
+        assertThat(speaker.speaks).isEqualTo(1)
+        assertThat(speaker.lastLanguage).isEqualTo("fr") // reads in the TARGET language
+        assertThat(vm.speaking.value).isTrue()
+
+        assertThat(vm.onSpeak()).isTrue() // stop
+        assertThat(speaker.stops).isEqualTo(1)
+        assertThat(vm.speaking.value).isFalse()
+    }
+
+    @Test
+    fun `speak with no engine for the language reports false - the UI guides`() {
+        val speaker = FakeResultSpeaker().apply { available = false }
+        val vm = viewModel(speaker = speaker)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        settle()
+
+        assertThat(vm.onSpeak()).isFalse()
+    }
+
+    @Test
+    fun `leaving the composer stops any reading`() {
+        val speaker = FakeResultSpeaker()
+        val vm = viewModel(speaker = speaker)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        settle()
+        vm.onSpeak()
+
+        vm.onComposerDismissed()
+
+        assertThat(speaker.stops).isEqualTo(1)
+        assertThat(vm.speaking.value).isFalse()
     }
 
     // ---- issue #68: tap-to-reopen + star-to-save -----------------------------

@@ -88,6 +88,7 @@ class FakeTranslator(
 | G5 | `Hello world` | en | de | ML2_MINI | `Hallo Welt (fake)` | ML2_MINI | Success |
 | G6 | `こんにちは` | ja | en | NLP35 | `Hello (fake)` | NLP35 | Success |
 | G7 | `Good morning` | auto | fr | AUTO | `Bonjour (fake)` | ML2_MINI | Success (detect→en) |
+| G12 | `Bonjour (fake)` | fr | en | AUTO | `Good morning (fake)` | OFFLINE_MLKIT | the C-7 reverse of G1 (issue #84) |
 | G8 | `நன்றி` | ta | en | ML2_MINI | *(no golden row)* | — | Error(attempt UNSUPPORTED_PAIR) |
 | G9 | `` (empty) | en | fr | any | — | — | EmptyInput (rev.2 — typed, not an attempt) |
 | G10 | `Offline test` | en | fr | ML2_ONLINE | *(forcedFailure=OFFLINE)* | — | Error(attempt OFFLINE) |

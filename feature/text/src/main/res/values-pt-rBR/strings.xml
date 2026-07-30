@@ -106,4 +106,6 @@
     <string name="text_paste_empty">A área de transferência está vazia.</string>
     <string name="text_swap_needs_detect">Traduza primeiro para detectar o idioma antes de inverter.</string>
     <string name="cd_text_counter_limit">Limite de %1$d caracteres atingido</string>
+    <string name="cd_speak_stop">Parar a leitura</string>
+    <string name="text_tts_unavailable">A fala não está disponível para este idioma neste aparelho.</string>
 </resources>
