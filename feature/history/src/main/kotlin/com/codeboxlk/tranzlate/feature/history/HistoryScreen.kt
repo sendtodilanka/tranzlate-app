@@ -1,6 +1,8 @@
 package com.codeboxlk.tranzlate.feature.history
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,17 +13,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SecondaryTabRow
-import androidx.compose.material3.Tab
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.model.Translation
+import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 
 /** C-13 single-column rule: phones fill, tablets centre. */
@@ -56,12 +68,29 @@ fun HistoryScreen(
 ) {
     val history by viewModel.history.collectAsStateWithLifecycle()
     val favourites by viewModel.favourites.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val deletedMessage = stringResource(R.string.history_deleted)
+    val undoLabel = stringResource(R.string.history_undo)
     HistoryContent(
         history = history,
         favourites = favourites,
         onToggleFavourite = viewModel::toggleFavourite,
+        onDelete = { translation ->
+            viewModel.delete(translation)
+            scope.launch {
+                val result =
+                    snackbarHostState.showSnackbar(
+                        message = deletedMessage,
+                        actionLabel = undoLabel,
+                        duration = SnackbarDuration.Short,
+                    )
+                if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete(translation)
+            }
+        },
         onPick = onPick,
         onBack = onBack,
+        snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
 }
@@ -71,14 +100,17 @@ internal fun HistoryContent(
     history: List<Translation>,
     favourites: List<Translation>,
     onToggleFavourite: (Translation) -> Unit,
+    onDelete: (Translation) -> Unit,
     onPick: (Translation) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val spacing = LocalSpacing.current
-    var tab by rememberSaveable { mutableIntStateOf(TAB_HISTORY) }
+    var filter by rememberSaveable { mutableIntStateOf(TAB_HISTORY) }
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.surface,
     ) { padding ->
         Column(
@@ -101,26 +133,29 @@ internal fun HistoryContent(
                         style = MaterialTheme.typography.titleLarge,
                     )
                 }
-                SecondaryTabRow(selectedTabIndex = tab) {
-                    Tab(
-                        selected = tab == TAB_HISTORY,
-                        onClick = { tab = TAB_HISTORY },
-                        text = { Text(stringResource(R.string.history_tab_all)) },
-                        modifier = Modifier.testTag("tt_history_tab_history"),
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
+                    modifier = Modifier.padding(horizontal = spacing.md16),
+                ) {
+                    FilterChip(
+                        selected = filter == TAB_HISTORY,
+                        onClick = { filter = TAB_HISTORY },
+                        label = { Text(stringResource(R.string.history_filter_all)) },
+                        modifier = Modifier.testTag("tt_history_filter_all"),
                     )
-                    Tab(
-                        selected = tab == TAB_SAVED,
-                        onClick = { tab = TAB_SAVED },
-                        text = { Text(stringResource(R.string.history_tab_saved)) },
-                        modifier = Modifier.testTag("tt_history_tab_saved"),
+                    FilterChip(
+                        selected = filter == TAB_SAVED,
+                        onClick = { filter = TAB_SAVED },
+                        label = { Text(stringResource(R.string.history_tab_saved)) },
+                        modifier = Modifier.testTag("tt_history_filter_saved"),
                     )
                 }
-                val rows = if (tab == TAB_HISTORY) history else favourites
+                val rows = if (filter == TAB_HISTORY) history else favourites
                 if (rows.isEmpty()) {
                     EmptyState(
                         text =
                             stringResource(
-                                if (tab == TAB_HISTORY) {
+                                if (filter == TAB_HISTORY) {
                                     R.string.history_empty
                                 } else {
                                     R.string.history_saved_empty
@@ -130,9 +165,10 @@ internal fun HistoryContent(
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize().testTag("tt_history_list")) {
                         items(rows, key = Translation::id) { translation ->
-                            HistoryRow(
+                            SwipeableHistoryRow(
                                 translation = translation,
                                 onToggleFavourite = onToggleFavourite,
+                                onDelete = onDelete,
                                 onPick = onPick,
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -157,6 +193,90 @@ private fun EmptyState(text: String) {
                 .padding(spacing.lg24)
                 .testTag("tt_history_empty"),
     )
+}
+
+/**
+ * Swipe actions (issue #80, owner): leading (→) toggles Saved, trailing (←)
+ * DELETES — the caller shows the Undo snackbar. The save swipe snaps back
+ * (it's a toggle, not a dismissal).
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableHistoryRow(
+    translation: Translation,
+    onToggleFavourite: (Translation) -> Unit,
+    onDelete: (Translation) -> Unit,
+    onPick: (Translation) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    val state =
+        rememberSwipeToDismissBoxState(
+            confirmValueChange = { value ->
+                when (value) {
+                    SwipeToDismissBoxValue.StartToEnd -> {
+                        onToggleFavourite(translation)
+                        false // toggle: snap back, row stays
+                    }
+
+                    SwipeToDismissBoxValue.EndToStart -> {
+                        onDelete(translation)
+                        true // dismiss: the row leaves (Undo re-inserts)
+                    }
+
+                    SwipeToDismissBoxValue.Settled -> {
+                        false
+                    }
+                }
+            },
+        )
+    SwipeToDismissBox(
+        state = state,
+        modifier = Modifier.testTag("tt_history_swipe"),
+        backgroundContent = {
+            val toDelete = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (toDelete) Arrangement.End else Arrangement.Start,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            if (toDelete) {
+                                MaterialTheme.colorScheme.errorContainer
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer
+                            },
+                        ).padding(horizontal = spacing.lg24),
+            ) {
+                Icon(
+                    painterResource(
+                        if (toDelete) {
+                            DsR.drawable.ic_delete
+                        } else if (translation.favourite) {
+                            DsR.drawable.ic_bookmark
+                        } else {
+                            DsR.drawable.ic_bookmark_filled
+                        },
+                    ),
+                    contentDescription = null, // announced via the swipe semantics
+                    tint =
+                        if (toDelete) {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        } else {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        },
+                )
+            }
+        },
+    ) {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            HistoryRow(
+                translation = translation,
+                onToggleFavourite = onToggleFavourite,
+                onPick = onPick,
+            )
+        }
+    }
 }
 
 @Composable

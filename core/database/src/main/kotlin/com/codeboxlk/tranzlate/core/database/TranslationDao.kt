@@ -51,6 +51,9 @@ interface TranslationDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entity: TranslationEntity): Long
 
+    @Query("DELETE FROM translation WHERE id = :id")
+    suspend fun delete(id: Long)
+
     @Query("UPDATE translation SET favourite = :favourite WHERE id = :id")
     suspend fun setFavourite(
         id: Long,

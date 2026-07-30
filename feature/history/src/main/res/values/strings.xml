@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_title">History</string>
-    <string name="history_tab_all">History</string>
     <string name="history_tab_saved">Saved</string>
     <string name="history_empty">No translations yet — translate something and it lands here.</string>
     <string name="history_saved_empty">Nothing saved yet — tap the bookmark on any translation to keep it here.</string>
@@ -10,4 +9,7 @@
     <string name="history_cd_open">Open in translator</string>
     <string name="history_cd_save">Save translation</string>
     <string name="history_cd_unsave">Remove from saved</string>
+    <string name="history_filter_all">All</string>
+    <string name="history_deleted">Translation deleted</string>
+    <string name="history_undo">Undo</string>
 </resources>

@@ -41,6 +41,9 @@ interface TranslationRepository {
 
     suspend fun save(translation: Translation): Long
 
+    /** Removes one history row (issue #80 swipe-to-delete; Undo re-inserts the content). */
+    suspend fun delete(id: Long)
+
     /** D-3: star toggles favourite. */
     suspend fun setFavourite(
         id: Long,

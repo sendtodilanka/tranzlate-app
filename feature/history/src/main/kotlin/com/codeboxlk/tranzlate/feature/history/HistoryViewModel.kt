@@ -39,4 +39,15 @@ class HistoryViewModel
                 repository.setFavourite(translation.id, !translation.favourite)
             }
         }
+
+        /** Swipe-to-delete (issue #80). Undo re-inserts the SAME content. */
+        fun delete(translation: Translation) {
+            viewModelScope.launch { repository.delete(translation.id) }
+        }
+
+        fun undoDelete(translation: Translation) {
+            viewModelScope.launch {
+                repository.save(translation.copy(id = 0L))
+            }
+        }
     }
