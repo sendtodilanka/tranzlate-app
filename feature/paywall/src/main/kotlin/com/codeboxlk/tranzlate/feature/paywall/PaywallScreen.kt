@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -44,7 +45,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
+import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 import kotlinx.coroutines.launch
+
+/**
+ * EXPANDED-window bound for the pricing column (issue #88 lens): medium fills
+ * per the owner + M3, but three plan cards across a 1200dp+ window break the
+ * 40-60cpl readability rule -- expanded re-centres at the old readable width.
+ */
+private val EXPANDED_CONTENT_MAX = 560.dp
 
 /** §4 visual anchoring: the Yearly card is deliberately wider than its siblings. */
 private const val YEARLY_CARD_WEIGHT = 1.4f
@@ -126,10 +135,18 @@ internal fun PaywallContent(
         Column(
             modifier =
                 Modifier
-                    // Issue #88 (owner + M3 breakpoints): fill the width — the
-                    // lg24 side padding already equals the medium margin.
-                    .fillMaxWidth()
-                    .padding(horizontal = spacing.lg24),
+                    // Issue #88 (owner + M3 breakpoints): compact + medium FILL
+                    // the width — the lg24 side padding already equals the medium
+                    // margin. EXPANDED re-bounds the column (lens catch: three
+                    // plan cards across ~1232dp break the 40-60cpl rule; M3
+                    // expanded prefers bounded or paned content).
+                    .then(
+                        if (rememberWindowInfo().isExpanded) {
+                            Modifier.widthIn(max = EXPANDED_CONTENT_MAX)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        },
+                    ).padding(horizontal = spacing.lg24),
         ) {
             // Play policy: always dismissible, and the ✕ comes first in traversal.
             IconButton(

@@ -64,3 +64,13 @@ Resizable emulator (owner mandate): phone portrait (unchanged 16dp), tablet
 portrait + unfolded portrait (full width, 24dp margins, bar/content aligned),
 sanity on phone landscape (untouched shapes). Screenshot set for the owner
 artifact. Full suite + `spotlessCheck detekt --rerun-tasks` + both APKs.
+
+## Lens round (cross-model, PR #89)
+- **OPEN-1 (fixed):** the 560dp paywall cap removal over-generalised to EXPANDED
+  windows — three plan cards stretched across ~1232dp on tablet landscape
+  (40–60cpl broken). Fix: `isExpanded` → `widthIn(max = 560.dp)` re-bound;
+  compact + medium still FILL per the owner + M3.
+- **Recorded (accepted for now):** Settings/History/Offline rows also span on
+  expanded landscape (~1264dp). These are list rows (not card clusters); the
+  owner's full-width direction stands until they flag the landscape look —
+  revisit together with the two-pane internal-margin follow-up.
