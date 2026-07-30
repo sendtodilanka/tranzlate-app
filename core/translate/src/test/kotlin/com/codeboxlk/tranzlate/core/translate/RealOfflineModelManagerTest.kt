@@ -42,34 +42,53 @@ class RealOfflineModelManagerTest {
     }
 
     @Test
-    fun `stop mid-download cancels the coroutine and the row never ghosts back`() =
+    fun `stop mid-download cancels the manager's job and the row never ghosts back`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store)
+            val manager = RealOfflineModelManager(store, backgroundScope)
 
-            val downloadJob = launch { manager.download("fr") }
+            manager.download("fr") // launches internally, returns at once
             runCurrent()
             assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
 
             manager.delete("fr") // the user's Stop
             runCurrent()
 
-            assertThat(store.downloadCancelled).isTrue() // the coroutine died at the gate
-            assertThat(downloadJob.isCancelled).isTrue()
+            assertThat(store.downloadCancelled).isTrue() // the internal job died at the gate
             assertThat(manager.modelStates().first()["fr"])
                 .isEqualTo(OfflineModelState.NotDownloaded) // never Downloaded, never Failed
+        }
+
+    @Test
+    fun `a caller's death never touches the download - the manager owns it`() =
+        runTest {
+            val store = FakeStore()
+            val manager = RealOfflineModelManager(store, backgroundScope)
+
+            // The "screen" launches and immediately dies (nav pop).
+            val screenScope = launch { manager.download("fr") }
+            runCurrent()
+            screenScope.cancel()
+            runCurrent()
+
+            // Still truthfully Downloading — the owner's leave-and-return scenario.
+            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
+
+            store.downloadGate.complete(Unit)
+            runCurrent()
+            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloaded)
         }
 
     @Test
     fun `a completed download publishes Downloaded through its own ownership`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store)
+            val manager = RealOfflineModelManager(store, backgroundScope)
 
-            val job = launch { manager.download("fr") }
+            manager.download("fr")
             runCurrent()
             store.downloadGate.complete(Unit)
-            job.join()
+            runCurrent()
 
             assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloaded)
         }
@@ -83,9 +102,10 @@ class RealOfflineModelManagerTest {
 
                     override fun capableTags(): Set<String> = setOf("fr")
                 }
-            val manager = RealOfflineModelManager(store)
+            val manager = RealOfflineModelManager(store, backgroundScope)
 
             manager.download("fr")
+            runCurrent()
 
             val state = manager.modelStates().first()["fr"]
             assertThat(state).isInstanceOf(OfflineModelState.Failed::class.java)

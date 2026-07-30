@@ -1,18 +1,19 @@
 package com.codeboxlk.tranzlate.feature.languagepicker
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DownloadForOffline
@@ -129,31 +130,17 @@ private fun OfflineRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .heightIn(min = 56.dp)
                 .padding(start = spacing.md16, end = spacing.xs4)
                 .testTag("tt_offline_row"),
     ) {
-        Column(modifier = Modifier.weight(1f).padding(vertical = spacing.sm8)) {
-            Text(text = row.name, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text =
-                    stringResource(
-                        when (row.state) {
-                            OfflineModelState.Downloaded -> R.string.offline_state_downloaded
-                            OfflineModelState.Downloading -> R.string.offline_state_downloading
-                            OfflineModelState.Deleting -> R.string.offline_state_deleting
-                            is OfflineModelState.Failed -> R.string.offline_state_failed
-                            else -> R.string.offline_state_available
-                        },
-                    ),
-                style = MaterialTheme.typography.bodySmall,
-                color =
-                    if (row.state is OfflineModelState.Failed) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            )
-        }
+        Text(
+            text = row.name,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        // Owner (issue #82): the STATE is the single trailing control — the
+        // old app's pattern (reference read, written fresh): ⬇ / ◌+⏹ / 🗑 / ↻.
         when (row.state) {
             OfflineModelState.NotDownloaded -> {
                 IconButton(
@@ -169,24 +156,25 @@ private fun OfflineRow(
             }
 
             OfflineModelState.Downloading -> {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 IconButton(
                     onClick = { onDelete(row.id) }, // the verified stop = delete-to-cancel
                     modifier = Modifier.testTag("tt_offline_stop"),
                 ) {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.offline_cd_stop, row.name),
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Icon(
+                            Icons.Filled.Stop,
+                            contentDescription = stringResource(R.string.offline_cd_stop, row.name),
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
             }
 
             OfflineModelState.Downloaded -> {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = null, // the sub-line says Downloaded
-                    tint = MaterialTheme.colorScheme.primary,
-                )
                 IconButton(
                     onClick = { onDelete(row.id) },
                     modifier = Modifier.testTag("tt_offline_delete"),
@@ -194,12 +182,16 @@ private fun OfflineRow(
                     Icon(
                         Icons.Outlined.Delete,
                         contentDescription = stringResource(R.string.offline_cd_delete, row.name),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
             OfflineModelState.Deleting -> {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp).testTag("tt_offline_deleting"),
+                    strokeWidth = 2.dp,
+                )
             }
 
             is OfflineModelState.Failed -> {

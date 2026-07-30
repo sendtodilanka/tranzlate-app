@@ -7,7 +7,11 @@ import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.TranslateRemoteModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
@@ -80,9 +85,18 @@ internal class MlKitModelStore
 @Singleton
 class RealOfflineModelManager internal constructor(
     private val store: ModelStore,
+    scope: CoroutineScope?,
 ) : OfflineModelManager {
     @Inject
-    internal constructor(store: MlKitModelStore) : this(store as ModelStore)
+    internal constructor(store: MlKitModelStore) : this(store as ModelStore, null)
+
+    /**
+     * Downloads run in the MANAGER's scope (issue #82): the owner's scenario —
+     * leave the screen mid-download, come back — must show the live truth, and
+     * a caller-scope coroutine died with the screen, stranding `Downloading`.
+     */
+    private val downloadScope =
+        scope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val downloaded = MutableStateFlow<Set<String>>(emptySet())
     private val transient = MutableStateFlow<Map<String, OfflineModelState>>(emptyMap())
@@ -95,27 +109,32 @@ class RealOfflineModelManager internal constructor(
 
     override suspend fun download(languageTag: String) {
         if (!store.isCapable(languageTag)) return
-        val job = currentCoroutineContext().job
-        activeDownloads[languageTag] = job
+        if (activeDownloads.containsKey(languageTag)) return // one in-flight per tag
         setTransient(languageTag, OfflineModelState.Downloading)
-        try {
-            store.download(languageTag)
-            if (owns(languageTag, job)) {
-                refreshDownloaded()
-                clearTransient(languageTag)
+        val job =
+            downloadScope.launch(start = CoroutineStart.LAZY) {
+                val self = currentCoroutineContext().job
+                try {
+                    store.download(languageTag)
+                    if (owns(languageTag, self)) {
+                        refreshDownloaded()
+                        clearTransient(languageTag)
+                    }
+                } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                    // Cancelled by Stop: delete() owns the row's state now.
+                    throw rethrown
+                } catch (
+                    @Suppress("TooGenericExceptionCaught", "SwallowedException") cause: Exception,
+                ) {
+                    if (owns(languageTag, self)) {
+                        setTransient(languageTag, OfflineModelState.Failed(cause.toFailure()))
+                    }
+                } finally {
+                    activeDownloads.remove(languageTag, self)
+                }
             }
-        } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
-            // Cancelled by Stop: delete() owns the row's state now — touch nothing.
-            throw rethrown
-        } catch (
-            @Suppress("TooGenericExceptionCaught", "SwallowedException") cause: Exception,
-        ) {
-            if (owns(languageTag, job)) {
-                setTransient(languageTag, OfflineModelState.Failed(cause.toFailure()))
-            }
-        } finally {
-            activeDownloads.remove(languageTag, job)
-        }
+        activeDownloads[languageTag] = job
+        job.start() // registered BEFORE it runs — Stop can never miss the window
     }
 
     override suspend fun delete(languageTag: String) {
