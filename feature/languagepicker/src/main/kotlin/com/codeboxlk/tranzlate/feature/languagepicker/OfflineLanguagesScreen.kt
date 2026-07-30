@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DownloadForOffline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -23,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -32,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
+import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 
@@ -47,11 +50,15 @@ fun OfflineLanguagesScreen(
     modifier: Modifier = Modifier,
 ) {
     val rows by viewModel.rows.collectAsStateWithLifecycle()
+    val pendingConsent by viewModel.pendingConsent.collectAsStateWithLifecycle()
     OfflineLanguagesContent(
         rows = rows,
         onDownload = viewModel::download,
         onDelete = viewModel::delete,
         onBack = onBack,
+        pendingConsent = pendingConsent,
+        onDownloadAnyway = viewModel::downloadAnyway,
+        onDismissConsent = viewModel::dismissConsent,
         modifier = modifier,
     )
 }
@@ -63,8 +70,34 @@ internal fun OfflineLanguagesContent(
     onDelete: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    pendingConsent: String? = null,
+    onDownloadAnyway: () -> Unit = {},
+    onDismissConsent: () -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
+    // Issue #90: metered-download consent — ONE dialog at peak intent, wifi
+    // waiting keeps the row NotDownloaded (no spinner, no dead end).
+    pendingConsent?.let { id ->
+        val name = rows.firstOrNull { it.id == id }?.name ?: id
+        AlertDialog(
+            onDismissRequest = onDismissConsent,
+            title = { Text(stringResource(R.string.offline_data_dialog_title, name)) },
+            text = { Text(stringResource(R.string.offline_data_dialog_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = onDownloadAnyway,
+                    modifier = Modifier.testTag("tt_offline_data_once"),
+                ) { Text(stringResource(R.string.offline_data_dialog_once)) }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = onDismissConsent,
+                    modifier = Modifier.testTag("tt_offline_data_wait"),
+                ) { Text(stringResource(R.string.offline_data_dialog_wait)) }
+            },
+            modifier = Modifier.testTag("tt_offline_data_dialog"),
+        )
+    }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface,
@@ -134,11 +167,34 @@ private fun OfflineRow(
                 .padding(start = spacing.md16, end = spacing.xs4)
                 .testTag("tt_offline_row"),
     ) {
-        Text(
-            text = row.name,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = row.name,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            // Issue #90 (EDGE_CASES no-dead-end): a Failed row explains WHY —
+            // ↻ on a full disk re-fails silently otherwise. This is an error
+            // line, not the always-on sub-line the owner removed in #82.
+            if (row.state is OfflineModelState.Failed) {
+                Text(
+                    text =
+                        stringResource(
+                            when (row.state.cause) {
+                                OfflineModelFailure.STORAGE -> R.string.offline_error_storage
+
+                                OfflineModelFailure.NETWORK,
+                                OfflineModelFailure.WIFI_REQUIRED,
+                                -> R.string.offline_error_network
+
+                                OfflineModelFailure.UNKNOWN -> R.string.offline_error_generic
+                            },
+                        ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag("tt_offline_error_line"),
+                )
+            }
+        }
         // Owner (issue #82): the STATE is the single trailing control — the
         // old app's pattern (reference read, written fresh): ⬇ / ◌+⏹ / 🗑 / ↻.
         when (row.state) {

@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.core.translate
 
+import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
@@ -58,6 +59,10 @@ internal class MlKitModelStore
             manager
                 .download(
                     TranslateRemoteModel.Builder(tag).build(),
+                    // Deliberately NO requireWifi (issue #90 ruling): the metered
+                    // gate is a consent dialog in OUR code before this is ever
+                    // reached — requireWifi's mid-download behaviour is untested
+                    // (silent-hang risk, research doc X6).
                     DownloadConditions.Builder().build(),
                 ).await()
         }
@@ -85,10 +90,14 @@ internal class MlKitModelStore
 @Singleton
 class RealOfflineModelManager internal constructor(
     private val store: ModelStore,
+    private val storageProbe: StorageProbe,
     scope: CoroutineScope?,
 ) : OfflineModelManager {
     @Inject
-    internal constructor(store: MlKitModelStore) : this(store as ModelStore, null)
+    internal constructor(
+        store: MlKitModelStore,
+        storageProbe: StorageProbe,
+    ) : this(store as ModelStore, storageProbe, null)
 
     /**
      * Downloads run in the MANAGER's scope (issue #82): the owner's scenario —
@@ -110,6 +119,12 @@ class RealOfflineModelManager internal constructor(
     override suspend fun download(languageTag: String) {
         if (!store.isCapable(languageTag)) return
         if (activeDownloads.containsKey(languageTag)) return // one in-flight per tag
+        // Issue #90 pre-flight: refuse BEFORE enqueue when the disk can't hold
+        // a model — a partial download + a generic failure is a dead end.
+        if (storageProbe.freeBytes() < REQUIRED_FREE_BYTES) {
+            setTransient(languageTag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+            return
+        }
         setTransient(languageTag, OfflineModelState.Downloading)
         val job =
             downloadScope.launch(start = CoroutineStart.LAZY) {
@@ -194,6 +209,12 @@ class RealOfflineModelManager internal constructor(
         transient.update { it - tag }
     }
 }
+
+/**
+ * Pre-flight free-space budget (issue #90): the observed de<->en pair is
+ * 45.7MB on disk (research E3) — x3 headroom for the store + unzip staging.
+ */
+private const val REQUIRED_FREE_BYTES = 150L * 1024 * 1024
 
 private fun Exception.toFailure(): OfflineModelFailure =
     when (this) {

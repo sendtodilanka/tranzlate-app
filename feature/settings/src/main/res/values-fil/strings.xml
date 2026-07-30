@@ -13,4 +13,7 @@
     <string name="settings_data_header">Ang iyong data</string>
     <string name="settings_history_label">History at naka-save</string>
     <string name="settings_history_supporting">Bawat pagsasalin, at ang mga na-star mo</string>
+    <string name="settings_downloads_header">Mga download</string>
+    <string name="settings_mobile_data_label">Palaging payagan ang mobile data</string>
+    <string name="settings_mobile_data_supporting">Humigit-kumulang 30 MB bawat language pack. Kapag naka-off, tatanungin ka muna bago gumamit ng mobile data</string>
 </resources>

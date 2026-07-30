@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.model.ThemeMode
 import com.codeboxlk.tranzlate.core.model.ThemeSettings
+import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.ThemePrefsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -23,6 +25,7 @@ class SettingsViewModel
     @Inject
     constructor(
         private val themePrefs: ThemePrefsRepository,
+        private val downloadPrefs: DownloadPrefsRepository,
     ) : ViewModel() {
         /**
          * `null` = not read yet, so the screen can render nothing rather than a
@@ -42,6 +45,20 @@ class SettingsViewModel
 
         fun onDynamicColorChanged(enabled: Boolean) {
             viewModelScope.launch { themePrefs.setDynamicColor(enabled) }
+        }
+
+        /** Issue #90: standing metered-download consent (null = not read yet). */
+        val allowMobileData: StateFlow<Boolean?> =
+            downloadPrefs.allowMobileData
+                .map<Boolean, Boolean?> { it }
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS),
+                    initialValue = null,
+                )
+
+        fun onAllowMobileDataChanged(enabled: Boolean) {
+            viewModelScope.launch { downloadPrefs.setAllowMobileData(enabled) }
         }
 
         private companion object {

@@ -2,10 +2,12 @@ package com.codeboxlk.tranzlate.core.data.di
 
 import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
 import com.codeboxlk.tranzlate.core.data.config.StaticRemoteConfigSource
+import com.codeboxlk.tranzlate.core.data.repository.DownloadPrefsRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.LanguageRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.ThemePrefsRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.TranslatePrefsRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.TranslationRepositoryImpl
+import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.ThemePrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
@@ -34,6 +36,9 @@ internal abstract class DataModule {
 
     @Binds
     abstract fun themePrefsRepository(impl: ThemePrefsRepositoryImpl): ThemePrefsRepository
+
+    @Binds
+    abstract fun downloadPrefsRepository(impl: DownloadPrefsRepositoryImpl): DownloadPrefsRepository
 
     @Binds
     abstract fun remoteConfigSource(impl: StaticRemoteConfigSource): RemoteConfigSource

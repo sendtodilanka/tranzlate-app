@@ -18,4 +18,11 @@ interface ConnectivityMonitor {
 
     /** Synchronous snapshot for pre-flight checks. */
     fun isOnline(): Boolean
+
+    /**
+     * Metered snapshot for the model-download consent gate (issue #90 ruling:
+     * metered is CONSENT, not availability — the gate lives in our code, not
+     * in MLKit's untested `requireWifi`).
+     */
+    fun isMetered(): Boolean
 }

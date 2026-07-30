@@ -73,6 +73,7 @@ class RealTranslatorTest {
         override val qonversionKey: String = ""
         override val defaultSourceLang: String = "en"
         override val defaultTargetLang: String = "fr"
+        override val defaultAllowMobileData: Boolean = false
         override val featureToggles: Set<FeatureToggle> = emptySet()
     }
 

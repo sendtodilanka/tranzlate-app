@@ -87,12 +87,24 @@ class TranzlatePreferencesDataSource
             dataStore.edit { it[KEY_DYNAMIC_COLOR] = value }
         }
 
+        /**
+         * Issue #90 consent gate. The DEFAULT is per-brand (AppConfig), so the
+         * caller supplies it — this layer stays config-blind.
+         */
+        fun allowMobileData(defaultValue: Boolean): Flow<Boolean> =
+            preferences.map { it[KEY_ALLOW_MOBILE_DATA] ?: defaultValue }
+
+        suspend fun setAllowMobileData(value: Boolean) {
+            dataStore.edit { it[KEY_ALLOW_MOBILE_DATA] = value }
+        }
+
         companion object {
             private val KEY_SOURCE_LANG = stringPreferencesKey("prefs.source_lang")
             private val KEY_TARGET_LANG = stringPreferencesKey("prefs.target_lang")
             private val KEY_TEXT_MODE = stringPreferencesKey("prefs.text_mode")
             private val KEY_THEME = intPreferencesKey("prefs.theme")
             private val KEY_DYNAMIC_COLOR = booleanPreferencesKey("prefs.dynamic_color")
+            private val KEY_ALLOW_MOBILE_DATA = booleanPreferencesKey("prefs.allow_mobile_data")
 
             const val DEFAULT_SOURCE_LANG = "en"
             const val DEFAULT_TARGET_LANG = "fr"
