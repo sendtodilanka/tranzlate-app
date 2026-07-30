@@ -25,6 +25,13 @@ interface AppConfig {
 
     val defaultTargetLang: String
 
+    /**
+     * Fresh-install default for `prefs.allow_mobile_data` (issue #90): false =
+     * wifi-only downloads until the user consents. Per-brand — a data-cost-
+     * sensitive flavor ships false; a premium brand may flip it.
+     */
+    val defaultAllowMobileData: Boolean
+
     /** Parsed ONCE from the flavor's FEATURES csv (plan §4 — typed set, no re-parsing). */
     val featureToggles: Set<FeatureToggle>
 }

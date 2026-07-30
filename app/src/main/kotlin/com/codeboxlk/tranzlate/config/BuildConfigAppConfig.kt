@@ -20,6 +20,7 @@ class BuildConfigAppConfig
         override val gctApiKey: String = BuildConfig.GCT_API_KEY
         override val defaultSourceLang: String = BuildConfig.DEFAULT_SOURCE_LANG
         override val defaultTargetLang: String = BuildConfig.DEFAULT_TARGET_LANG
+        override val defaultAllowMobileData: Boolean = BuildConfig.DEFAULT_ALLOW_MOBILE_DATA
         override val featureToggles: Set<FeatureToggle> by lazy {
             FeatureToggle.parseCsv(BuildConfig.FEATURES)
         }

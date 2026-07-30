@@ -61,12 +61,15 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val allowMobileData by viewModel.allowMobileData.collectAsStateWithLifecycle()
     SettingsContent(
         settings = settings,
         onBack = onBack,
         onOpenHistory = onOpenHistory,
         onThemeModeSelected = viewModel::onThemeModeSelected,
         onDynamicColorChanged = viewModel::onDynamicColorChanged,
+        allowMobileData = allowMobileData,
+        onAllowMobileDataChanged = viewModel::onAllowMobileDataChanged,
         modifier = modifier,
     )
 }
@@ -85,6 +88,8 @@ fun SettingsContent(
     onDynamicColorChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onOpenHistory: () -> Unit = {},
+    allowMobileData: Boolean? = null,
+    onAllowMobileDataChanged: (Boolean) -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     Scaffold(
@@ -153,8 +158,56 @@ fun SettingsContent(
                         )
                     }
                 }
+
+                // Issue #90: the STANDING metered-download consent — the per-tap
+                // dialog covers the one-off case; this suppresses it for good.
+                SectionHeader(stringResource(R.string.settings_downloads_header))
+                allowMobileData?.let { allowed ->
+                    MobileDataRow(enabled = allowed, onToggle = onAllowMobileDataChanged)
+                }
             }
         }
+    }
+}
+
+/** Issue #90 — standing consent for downloads over mobile data. */
+@Composable
+private fun MobileDataRow(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = enabled,
+                    role = Role.Switch,
+                    onValueChange = onToggle,
+                ).heightIn(min = Dimensions.touchTargetMin + spacing.md16)
+                .testTag("tt_settings_mobile_data")
+                .padding(horizontal = spacing.md16, vertical = spacing.sm8),
+    ) {
+        Column(Modifier.weight(1f).padding(end = spacing.md16)) {
+            Text(
+                text = stringResource(R.string.settings_mobile_data_label),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = stringResource(R.string.settings_mobile_data_supporting),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = null,
+            // Visual only — the row carries the semantics, so clear the Switch's.
+            modifier = Modifier.clearAndSetSemantics {},
+        )
     }
 }
 

@@ -42,6 +42,8 @@ android {
             buildConfigField("String", "AD_UNIT_INTERSTITIAL", "\"\"")
             buildConfigField("String", "DEFAULT_SOURCE_LANG", "\"en\"")
             buildConfigField("String", "DEFAULT_TARGET_LANG", "\"fr\"")
+            // Issue #90: wifi-only model downloads by default for this brand.
+            buildConfigField("boolean", "DEFAULT_ALLOW_MOBILE_DATA", "false")
             buildConfigField("String", "FEATURES", "\"text,dialog,camera,history,settings\"")
         }
         // Brand 2 (future, plan §4 — owner's live "French Translator - English" app):

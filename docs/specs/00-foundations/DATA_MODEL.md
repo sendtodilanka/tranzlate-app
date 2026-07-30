@@ -39,6 +39,7 @@ Pre-launch: `fallbackToDestructiveMigration(dropAllTables = true)` — no shippe
 | `prefs.text_mode` | String (ModeId) | `AUTO` |
 | `prefs.theme` | Int | 0 (system) · `ThemeMode.storedValue`: 0 SYSTEM · 1 LIGHT · 2 DARK; unknown → SYSTEM |
 | `prefs.dynamic_color` | Boolean | `false` — Material You is opt-in; the GT-identical static palette is the brand identity (issue #15). Stored on every API level, honoured only on 31+. |
+| `prefs.allow_mobile_data` | Boolean | brand default (`AppConfig.defaultAllowMobileData`, tranzlate = `false`) — issue #90 standing metered-download consent; the per-tap dialog covers one-off yes |
 | `prefs.onboarding_complete` | Boolean | `false` — first-run once-flag; set `true` after the Welcome → language-pick → home onboarding completes. Gates the first-run flow so it shows exactly once (issue #26). |
 
 ## Usage (DataStore)

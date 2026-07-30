@@ -13,4 +13,9 @@ class FakeConnectivityMonitor(
     override val online: Flow<Boolean> get() = state
 
     override fun isOnline(): Boolean = state.value
+
+    /** Tests flip this to simulate a mobile-data network (issue #90 gate). */
+    var metered: Boolean = false
+
+    override fun isMetered(): Boolean = metered
 }

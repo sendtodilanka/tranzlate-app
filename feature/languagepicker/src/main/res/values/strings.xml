@@ -13,4 +13,11 @@
     <string name="offline_cd_stop">Stop downloading %1$s</string>
     <string name="offline_cd_delete">Delete %1$s</string>
     <string name="offline_cd_retry">Retry downloading %1$s</string>
+    <string name="offline_data_dialog_title">Download %1$s over mobile data?</string>
+    <string name="offline_data_dialog_body">Language packs are about 30 MB. You can wait for Wi-Fi instead.</string>
+    <string name="offline_data_dialog_once">Download once</string>
+    <string name="offline_data_dialog_wait">Wait for Wi-Fi</string>
+    <string name="offline_error_storage">Not enough space — free some storage, then retry</string>
+    <string name="offline_error_network">Download failed — check your connection, then retry</string>
+    <string name="offline_error_generic">Something went wrong — retry</string>
 </resources>

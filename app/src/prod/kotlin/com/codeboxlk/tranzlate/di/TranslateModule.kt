@@ -16,6 +16,7 @@ import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.common.DefaultDispatcherProvider
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
+import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.translate.RealOfflineModelManager
 import com.codeboxlk.tranzlate.core.translate.RealTranslator
@@ -95,6 +96,12 @@ object TranslateModule {
     fun connectivityMonitor(
         @ApplicationContext context: Context,
     ): ConnectivityMonitor = AndroidConnectivityMonitor(context)
+
+    @Provides
+    @Singleton
+    fun storageProbe(
+        @ApplicationContext context: Context,
+    ): StorageProbe = AndroidStorageProbe(context)
 
     @Provides
     @Singleton

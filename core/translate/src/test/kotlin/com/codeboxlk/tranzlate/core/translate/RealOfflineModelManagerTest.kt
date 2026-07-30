@@ -1,5 +1,7 @@
 package com.codeboxlk.tranzlate.core.translate
 
+import com.codeboxlk.tranzlate.core.common.StorageProbe
+import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
@@ -42,10 +44,43 @@ class RealOfflineModelManagerTest {
     }
 
     @Test
+    fun `low disk refuses BEFORE enqueue - Failed(STORAGE), store never touched`() =
+        runTest {
+            val store = FakeStore()
+            val probe = FakeStorageProbe(free = 10L * 1024 * 1024) // 10MB < the 150MB budget
+            val manager = RealOfflineModelManager(store, probe, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.modelStates().first()["fr"])
+                .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+            assertThat(store.committed).isEmpty() // no partial download ever started
+        }
+
+    @Test
+    fun `freed disk lets the SAME row retry after Failed(STORAGE)`() =
+        runTest {
+            val store = FakeStore()
+            val probe = FakeStorageProbe(free = 0L)
+            val manager = RealOfflineModelManager(store, probe, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+            assertThat(manager.modelStates().first()["fr"])
+                .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+
+            probe.free = Long.MAX_VALUE // user freed space; retry must not be a dead end
+            manager.download("fr")
+            runCurrent()
+            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
+        }
+
+    @Test
     fun `stop mid-download cancels the manager's job and the row never ghosts back`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
 
             manager.download("fr") // launches internally, returns at once
             runCurrent()
@@ -63,7 +98,7 @@ class RealOfflineModelManagerTest {
     fun `a caller's death never touches the download - the manager owns it`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
 
             // The "screen" launches and immediately dies (nav pop).
             val screenScope = launch { manager.download("fr") }
@@ -93,7 +128,7 @@ class RealOfflineModelManagerTest {
 
                     override fun capableTags(): Set<String> = setOf("fr")
                 }
-            val manager = RealOfflineModelManager(store, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
 
             val screen = launch { manager.delete("fr") }
             runCurrent()
@@ -111,7 +146,7 @@ class RealOfflineModelManagerTest {
     fun `a second download tap while one is in flight is a no-op`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -128,7 +163,7 @@ class RealOfflineModelManagerTest {
     fun `a completed download publishes Downloaded through its own ownership`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -147,7 +182,7 @@ class RealOfflineModelManagerTest {
 
                     override fun capableTags(): Set<String> = setOf("fr")
                 }
-            val manager = RealOfflineModelManager(store, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -156,3 +191,11 @@ class RealOfflineModelManagerTest {
             assertThat(state).isInstanceOf(OfflineModelState.Failed::class.java)
         }
 }
+
+private class FakeStorageProbe(
+    var free: Long,
+) : StorageProbe {
+    override fun freeBytes(): Long = free
+}
+
+private val plentyFree = FakeStorageProbe(free = Long.MAX_VALUE)

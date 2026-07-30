@@ -59,4 +59,8 @@ class AndroidConnectivityMonitor(
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
             capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
+
+    // Platform's own metered judgement (VPN/hotspot edge reads are why the
+    // gate is a consent dialog + user override, never a hard block — #90).
+    override fun isMetered(): Boolean = manager.isActiveNetworkMetered
 }
