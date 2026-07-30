@@ -686,32 +686,13 @@ private fun ColumnScope.ComposerEditBody(
             stringResource(R.string.cd_text_counter, input.length, TEXT_CHAR_LIMIT)
         }
 
-    if (minimalIme) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f),
-        ) {
-            ComposerField(
-                input = input,
-                hasText = hasText,
-                focusRequester = focusRequester,
-                onInputChange = onInputChange,
-                onTranslate = onTranslate,
-                inputDescription = inputDescription,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-            )
-            Spacer(Modifier.width(spacing.sm8))
-            // Counter stays even here: the only over-limit signal + the P0-3
-            // announce live on this node (lens catch — a bare disabled action
-            // with no reason is an EDGE_CASES dead end).
-            CharCounter(length = input.length, overLimit = overLimit, counterDescription = counterDescription)
-            Spacer(Modifier.width(spacing.sm8))
-            EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
-        }
-        return
-    }
-
-    if (compactLandscape) {
+    // Issue #97 (owner video, debate-ruled): the FIELD renders at exactly ONE
+    // source position inside a stable parent Row. Arrangement changes must
+    // never dispose the focused node — a different call site made Compose
+    // clear focus mid-IME-slide, the InputConnection dropped, and the
+    // keyboard dismissed itself in a loop (landscape show-then-hide).
+    // minimalIme / compactLandscape only toggle SIBLING chrome + modifiers.
+    if (compactLandscape && !minimalIme) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
@@ -737,20 +718,34 @@ private fun ColumnScope.ComposerEditBody(
             EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
         }
     }
-    ComposerField(
-        input = input,
-        hasText = hasText,
-        focusRequester = focusRequester,
-        onInputChange = onInputChange,
-        onTranslate = onTranslate,
-        inputDescription = inputDescription,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier =
             Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(top = spacing.sm8),
-    )
-    if (input.isEmpty()) {
+                .padding(top = if (minimalIme) 0.dp else spacing.sm8),
+    ) {
+        ComposerField(
+            input = input,
+            hasText = hasText,
+            focusRequester = focusRequester,
+            onInputChange = onInputChange,
+            onTranslate = onTranslate,
+            inputDescription = inputDescription,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+        if (minimalIme) {
+            Spacer(Modifier.width(spacing.sm8))
+            // Counter stays even here: the only over-limit signal + the P0-3
+            // announce live on this node (lens catch — a bare disabled action
+            // with no reason is an EDGE_CASES dead end).
+            CharCounter(length = input.length, overLimit = overLimit, counterDescription = counterDescription)
+            Spacer(Modifier.width(spacing.sm8))
+            EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
+        }
+    }
+    if (!minimalIme && input.isEmpty()) {
         TextButton(onClick = onPaste, modifier = Modifier.testTag("tt_composer_paste")) {
             Icon(
                 painterResource(DsR.drawable.ic_content_paste),
@@ -761,7 +756,7 @@ private fun ColumnScope.ComposerEditBody(
             Text(stringResource(R.string.composer_paste))
         }
     }
-    if (compactLandscape) return
+    if (compactLandscape || minimalIme) return
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(top = spacing.sm8),
