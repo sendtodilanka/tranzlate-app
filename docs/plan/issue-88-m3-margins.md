@@ -53,8 +53,9 @@ Per screen:
 
 ## Follow-ups recorded (not this PR)
 
-- Landscape/two-pane INTERNAL margins are 16dp from the #56 device-tuning;
-  M3 expanded says 24dp. Align in an adaptive pass with fresh device frames.
+- ~~Landscape/two-pane INTERNAL margins are 16dp~~ (HALF-WRONG — issue #92
+  debate corrected it: Home two-pane was already 24/24; only the composer's
+  landscape shapes carried 16dp. Aligned in #92 with fresh device frames.)
 - 40–60 cpl: full-width result text on 800dp may exceed 60cpl for long
   translations; revisit type ramp only if the owner flags readability.
 
