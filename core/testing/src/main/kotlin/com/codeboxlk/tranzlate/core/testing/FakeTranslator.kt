@@ -88,6 +88,9 @@ class FakeTranslator(
                 // G7 — src "auto", detect→en, resolves offline-first (rev.2: detect is typed)
                 GoldenKey("Good morning", "auto", "fr", ModeId.AUTO) to
                     TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT, detectedSource = "en"),
+                // G12 — the C-7 reverse of G1/G2 (issue #84): fr→en of G1's output
+                GoldenKey("Bonjour (fake)", "fr", "en", ModeId.AUTO) to
+                    TranslationOutcome.Success("Good morning (fake)", Engine.OFFLINE_MLKIT),
                 // G8  `நன்றி` ta→en ML2_MINI — intentionally NO row → Error(attempt UNSUPPORTED_PAIR)
                 // G9  blank input — behaviour → EmptyInput (rev.2: validation, not an attempt)
                 // G10 `Offline test` — behaviour via forcedFailure=OFFLINE → Error(attempt OFFLINE)

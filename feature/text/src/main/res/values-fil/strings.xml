@@ -52,7 +52,6 @@
     <!-- Guided messages -->
     <string name="text_guided_mode">Darating ang pagpili ng engine sa brains update</string>
     <string name="text_guided_voice">Darating ang voice input sa voice update</string>
-    <string name="text_guided_tts">Darating ang text-to-speech sa voice update</string>
     <string name="text_guided_more">Darating ang iba pang opsyon sa susunod na update</string>
     <string name="text_guided_feedback">Darating ang feedback sa susunod na update</string>
 
@@ -106,4 +105,6 @@
     <string name="text_paste_empty">Walang laman ang clipboard.</string>
     <string name="text_swap_needs_detect">Magsalin muna para malaman ang wika bago baligtarin.</string>
     <string name="cd_text_counter_limit">Naabot na ang %1$d-character na limit</string>
+    <string name="cd_speak_stop">Itigil ang pagbabasa</string>
+    <string name="text_tts_unavailable">Hindi available ang speech para sa wikang ito sa device na ito.</string>
 </resources>
