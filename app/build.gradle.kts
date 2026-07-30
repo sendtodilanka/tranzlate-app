@@ -15,6 +15,23 @@ android {
         testInstrumentationRunner = "com.codeboxlk.tranzlate.HiltTestRunner"
     }
 
+    buildTypes {
+        release {
+            // Issue #5 (debate-ruled): R8 on, default-optimize file + ONE
+            // justified project rule (persisted enums). Library consumer rules
+            // (MLKit/OkHttp/Hilt/Room/Compose) cover the rest — no hand keeps.
+            // NO signingConfig on purpose: per-brand keystores land with the
+            // Qonversion/ads/release batch; CI's `gradlew build` already
+            // assembles tranzlateProdRelease, so R8 gates every PR.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+    }
+
     // ---------------------------------------------------------------------------------
     // WHITE-LABEL BRAND CATALOG (plan §4 R1): brands are DECLARATIVE DATA in this
     // build script — never a .kt file. Adding an app = adding one create("<brand>")
