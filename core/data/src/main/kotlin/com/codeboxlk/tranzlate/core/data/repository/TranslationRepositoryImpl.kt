@@ -29,6 +29,9 @@ class TranslationRepositoryImpl
         override fun history(): Flow<List<Translation>> =
             translationDao.history().map { entities -> entities.map(TranslationEntity::toDomain) }
 
+        override fun recent(limit: Int): Flow<List<Translation>> =
+            translationDao.recent(limit).map { entities -> entities.map(TranslationEntity::toDomain) }
+
         override fun favourites(): Flow<List<Translation>> =
             translationDao.favourites().map { entities -> entities.map(TranslationEntity::toDomain) }
 

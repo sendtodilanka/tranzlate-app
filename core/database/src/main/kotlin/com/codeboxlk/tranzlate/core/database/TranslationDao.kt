@@ -11,6 +11,9 @@ interface TranslationDao {
     @Query("SELECT * FROM translation ORDER BY created_at DESC")
     fun history(): Flow<List<TranslationEntity>>
 
+    @Query("SELECT * FROM translation ORDER BY created_at DESC LIMIT :limit")
+    fun recent(limit: Int): Flow<List<TranslationEntity>>
+
     @Query("SELECT * FROM translation WHERE favourite = 1 ORDER BY created_at DESC")
     fun favourites(): Flow<List<TranslationEntity>>
 

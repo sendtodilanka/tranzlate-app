@@ -17,7 +17,7 @@ private const val RECENTS_LIMIT = 4
 private const val SUBSCRIBE_TIMEOUT_MS = 5_000L
 
 /**
- * Drawer state holder: Recents from [TranslationRepository.history] (the write
+ * Drawer state holder: Recents from [TranslationRepository.recent] (the write
  * side lives in TranslateTextUseCase — success-only, C-8 deduped).
  */
 @HiltViewModel
@@ -28,7 +28,6 @@ class DrawerViewModel
     ) : ViewModel() {
         val recents: StateFlow<List<Translation>> =
             translationRepository
-                .history()
-                .map { history -> history.take(RECENTS_LIMIT) }
+                .recent(RECENTS_LIMIT)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyList())
     }
