@@ -64,6 +64,44 @@ class HistoryViewModelTest {
         }
 
     @Test
+    fun `delete removes the row and undo re-inserts the SAME content`() =
+        runTest {
+            val repo = FakeTranslationRepository()
+            repo.save(row(1, "keep me", favourite = true, at = 42))
+            val saved = repo.saved.single()
+            val vm = HistoryViewModel(repo)
+
+            vm.delete(saved)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertThat(repo.saved).isEmpty()
+
+            vm.undoDelete(saved)
+            dispatcher.scheduler.advanceUntilIdle()
+
+            val restored = repo.saved.single()
+            assertThat(restored.sourceText).isEqualTo("keep me")
+            assertThat(restored.favourite).isTrue() // star survives the round trip
+            assertThat(restored.createdAt).isEqualTo(42)
+        }
+
+    @Test
+    fun `undo after the tuple was re-translated is a silent no-op - never a crash`() =
+        runTest {
+            val repo = FakeTranslationRepository()
+            repo.save(row(1, "raced"))
+            val saved = repo.saved.single()
+            val vm = HistoryViewModel(repo)
+            vm.delete(saved)
+            dispatcher.scheduler.advanceUntilIdle()
+            repo.save(row(9, "raced")) // the same tuple came back before Undo
+
+            vm.undoDelete(saved) // IGNORE(-1) path
+
+            dispatcher.scheduler.advanceUntilIdle()
+            assertThat(repo.saved).hasSize(1) // no duplicate, no crash
+        }
+
+    @Test
     fun `toggle flips the row's favourite in the repository`() =
         runTest {
             val repo = FakeTranslationRepository()

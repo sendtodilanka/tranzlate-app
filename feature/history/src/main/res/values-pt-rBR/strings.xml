@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_title">Histórico</string>
-    <string name="history_tab_all">Histórico</string>
     <string name="history_tab_saved">Salvas</string>
     <string name="history_empty">Nenhuma tradução ainda — traduza algo e ela aparece aqui.</string>
     <string name="history_saved_empty">Nada salvo ainda — toque no marcador em qualquer tradução para guardá-la aqui.</string>
@@ -10,4 +9,8 @@
     <string name="history_cd_open">Abrir no tradutor</string>
     <string name="history_cd_save">Salvar tradução</string>
     <string name="history_cd_unsave">Remover das salvas</string>
+    <string name="history_filter_all">Todas</string>
+    <string name="history_deleted">Tradução excluída</string>
+    <string name="history_undo">Desfazer</string>
+    <string name="history_action_delete">Excluir tradução</string>
 </resources>

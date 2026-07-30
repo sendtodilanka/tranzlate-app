@@ -17,4 +17,7 @@
          name from their own text (selectable/toggleable merge the child Text), so
          only the icon-only back button needs an explicit contentDescription. -->
     <string name="cd_settings_back">Back</string>
+    <string name="settings_data_header">Your data</string>
+    <string name="settings_history_label">History &amp; saved</string>
+    <string name="settings_history_supporting">Every translation, and the ones you starred</string>
 </resources>

@@ -10,4 +10,7 @@
     <string name="settings_dynamic_color_supporting">Usar cores do seu papel de parede</string>
     <string name="settings_dynamic_color_unavailable">Requer Android 12 ou mais recente</string>
     <string name="cd_settings_back">Voltar</string>
+    <string name="settings_data_header">Seus dados</string>
+    <string name="settings_history_label">Histórico e salvas</string>
+    <string name="settings_history_supporting">Toda tradução, e as que você marcou</string>
 </resources>

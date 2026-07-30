@@ -56,6 +56,8 @@ class TranslationRepositoryImpl
 
         override suspend fun save(translation: Translation): Long = translationDao.insert(translation.toEntity())
 
+        override suspend fun delete(id: Long) = translationDao.delete(id)
+
         override suspend fun setFavourite(
             id: Long,
             favourite: Boolean,

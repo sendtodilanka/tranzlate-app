@@ -18,7 +18,6 @@
     <string name="cd_text_mic">Translate by voice</string>
     <string name="cd_text_mode_chip">Translation model, %1$s</string>
     <string name="text_mode_automatic">Automatic</string>
-    <string name="cd_text_menu">Open navigation</string>
     <string name="cd_text_clear">New translation</string>
     <string name="cd_text_edit">Edit text</string>
 

@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.feature.settings
 
 import android.os.Build
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,12 +55,14 @@ private val dynamicColorAvailable: Boolean = Build.VERSION.SDK_INT >= Build.VERS
 fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenHistory: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     SettingsContent(
         settings = settings,
         onBack = onBack,
+        onOpenHistory = onOpenHistory,
         onThemeModeSelected = viewModel::onThemeModeSelected,
         onDynamicColorChanged = viewModel::onDynamicColorChanged,
         modifier = modifier,
@@ -79,6 +82,7 @@ fun SettingsContent(
     onThemeModeSelected: (ThemeMode) -> Unit,
     onDynamicColorChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenHistory: () -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     Scaffold(
@@ -113,6 +117,34 @@ fun SettingsContent(
             ThemeModeGroup(selected = settings.mode, onSelect = onThemeModeSelected)
 
             DynamicColorRow(enabled = settings.dynamicColor, onToggle = onDynamicColorChanged)
+
+            // Issue #80 (owner): History lives HERE — the design has no drawer,
+            // and Offline languages already has its Home entries.
+            SectionHeader(stringResource(R.string.settings_data_header))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = Dimensions.touchTargetMin)
+                        .clickable(
+                            role = Role.Button,
+                            onClick = onOpenHistory,
+                        ).padding(horizontal = spacing.lg24)
+                        .testTag("tt_settings_history"),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.settings_history_label),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_history_supporting),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }

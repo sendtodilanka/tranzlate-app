@@ -26,8 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -106,7 +104,6 @@ fun HomeScreen(
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
-    onOpenDrawer: () -> Unit,
     modifier: Modifier = Modifier,
     previewCardModifier: Modifier = Modifier,
 ) {
@@ -125,7 +122,6 @@ fun HomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenPaywall = onOpenPaywall,
         showProChip = !isPro,
-        onOpenDrawer = onOpenDrawer,
         onOpenCamera = onOpenCamera,
         onOpenLanguages = onOpenLanguages,
         onOpenConversation = onOpenConversation,
@@ -151,7 +147,6 @@ fun HomeContent(
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
-    onOpenDrawer: () -> Unit,
     modifier: Modifier = Modifier,
     previewCardModifier: Modifier = Modifier,
 ) {
@@ -193,15 +188,6 @@ fun HomeContent(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().height(Dimensions.topBarHeight),
                     ) {
-                        IconButton(
-                            onClick = onOpenDrawer,
-                            modifier = Modifier.testTag("tt_home_menu"),
-                        ) {
-                            Icon(
-                                Icons.Outlined.Menu,
-                                contentDescription = stringResource(R.string.cd_text_menu),
-                            )
-                        }
                         Text(
                             text = stringResource(R.string.home_title),
                             style = MaterialTheme.typography.titleLarge,
@@ -280,15 +266,6 @@ fun HomeContent(
             ) {
                 TopAppBar(
                     title = {
-                        IconButton(
-                            onClick = onOpenDrawer,
-                            modifier = Modifier.testTag("tt_home_menu"),
-                        ) {
-                            Icon(
-                                Icons.Outlined.Menu,
-                                contentDescription = stringResource(R.string.cd_text_menu),
-                            )
-                        }
                         Text(
                             text = stringResource(R.string.home_title),
                             style = MaterialTheme.typography.titleLarge,
@@ -854,7 +831,6 @@ private fun HomeContentPreview() {
             onPickLanguage = {},
             onOpenSettings = {},
             onOpenPaywall = {},
-            onOpenDrawer = {},
             onOpenCamera = {},
             onOpenLanguages = {},
             onOpenConversation = {},

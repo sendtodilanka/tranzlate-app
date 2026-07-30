@@ -75,6 +75,10 @@ class FakeTranslationRepository(
         return id
     }
 
+    override suspend fun delete(id: Long) {
+        store.value = store.value.filterNot { it.id == id }
+    }
+
     override suspend fun setFavourite(
         id: Long,
         favourite: Boolean,
