@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -34,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
@@ -104,45 +106,52 @@ fun SettingsContent(
     ) { contentPadding ->
         if (settings == null) return@Scaffold
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(contentPadding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(vertical = spacing.md16),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxSize().padding(contentPadding),
         ) {
-            SectionHeader(stringResource(R.string.settings_appearance_header))
-
-            SubGroupLabel(stringResource(R.string.settings_theme_label))
-            ThemeModeGroup(selected = settings.mode, onSelect = onThemeModeSelected)
-
-            DynamicColorRow(enabled = settings.dynamicColor, onToggle = onDynamicColorChanged)
-
-            // Issue #80 (owner): History lives HERE — the design has no drawer,
-            // and Offline languages already has its Home entries.
-            SectionHeader(stringResource(R.string.settings_data_header))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
                 modifier =
                     Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = Dimensions.touchTargetMin)
-                        .clickable(
-                            role = Role.Button,
-                            onClick = onOpenHistory,
-                        ).padding(horizontal = spacing.lg24)
-                        .testTag("tt_settings_history"),
+                        // Issue #86: the same centred cap every screen shares on
+                        // medium-width portrait (tablets/foldables).
+                        .widthIn(max = 600.dp)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = spacing.md16),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.settings_history_label),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_history_supporting),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                SectionHeader(stringResource(R.string.settings_appearance_header))
+
+                SubGroupLabel(stringResource(R.string.settings_theme_label))
+                ThemeModeGroup(selected = settings.mode, onSelect = onThemeModeSelected)
+
+                DynamicColorRow(enabled = settings.dynamicColor, onToggle = onDynamicColorChanged)
+
+                // Issue #80 (owner): History lives HERE — the design has no drawer,
+                // and Offline languages already has its Home entries.
+                SectionHeader(stringResource(R.string.settings_data_header))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = Dimensions.touchTargetMin)
+                            .clickable(
+                                role = Role.Button,
+                                onClick = onOpenHistory,
+                            ).padding(horizontal = spacing.lg24)
+                            .testTag("tt_settings_history"),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_history_label),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_history_supporting),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
