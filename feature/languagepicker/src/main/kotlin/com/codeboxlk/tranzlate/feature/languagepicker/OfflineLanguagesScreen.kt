@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -34,8 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
-
-private val CONTENT_MAX_WIDTH = 600.dp
+import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 
 /**
  * Screen B — "Offline translation" manager (spec 02 D-E2): only MLKit-capable
@@ -75,7 +73,9 @@ internal fun OfflineLanguagesContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            Column(modifier = Modifier.widthIn(max = CONTENT_MAX_WIDTH).fillMaxSize()) {
+            // Issue #88 (owner + M3 breakpoints): fill the width; the shim lands
+            // the 16dp-based rows on the 24dp medium margin.
+            Column(modifier = Modifier.fillMaxSize().padding(horizontal = adaptiveMarginShim())) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = spacing.xs4),

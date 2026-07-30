@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
@@ -49,11 +48,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.model.Translation
+import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 
 /** C-13 single-column rule: phones fill, tablets centre. */
-private val CONTENT_MAX_WIDTH = 600.dp
 
 private const val TAB_HISTORY = 0
 private const val TAB_SAVED = 1
@@ -121,7 +120,9 @@ internal fun HistoryContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            Column(modifier = Modifier.widthIn(max = CONTENT_MAX_WIDTH).fillMaxSize()) {
+            // Issue #88 (owner + M3 breakpoints): fill the width; the shim lands
+            // the 16dp-based rows on the 24dp medium margin.
+            Column(modifier = Modifier.fillMaxSize().padding(horizontal = adaptiveMarginShim())) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = spacing.xs4),

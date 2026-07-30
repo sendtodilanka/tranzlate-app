@@ -76,6 +76,7 @@ import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.ui.ShimmerResult
+import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
@@ -292,18 +293,18 @@ internal fun ComposerPaneContent(
         @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
         val splitImeVisible = layout.splitResultOnly && WindowInsets.isImeVisible
         val hideTopRow = isEditing && splitImeVisible
-        // Issue #86: on MEDIUM portrait the top row joins the card's centred cap.
-        val topRowCap =
+        // Issue #88 (owner + M3): medium portrait fills the width — the
+        // 16dp-based top row shifts by the margin shim so back + pills land
+        // on the 24dp M3 margin. Landscape keeps its #56 device-tuned frame.
+        val topRowFrame =
             if (layout.mediumWidth && !layout.expandedWidth) {
-                Modifier
-                    .widthIn(max = Dimensions.contentMaxWidthMedium)
-                    .align(Alignment.CenterHorizontally)
+                Modifier.padding(horizontal = adaptiveMarginShim())
             } else {
                 Modifier
             }
         Box(
             modifier =
-                topRowCap
+                topRowFrame
                     .clipToBounds()
                     .then(
                         if (hideTopRow) {
@@ -470,11 +471,14 @@ internal fun ComposerPaneContent(
             return
         }
 
-        val cardWidth =
+        // Issue #88 (owner + M3): the card fills the width — only the margin
+        // widens on medium portrait (16dp -> 24dp); landscape keeps the #56
+        // device-tuned 16dp frame.
+        val cardMargin =
             if (layout.mediumWidth && !layout.expandedWidth) {
-                Modifier.widthIn(max = Dimensions.contentMaxWidthMedium)
+                Dimensions.screenMarginMedium
             } else {
-                Modifier
+                LocalSpacing.current.md16
             }
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
@@ -482,8 +486,7 @@ internal fun ComposerPaneContent(
             shadowElevation = Elevation.level1,
             modifier =
                 cardModifier
-                    .padding(horizontal = LocalSpacing.current.md16)
-                    .then(cardWidth)
+                    .padding(horizontal = cardMargin)
                     .align(Alignment.CenterHorizontally)
                     .fillMaxWidth()
                     .weight(1f)

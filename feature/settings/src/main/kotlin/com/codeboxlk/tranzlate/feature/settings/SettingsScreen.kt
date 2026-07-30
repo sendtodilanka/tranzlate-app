@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -43,6 +42,7 @@ import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.ThemeMode
 import com.codeboxlk.tranzlate.core.model.ThemeSettings
+import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 
 /**
  * Whether Material You can actually apply — dynamic colour schemes exist only on
@@ -112,11 +112,11 @@ fun SettingsContent(
             Column(
                 modifier =
                     Modifier
-                        // Issue #86: the same centred cap every screen shares on
-                        // medium-width portrait (tablets/foldables).
-                        .widthIn(max = 600.dp)
+                        // Issue #88 (owner + M3 breakpoints): fill the width; the
+                        // shim lands the 16dp-based rows on the 24dp medium margin.
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
+                        .padding(horizontal = adaptiveMarginShim())
                         .padding(vertical = spacing.md16),
             ) {
                 SectionHeader(stringResource(R.string.settings_appearance_header))
