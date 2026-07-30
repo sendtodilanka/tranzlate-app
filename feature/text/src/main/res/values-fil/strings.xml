@@ -104,8 +104,6 @@
     <string name="text_over_char_limit">Limitado sa %1$d characters bawat pagsasalin. Paikliin ang text.</string>
     <string name="text_star_unavailable">Hindi ito ma-save — hindi natukoy ang wika nito.</string>
     <string name="cd_favourite_remove">Alisin sa naka-save</string>
-    <string name="home_row_history">History at naka-save</string>
-    <string name="home_row_history_sub">Bawat pagsasalin, isang tap lang</string>
     <string name="text_paste_empty">Walang laman ang clipboard.</string>
     <string name="text_swap_needs_detect">Magsalin muna para malaman ang wika bago baligtarin.</string>
     <string name="cd_text_counter_limit">Naabot na ang %1$d-character na limit</string>

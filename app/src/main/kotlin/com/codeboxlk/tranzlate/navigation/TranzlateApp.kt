@@ -4,10 +4,16 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -28,6 +34,7 @@ import com.codeboxlk.tranzlate.feature.text.HomeScreen
 import com.codeboxlk.tranzlate.feature.text.LanguagePickerScreen
 import com.codeboxlk.tranzlate.feature.text.LanguagePickerTarget
 import com.codeboxlk.tranzlate.feature.text.TextViewModel
+import kotlinx.coroutines.launch
 
 /**
  * The nav mediator (D-5 rev.3 — Claude Design "Offline Translator M3"): the
@@ -41,18 +48,55 @@ fun TranzlateApp(
 ) {
     val backStack = rememberNavBackStack(TextNavKey)
     val textViewModel: TextViewModel = hiltViewModel()
+    val drawerViewModel: DrawerViewModel = hiltViewModel()
+    val recents by drawerViewModel.recents.collectAsStateWithLifecycle()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
     fun navigateTo(key: NavKey) {
         if (backStack.lastOrNull() != key) backStack.add(key)
     }
 
-    SharedTransitionLayout {
-        AppNavDisplay(
-            backStack = backStack,
-            textViewModel = textViewModel,
-            onNavigate = ::navigateTo,
-            sharedScope = this,
-        )
+    // UI_SPEC §2.3: the drawer finally has a host (issue #74). Destinations
+    // close the sheet first so the nav transition isn't hidden behind it.
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent(
+                drawerState = drawerState,
+                recents = recents,
+                onDestinationClick = { destination ->
+                    scope.launch { drawerState.close() }
+                    when (destination) {
+                        DrawerDestination.HISTORY, DrawerDestination.SAVED -> {
+                            navigateTo(HistoryNavKey)
+                        }
+
+                        DrawerDestination.OFFLINE_LANGUAGES -> {
+                            navigateTo(LanguagesNavKey)
+                        }
+
+                        DrawerDestination.SETTINGS -> {
+                            navigateTo(SettingsNavKey)
+                        }
+
+                        DrawerDestination.SEARCH -> {
+                            Unit
+                        } // row absent until search lands
+                    }
+                },
+            )
+        },
+    ) {
+        SharedTransitionLayout {
+            AppNavDisplay(
+                backStack = backStack,
+                textViewModel = textViewModel,
+                onNavigate = ::navigateTo,
+                onOpenDrawer = { scope.launch { drawerState.open() } },
+                sharedScope = this,
+            )
+        }
     }
 }
 
@@ -62,6 +106,7 @@ private fun AppNavDisplay(
     backStack: androidx.navigation3.runtime.NavBackStack<NavKey>,
     textViewModel: TextViewModel,
     onNavigate: (NavKey) -> Unit,
+    onOpenDrawer: () -> Unit,
     sharedScope: SharedTransitionScope,
 ) {
     NavDisplay(
@@ -104,7 +149,7 @@ private fun AppNavDisplay(
                         },
                         onOpenSettings = { onNavigate(SettingsNavKey) },
                         onOpenPaywall = { onNavigate(PaywallNavKey) },
-                        onOpenHistory = { onNavigate(HistoryNavKey) },
+                        onOpenDrawer = onOpenDrawer,
                         onOpenCamera = { onNavigate(CameraNavKey) },
                         onOpenLanguages = { onNavigate(LanguagesNavKey) },
                         onOpenConversation = { onNavigate(ChatNavKey) },
