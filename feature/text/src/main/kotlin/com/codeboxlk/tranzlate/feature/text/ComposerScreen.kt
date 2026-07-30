@@ -283,14 +283,15 @@ internal fun ComposerPaneContent(
         // field keeps a readable height. The system back gesture still works,
         // and the row returns the moment the keyboard drops. Verified on
         // device: without this the field measures near zero (issue #56).
-        // No isImeVisible read: in the 412dp-tall landscape the row must go whenever
-        // the user is composing anyway, and the per-frame inset invalidation it
-        // caused is the prime suspect for the field's draw failure (issue #56).
+        // The isImeVisible read is short-circuit-gated to the short-landscape
+        // shape: issue-56 flagged its per-frame inset invalidation as the draw-
+        // failure suspect, so every other shape stays unsubscribed from IME
+        // toggles. Here it is required (issue #86, owner): the row hides ONLY
+        // while the keyboard owns the height — dismissing the IME must bring
+        // back the ONLY back affordance.
         @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-        val imeVisible = WindowInsets.isImeVisible
-        // Issue #86 (owner): the row hides ONLY while the keyboard owns the
-        // height — dismissing the IME must bring back the ONLY back affordance.
-        val hideTopRow = layout.splitResultOnly && isEditing && imeVisible
+        val splitImeVisible = layout.splitResultOnly && WindowInsets.isImeVisible
+        val hideTopRow = isEditing && splitImeVisible
         // Issue #86: on MEDIUM portrait the top row joins the card's centred cap.
         val topRowCap =
             if (layout.mediumWidth && !layout.expandedWidth) {
@@ -498,7 +499,7 @@ internal fun ComposerPaneContent(
                             // Issue #86: with the IME up in the short landscape
                             // shape every dp belongs to the field.
                             top =
-                                if (layout.splitResultOnly && isEditing && imeVisible) {
+                                if (isEditing && splitImeVisible) {
                                     spacing.sm8
                                 } else {
                                     spacing.lg24
@@ -532,7 +533,7 @@ internal fun ComposerPaneContent(
                             }
                         },
                         compactLandscape = layout.splitResultOnly,
-                        minimalIme = layout.splitResultOnly && imeVisible,
+                        minimalIme = splitImeVisible,
                         label = languageLabel(sourceLangId),
                         onClear = {
                             onClearAll()
@@ -701,6 +702,11 @@ private fun ColumnScope.ComposerEditBody(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
             Spacer(Modifier.width(spacing.sm8))
+            // Counter stays even here: the only over-limit signal + the P0-3
+            // announce live on this node (lens catch — a bare disabled action
+            // with no reason is an EDGE_CASES dead end).
+            CharCounter(length = input.length, overLimit = overLimit, counterDescription = counterDescription)
+            Spacer(Modifier.width(spacing.sm8))
             EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
         }
         return
@@ -714,27 +720,10 @@ private fun ColumnScope.ComposerEditBody(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                text =
-                    if (overLimit) {
-                        stringResource(R.string.text_over_char_limit, TEXT_CHAR_LIMIT)
-                    } else {
-                        stringResource(R.string.text_char_counter, input.length, TEXT_CHAR_LIMIT)
-                    },
-                style = MaterialTheme.typography.labelMedium,
-                color =
-                    if (overLimit) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                modifier =
-                    Modifier
-                        .semantics {
-                            contentDescription = counterDescription
-                            // Recorded TalkBack P0-3: hitting the cap announces.
-                            if (input.length >= TEXT_CHAR_LIMIT) liveRegion = LiveRegionMode.Polite
-                        }.testTag("tt_text_counter"),
+            CharCounter(
+                length = input.length,
+                overLimit = overLimit,
+                counterDescription = counterDescription,
             )
             if (input.isNotEmpty()) {
                 IconButton(onClick = onClear, modifier = Modifier.testTag("tt_composer_clear")) {
@@ -778,30 +767,51 @@ private fun ColumnScope.ComposerEditBody(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(top = spacing.sm8),
     ) {
-        Text(
-            text =
-                if (overLimit) {
-                    stringResource(R.string.text_over_char_limit, TEXT_CHAR_LIMIT)
-                } else {
-                    stringResource(R.string.text_char_counter, input.length, TEXT_CHAR_LIMIT)
-                },
-            style = MaterialTheme.typography.labelMedium,
-            color =
-                if (overLimit) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .semantics {
-                        contentDescription = counterDescription
-                        if (input.length >= TEXT_CHAR_LIMIT) liveRegion = LiveRegionMode.Polite
-                    }.testTag("tt_text_counter"),
+        CharCounter(
+            length = input.length,
+            overLimit = overLimit,
+            counterDescription = counterDescription,
+            modifier = Modifier.weight(1f),
         )
         EditAction(hasText = hasText, overLimit = overLimit, onMic = onMic, onTranslate = onTranslate)
     }
+}
+
+/**
+ * The ONE counter definition. Every edit arrangement must include it: it is
+ * the only visible over-limit explanation (EDGE_CASES no-dead-end — the
+ * Translate action just disables) AND the node carrying the recorded TalkBack
+ * P0-3 cap-announce. Dropping it from a shape silently kills both (lens
+ * catch, issue #86).
+ */
+@Composable
+private fun CharCounter(
+    length: Int,
+    overLimit: Boolean,
+    counterDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text =
+            if (overLimit) {
+                stringResource(R.string.text_over_char_limit, TEXT_CHAR_LIMIT)
+            } else {
+                stringResource(R.string.text_char_counter, length, TEXT_CHAR_LIMIT)
+            },
+        style = MaterialTheme.typography.labelMedium,
+        color =
+            if (overLimit) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        modifier =
+            modifier
+                .semantics {
+                    contentDescription = counterDescription
+                    if (length >= TEXT_CHAR_LIMIT) liveRegion = LiveRegionMode.Polite
+                }.testTag("tt_text_counter"),
+    )
 }
 
 /** The one action slot: empty → mic, text → Translate (a morph, never a disable). */

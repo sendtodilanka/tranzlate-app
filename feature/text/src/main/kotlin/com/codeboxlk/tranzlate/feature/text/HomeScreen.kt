@@ -257,11 +257,11 @@ fun HomeContent(
         topBar = {
             // Scaffold does not inset topBar content — it expects the bar to do
             // it. TopAppBar handles its own; the pinned language row below it
-            // would otherwise sit under a landscape display cutout.
+            // would otherwise sit under a landscape display cutout. fillMaxWidth
+            // matters (issue #86): with BOTH children capped the column would
+            // wrap to 600dp and pin the bar to the left.
             Column(
                 modifier =
-                    // fillMaxWidth matters (issue #86): with BOTH children capped
-                    // the column would wrap to 600dp and pin the bar to the left.
                     Modifier.fillMaxWidth().windowInsetsPadding(
                         WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
                     ),

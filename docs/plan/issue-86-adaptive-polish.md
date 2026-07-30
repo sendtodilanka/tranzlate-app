@@ -21,3 +21,14 @@ Owner-reported, reproduced on the **Resizable emulator** (owner-mandated tool;
 3. **No back after keyboard dismissal**: the hidden top row was gated on
    `isEditing` alone; now `isEditing && imeVisible` — back + pills return the
    moment the keyboard drops.
+
+## Lens round (cross-model, PR #87)
+- **OPEN-1 (fixed):** the minimal-IME body dropped the counter node — the only
+  visible over-limit explanation AND the carrier of the recorded TalkBack P0-3
+  cap-announce. Fix: ONE `CharCounter` composable, included by all three edit
+  arrangements (normal / compactLandscape / minimalIme).
+- **NOTE (fixed):** `isImeVisible` read narrowed to the short-landscape shape via
+  short-circuit (`splitImeVisible`) so no other shape re-subscribes to per-frame
+  IME inset invalidation (the issue-56 draw-failure suspect); stale comment
+  rewritten to match.
+- CI spotless: value-argument comment moved above the argument (HomeScreen).
