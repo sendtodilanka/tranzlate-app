@@ -183,15 +183,52 @@ now driven **only** by the GOT/GCT network calls, no longer by backup.
 
 ---
 
-## Verification
+## Verification — results
 
-- `./gradlew test` · `:app:assembleTranzlateProdDebug` · `spotlessCheck detekt
-  --rerun-tasks` · `:app:testTranzlateProdDebugUnitTest --tests "*Konsist*"`.
-- New: `MigrationCoverageTest` (`core/database`) — the schema-stance gate.
-- Every touched/created composable keeps `@PreviewLightDark`.
+| Gate | Result |
+|---|---|
+| `./gradlew test --continue --rerun-tasks` | **160 tests, 0 failures** across 22 suites — *except* the 4 pre-existing `KonsistArchitectureTest` failures below |
+| `./gradlew :app:assembleTranzlateProdDebug` | ✅ |
+| `./gradlew spotlessCheck detekt --rerun-tasks` | ✅ |
+| `./gradlew :app:testTranzlateProdDebugUnitTest --tests "*Konsist*"` | ❌ 4/4 — **pre-existing, environmental** (below) |
+| `./gradlew :app:assembleTranzlateProdRelease` (R8, extra) | ✅ |
+| `./gradlew :app:lintTranzlateProdDebug` | ✅ — zero `MissingTranslation` / `MissingQuantity` / `ExtraTranslation` in the SARIF, so all three locales are in parity |
+
+New tests: `MigrationCoverageTest` (3, `core/database`) · two
+`offlineLanguageCount` cases in `TextViewModelTest` (32 → 34) · two
+`ComingSoonScreen` back-affordance cases in `NavShellSmokeTest`.
+
+Backup rules verified in the built artifact, not just in source: both compiled
+XMLs inside `app-tranzlate-prod-release-unsigned.apk` carry
+`tranzlate.db` / `-wal` / `-shm` excludes, and the `<cloud-backup>` /
+`<device-transfer>` split survives resource compilation.
+
+### The Konsist failures are the worktree, not the change
+
+`KonsistArchitectureTest` slices out every file whose path contains
+`/.claude/worktrees/` (`KonsistArchitectureTest.kt:23-26`) so that a live agent
+worktree cannot double-count declarations. This branch **is** such a worktree, so
+the slice removes the entire project and the scope is empty — every
+`assertThat(...).isNotEmpty()` fails.
+
+Disconfirmed as mine: with all changes stashed (clean `main` tree, same
+directory) the run produces the **identical** 4/4 failure set. CI checks out at
+the repo root, where the fragment is absent, so this gate is green there.
+
+### Two things the gates surfaced that are NOT mine to fix
+
+1. **`:app:assembleTranzlateProdDebugAndroidTest` does not compile at all** —
+   `[Dagger/MissingBinding] com.codeboxlk.tranzlate.domain.access.PurchaseFlow
+   cannot be provided without an @Provides-annotated method`. Also confirmed
+   pre-existing by stashing. Issue #40 records the androidTest suite as *failing
+   on API 35+*; it in fact does not build on any API, so the two new smoke
+   assertions above are written but unrun.
+2. **`versionCode = 1` < the shipped `4`** — see the context section. Play will
+   reject the upload. `app/build.gradle.kts` is another track's file.
 
 **Note on the "preview gate":** the brief said a Konsist rule enforces
-`@PreviewLightDark`. In this tree `app/src/test/.../KonsistArchitectureTest.kt`
-has four tests (ring purity, brain-impl imports, `:lib:*` independence, FROZEN
-`Translator` package) and **none** of them checks previews. The convention is
-followed here regardless; the missing gate is recorded as follow-up.
+`@PreviewLightDark`. In this tree `KonsistArchitectureTest` has four tests (ring
+purity, brain-impl imports, `:lib:*` independence, FROZEN `Translator` package)
+and **none** of them checks previews. The convention is followed here regardless
+(`ComingSoonScreen` and `HomeContent` both keep theirs); the missing gate is
+recorded as follow-up.
