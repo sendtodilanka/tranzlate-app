@@ -155,7 +155,10 @@ class LanguageRepositoryImplTest {
             val repository = repository()
 
             repository.setLastUsed("fr", atMillis = 1_234L)
-            val languages = repository.languages().first()
+            // `drop(1)` is the contract, not a workaround — identical to the
+            // model-state overlay above. The first emission is the deliberate
+            // paint that does not wait on DataStore; recents land on the next.
+            val languages = repository.languages().drop(1).first()
 
             assertThat(languages.single { it.id == "fr" }.lastUsedAt).isEqualTo(1_234L)
             assertThat(languages.filter { it.lastUsedAt != null }.map { it.id }).containsExactly("fr")
@@ -175,6 +178,7 @@ class LanguageRepositoryImplTest {
             assertThat(
                 repository
                     .languages()
+                    .drop(1)
                     .first()
                     .single { it.id == "es" }
                     .lastUsedAt,
@@ -192,6 +196,7 @@ class LanguageRepositoryImplTest {
             assertThat(
                 repository
                     .languages()
+                    .drop(1)
                     .first()
                     .single { it.id == "he" }
                     .lastUsedAt,
@@ -207,7 +212,12 @@ class LanguageRepositoryImplTest {
             val ids = BundledLanguageCatalog.all.take(TranzlatePreferencesDataSource.RECENT_STORE_LIMIT + 3)
 
             ids.forEachIndexed { index, language -> repository.setLastUsed(language.id, atMillis = index.toLong()) }
-            val remembered = repository.languages().first().filter { it.lastUsedAt != null }
+            val remembered =
+                repository
+                    .languages()
+                    .drop(1)
+                    .first()
+                    .filter { it.lastUsedAt != null }
 
             assertThat(remembered).hasSize(TranzlatePreferencesDataSource.RECENT_STORE_LIMIT)
             // Newest survive: the first three writes are the ones dropped.

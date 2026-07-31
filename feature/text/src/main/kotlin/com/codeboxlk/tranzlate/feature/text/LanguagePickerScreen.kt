@@ -350,7 +350,14 @@ private fun PickerList(
             contentPadding =
                 PaddingValues(
                     start = spacing.sm8,
-                    end = spacing.sm8,
+                    // The rail is an OVERLAY with a 48dp touch strip on this
+                    // edge, and it wins the hit test. At an 8dp inset the rows
+                    // ran under it and it swallowed the right half of every
+                    // trailing control: tapping the outer edge of a row's ⬇
+                    // scrolled the list instead of starting the download —
+                    // deterministic, not a race. While the rail is up, the list
+                    // ends where the rail begins.
+                    end = if (railed) Dimensions.touchTargetMin else spacing.sm8,
                     bottom = spacing.sm8,
                 ),
             modifier = Modifier.fillMaxSize().testTag("tt_lang_list"),

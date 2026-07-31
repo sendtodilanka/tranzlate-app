@@ -9,6 +9,7 @@ import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onStart
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,7 +45,23 @@ class LanguageRepositoryImpl
             combine(
                 languageDao.languages(),
                 offlineModelManager.modelStates().onStart { emit(emptyMap()) },
-                preferences.recentLanguages,
+                // Same guard as the line above, for the same reason: `combine`
+                // waits for EVERY source, so an unprefixed third one would let
+                // a slow DataStore read hold the whole catalog behind a
+                // "Loading languages…" with no retry. Recents are decoration;
+                // they must never gate the list.
+                //
+                // `distinctUntilChanged` sits UPSTREAM of `onStart`, not after
+                // it: `dataStore.data` re-emits on every unrelated preference
+                // write (theme, mode, consent), and each identical map would
+                // otherwise rebuild 194 rows. Downstream of `onStart` it would
+                // also swallow the first real value whenever that value is
+                // itself empty — a fresh install — collapsing this source to a
+                // single emission and stranding anything waiting for the one
+                // after it.
+                preferences.recentLanguages
+                    .distinctUntilChanged()
+                    .onStart { emit(emptyMap()) },
             ) { entities, modelStates, recents ->
                 val catalog =
                     if (entities.isEmpty()) {
