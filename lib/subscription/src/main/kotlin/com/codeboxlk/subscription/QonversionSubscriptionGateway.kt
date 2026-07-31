@@ -5,30 +5,18 @@ import android.util.Log
 import com.qonversion.android.sdk.Qonversion
 import com.qonversion.android.sdk.QonversionConfig
 import com.qonversion.android.sdk.dto.QLaunchMode
-import com.qonversion.android.sdk.dto.QPurchaseResult
-import com.qonversion.android.sdk.dto.QonversionError
-import com.qonversion.android.sdk.dto.eligibility.QEligibility
-import com.qonversion.android.sdk.dto.eligibility.QIntroEligibilityStatus
-import com.qonversion.android.sdk.dto.entitlements.QEntitlement
-import com.qonversion.android.sdk.dto.products.QProduct
-import com.qonversion.android.sdk.dto.products.QSubscriptionPeriod
-import com.qonversion.android.sdk.listeners.QonversionEligibilityCallback
-import com.qonversion.android.sdk.listeners.QonversionEntitlementsCallback
-import com.qonversion.android.sdk.listeners.QonversionProductsCallback
-import com.qonversion.android.sdk.listeners.QonversionPurchaseCallback
-import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.coroutines.resume
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "Subscription"
 
@@ -54,9 +42,12 @@ private const val STORE_CALL_TIMEOUT_MS = 15_000L
 private fun timedOut(what: String) = Result.failure<Nothing>(SubscriptionFailure.StoreError("$what timed out"))
 
 /**
- * Qonversion-backed [SubscriptionGateway]. The SDK never escapes this file — the
- * host still only sees [SubscriptionGateway] / [Entitlement], so this library
- * stays droppable into another app (Ring 1 rule: zero project dependencies).
+ * Qonversion-backed [SubscriptionGateway]. The SDK never escapes this module —
+ * its types stop at [QonversionApi], the host still only sees
+ * [SubscriptionGateway] / [Entitlement], so this library stays droppable into
+ * another app (Ring 1 rule: zero project dependencies). Everything above the
+ * seam — including this class — is testable on a plain JVM against a fake
+ * [QonversionApi]; only [RealQonversionApi] needs the store.
  *
  * ## Why the config arrives as a suspending provider
  * The project key is not necessarily known when the DI graph is built: hosts that
@@ -76,15 +67,34 @@ private fun timedOut(what: String) = Result.failure<Nothing>(SubscriptionFailure
  *
  * ## Threading
  * Qonversion is callback-only (no suspend API), and its purchase flow launches an
- * Activity, so `initialize` and `purchase` are marshalled onto the main thread
- * here rather than trusting the caller's dispatcher.
+ * Activity, so `initialize` (here, via the default [sessionFactory]) and
+ * `purchase` (in [RealQonversionApi]) are marshalled onto the main thread rather
+ * than trusting the caller's dispatcher.
  */
-class QonversionSubscriptionGateway(
+class QonversionSubscriptionGateway internal constructor(
     private val application: Application,
     private val activityProvider: ActivityProvider,
     scope: CoroutineScope,
     private val configProvider: suspend () -> SubscriptionConfig,
+    // Injectable seam for tests; production uses ::initialiseQonversion below.
+    // Returns null when the SDK could not come up — the gateway then behaves
+    // exactly like the blank-key case. The blank-key check itself stays HERE
+    // (createSession), before the factory, so no factory can accidentally
+    // initialise a store SDK against an empty key.
+    private val sessionFactory: suspend (Application, SubscriptionConfig) -> QonversionApi?,
 ) : SubscriptionGateway {
+    /**
+     * Production entry point — the signature the host has always called. Kept as
+     * a secondary constructor because the primary one names [QonversionApi],
+     * which is internal and may not appear in a public signature.
+     */
+    constructor(
+        application: Application,
+        activityProvider: ActivityProvider,
+        scope: CoroutineScope,
+        configProvider: suspend () -> SubscriptionConfig,
+    ) : this(application, activityProvider, scope, configProvider, ::initialiseQonversion)
+
     private val state = MutableStateFlow<Entitlement>(Entitlement.Loading)
 
     override val entitlement: Flow<Entitlement> = state.asStateFlow()
@@ -96,7 +106,10 @@ class QonversionSubscriptionGateway(
     private val initLock = Mutex()
 
     @Volatile
-    private var sdk: Qonversion? = null
+    private var session: QonversionApi? = null
+
+    /** See [refreshPrices] for why this exists. */
+    private val priceRefreshInFlight = AtomicBoolean(false)
 
     init {
         // Resolve eagerly: FeatureAccess.awaitResolved() blocks on the first
@@ -118,81 +131,115 @@ class QonversionSubscriptionGateway(
      * offline first launch, or one store error, left the paywall unable to sell
      * anything for the whole life of the process, with a permanently disabled
      * button and no way back but killing the app. Hosts call this on every open.
+     *
+     * At most ONE refresh runs at a time; a call that arrives while one is in
+     * flight returns immediately without touching [productState]. WHY: two
+     * concurrent refreshes race their publications, and last-writer-wins could
+     * wipe a rendered Known with a stale Unavailable — and a retry tapped while
+     * the first attempt is still out must not double-fetch either.
      */
     override suspend fun refreshPrices() {
-        productState.value = StorePrices.Loading
-        val instance =
-            ensureReady() ?: run {
-                // No key: settled, not pending. Saying "loading" here would spin
-                // forever on a brand that simply has no billing.
-                productState.value = StorePrices.Unavailable
-                return
-            }
-        val catalogue =
-            withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { loadProducts(instance) }
-                ?.getOrNull()
-                ?: run {
-                    Log.w(TAG, "Store prices unresolved — the paywall will offer a retry")
+        if (!priceRefreshInFlight.compareAndSet(false, true)) return
+        try {
+            productState.value = StorePrices.Loading
+            val session =
+                ensureReady() ?: run {
+                    // No key: settled, not pending. Saying "loading" here would spin
+                    // forever on a brand that simply has no billing.
                     productState.value = StorePrices.Unavailable
                     return
                 }
-        // Eligibility is per ACCOUNT, not per product: a user who already spent
-        // the intro offer is not getting another one, and printing "7-day free
-        // trial" at them would be the same lie as printing the wrong currency.
-        // An unresolved answer is treated as NOT eligible — under-promising is
-        // recoverable, over-promising is a policy problem.
-        val eligibility =
-            withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { checkTrialEligibility(instance, catalogue.keys.toList()) }
-                .orEmpty()
-        // The SDK's own types stop here. Everything that DECIDES anything below
-        // this line is pure and tested — see `storePricesFrom`.
-        productState.value =
-            storePricesFrom(
-                catalogue.map { (offeringId, product) ->
-                    val eligible = eligibility[offeringId] == QIntroEligibilityStatus.Eligible
-                    val trial = product.trialPeriod.takeIf { eligible }
-                    StoreProductFacts(
-                        offeringId = offeringId,
-                        price = product.prettyPrice,
-                        trialDays = trial?.exactDays(),
-                        hasTrial = trial != null,
-                    )
-                },
-            )
+            val catalogue =
+                withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { session.products() }
+                    ?.getOrNull()
+                    ?: run {
+                        Log.w(TAG, "Store prices unresolved — the paywall will offer a retry")
+                        productState.value = StorePrices.Unavailable
+                        return
+                    }
+            // Eligibility is per ACCOUNT, not per product: a user who already spent
+            // the intro offer is not getting another one, and printing "7-day free
+            // trial" at them would be the same lie as printing the wrong currency.
+            // An unresolved answer is treated as NOT eligible — under-promising is
+            // recoverable, over-promising is a policy problem.
+            val eligibility =
+                withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { session.eligibility(catalogue.map { it.offeringId }) }
+                    .orEmpty()
+            // Everything that DECIDES anything below this line is pure and
+            // tested — see `productFacts` (trial rules) and `storePricesFrom`
+            // (blank-price rule). A store that priced nothing still lands here:
+            // that is an ANSWER, so it publishes Known(empty), never Unavailable.
+            productState.value =
+                storePricesFrom(catalogue.map { productFacts(it, eligibility[it.offeringId]) })
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (
+            // Deliberately generic: the whole point is that we cannot know what
+            // a misbehaving provider SDK throws, and anything non-cancellation
+            // escaping here rides the host's bare launch to a process crash.
+            @Suppress("TooGenericExceptionCaught") thrown: Exception,
+        ) {
+            // The seam's contract is answer-by-value, but a provider SDK that
+            // throws synchronously would otherwise ride the caller's bare
+            // viewModelScope.launch straight to an app crash — with the state
+            // stranded at Loading. Every failure lands at Unavailable, where
+            // the retry affordance lives.
+            Log.w(TAG, "Store price refresh threw — the paywall will offer a retry", thrown)
+            productState.value = StorePrices.Unavailable
+        } finally {
+            priceRefreshInFlight.set(false)
+        }
     }
 
     override suspend fun purchase(offeringId: String): Result<Entitlement> {
-        val instance = ensureReady() ?: return Result.failure(SubscriptionFailure.NotConfigured())
+        val session = ensureReady() ?: return Result.failure(SubscriptionFailure.NotConfigured())
         val activity =
             activityProvider.current()
                 ?: return Result.failure(SubscriptionFailure.NoForegroundActivity())
-        val products =
-            withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { loadProducts(instance) }
-                ?: timedOut("Product lookup")
-        val product =
-            products.getOrElse { return Result.failure(it) }[offeringId]
-                ?: return Result.failure(SubscriptionFailure.ProductUnavailable(offeringId))
-
-        val outcome =
-            withContext(Dispatchers.Main) {
-                suspendCancellableCoroutine { continuation ->
-                    instance.purchase(
-                        activity,
-                        product,
-                        object : QonversionPurchaseCallback {
-                            override fun onResult(result: QPurchaseResult) = continuation.resume(result)
-                        },
-                    )
-                }
+        // Fetch-then-purchase, in that order: QonversionApi's sequencing contract
+        // says purchase resolves its store product from the latest products()
+        // answer, and the catalogue is what lets us fail an unknown id honestly.
+        val catalogue =
+            (withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { session.products() } ?: timedOut("Product lookup"))
+                .getOrElse { return Result.failure(it) }
+        if (catalogue.none { it.offeringId == offeringId }) {
+            return Result.failure(SubscriptionFailure.ProductUnavailable(offeringId))
+        }
+        return when (val outcome = session.purchase(activity, offeringId)) {
+            // Publish on success so a purchase and the entitlement flow can never
+            // disagree — and keep the store's own outcomes distinguishable.
+            is PurchaseOutcome.Granted -> {
+                Result.success(outcome.entitlement.also { state.value = it })
             }
-        return outcome.toResult()
+
+            PurchaseOutcome.Cancelled -> {
+                Result.failure(SubscriptionFailure.Cancelled())
+            }
+
+            PurchaseOutcome.Pending -> {
+                Result.failure(SubscriptionFailure.Pending())
+            }
+
+            is PurchaseOutcome.Error -> {
+                Result.failure(
+                    // The api's own absent-id backstop (mis-sequenced call, or the
+                    // store's answer changed under us) states the same fact as the
+                    // catalogue check above and must fail the same way.
+                    if (outcome.detail == noStoreProductDetail(offeringId)) {
+                        SubscriptionFailure.ProductUnavailable(offeringId)
+                    } else {
+                        SubscriptionFailure.StoreError(outcome.detail)
+                    },
+                )
+            }
+        }
     }
 
     override suspend fun restore(): Result<Entitlement> {
-        val instance = ensureReady() ?: return Result.failure(SubscriptionFailure.NotConfigured())
+        val session = ensureReady() ?: return Result.failure(SubscriptionFailure.NotConfigured())
         // Bounded: the paywall shows a spinner for the whole of this, and a
         // spinner with no exit is the dead end EDGE_CASES forbids.
-        return (withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { restorePurchases(instance) } ?: timedOut("Restore"))
+        return (withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { session.restore() } ?: timedOut("Restore"))
             .onSuccess { state.value = it }
     }
 
@@ -202,9 +249,9 @@ class QonversionSubscriptionGateway(
      * [FIRST_RESOLUTION_TIMEOUT_MS].
      */
     private suspend fun refresh() {
-        val instance = ensureReady() ?: return
+        val session = ensureReady() ?: return
         val resolved =
-            withTimeoutOrNull(FIRST_RESOLUTION_TIMEOUT_MS) { checkEntitlements(instance) }
+            withTimeoutOrNull(FIRST_RESOLUTION_TIMEOUT_MS) { session.checkEntitlements() }
                 ?: timedOut("Entitlement check")
         resolved
             .onSuccess { state.value = it }
@@ -215,147 +262,59 @@ class QonversionSubscriptionGateway(
     }
 
     /**
-     * Initialises the SDK at most once. Returns null when this build has no key,
-     * having first resolved [entitlement] so nothing waits on it.
+     * Opens the provider session at most once. Returns null when this build has
+     * no key or the SDK failed to come up, having first resolved [entitlement]
+     * so nothing waits on it.
      */
-    private suspend fun ensureReady(): Qonversion? {
-        sdk?.let { return it }
+    private suspend fun ensureReady(): QonversionApi? {
+        session?.let { return it }
         return initLock.withLock {
-            sdk ?: createSdk()
+            session ?: createSession()
         }
     }
 
-    private suspend fun createSdk(): Qonversion? {
+    private suspend fun createSession(): QonversionApi? {
         val config = configProvider()
         if (config.projectKey.isBlank()) {
             state.value = Entitlement.Free
             return null
         }
-        return runCatching {
-            withContext(Dispatchers.Main) {
-                Qonversion.initialize(
-                    QonversionConfig
-                        .Builder(application, config.projectKey, QLaunchMode.SubscriptionManagement)
-                        .build(),
-                )
+        return sessionFactory(application, config)
+            ?.also { session = it }
+            ?: run {
+                state.value = Entitlement.Free
+                null
             }
-        }.onFailure {
-            Log.e(TAG, "Qonversion initialisation failed", it)
-            state.value = Entitlement.Free
-        }.onSuccess { sdk = it }
-            .getOrNull()
     }
-
-    private suspend fun checkEntitlements(instance: Qonversion): Result<Entitlement> =
-        suspendCancellableCoroutine { continuation ->
-            instance.checkEntitlements(entitlementsCallback(continuation))
-        }
-
-    /**
-     * The recovery path, and NOT [checkEntitlements].
-     *
-     * `checkEntitlements` answers "what does the CURRENT identity own" — on a
-     * reinstall or a new phone that identity is a fresh anonymous one, so a
-     * paying subscriber would be told they have nothing to restore. `restore`
-     * is the call that reads the store's own purchase history and re-attaches
-     * it to this identity; verified present on the SDK we ship
-     * (`javap` on sdk-9.7.0.aar: `restore(QonversionEntitlementsCallback)`).
-     *
-     * Play requires a working restore path for a subscription app, so this
-     * distinction is a policy obligation, not a refinement.
-     */
-    private suspend fun restorePurchases(instance: Qonversion): Result<Entitlement> =
-        suspendCancellableCoroutine { continuation ->
-            instance.restore(entitlementsCallback(continuation))
-        }
-
-    /** Shared bridge: both entitlement calls answer on the same callback type. */
-    private fun entitlementsCallback(continuation: CancellableContinuation<Result<Entitlement>>) =
-        object : QonversionEntitlementsCallback {
-            override fun onSuccess(entitlements: Map<String, QEntitlement>) =
-                continuation.resume(Result.success(entitlements.toEntitlement()))
-
-            override fun onError(error: QonversionError) =
-                continuation.resume(Result.failure(SubscriptionFailure.StoreError(error.toString())))
-        }
-
-    private suspend fun loadProducts(instance: Qonversion): Result<Map<String, QProduct>> =
-        suspendCancellableCoroutine { continuation ->
-            instance.products(
-                object : QonversionProductsCallback {
-                    override fun onSuccess(products: Map<String, QProduct>) =
-                        continuation.resume(Result.success(products))
-
-                    override fun onError(error: QonversionError) =
-                        continuation.resume(Result.failure(SubscriptionFailure.StoreError(error.toString())))
-                },
-            )
-        }
-
-    /** Empty on any error — an unknown eligibility must read as "no trial", never as "yes". */
-    private suspend fun checkTrialEligibility(
-        instance: Qonversion,
-        offeringIds: List<String>,
-    ): Map<String, QIntroEligibilityStatus> =
-        suspendCancellableCoroutine { continuation ->
-            instance.checkTrialIntroEligibility(
-                offeringIds,
-                object : QonversionEligibilityCallback {
-                    override fun onSuccess(eligibilities: Map<String, QEligibility>) =
-                        continuation.resume(eligibilities.mapValues { it.value.status })
-
-                    override fun onError(error: QonversionError) {
-                        Log.w(TAG, "Trial eligibility unresolved — treating as not eligible: $error")
-                        continuation.resume(emptyMap())
-                    }
-                },
-            )
-        }
-
-    /**
-     * Publishes on success so a purchase and the entitlement flow can never
-     * disagree, and keeps the store's own outcomes distinguishable.
-     */
-    private fun QPurchaseResult.toResult(): Result<Entitlement> =
-        when {
-            isSuccessful -> Result.success(entitlements.toEntitlement().also { state.value = it })
-            isCanceledByUser -> Result.failure(SubscriptionFailure.Cancelled())
-            isPending -> Result.failure(SubscriptionFailure.Pending())
-            else -> Result.failure(SubscriptionFailure.StoreError(error?.toString() ?: "Purchase failed"))
-        }
 }
 
 /**
- * Single-paid-tier reading: ANY active entitlement means paid, and its id names
- * the purchase. Matching on specific ids here would make a dashboard rename a
- * silent revenue outage.
+ * The production [QonversionApi] factory: initialise the SDK — on the main
+ * thread, which Qonversion requires — and wrap it in [RealQonversionApi].
+ * Null on failure, after logging; the gateway then resolves entitlement to
+ * Free, exactly as it does for a blank key. Never caches a failure: the next
+ * ensureReady() genuinely retries, so a recovered network can still bring
+ * billing up.
  */
-private fun Map<String, QEntitlement>.toEntitlement(): Entitlement =
-    values.firstOrNull { it.isActive }?.let { Entitlement.Paid(it.id) } ?: Entitlement.Free
-
-/**
- * The trial length in days, but only when the store's own unit converts without
- * rounding.
- *
- * A day is a day and a billing week is exactly seven of them, so both are
- * exact. A month is not: printing "30-day free trial" for a P1M offer would be
- * wrong in seven months of the year, and this whole change exists to stop the
- * paywall stating figures it cannot source. Those periods return null and the
- * host falls back to naming the trial without a number — `hasTrial` still
- * carries the fact that one exists.
- */
-private fun QSubscriptionPeriod.exactDays(): Int? =
-    when (unit) {
-        QSubscriptionPeriod.Unit.Day -> unitCount
-        QSubscriptionPeriod.Unit.Week -> unitCount * DAYS_PER_WEEK
-        else -> null
-    }
-
-private const val DAYS_PER_WEEK = 7
+private suspend fun initialiseQonversion(
+    application: Application,
+    config: SubscriptionConfig,
+): QonversionApi? =
+    runCatching {
+        withContext(Dispatchers.Main) {
+            Qonversion.initialize(
+                QonversionConfig
+                    .Builder(application, config.projectKey, QLaunchMode.SubscriptionManagement)
+                    .build(),
+            )
+        }
+    }.onFailure { Log.e(TAG, "Qonversion initialisation failed", it) }
+        .map(::RealQonversionApi)
+        .getOrNull()
 
 /**
  * What the provider told us about one product, with its SDK types already
- * stripped off. Exists so the rule below can be tested without a Play
+ * stripped off. Exists so the rules below can be tested without a Play
  * connection, an Activity, or a mocking framework.
  */
 internal data class StoreProductFacts(
@@ -364,6 +323,31 @@ internal data class StoreProductFacts(
     val trialDays: Int?,
     val hasTrial: Boolean,
 )
+
+/**
+ * The ONLY place the trial rules live. A trial is granted when — and only
+ * when — the store says THIS account is [ApiEligibility.ELIGIBLE] **and** the
+ * product actually carries a trial period; every other eligibility answer
+ * (ineligible, unknown, non-intro product, or no answer at all) grants
+ * nothing. `trialDays` is then the period's exact day count where one exists
+ * ([exactDays]), and `hasTrial` is that same grant — never independently true.
+ *
+ * A named pure function for the same reason as [storePricesFrom]: while these
+ * decisions sat inline in a coroutine, inverting the eligibility check or
+ * dropping the week→days conversion left the whole suite green.
+ */
+internal fun productFacts(
+    product: ApiProduct,
+    eligibility: ApiEligibility?,
+): StoreProductFacts {
+    val trial = product.trialPeriod.takeIf { eligibility == ApiEligibility.ELIGIBLE }
+    return StoreProductFacts(
+        offeringId = product.offeringId,
+        price = product.prettyPrice,
+        trialDays = trial?.exactDays(),
+        hasTrial = trial != null,
+    )
+}
 
 /**
  * The rule: **a product without a price is not published.**

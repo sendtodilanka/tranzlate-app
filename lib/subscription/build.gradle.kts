@@ -8,6 +8,11 @@ plugins {
 // providers is a change to this module only.
 android {
     namespace = "com.codeboxlk.subscription"
+    // Gateway unit tests construct Application() and cross android.util.Log; the
+    // default unit-test android.jar throws "Stub!" from both. Return-default
+    // stubs make them inert — no Robolectric needed for logic that never touches
+    // a real Context (the SDK itself stays behind QonversionApi and out of tests).
+    testOptions.unitTests.isReturnDefaultValues = true
 }
 
 dependencies {

@@ -9,6 +9,7 @@ import com.codeboxlk.tranzlate.core.model.PlanPrices
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.access.PurchaseCancelledException
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
+import com.codeboxlk.tranzlate.domain.access.PurchasePendingException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +44,13 @@ enum class PaywallPlan(
 /** One-shot UI events — the screen shows these as snackbars. */
 enum class PaywallEvent {
     PURCHASE_FAILED,
+
+    /**
+     * Deferred payment in flight ([PurchasePendingException]) — NOT a failure.
+     * The buyer may still be charged when it clears, so this must never share
+     * PURCHASE_FAILED's "nothing was charged" copy.
+     */
+    PURCHASE_PENDING,
     RESTORE_FAILED,
     RESTORED_FREE,
 
@@ -155,15 +163,27 @@ class PaywallViewModel
                 val result = purchaseFlow.purchase(_selected.value.offeringId)
                 _purchasing.value = false
                 // Success(Free) is NOT a purchase — an unconfigured gateway lands
-                // here; never fake success. The one silent case is the user's own
-                // dismissal of the store sheet: they know what they did, and an
-                // error toast on top of it reads as a broken paywall.
-                val cancelledByUser =
-                    result is AppResult.Failure && result.error is PurchaseCancelledException
-                if (!cancelledByUser &&
-                    (result !is AppResult.Success || result.value !is Entitlement.Paid)
-                ) {
-                    _events.tryEmit(PaywallEvent.PURCHASE_FAILED)
+                // here; never fake success. Two failures are NOT "purchase failed":
+                // the user's own dismissal of the store sheet (they know what they
+                // did — silence), and a deferred payment still clearing (it may
+                // yet charge, so "nothing was charged" would be a lie — PENDING).
+                val failure = (result as? AppResult.Failure)?.error
+                when {
+                    failure is PurchaseCancelledException -> {
+                        Unit
+                    }
+
+                    failure is PurchasePendingException -> {
+                        _events.tryEmit(PaywallEvent.PURCHASE_PENDING)
+                    }
+
+                    result !is AppResult.Success || result.value !is Entitlement.Paid -> {
+                        _events.tryEmit(PaywallEvent.PURCHASE_FAILED)
+                    }
+
+                    else -> {
+                        Unit
+                    } // Paid — the entitlement flow flips isPro → screen dismisses
                 }
             }
         }
@@ -200,3 +220,47 @@ fun canPurchase(
     selected: PaywallPlan,
     purchasing: Boolean,
 ): Boolean = !purchasing && prices[selected.offeringId] != null
+
+/**
+ * What the price hint under the plan cards should say — one value per honestly
+ * distinct situation, because two of them used to share one message.
+ */
+enum class PriceHint {
+    /** No answer yet — say we are getting prices, promise nothing else. */
+    LOADING,
+
+    /** We asked and could not reach Play. Retry can genuinely fix this. */
+    STORE_UNREACHABLE,
+
+    /**
+     * The store ANSWERED and the selected plan is not in the answer. Telling the
+     * user we "couldn't reach Google Play" here is false — Play was reached and
+     * said no — and retrying can never conjure the missing product. The honest
+     * message names the plan as unavailable.
+     */
+    PLAN_UNAVAILABLE,
+
+    /** The selected plan has a store price — nothing to explain. */
+    NONE,
+}
+
+/**
+ * The three-way hint, as a pure function rather than conditions inside the
+ * Composable — the previous inline version collapsed [PriceHint.PLAN_UNAVAILABLE]
+ * into [PriceHint.STORE_UNREACHABLE] and no test could see it. The screen renders
+ * this enum and branches on NOTHING else.
+ */
+internal fun priceHintFor(
+    prices: PlanPrices,
+    selected: PaywallPlan,
+): PriceHint =
+    when {
+        prices is PlanPrices.Loading -> PriceHint.LOADING
+
+        prices is PlanPrices.Unavailable -> PriceHint.STORE_UNREACHABLE
+
+        // Only Known reaches here: the store answered, this plan is not in it.
+        prices[selected.offeringId] == null -> PriceHint.PLAN_UNAVAILABLE
+
+        else -> PriceHint.NONE
+    }

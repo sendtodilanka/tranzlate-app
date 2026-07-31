@@ -35,3 +35,18 @@ interface PurchaseFlow {
  * and translating it here keeps that SDK out of the feature modules.
  */
 class PurchaseCancelledException : Exception("Purchase cancelled by the user")
+
+/**
+ * The store accepted the purchase but the payment has not cleared yet.
+ *
+ * Deferred payment methods (cash at a store, slow bank transfers — Google's
+ * PENDING purchase state) settle minutes to days later, and when they do the
+ * buyer IS charged and the entitlement arrives. So this must never surface as
+ * "Couldn't complete the purchase. Nothing was charged." — both halves of that
+ * sentence can turn out false, on a screen that ships in pt-rBR to Brazil,
+ * where cash-based pending payments are routine.
+ *
+ * Provider-neutral for the same reason as [PurchaseCancelledException]: the
+ * billing library's own pending type stays out of the feature modules.
+ */
+class PurchasePendingException : Exception("Purchase is pending — payment may still complete and charge later")

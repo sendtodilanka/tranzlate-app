@@ -90,6 +90,7 @@ fun PaywallScreen(
     }
     val prices by viewModel.prices.collectAsStateWithLifecycle()
     val purchaseFailed = stringResource(R.string.paywall_purchase_unavailable)
+    val purchasePending = stringResource(R.string.paywall_purchase_pending)
     val restoreFailed = stringResource(R.string.paywall_restore_failed)
     val restoredFree = stringResource(R.string.paywall_restore_nothing)
     val linkUnavailable = stringResource(R.string.paywall_link_unavailable)
@@ -98,8 +99,15 @@ fun PaywallScreen(
             snackbarHostState.showSnackbar(
                 when (event) {
                     PaywallEvent.PURCHASE_FAILED -> purchaseFailed
+
+                    // A deferred payment may still charge — never the
+                    // "nothing was charged" copy.
+                    PaywallEvent.PURCHASE_PENDING -> purchasePending
+
                     PaywallEvent.RESTORE_FAILED -> restoreFailed
+
                     PaywallEvent.RESTORED_FREE -> restoredFree
+
                     PaywallEvent.LINK_UNAVAILABLE -> linkUnavailable
                 },
             )
@@ -232,11 +240,12 @@ internal fun PaywallContent(
                 )
             }
             Spacer(Modifier.height(spacing.md16))
-            // Three states, three different things to say. Keyed on the SELECTED
-            // plan rather than on the map as a whole, so a partial answer cannot
-            // leave the button silently disabled with nothing explaining why.
-            when {
-                prices is PlanPrices.Loading -> {
+            // Four hints, decided in `priceHintFor` (tested there, keyed on the
+            // SELECTED plan) — this Composable renders the enum and branches on
+            // nothing else. "Couldn't reach Play" and "this plan isn't sold"
+            // are different facts and get different words.
+            when (priceHintFor(prices, selected)) {
+                PriceHint.LOADING -> {
                     Text(
                         text = stringResource(R.string.paywall_price_loading),
                         style = MaterialTheme.typography.bodySmall,
@@ -245,13 +254,26 @@ internal fun PaywallContent(
                     )
                 }
 
-                prices[selected.offeringId] == null -> {
+                PriceHint.STORE_UNREACHABLE -> {
                     TextButton(
                         onClick = onRetryPrices,
                         modifier = Modifier.testTag("tt_paywall_price_retry"),
                     ) {
                         Text(text = stringResource(R.string.paywall_price_unavailable))
                     }
+                }
+
+                PriceHint.PLAN_UNAVAILABLE -> {
+                    TextButton(
+                        onClick = onRetryPrices,
+                        modifier = Modifier.testTag("tt_paywall_plan_unavailable"),
+                    ) {
+                        Text(text = stringResource(R.string.paywall_plan_unavailable))
+                    }
+                }
+
+                PriceHint.NONE -> {
+                    Unit
                 }
             }
             Text(
@@ -457,19 +479,120 @@ private fun ctaLabel(price: PlanPrice?): String {
 }
 
 /**
- * The state this change introduced: the store has not answered, so there is no
- * price to show and nothing may be charged. Rule 7 — it is a meaningful state,
- * so it is previewable.
+ * STORE_UNREACHABLE: we asked and could not reach Play — retry hint, disarmed
+ * CTA. Rule 7 — a meaningful state, so it is previewable.
  */
 @PreviewLightDark
 @Composable
-private fun PaywallPricesUnknownPreview() {
+private fun PaywallStoreUnreachablePreview() {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             PaywallContent(
                 selected = PaywallPlan.YEARLY,
                 purchasing = false,
                 prices = PlanPrices.Unavailable,
+                onRetryPrices = {},
+                onSelect = {},
+                onPurchase = {},
+                onRestore = {},
+                onClose = {},
+            )
+        }
+    }
+}
+
+/**
+ * LOADING: no answer yet — "Getting prices…" under em-dash cards, CTA shut.
+ * Distinct from unreachable on purpose; collapsing them was finding R3-B2.
+ */
+@PreviewLightDark
+@Composable
+private fun PaywallPricesLoadingPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            PaywallContent(
+                selected = PaywallPlan.YEARLY,
+                purchasing = false,
+                prices = PlanPrices.Loading,
+                onRetryPrices = {},
+                onSelect = {},
+                onPurchase = {},
+                onRestore = {},
+                onClose = {},
+            )
+        }
+    }
+}
+
+/**
+ * The store says a trial exists but only in a unit that does not convert to
+ * days without rounding (`trialDays = null`, `hasTrial = true`): the card and
+ * the CTA must fall back to the generic "free trial" wording, never invent a
+ * day count.
+ */
+@PreviewLightDark
+@Composable
+private fun PaywallTrialWithoutDayCountPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            PaywallContent(
+                selected = PaywallPlan.YEARLY,
+                purchasing = false,
+                prices =
+                    PlanPrices.Known(
+                        mapOf(
+                            PaywallPlan.WEEKLY.offeringId to PlanPrice("Rs 690.00"),
+                            PaywallPlan.MONTHLY.offeringId to PlanPrice("Rs 1,750.00"),
+                            PaywallPlan.YEARLY.offeringId to
+                                PlanPrice("Rs 10,500.00", trialDays = null, hasTrial = true),
+                        ),
+                    ),
+                onRetryPrices = {},
+                onSelect = {},
+                onPurchase = {},
+                onRestore = {},
+                onClose = {},
+            )
+        }
+    }
+}
+
+/**
+ * PLAN_UNAVAILABLE: the store ANSWERED and the selected plan is not in the
+ * answer — "isn't available" wording, not the false "couldn't reach Play".
+ */
+@PreviewLightDark
+@Composable
+private fun PaywallPlanUnavailablePreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            PaywallContent(
+                selected = PaywallPlan.YEARLY,
+                purchasing = false,
+                prices = PlanPrices.Known(emptyMap()),
+                onRetryPrices = {},
+                onSelect = {},
+                onPurchase = {},
+                onRestore = {},
+                onClose = {},
+            )
+        }
+    }
+}
+
+/**
+ * Mid-purchase: the CTA is a spinner and everything else stays live — the one
+ * interactive state the other previews all pass `purchasing = false` through.
+ */
+@PreviewLightDark
+@Composable
+private fun PaywallPurchasingPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            PaywallContent(
+                selected = PaywallPlan.YEARLY,
+                purchasing = true,
+                prices = PlanPrices.Known(previewPrices),
                 onRetryPrices = {},
                 onSelect = {},
                 onPurchase = {},

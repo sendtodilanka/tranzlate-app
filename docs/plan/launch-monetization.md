@@ -313,4 +313,111 @@ finding.
 
 Open, tracked rather than fixed here: the unbounded `awaitResolved()` in
 `TranslateTextUseCase` (harmless while the NoOp gateway starts `Free`, now
-network-bounded), and a `Pending` purchase being told "Nothing was charged".
+network-bounded), and a `Pending` purchase being told "Nothing was charged"
+*(the Pending item was subsequently fixed in the round-4/5 pass — see below)*.
+
+### Round 4 (2026-07-31, same day)
+
+A fourth lens went over the *corrections themselves* and found the pattern had
+recurred once more, so this round is recorded the same way: what was claimed,
+what was true, what changed. The fixes in this round were applied by a
+multi-agent pass; each entry names what defends it now.
+
+- **The correction above about §7.7 was itself incomplete — and this doc's own
+  round-3 commit (`d343b21`) claimed two previews it never added.**
+  `PaywallPricesLoadingPreview` and a trial-without-day-count preview were named
+  in the commit as delivered; the scripted edit that was supposed to add them
+  missed its anchor and exited silently, so nothing landed. They are genuinely
+  in `PaywallScreen.kt` now — added in this pass by a different agent than the
+  one that made the false claim — alongside a `PaywallPlanUnavailablePreview`
+  for the new state below. The workflow lesson is now a standing rule for this
+  repo's agents: after every scripted or manual edit, grep for the thing you
+  added, and a commit message may never claim something not verified to have
+  landed.
+- **Round 3's three-state fix still collapsed two truths into one lie.** A store
+  that ANSWERED but published nothing for the selected plan (`Known` with an
+  empty or partial map) rendered as "Couldn't reach Google Play" — with a retry
+  that could never succeed, because there was nothing unreachable to retry. The
+  render decision is now a pure function, `priceHintFor` in
+  `PaywallViewModel.kt`, with four hints (`LOADING`, `STORE_UNREACHABLE`,
+  `PLAN_UNAVAILABLE`, `NONE`), its own honest string, a preview, and a test that
+  goes red if the two error arms are ever swapped or re-collapsed.
+- **Round 1's headline fix was silently revertible.** `restore()` calling the
+  SDK's `restore` instead of `checkEntitlements` — the reinstalled-subscriber
+  fix — had no test that could see it, because the SDK's static entry point made
+  the gateway untestable. The SDK now sits behind a `QonversionApi` seam
+  (`lib/subscription/.../QonversionApi.kt`), so a call-recording fake can pin
+  which SDK call each gateway method makes.
+- **The fake/Maestro APK was auto-initialising the LIVE Firebase project.** The
+  google-services plugin generates the `google_app_id` resource for every
+  variant, and Firebase's `FirebaseInitProvider` initialises from it at process
+  start — before DI exists, so binding `FakeConfigModule` changed nothing. Every
+  UI-test launch registered against production Firebase. `app/build.gradle.kts`
+  now disables the `process*Fake*GoogleServices` tasks (and deletes their stale
+  generated output, so machines that built fake before the guard converge
+  without a manual clean). Verified by resource dump, not assumed:
+  `google_app_id` has 0 hits in `app-tranzlate-fake-debug.apk` and is present in
+  the prod APK.
+- **The Activity-tracker fix had zero regression defence.** Deleting the
+  `@IntoSet` startup provider, the injected set, or the `onCreate` loop compiled
+  cleanly and kept every test green — reintroducing "first purchase of every
+  session fails", which reads as flakiness, not as a bug. A source-shape gate in
+  `KonsistArchitectureTest` (`the app runs its startup tasks at create`) now
+  asserts all three; verified red by actually deleting the `@IntoSet`
+  annotation and watching it fail.
+
+**Acceptance criterion adopted from this round:** the review register's mutation
+checklist (M1–M15) is the merge gate — every listed mutation must turn at least
+one test red. Three rounds running, the way a false "it is tested / it is fixed"
+claim survived was that the suite stayed green while the fix was deleted; green
+under mutation is now the working definition of untested.
+
+### Round 5 — merge-gate co-verify (2026-07-31, same day)
+
+What this round verified, and the one thing it found. Recorded per this
+section's convention: corrections are appended, never silently rewritten.
+
+- **The `Pending` item in the round-3 "open, tracked" list above is fixed** and
+  was not recorded here until now: `PurchasePendingException` at the
+  `:core:access` boundary, a distinct `PURCHASE_PENDING` snackbar in all three
+  locales, and tests at both layers (`SubscriptionPurchaseFlowTest` "Pending
+  crosses as PurchasePendingException", `PaywallViewModelTest` "a pending
+  purchase reports PENDING"). Mutation-audited this round: M1 and M12 re-run by
+  the gate lens itself — both red on exactly the pinning tests, both reverts
+  verified by grep, suites restored green.
+- **§9's gate table is stale in one respect:** the four "environmental" Konsist
+  failures no longer occur in this worktree — the relative worktree slice
+  (issue #110) is on `main`, and this round's full `./gradlew test` exited 0
+  here, with the result XML showing all 7 `KonsistArchitectureTest` cases
+  (including the new startup-task gate) executed and passing in both variants.
+- **Found this round, still open — the pending copy's second sentence
+  over-promises.** "Pro unlocks as soon as it clears" is a timing the code
+  cannot deliver: `QonversionSubscriptionGateway.state` has exactly six writers
+  (purchase-Granted, restore, the one-shot startup refresh, and Free
+  fallbacks) and none fires when a deferred purchase clears; no
+  `setEntitlementsUpdateListener` is registered anywhere, though the shipped
+  sdk-9.7.0.aar exposes it (javap-verified, same method as the restore check).
+  In truth Pro unlocks at the next process start or a manual "Restore
+  purchases" tap. Remedy is either of: soften the sentence in the three locale
+  files, or register the SDK's entitlements-update listener into the gateway's
+  state flow (which also serves the tracked entitlement-re-resolution issue).
+
+## Standing risks the register claimed were recorded here, now actually recorded
+
+- **Remote Config as a credential channel (R1-B3).** `CloudApiKey` reaches every
+  install through Remote Config, and Firebase's own documentation forbids
+  confidential data there because any client can read its fetched parameters.
+  The Cloud Console restrictions the owner applied (package + SHA-1,
+  Translation-API-only) bound the damage; they do not change what the channel
+  is. **The long-term shape is a server-side proxy for GCT calls** so no
+  billable key ships to clients at all. Until that exists, this paragraph is
+  the standing record that the current design is an accepted, bounded risk —
+  not an endorsed pattern.
+- **Installations ID before any consent surface (R1-O8).** The Remote Config
+  bootstrap runs at process start and necessarily sends Google a Firebase
+  Installations ID before the app has shown any privacy surface; the only
+  privacy-policy link lives on the paywall, and on a cold first launch it is
+  blank until that same fetch completes. `firebase-analytics` is deliberately
+  absent, which mitigates but does not erase this. When the UMP/consent batch
+  lands, the RC bootstrap must be re-examined for consent-awareness — this
+  paragraph is the tracked finding that batch must answer.

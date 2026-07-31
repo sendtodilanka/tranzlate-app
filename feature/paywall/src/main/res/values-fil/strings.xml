@@ -31,4 +31,6 @@
     <string name="paywall_cta_trial_generic">Simulan ang libreng subok</string>
     <string name="paywall_price_loading">Kinukuha ang mga presyo mula sa Google Play\u2026</string>
     <string name="paywall_price_unavailable">Hindi maabot ang Google Play. I-tap para subukan ulit.</string>
+    <string name="paywall_plan_unavailable">Hindi available ang plan na ito sa Google Play ngayon. I-tap para tingnan ulit.</string>
+    <string name="paywall_purchase_pending">Pinoproseso pa ang bayad. Kapag natapos ito, buksan ulit ang app o i-tap ang I-restore ang mga binili para ma-unlock ang Pro.</string>
 </resources>

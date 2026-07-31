@@ -195,6 +195,52 @@ class KonsistArchitectureTest {
         assertThat(missing).isEmpty()
     }
 
+    /**
+     * R3-B1 regression defence (register R4-O1, mutation M13) — the app runs its
+     * startup tasks at create.
+     *
+     * The Activity tracker used to register itself from inside the lazy
+     * `@Provides` for `SubscriptionGateway`. Nothing pulls that gateway before
+     * first composition, first composition happens strictly AFTER the first
+     * `dispatchActivityResumed`, and Android never replays that callback — so the
+     * callbacks registered too late to ever see the first resume, and the **first
+     * purchase of every session failed** with `NoForegroundActivity`. Because it
+     * needed a rotation or background-and-return to reproduce, it read as
+     * flakiness, not as a bug, and survived three review rounds. The fix is the
+     * `AppStartupTask` multibinding run from `Application.onCreate`.
+     *
+     * These are SOURCE-SHAPE assertions, stated honestly: they cannot prove the
+     * wiring *executes* (no Android runtime here). What they defend against is
+     * the realistic regression — DELETION of the wiring: the injected set, the
+     * `onCreate` loop, or the prod `@IntoSet` contribution quietly removed in a
+     * refactor. Any of those deletions compiles, every other test stays green,
+     * and the bug above comes back looking like flakiness. This gate makes each
+     * of them RED instead.
+     */
+    @Test
+    fun `the app runs its startup tasks at create`() {
+        // (a) The Application declares the injected task set.
+        val application = scope.classes().single { it.name == "TranzlateApplication" }
+        val startupTasks = application.properties().single { it.name == "startupTasks" }
+        assertThat(startupTasks.hasAnnotationWithName("Inject")).isTrue()
+
+        // (b) onCreate actually runs them.
+        val onCreate = application.functions().single { it.name == "onCreate" }
+        assertThat(onCreate.text).contains("startupTasks.forEach")
+
+        // (c) The prod source set contributes the Activity tracker to the set.
+        //     (The fake variant ships no billing and legitimately contributes
+        //     nothing — that is why only prod is asserted.)
+        val prodContributions =
+            filesUnder("/app/src/prod/")
+                .flatMap { it.functions(includeNested = true) }
+                .filter { function ->
+                    function.returnType?.name == "AppStartupTask" &&
+                        function.hasAnnotationWithName("IntoSet")
+                }
+        assertThat(prodContributions).isNotEmpty()
+    }
+
     private companion object {
         /**
          * `Theme` is the theme WRAPPER: it renders only whatever content is passed

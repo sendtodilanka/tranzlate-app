@@ -10,10 +10,12 @@ import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
 import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
 import com.codeboxlk.tranzlate.domain.access.PurchaseCancelledException
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
+import com.codeboxlk.tranzlate.domain.access.PurchasePendingException
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -134,6 +136,55 @@ class PaywallViewModelTest {
                 dispatcher.scheduler.advanceUntilIdle()
                 expectNoEvents()
             }
+        }
+
+    /**
+     * R4-O6 (R1-O3/R3-O5): a deferred payment (Google PENDING — cash at a
+     * store; Brazil ships) may STILL charge when it clears. It must surface as
+     * its own "processing" event and never as PURCHASE_FAILED, whose copy says
+     * "Nothing was charged" — a claim that can turn out false. Mutation M9's
+     * VM-side pair: remapping Pending onto Cancelled (silence) or FAILED here
+     * turns this red.
+     */
+    @Test
+    fun `a pending purchase reports PENDING - never the 'nothing was charged' failure`() =
+        runTest {
+            val flow =
+                FakePurchaseFlow(purchaseResult = AppResult.Failure(PurchasePendingException()))
+            val vm = PaywallViewModel(flow, FakeFeatureAccess(), FakeRemoteConfig())
+
+            vm.events.test {
+                vm.purchase()
+                dispatcher.scheduler.advanceUntilIdle()
+                assertThat(awaitItem()).isEqualTo(PaywallEvent.PURCHASE_PENDING)
+                expectNoEvents() // and nothing else — no trailing PURCHASE_FAILED
+            }
+        }
+
+    /**
+     * M5: the stateIn INITIAL value, observed before the upstream flow has said
+     * anything at all (this fake's flow never emits). It must be Loading —
+     * "couldn't reach Play" is not a claim we may open the screen with.
+     */
+    @Test
+    fun `before the store says anything the screen sees Loading - never Unavailable`() =
+        runTest {
+            val silent =
+                object : PurchaseFlow {
+                    override val prices: Flow<PlanPrices> = MutableSharedFlow()
+
+                    override suspend fun refreshPrices() = Unit
+
+                    override suspend fun purchase(offeringId: String): AppResult<Entitlement> =
+                        AppResult.Success(Entitlement.Free)
+
+                    override suspend fun restore(): AppResult<Entitlement> = AppResult.Success(Entitlement.Free)
+                }
+            val model = PaywallViewModel(silent, FakeFeatureAccess(), FakeRemoteConfig())
+            model.prices.collectIn(backgroundScope)
+            runCurrent()
+
+            assertThat(model.prices.value).isEqualTo(PlanPrices.Loading)
         }
 
     @Test

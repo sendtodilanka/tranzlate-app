@@ -31,4 +31,6 @@
     <string name="paywall_cta_trial_generic">Come\u00e7ar meu teste gr\u00e1tis</string>
     <string name="paywall_price_loading">Buscando os pre\u00e7os no Google Play\u2026</string>
     <string name="paywall_price_unavailable">N\u00e3o foi poss\u00edvel acessar o Google Play. Toque para tentar de novo.</string>
+    <string name="paywall_plan_unavailable">Este plano n\u00e3o est\u00e1 dispon\u00edvel no Google Play no momento. Toque para verificar de novo.</string>
+    <string name="paywall_purchase_pending">O pagamento est\u00e1 sendo processado. Quando for conclu\u00eddo, abra o app de novo ou toque em Restaurar compras para liberar o Pro.</string>
 </resources>

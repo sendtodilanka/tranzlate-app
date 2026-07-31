@@ -37,4 +37,10 @@
     <string name="paywall_cta_trial_generic">Start my free trial</string>
     <string name="paywall_price_loading">Getting prices from Google Play\u2026</string>
     <string name="paywall_price_unavailable">Couldn\u2019t reach Google Play. Tap to try again.</string>
+    <!-- The store ANSWERED and this plan was not in the answer \u2014 saying we
+         "couldn't reach" Play here would be false. -->
+    <string name="paywall_plan_unavailable">This plan isn\u2019t available on Google Play right now. Tap to check again.</string>
+    <!-- Deferred payment (Google PENDING): the buyer MAY still be charged when
+         it clears, so this must never say "nothing was charged". -->
+    <string name="paywall_purchase_pending">Payment is being processed. When it clears, reopen the app or tap Restore purchases to unlock Pro.</string>
 </resources>

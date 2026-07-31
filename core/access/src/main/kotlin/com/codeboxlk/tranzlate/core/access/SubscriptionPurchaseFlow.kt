@@ -9,6 +9,7 @@ import com.codeboxlk.tranzlate.core.model.PlanPrice
 import com.codeboxlk.tranzlate.core.model.PlanPrices
 import com.codeboxlk.tranzlate.domain.access.PurchaseCancelledException
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
+import com.codeboxlk.tranzlate.domain.access.PurchasePendingException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -60,17 +61,24 @@ class SubscriptionPurchaseFlow
     }
 
 /**
- * Provider failures cross into the domain unchanged EXCEPT cancellation, which
- * becomes the neutral [PurchaseCancelledException]. That translation happens
- * here, at the one boundary that knows both vocabularies — a screen must be able
- * to stay silent on a user's own back-tap without importing the billing SDK.
+ * Provider failures cross into the domain unchanged EXCEPT the two the paywall
+ * must treat specially: cancellation becomes the neutral
+ * [PurchaseCancelledException] (the screen stays silent on a user's own
+ * back-tap), and a deferred payment becomes [PurchasePendingException] (the
+ * screen must say "processing", never "nothing was charged" — a pending
+ * payment may still charge). The translation happens here, at the one boundary
+ * that knows both vocabularies, so no feature module imports the billing SDK.
  */
 private fun Result<com.codeboxlk.subscription.Entitlement>.toAppResult(): AppResult<Entitlement> =
     fold(
         onSuccess = { AppResult.Success(it.toDomain()) },
         onFailure = { failure ->
             AppResult.Failure(
-                if (failure is SubscriptionFailure.Cancelled) PurchaseCancelledException() else failure,
+                when (failure) {
+                    is SubscriptionFailure.Cancelled -> PurchaseCancelledException()
+                    is SubscriptionFailure.Pending -> PurchasePendingException()
+                    else -> failure
+                },
             )
         },
     )
