@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shell strings only (nav labels + drawer). app_name comes from the brand
-     flavor's resValue (plan §4 — the one mechanism). Feature strings live in
-     features. TODO(NEEDS-TRANSLATION, C-12): values-fil + values-pt-rBR queued
-     before ship; MissingTranslation suppressed until that tracked task lands. -->
-<resources xmlns:tools="http://schemas.android.com/tools"
-    tools:ignore="MissingTranslation">
+<!-- Shell strings only (nav labels + the not-shipped-yet placeholder). app_name
+     comes from the brand flavor's resValue (plan §4 — the one mechanism).
+     Feature strings live in features. fil + pt-rBR carry FULL parity, so
+     MissingTranslation is NOT suppressed here any more — lint guards it. The
+     authored fil/pt-rBR wordings are queued for native-speaker review (C-12). -->
+<resources>
     <string name="nav_home">Home</string>
     <string name="nav_chat">Chat</string>
     <string name="nav_camera">Camera</string>
 
-    <!-- Chat/Dialog ships in v2; the tab shows a coming-soon placeholder (no dead-end). -->
+    <!-- Not-shipped-yet destinations. The copy states a fact and points at what
+         DOES work — no date is promised, because we cannot keep one. -->
     <string name="chat_coming_soon_title">Conversation</string>
-    <string name="coming_soon">Coming soon</string>
+    <string name="chat_coming_soon_body">Two-way conversation isn\'t part of this version yet. You can still translate anything you type on the home screen.</string>
+    <string name="camera_coming_soon_title">Camera</string>
+    <string name="camera_coming_soon_body">Translating signs and menus with the camera isn\'t part of this version yet. You can still type or paste the text on the home screen.</string>
+    <string name="cd_coming_soon_back">Back</string>
 
 </resources>

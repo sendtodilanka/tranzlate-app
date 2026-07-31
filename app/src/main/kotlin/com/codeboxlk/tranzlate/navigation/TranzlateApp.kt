@@ -4,6 +4,7 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -17,7 +18,6 @@ import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
 import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
-import com.codeboxlk.tranzlate.feature.camera.CameraScreen
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
 import com.codeboxlk.tranzlate.feature.languagepicker.OfflineLanguagesScreen
 import com.codeboxlk.tranzlate.feature.paywall.PaywallScreen
@@ -154,11 +154,24 @@ private fun AppNavDisplay(
                         onDone = { backStack.removeLastOrNull() },
                     )
                 }
-                entry<CameraNavKey> { CameraScreen() }
+                // Camera + Conversation are BOTH doors to features that have not
+                // shipped (issue #78 open · Dialog deferred to v2). Neither may be
+                // a blank screen the user has to guess their way out of, so both
+                // land on the one honest placeholder with a back arrow.
+                entry<CameraNavKey> {
+                    ComingSoonScreen(
+                        title = stringResource(R.string.camera_coming_soon_title),
+                        message = stringResource(R.string.camera_coming_soon_body),
+                        icon = Icons.Filled.PhotoCamera,
+                        onBack = { backStack.removeLastOrNull() },
+                    )
+                }
                 entry<ChatNavKey> {
                     ComingSoonScreen(
                         title = stringResource(R.string.chat_coming_soon_title),
+                        message = stringResource(R.string.chat_coming_soon_body),
                         icon = Icons.AutoMirrored.Filled.Chat,
+                        onBack = { backStack.removeLastOrNull() },
                     )
                 }
                 entry<HistoryNavKey> {
