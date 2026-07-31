@@ -846,3 +846,109 @@ private fun HomeContentPreview() {
         )
     }
 }
+
+/** THE ITEMS: the language row + its pills, on both themes. */
+@PreviewLightDark
+@Composable
+private fun LanguageRowPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column(modifier = Modifier.padding(LocalSpacing.current.md16)) {
+                LanguageRow(
+                    sourceLabel = "English",
+                    targetLabel = "French",
+                    onSourceClick = {},
+                    onTargetClick = {},
+                    onSwap = {},
+                    swapEnabled = true,
+                )
+                Spacer(Modifier.height(LocalSpacing.current.sm8))
+                // Detect-language source: swap has nothing to swap TO yet.
+                LanguageRow(
+                    sourceLabel = "Detect language",
+                    targetLabel = "Sinhala",
+                    onSourceClick = {},
+                    onTargetClick = {},
+                    onSwap = {},
+                    swapEnabled = false,
+                )
+            }
+        }
+    }
+}
+
+/** The input preview card + the Pro chip. */
+@PreviewLightDark
+@Composable
+private fun InputPreviewCardPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column(modifier = Modifier.padding(LocalSpacing.current.md16)) {
+                InputPreviewCard(onOpen = {}, onMic = {})
+                Spacer(Modifier.height(LocalSpacing.current.md16))
+                TokenProChip(onClick = {})
+            }
+        }
+    }
+}
+
+/** Tool cards + list row + mini cards + the phrasing banner — every Home item. */
+@PreviewLightDark
+@Composable
+private fun HomeItemsPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm8),
+                modifier = Modifier.padding(LocalSpacing.current.md16),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm8)) {
+                    ToolCard(
+                        icon = painterResource(DsR.drawable.ic_cloud_done),
+                        title = stringResource(R.string.home_tool_offline),
+                        subtitle = stringResource(R.string.home_tool_offline_sub),
+                        container = MaterialTheme.colorScheme.primaryContainer,
+                        onContainer = MaterialTheme.colorScheme.onPrimaryContainer,
+                        onClick = {},
+                        testTag = "tt_preview_tool_offline",
+                        modifier = Modifier.weight(1f),
+                    )
+                    ToolCard(
+                        icon = painterResource(DsR.drawable.ic_photo_camera),
+                        title = stringResource(R.string.home_tool_camera),
+                        subtitle = stringResource(R.string.home_tool_camera_sub),
+                        container = MaterialTheme.colorScheme.tertiaryContainer,
+                        onContainer = MaterialTheme.colorScheme.onTertiaryContainer,
+                        onClick = {},
+                        testTag = "tt_preview_tool_camera",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                ListRowCard(
+                    icon = painterResource(DsR.drawable.ic_download_for_offline),
+                    title = stringResource(R.string.home_row_download),
+                    subtitle = stringResource(R.string.home_row_download_sub),
+                    onClick = {},
+                    testTag = "tt_preview_row_download",
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm8)) {
+                    MiniCard(
+                        icon = painterResource(DsR.drawable.ic_menu_book),
+                        label = stringResource(R.string.home_mini_phrasebook),
+                        onClick = {},
+                        testTag = "tt_preview_mini_phrasebook",
+                        modifier = Modifier.weight(1f),
+                    )
+                    MiniCard(
+                        icon = painterResource(DsR.drawable.ic_format_quote),
+                        label = stringResource(R.string.home_mini_quotes),
+                        onClick = {},
+                        testTag = "tt_preview_mini_quotes",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                PhrasingBanner(onClick = {})
+            }
+        }
+    }
+}

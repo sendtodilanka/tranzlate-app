@@ -23,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -369,5 +370,24 @@ private fun SettingsDarkChosenPreview() {
             onThemeModeSelected = {},
             onDynamicColorChanged = {},
         )
+    }
+}
+
+/** THE ITEMS: every Settings row shape, both themes. */
+@PreviewLightDark
+@Composable
+private fun SettingsItemsPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column {
+                SectionHeader("Appearance")
+                SubGroupLabel("Theme")
+                ThemeModeRow(label = "System default", selected = true, onClick = {}, testTag = "tt_preview_row")
+                ThemeModeRow(label = "Dark", selected = false, onClick = {}, testTag = "tt_preview_row2")
+                DynamicColorRow(enabled = true, onToggle = {})
+                SectionHeader("Downloads")
+                MobileDataRow(enabled = false, onToggle = {})
+            }
+        }
     }
 }

@@ -44,9 +44,12 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
+import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
+import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 import kotlinx.coroutines.launch
@@ -382,6 +385,85 @@ private fun HistoryRow(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
             )
+        }
+    }
+}
+
+// ── Previews (owner convention: screens AND custom M3 items, light + dark).
+
+private fun previewTranslation(
+    id: Long,
+    source: String,
+    target: String,
+    favourite: Boolean = false,
+) = Translation(
+    id = id,
+    sourceLang = "en",
+    sourceText = source,
+    targetLang = "fr",
+    targetText = target,
+    engine = Engine.OFFLINE_MLKIT,
+    favourite = favourite,
+    createdAt = 0L,
+)
+
+private val previewHistory =
+    listOf(
+        previewTranslation(1, "Good morning", "Bonjour", favourite = true),
+        previewTranslation(2, "See you tomorrow", "À demain"),
+        previewTranslation(3, "Where is the station?", "Où est la gare ?"),
+    )
+
+@PreviewLightDark
+@Composable
+private fun HistoryContentPreview() {
+    TranzlateTheme {
+        HistoryContent(
+            history = previewHistory,
+            favourites = previewHistory.filter(Translation::favourite),
+            onToggleFavourite = {},
+            onDelete = {},
+            onPick = {},
+            onBack = {},
+        )
+    }
+}
+
+/** The empty face — both filter chips can reach it (EDGE_CASES: no dead end). */
+@PreviewLightDark
+@Composable
+private fun HistoryEmptyPreview() {
+    TranzlateTheme {
+        HistoryContent(
+            history = emptyList(),
+            favourites = emptyList(),
+            onToggleFavourite = {},
+            onDelete = {},
+            onPick = {},
+            onBack = {},
+        )
+    }
+}
+
+/** THE ITEM: one row, starred and unstarred, on both themes. */
+@PreviewLightDark
+@Composable
+private fun HistoryRowPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column {
+                HistoryRow(
+                    translation = previewHistory[0],
+                    onToggleFavourite = {},
+                    onPick = {},
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                HistoryRow(
+                    translation = previewHistory[1],
+                    onToggleFavourite = {},
+                    onPick = {},
+                )
+            }
         }
     }
 }
