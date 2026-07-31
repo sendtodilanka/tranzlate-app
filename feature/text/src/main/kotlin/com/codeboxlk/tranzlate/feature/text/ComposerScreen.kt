@@ -50,7 +50,9 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -63,7 +65,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.designsystem.Elevation
@@ -287,21 +291,50 @@ internal fun ComposerPaneContent(
     }
     val copiedMessage = stringResource(R.string.text_copied)
 
-    Column(modifier = modifier) {
-        // Height-compact landscape + IME: the keyboard owns most of the 412dp —
-        // hide the top row while typing (GT's own landscape behaviour) so the
-        // field keeps a readable height. The system back gesture still works,
-        // and the row returns the moment the keyboard drops. Verified on
-        // device: without this the field measures near zero (issue #56).
-        // The isImeVisible read is short-circuit-gated to the short-landscape
-        // shape: issue-56 flagged its per-frame inset invalidation as the draw-
-        // failure suspect, so every other shape stays unsubscribed from IME
-        // toggles. Here it is required (issue #86, owner): the row hides ONLY
-        // while the keyboard owns the height — dismissing the IME must bring
-        // back the ONLY back affordance.
+    // Issue #99: how much room the edit face gets is a MEASURED question, not a
+    // size-class one. The owner's OnePlus 7 Pro is 832dp in landscape — 8dp
+    // short of the expanded breakpoint — so the width-gated treatments left a
+    // 48dp field inside a 40dp card interior. This node fills the constraints
+    // it is handed (fillMaxSize + the Scaffold's safeDrawing padding, IME
+    // included), so its height is branch-independent: nothing below can change
+    // it, and the gating cannot oscillate. Measured rather than derived from
+    // BoxWithConstraints because the branch bodies below early-return, which a
+    // non-inline content lambda forbids — and because this costs no
+    // subcomposition while the IME animates.
+    val density = LocalDensity.current
+    var paneHeight by remember { mutableStateOf(Dp.Unspecified) }
+    val fit =
+        when {
+            // Two-pane windows keep the tall face by construction; a tablet at
+            // the 480dp height bound with a tall IME must not start folding.
+            layout.permanentTwoPane -> ComposerFit.FULL
+
+            paneHeight.isSpecified -> composerFitFor(paneHeight)
+
+            // Before the first layout pass: the tall face is the safe default.
+            else -> ComposerFit.FULL
+        }
+
+    Column(
+        modifier =
+            modifier.onSizeChanged { size ->
+                with(density) { paneHeight = size.height.toDp() }
+            },
+    ) {
+        // Short window + IME: the keyboard owns most of the height — hide the
+        // top row while typing (GT's own landscape behaviour) so the field keeps
+        // a readable height. The system back gesture still works, and the row
+        // returns the moment the keyboard drops. Verified on device: without
+        // this the field measures near zero (issue #56).
+        // The isImeVisible read stays short-circuit-gated — issue-56 flagged its
+        // per-frame inset invalidation as the draw-failure suspect, so every
+        // window above MINIMAL stays unsubscribed from IME toggles. The IME term
+        // itself is required (issue #86, owner): the row hides ONLY while the
+        // keyboard owns the height — dismissing the IME must bring back the ONLY
+        // back affordance, and a tiny window with no keyboard must keep it.
         @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-        val splitImeVisible = layout.splitResultOnly && WindowInsets.isImeVisible
-        val hideTopRow = isEditing && splitImeVisible
+        val minimalIme = fit.minimal && WindowInsets.isImeVisible
+        val hideTopRow = isEditing && minimalIme
         // Issue #92 (debate-ruled): the 16dp-based top row shifts by the margin
         // shim in EVERY non-compact shape (shim = margin − 16, so 0dp on
         // phones) — back + pills land exactly on the pane/card edge because
@@ -507,10 +540,10 @@ internal fun ComposerPaneContent(
                         .padding(
                             start = spacing.md16,
                             end = spacing.md16,
-                            // Issue #86: with the IME up in the short landscape
-                            // shape every dp belongs to the field.
+                            // Issue #86: with the IME up in a short window every
+                            // dp belongs to the field.
                             top =
-                                if (isEditing && splitImeVisible) {
+                                if (isEditing && minimalIme) {
                                     spacing.sm8
                                 } else {
                                     spacing.lg24
@@ -518,7 +551,10 @@ internal fun ComposerPaneContent(
                             bottom = spacing.md16,
                         ),
             ) {
-                if (!(layout.splitResultOnly && isEditing)) {
+                // Folded chrome carries the label inside its own row, so the
+                // standalone label row would be a duplicate (issue #99: the
+                // fold is decided by measured height, not by width).
+                if (!(fit.foldsChrome && isEditing)) {
                     SourceLabelRow(
                         label = languageLabel(sourceLangId),
                         showClear = input.isNotEmpty(),
@@ -543,8 +579,8 @@ internal fun ComposerPaneContent(
                                 keyboard?.hide()
                             }
                         },
-                        compactLandscape = layout.splitResultOnly,
-                        minimalIme = splitImeVisible,
+                        foldChrome = fit.foldsChrome,
+                        minimalIme = minimalIme,
                         label = languageLabel(sourceLangId),
                         onClear = {
                             onClearAll()
@@ -674,14 +710,14 @@ private fun ColumnScope.ComposerEditBody(
     onPaste: () -> Unit,
     onMic: () -> Unit,
     onTranslate: () -> Unit,
-    // Height-compact landscape (issue #56): the card has ~140dp of interior —
-    // label row + a min-height field + the action row overflow it and the
-    // actions clip out of reach (device-verified). Compact mode folds label,
-    // counter, clear and the action into ONE top row so the field keeps the
-    // rest.
-    compactLandscape: Boolean = false,
-    // Issue #86 (owner): with the IME up in the short landscape shape there was
-    // ~0dp to type in — this mode is field + action ONLY; the chrome returns
+    // Short window (issue #56, re-gated on measured height in #99): the tall
+    // stack — label row + a min-height field + the action row — overflows the
+    // card interior and the actions clip out of reach (device-verified). Folded
+    // mode puts label, counter, clear and the action into ONE row so the field
+    // keeps the rest. See [ComposerFit].
+    foldChrome: Boolean = false,
+    // Issue #86 (owner): with the IME up in a short window there was ~0dp to
+    // type in — this mode is field + counter + action ONLY; the chrome returns
     // the moment the keyboard drops.
     minimalIme: Boolean = false,
     label: String = "",
@@ -703,8 +739,8 @@ private fun ColumnScope.ComposerEditBody(
     // never dispose the focused node — a different call site made Compose
     // clear focus mid-IME-slide, the InputConnection dropped, and the
     // keyboard dismissed itself in a loop (landscape show-then-hide).
-    // minimalIme / compactLandscape only toggle SIBLING chrome + modifiers.
-    if (compactLandscape && !minimalIme) {
+    // minimalIme / foldChrome only toggle SIBLING chrome + modifiers.
+    if (foldChrome && !minimalIme) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
@@ -768,7 +804,7 @@ private fun ColumnScope.ComposerEditBody(
             Text(stringResource(R.string.composer_paste))
         }
     }
-    if (compactLandscape || minimalIme) return
+    if (foldChrome || minimalIme) return
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(top = spacing.sm8),
@@ -1411,6 +1447,71 @@ private fun ComposerEditPreview() {
                 onClearAll = {},
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+    }
+}
+
+/*
+ * The two short-window edit faces (issue #99). Before #99 they were reachable
+ * only on windows ≥840dp wide, so no preview ever rendered them; they now serve
+ * every ~800dp landscape phone, including the owner's. The card heights are the
+ * real ones a 384dp-tall landscape window produces: ~200dp with the keyboard
+ * down, ~104dp with it up. Rendered against ComposerEditBody directly because
+ * `minimalIme` also carries an IME-visible term that a preview cannot raise.
+ */
+private val PREVIEW_FOLDED_CARD_HEIGHT = 200.dp
+private val PREVIEW_MINIMAL_CARD_HEIGHT = 104.dp
+
+@PreviewLightDark
+@Composable
+private fun ComposerFoldedChromePreview() {
+    ShortWindowEditPreview(cardHeight = PREVIEW_FOLDED_CARD_HEIGHT, minimalIme = false)
+}
+
+@PreviewLightDark
+@Composable
+private fun ComposerMinimalImePreview() {
+    ShortWindowEditPreview(cardHeight = PREVIEW_MINIMAL_CARD_HEIGHT, minimalIme = true)
+}
+
+@Composable
+private fun ShortWindowEditPreview(
+    cardHeight: Dp,
+    minimalIme: Boolean,
+) {
+    TranzlateTheme {
+        val spacing = LocalSpacing.current
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                color = LocalFloatingSurface.current,
+                shadowElevation = Elevation.level1,
+                modifier = Modifier.padding(spacing.lg24).fillMaxWidth().height(cardHeight),
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(
+                                start = spacing.md16,
+                                end = spacing.md16,
+                                top = if (minimalIme) spacing.sm8 else spacing.lg24,
+                                bottom = spacing.md16,
+                            ),
+                ) {
+                    ComposerEditBody(
+                        input = "Good morning",
+                        focusRequester = remember { FocusRequester() },
+                        onInputChange = {},
+                        onPaste = {},
+                        onMic = {},
+                        onTranslate = {},
+                        foldChrome = true,
+                        minimalIme = minimalIme,
+                        label = "English",
+                    )
+                }
+            }
         }
     }
 }
