@@ -147,4 +147,53 @@ class LanguageNamesTest {
             Locale.setDefault(default)
         }
     }
+
+    /**
+     * CLDR names these by region or script code, which drops the only word the
+     * reader is scanning for. "Chinese (Taiwan)" does not say Traditional.
+     *
+     * Pinned as EXACT strings on purpose: the family test beside this one only
+     * asserts the labels differ from each other, which the broken behaviour also
+     * satisfied.
+     */
+    @Test
+    fun `the catalog name wins where CLDR drops the script`() {
+        assertThat(languageDisplayName("zh", Locale.ENGLISH, fallback = "Chinese (Simplified)"))
+            .isEqualTo("Chinese (Simplified)")
+        assertThat(languageDisplayName("zh-TW", Locale.ENGLISH, fallback = "Chinese (Traditional)"))
+            .isEqualTo("Chinese (Traditional)")
+        assertThat(languageDisplayName("ms-Arab", Locale.ENGLISH, fallback = "Malay (Jawi)"))
+            .isEqualTo("Malay (Jawi)")
+        assertThat(languageDisplayName("pa-Arab", Locale.ENGLISH, fallback = "Punjabi (Shahmukhi)"))
+            .isEqualTo("Punjabi (Shahmukhi)")
+    }
+
+    /** The override is a named set, not a rule that quietly widens. */
+    @Test
+    fun `every other id still takes the localized platform name`() {
+        assertThat(languageDisplayName("fr-CA", Locale.ENGLISH, fallback = "French (Canada)"))
+            .isEqualTo("French (Canada)")
+        assertThat(languageDisplayName("de", Locale.FRENCH, fallback = "German")).isEqualTo("allemand")
+    }
+
+    @Test
+    fun `the rail keeps its ends and never exceeds what fits`() {
+        val alphabet = ('A'..'Z').mapIndexed { index, letter -> letter to index }
+
+        val sampled = alphabet.sampledTo(10)
+
+        assertThat(sampled).hasSize(10)
+        assertThat(sampled.first()).isEqualTo('A' to 0)
+        // Dropping the tail instead would make the rail lie by omission: an
+        // index that stops at M in a list that runs to Z.
+        assertThat(sampled.last()).isEqualTo('Z' to 25)
+        assertThat(sampled.map { it.second }).isInOrder()
+    }
+
+    @Test
+    fun `a rail that already fits is untouched`() {
+        val five = ('A'..'E').mapIndexed { index, letter -> letter to index }
+
+        assertThat(five.sampledTo(10)).isEqualTo(five)
+    }
 }

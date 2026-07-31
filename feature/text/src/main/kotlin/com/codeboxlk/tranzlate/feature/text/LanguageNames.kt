@@ -42,11 +42,33 @@ fun languageDisplayName(
     locale: Locale = Locale.getDefault(),
     fallback: String = id,
 ): String {
+    if (id in CATALOG_NAME_WINS && fallback.isNotBlank()) return fallback
     val self = Locale.forLanguageTag(id)
     val display = self.getDisplayName(locale)
     val platformKnowsIt = display.isNotBlank() && display != id && display != self.toLanguageTag()
     return if (platformKnowsIt) display else fallback.ifBlank { id }
 }
+
+/**
+ * The handful of ids where CLDR is *less* informative than our own catalog, and
+ * the catalog label wins outright.
+ *
+ * CLDR names these by region or script code, which loses the word the user is
+ * actually looking for: `zh` becomes "Chinese" and `zh-TW` "Chinese (Taiwan)",
+ * so neither row says **Simplified** or **Traditional** — the one distinction a
+ * Chinese reader is scanning for. Likewise "Malay (Arabic)" for Jawi and
+ * "Punjabi (Arabic)" for Shahmukhi.
+ *
+ * The trade-off is deliberate and narrow: these four rows read in English on a
+ * device whose UI language is something else, whereas the other 190 stay
+ * localized. A name that is localized but does not say which script you are
+ * choosing is worse than one that does — and the alternative, hand-translating
+ * script qualifiers into every locale, is a bigger promise than this list.
+ *
+ * An explicit set rather than a heuristic, so a future entry is an argued
+ * decision rather than a rule quietly widening.
+ */
+private val CATALOG_NAME_WINS = setOf("zh", "zh-TW", "ms-Arab", "pa-Arab")
 
 /**
  * The language's name **in itself** — "Español", "සිංහල", "日本語".

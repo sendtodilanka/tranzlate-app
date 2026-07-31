@@ -88,6 +88,14 @@ object Dimensions {
     /** A–Z rail VISUAL width; its touch target is [touchTargetMin]. */
     val pickerRailWidth: Dp = 18.dp
 
+    /**
+     * Vertical slot one A–Z rail letter occupies. Not decoration: the rail
+     * divides its height by this to decide how many letters can be drawn
+     * without them overlapping, so it is the number that keeps the letter you
+     * touch and the row it scrolls to in agreement.
+     */
+    val pickerRailLetter: Dp = 18.dp
+
     /** A–Z rail active-letter pill. */
     val pickerRailPill: Dp = 16.dp
 

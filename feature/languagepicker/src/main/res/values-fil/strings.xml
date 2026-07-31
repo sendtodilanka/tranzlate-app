@@ -14,7 +14,7 @@
     <string name="offline_cd_delete">Burahin ang %1$s</string>
     <string name="offline_cd_retry">Subukang i-download muli ang %1$s</string>
     <string name="offline_data_dialog_title">I-download ang %1$s gamit ang mobile data?</string>
-    <string name="offline_data_dialog_body">Humigit-kumulang 30 MB ang mga language pack. Puwede ring maghintay ng Wi-Fi.</string>
+    <string name="offline_data_dialog_body">Malalaki ang mga language pack. Puwede ring maghintay ng Wi-Fi.</string>
     <string name="offline_data_dialog_once">I-download nang isang beses</string>
     <string name="offline_data_dialog_wait">Maghintay ng Wi-Fi</string>
     <string name="offline_error_storage">Kulang ang espasyo — magbakante ng storage, pagkatapos ay subukang muli</string>

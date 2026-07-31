@@ -5,6 +5,7 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -88,6 +89,7 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private const val CONTENT_TYPE_ROW = "lang_row"
 private const val CONTENT_TYPE_HEADER = "lang_header"
@@ -966,6 +968,30 @@ private fun AlphabetRail(
     listState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
+    BoxWithConstraints(modifier = modifier.width(Dimensions.touchTargetMin).fillMaxHeight()) {
+        // Only as many letters as actually fit. `SpaceEvenly` has no answer for
+        // negative free space: past that point the glyphs overlap and the ones
+        // at the end clamp to nothing, while `railSlot` keeps mapping the
+        // finger across the ORIGINAL count — so the letter you touch and the
+        // place it scrolls to stop agreeing. Reachable two ways: landscape,
+        // where the list viewport is a fraction of the 26 × 18dp an English
+        // alphabet needs, and a CJK system locale, where the index letter is
+        // the first character of a localized name and the count runs past a
+        // hundred. Sampling keeps the rail honest at any height; below three
+        // survivors it is not an index any more and does not draw.
+        val fits = (maxHeight / Dimensions.pickerRailLetter).toInt().coerceAtLeast(1)
+        val shown = remember(letters, fits) { letters.sampledTo(fits) }
+        if (shown.size >= MIN_RAIL_LETTERS) {
+            RailColumn(letters = shown, listState = listState)
+        }
+    }
+}
+
+@Composable
+private fun RailColumn(
+    letters: List<Pair<Char, Int>>,
+    listState: LazyListState,
+) {
     val scope = rememberCoroutineScope()
     val active: State<Char?> =
         remember(letters, listState) {
@@ -978,9 +1004,8 @@ private fun AlphabetRail(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly,
         modifier =
-            modifier
-                .width(Dimensions.touchTargetMin)
-                .fillMaxHeight()
+            Modifier
+                .fillMaxSize()
                 .testTag("tt_lang_rail")
                 .clearAndSetSemantics { }
                 .pointerInput(letters) {
@@ -1405,3 +1430,19 @@ private fun NoSearchResultsPreview() {
         }
     }
 }
+
+/**
+ * Evenly spaced subset of at most [limit] entries, first and last always kept.
+ *
+ * Dropping the tail instead would make the rail lie by omission — an index that
+ * stops at M in a list that runs to Z.
+ */
+internal fun List<Pair<Char, Int>>.sampledTo(limit: Int): List<Pair<Char, Int>> {
+    if (size <= limit) return this
+    if (limit <= 1) return listOf(first())
+    val step = (size - 1).toFloat() / (limit - 1)
+    return (0 until limit).map { this[(it * step).roundToInt()] }
+}
+
+/** Below this a rail is decoration, not navigation. */
+private const val MIN_RAIL_LETTERS = 3
