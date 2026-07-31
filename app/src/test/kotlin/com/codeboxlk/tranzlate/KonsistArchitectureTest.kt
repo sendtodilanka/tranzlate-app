@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate
 import com.google.common.truth.Truth.assertThat
 import com.lemonappdev.konsist.api.Konsist
 import org.junit.Test
+import java.io.File
 
 /**
  * Architecture gates (plan §8) — ship in the scaffold PR and run in CI:
@@ -18,12 +19,43 @@ class KonsistArchitectureTest {
      * agents in git worktrees under `.claude/worktrees/`. A worktree is a
      * second copy of every source file, so while one exists each declaration is
      * found twice and the FROZEN-package gate fails with `[Translator,
-     * Translator]`. Slicing them out keeps the gate about *our* sources.
+     * Translator]`. Those copies are sliced out.
+     *
+     * The slice is RELATIVE to the checkout being scanned, not an absolute path
+     * match (issue #110). An absolute `contains("/.claude/worktrees/")` is true
+     * of *every* file when the test itself runs inside a worktree — which is
+     * exactly when an agent runs it — so the scope emptied and all four gates
+     * failed with nothing wrong. Relativising makes the rule mean what it says:
+     * ignore worktrees nested inside THIS checkout.
      */
+    private val checkoutRoot: String =
+        generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
+            .first { File(it, SETTINGS_FILE).isFile }
+            .path
+            .replace('\\', '/')
+
     private val scope =
         Konsist.scopeFromProject().slice { file ->
-            !file.path.replace('\\', '/').contains("/.claude/worktrees/")
+            val relative =
+                file.path
+                    .replace('\\', '/')
+                    .removePrefix(checkoutRoot)
+                    .trimStart('/')
+            !relative.startsWith(NESTED_WORKTREES)
         }
+
+    /**
+     * The gate that stops a vacuous pass. Every assertion below is of the form
+     * "no file does X", which an empty scope satisfies perfectly — so a scope
+     * that silently loses its files would turn four gates green while checking
+     * nothing. #110 was the loud version of that failure; this is the guard for
+     * the quiet one.
+     */
+    @Test
+    fun `the architecture scope is not empty`() {
+        assertThat(scope.files).isNotEmpty()
+        assertThat(filesUnder("/core/domain/")).isNotEmpty()
+    }
 
     private fun filesUnder(vararg pathFragments: String) =
         scope.files.filter { file ->
@@ -170,5 +202,11 @@ class KonsistArchitectureTest {
          * composable in the app already exercises it (`TranzlateTheme { … }`).
          */
         val PREVIEW_EXEMPT = setOf("Theme")
+
+        /** Marks the checkout root — a worktree has one of its own, which is the point. */
+        const val SETTINGS_FILE = "settings.gradle.kts"
+
+        /** Worktrees nested inside the checkout being scanned; never the checkout itself. */
+        const val NESTED_WORKTREES = ".claude/worktrees/"
     }
 }

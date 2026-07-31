@@ -2,12 +2,14 @@ package com.codeboxlk.tranzlate.core.data.repository
 
 import com.codeboxlk.tranzlate.core.database.LanguageDao
 import com.codeboxlk.tranzlate.core.database.LanguageEntity
+import com.codeboxlk.tranzlate.core.datastore.TranzlatePreferencesDataSource
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onStart
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,12 +39,30 @@ class LanguageRepositoryImpl
     constructor(
         private val languageDao: LanguageDao,
         private val offlineModelManager: OfflineModelManager,
+        private val preferences: TranzlatePreferencesDataSource,
     ) : LanguageRepository {
         override fun languages(): Flow<List<Language>> =
             combine(
                 languageDao.languages(),
                 offlineModelManager.modelStates().onStart { emit(emptyMap()) },
-            ) { entities, modelStates ->
+                // Same guard as the line above, for the same reason: `combine`
+                // waits for EVERY source, so an unprefixed third one would let
+                // a slow DataStore read hold the whole catalog behind a
+                // "Loading languages…" with no retry. Recents are decoration;
+                // they must never gate the list.
+                //
+                // `distinctUntilChanged` sits UPSTREAM of `onStart`, not after
+                // it: `dataStore.data` re-emits on every unrelated preference
+                // write (theme, mode, consent), and each identical map would
+                // otherwise rebuild 194 rows. Downstream of `onStart` it would
+                // also swallow the first real value whenever that value is
+                // itself empty — a fresh install — collapsing this source to a
+                // single emission and stranding anything waiting for the one
+                // after it.
+                preferences.recentLanguages
+                    .distinctUntilChanged()
+                    .onStart { emit(emptyMap()) },
+            ) { entities, modelStates, recents ->
                 val catalog =
                     if (entities.isEmpty()) {
                         BundledLanguageCatalog.all
@@ -52,6 +72,7 @@ class LanguageRepositoryImpl
                 catalog.map { language ->
                     language.copy(
                         offlineDownloaded = modelStates[language.id] == OfflineModelState.Downloaded,
+                        lastUsedAt = recents[language.id] ?: language.lastUsedAt,
                     )
                 }
             }
@@ -60,13 +81,24 @@ class LanguageRepositoryImpl
          * The id is normalised first: a tag that arrived from ML Kit's
          * Language-ID API or from a restored preference can carry an alternate
          * spelling (`iw`, `fil`, `zh-CN`), and an un-normalised write would
-         * update no row at all and lose the signal silently.
+         * record a language the catalog has no row for — the signal would be
+         * kept and then never matched.
+         *
+         * The write goes to preferences, not to the `language` table. The table
+         * is never seeded (`upsertAll` has no production caller), so the DAO's
+         * `UPDATE … WHERE id = ?` matched zero rows every time and the picker's
+         * Recent section could never populate — the section rendered empty for
+         * every user, forever, while looking implemented. The DAO write is kept
+         * ALONGSIDE for the day the table is seeded; preferences are what the
+         * overlay above actually reads.
          */
         override suspend fun setLastUsed(
             languageId: String,
             atMillis: Long,
         ) {
-            languageDao.setLastUsed(BundledLanguageCatalog.canonicalId(languageId) ?: languageId, atMillis)
+            val canonical = BundledLanguageCatalog.canonicalId(languageId) ?: languageId
+            preferences.recordLanguageUse(canonical, atMillis)
+            languageDao.setLastUsed(canonical, atMillis)
         }
     }
 

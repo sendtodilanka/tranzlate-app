@@ -60,6 +60,45 @@ object Dimensions {
     /** Composer language pill — taller than the 32dp M3 chip default (GT parity). */
     val languageChipHeight: Dp = 40.dp
 
+    // ---- Language picker (Claude Design "Language Picker 15a", issue #117) ----
+    // Measured from the export, not eyeballed. The pill radii are deliberately
+    // ABSENT: every picker pill is exactly half its own height, which is the
+    // `full` shape token ([TranzlateShapeFull]) — a 28dp/30dp literal would be
+    // the same shape with a worse name.
+
+    /** Picker row without a supporting line. */
+    val pickerRowHeight: Dp = 56.dp
+
+    /** Picker row carrying a supporting line (on-device / progress / failure). */
+    val pickerRowHeightTall: Dp = 60.dp
+
+    /**
+     * Leading inset inside a picker pill — the row's start padding and the
+     * search field's icon→text gap. Smaller than [screenMarginCompact] because
+     * the pill itself is already inset from the screen edge.
+     */
+    val pickerLeadingInset: Dp = 12.dp
+
+    /** Trailing state glyph (cloud_done / download / refresh) — between [iconSm] and [iconMd]. */
+    val pickerStateIcon: Dp = 22.dp
+
+    /** "ONLINE ONLY" chip height. */
+    val pickerChipHeight: Dp = 24.dp
+
+    /** A–Z rail VISUAL width; its touch target is [touchTargetMin]. */
+    val pickerRailWidth: Dp = 18.dp
+
+    /**
+     * Vertical slot one A–Z rail letter occupies. Not decoration: the rail
+     * divides its height by this to decide how many letters can be drawn
+     * without them overlapping, so it is the number that keeps the letter you
+     * touch and the row it scrolls to in agreement.
+     */
+    val pickerRailLetter: Dp = 18.dp
+
+    /** A–Z rail active-letter pill. */
+    val pickerRailPill: Dp = 16.dp
+
     /** ListDetailPaneScaffold: list/input pane minimum (C-13). */
     val paneListMin: Dp = 360.dp
 

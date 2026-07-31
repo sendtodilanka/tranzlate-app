@@ -98,6 +98,46 @@ class TranzlatePreferencesDataSource
             dataStore.edit { it[KEY_ALLOW_MOBILE_DATA] = value }
         }
 
+        /**
+         * When each language was last chosen — what the picker's "Recent" section
+         * is built from (issue #117).
+         *
+         * This lives in preferences and NOT in the `language` Room table, which
+         * is where it looks like it should live. That table is never seeded —
+         * `LanguageDao.upsertAll` has no production caller — so its `last_used_at`
+         * UPDATE always matched zero rows and Recent could never populate. A
+         * recents list is a UI convenience about a handful of ids, not catalog
+         * data; keeping it here means it does not depend on a seeding decision
+         * that has not been made, and it survives the catalog changing under it.
+         *
+         * Stored as `id:millis` entries joined by U+001F — a unit separator can
+         * appear in neither a BCP-47 tag nor a decimal, so the codec has no
+         * escaping to get wrong. Malformed entries are dropped rather than
+         * throwing: a corrupt preference must cost the user their recents list,
+         * never the screen.
+         */
+        val recentLanguages: Flow<Map<String, Long>> =
+            preferences.map { prefs -> decodeRecents(prefs[KEY_RECENT_LANGS].orEmpty()) }
+
+        /**
+         * Records a use and keeps only the [RECENT_STORE_LIMIT] most recent, so the
+         * preference cannot grow with every language the user ever touches.
+         */
+        suspend fun recordLanguageUse(
+            languageId: String,
+            atMillis: Long,
+        ) {
+            if (languageId.isBlank()) return
+            dataStore.edit { prefs ->
+                val merged = decodeRecents(prefs[KEY_RECENT_LANGS].orEmpty()) + (languageId to atMillis)
+                prefs[KEY_RECENT_LANGS] =
+                    merged.entries
+                        .sortedByDescending { it.value }
+                        .take(RECENT_STORE_LIMIT)
+                        .joinToString(RECENT_ENTRY_SEPARATOR) { "${it.key}$RECENT_FIELD_SEPARATOR${it.value}" }
+            }
+        }
+
         companion object {
             private val KEY_SOURCE_LANG = stringPreferencesKey("prefs.source_lang")
             private val KEY_TARGET_LANG = stringPreferencesKey("prefs.target_lang")
@@ -105,11 +145,32 @@ class TranzlatePreferencesDataSource
             private val KEY_THEME = intPreferencesKey("prefs.theme")
             private val KEY_DYNAMIC_COLOR = booleanPreferencesKey("prefs.dynamic_color")
             private val KEY_ALLOW_MOBILE_DATA = booleanPreferencesKey("prefs.allow_mobile_data")
+            private val KEY_RECENT_LANGS = stringPreferencesKey("prefs.recent_languages")
 
             const val DEFAULT_SOURCE_LANG = "en"
             const val DEFAULT_TARGET_LANG = "fr"
             const val DEFAULT_TEXT_MODE = "AUTO"
             const val DEFAULT_THEME = 0
             const val DEFAULT_DYNAMIC_COLOR = false
+
+            /** Stored beyond what the picker shows, so trimming the UI list never loses history. */
+            const val RECENT_STORE_LIMIT = 10
+
+            private const val RECENT_ENTRY_SEPARATOR = "\u001F"
+            private const val RECENT_FIELD_SEPARATOR = ":"
+
+            internal fun decodeRecents(raw: String): Map<String, Long> =
+                raw
+                    .split(RECENT_ENTRY_SEPARATOR)
+                    .mapNotNull { entry ->
+                        val id = entry.substringBefore(RECENT_FIELD_SEPARATOR, missingDelimiterValue = "")
+                        val millis =
+                            entry
+                                .substringAfter(
+                                    RECENT_FIELD_SEPARATOR,
+                                    missingDelimiterValue = "",
+                                ).toLongOrNull()
+                        if (id.isNotBlank() && millis != null) id to millis else null
+                    }.toMap()
         }
     }
