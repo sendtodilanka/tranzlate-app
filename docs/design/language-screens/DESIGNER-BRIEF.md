@@ -2,12 +2,25 @@
 
 **Give this to Claude Design at the start of every language-screens task.**
 
-The "Complete Language Screen design guideline" is excellent and most of it is
-being built. This brief exists because that spec was drawn without knowing what
-the Android platform will and will not tell us at runtime. Nothing below is a
-matter of taste — each item is a measured fact about the APIs, with the
-measurement named, so you can design *around* the constraint instead of
-designing something that has to be faked.
+> ## Status: rev 3 of the spec is reconciled with this brief ✅
+>
+> Verified against the drawings, not just the changelog: **zero user-facing
+> percentages** (the only `%` left in the file is the CSS keyframe that drives
+> the indeterminate bar), **zero per-row sizes**, every MB figure either
+> aggregate ("110 MB used", "12 MB free") or the sanctioned range, and
+> pause / resume / queue / Undo / update appear **only in prose explaining why
+> they were removed**. The one remaining "Cancel" is the tablet dialog's dismiss
+> button, which is correct — it cancels the dialog, not a download.
+>
+> Two things still to tidy in the spec's own README, and one engineering
+> prerequisite, are listed in §7. Everything else below still applies to future
+> work.
+
+This brief exists because the spec was first drawn without knowing what the
+Android platform will and will not tell us at runtime. Nothing below is a matter
+of taste — each item is a measured fact about the APIs, with the measurement
+named, so you can design *around* the constraint instead of designing something
+that has to be faked.
 
 **The governing rule for this product: the screen may not state anything the app
 cannot know.** We removed a "2 updates ready" badge from this app in the same
@@ -157,3 +170,54 @@ is useful on the download confirm, one honest sentence ("packs are usually
 `android.jar` (API 37); the on-disk measurement in
 `docs/research/issue-90-offline-download-lifecycle.md` §E3; ML Kit's published
 language list; Cloud Translation's NMT list.*
+
+---
+
+## 7. Rev 3 — what is left
+
+Three items, all small. Nothing here blocks building from rev 3.
+
+### 7a. Two leftovers in the spec's own README (docs only)
+
+1. **"The three rules" still reads "Every row states offline status and pack
+   size."** Rev 3's own change table removes per-row size — the rule outlived
+   the decision. It should read *"Every row states its offline status."*
+2. **The sanctioned range is written twice with different numbers** — "usually
+   20–50 MB" in one paragraph and "usually 20–45 MB" in the change table and on
+   the drawings. The drawings win; 20–45 MB is the figure we measured against.
+   Please make the prose match.
+
+### 7b. One engineering prerequisite for "Not used since April" ⚠️
+
+Rev 3's Manage packs nudge and the **20e Free up space** sheet both key off
+per-pack last-used dates, correctly labelled in the spec as *"app-recorded
+usage, not a platform figure"*. That framing is right, and the data is ours to
+keep — but **the app does not record it in a usable form yet**.
+
+What exists today is a *recents* list: the last **10** languages the user
+selected, kept in preferences to drive the picker's Recent section. Two gaps for
+this feature:
+
+- It is capped at 10. A user with twelve packs would have two with no date at
+  all — and those are exactly the stale ones the nudge is meant to surface.
+- It records **selection**, not use. Close enough as a proxy, but it should be a
+  deliberate choice rather than an accident of what the recents list happened to
+  need.
+
+The fix is small — keep a last-used entry for every language that has ever been
+selected, bounded by the offline-capable set rather than by a top-N cap — but it
+has to land **before** a screen can say "not used since April". Until it does, a
+date on that row would be exactly the kind of invented figure this brief exists
+to prevent. Tracked as its own issue.
+
+### 7c. Build order
+
+Rev 3 is much bigger than one change. The intended sequence, so nothing is drawn
+that waits on something unbuilt:
+
+1. **15a picker** — in review now (PR #121).
+2. **16a Translate to** + the offline-voice speaker mark.
+3. **17a–17d adaptive** — landscape two-pane, foldable two-leaf, tablet dialog.
+4. **The ten sheets**, then **18a/18b first run**.
+5. **20a–20e snackbars and Manage packs** — last, because 20b and 20e depend on
+   7b.
