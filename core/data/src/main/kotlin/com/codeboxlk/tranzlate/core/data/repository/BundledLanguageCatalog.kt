@@ -3,40 +3,343 @@ package com.codeboxlk.tranzlate.core.data.repository
 import com.codeboxlk.tranzlate.core.model.Language
 
 /**
- * INTERIM minimal catalog (issue #11 Home vertical) — serves the language picker
- * until the brains phase seeds the full re-derived 180+ list into Room
- * (spec 02 §4.1/§4.2; the `TODO(#4-brains)` in [LanguageRepositoryImpl]).
+ * The bundled static language catalog (spec 02 §4.1) — re-derived FRESH on
+ * 2026-07-31 from Google's own two capability lists, never copied from the old
+ * app (Mandatory Rule 1). Full derivation, every per-code ruling and everything
+ * that could NOT be verified: `docs/plan/issue-117-catalog.md`.
  *
- * Every id below is BCP-47 AND present in ML Kit Translation's supported set
- * (developers.google.com/ml-kit/language/translation/translate-language-support),
- * so `offlineAvailable = true` is accurate for each row. `offlineDownloaded`
- * stays false — download state is runtime data the offline-manager owns (D-E2)
- * and is unknown until that vertical lands.
+ * - **Offline tier** = ML Kit Translation's `TranslateLanguage` constants
+ *   (`developers.google.com/android/reference/.../nl/translate/TranslateLanguage`)
+ *   — 59 tags, which that reference documents as "in the form of BCP 47 tags".
+ *   The prose page named in spec 02 (`.../translation/translate-language-support`)
+ *   now 301-redirects to the ML Kit landing page, so the API reference is the
+ *   surviving authority.
+ * - **Online tier** = Cloud Translation's NMT model list
+ *   (`cloud.google.com/translate/docs/languages`) — 194 rows, a strict superset
+ *   of the ML Kit set (verified: every ML Kit tag appears there).
+ *
+ * [Language.offlineAvailable] is DERIVED from [offlineCapableIds] rather than
+ * written per row, so the two lists can never drift apart by a typo.
+ * [Language.offlineDownloaded] is `false` in every row here on purpose: it is
+ * per-device truth owned by the offline manager (D-E2), and [LanguageRepositoryImpl]
+ * overlays the live value at read time. A compile-time constant must never claim it.
  */
 internal object BundledLanguageCatalog {
-    val minimal: List<Language> =
+    /**
+     * ML Kit Translation's on-device set — the exact `TranslateLanguage` constant
+     * values, so a catalog id can be handed straight to `fromLanguageTag`,
+     * `TranslateRemoteModel.Builder` and the `getAllLanguages()`-keyed state map
+     * with no translation layer in between.
+     */
+    val offlineCapableIds: Set<String> =
+        setOf(
+            "af",
+            "sq",
+            "ar",
+            "be",
+            "bn",
+            "bg",
+            "ca",
+            "zh",
+            "hr",
+            "cs",
+            "da",
+            "nl",
+            "en",
+            "eo",
+            "et",
+            "tl",
+            "fi",
+            "fr",
+            "gl",
+            "ka",
+            "de",
+            "el",
+            "gu",
+            "ht",
+            "he",
+            "hi",
+            "hu",
+            "is",
+            "id",
+            "ga",
+            "it",
+            "ja",
+            "kn",
+            "ko",
+            "lv",
+            "lt",
+            "mk",
+            "ms",
+            "mt",
+            "mr",
+            "no",
+            "fa",
+            "pl",
+            "pt",
+            "ro",
+            "ru",
+            "sk",
+            "sl",
+            "es",
+            "sw",
+            "sv",
+            "ta",
+            "te",
+            "th",
+            "tr",
+            "uk",
+            "ur",
+            "vi",
+            "cy",
+        )
+
+    /**
+     * Alternate and legacy spellings that must resolve to a catalog id rather
+     * than silently miss — ML Kit's Language-ID API, restored preferences and
+     * Cloud's own documented "X or Y" cells all emit these forms. Keys are
+     * lowercase because RFC 4647 requires case-insensitive matching.
+     */
+    private val legacyAliases: Map<String, String> =
+        mapOf(
+            "iw" to "he",
+            "in" to "id",
+            "ji" to "yi",
+            "jw" to "jv",
+            "fil" to "tl",
+            "zh-cn" to "zh",
+            "zh-hk" to "zh-TW",
+            "zh-hant" to "zh-TW",
+        )
+
+    /** The full catalog, ordered by English name (picker order). */
+    val all: List<Language> =
         listOf(
+            language("ab", "Abkhaz"),
+            language("ace", "Acehnese"),
+            language("ach", "Acholi"),
+            language("af", "Afrikaans"),
+            language("sq", "Albanian"),
+            language("alz", "Alur"),
+            language("am", "Amharic"),
             language("ar", "Arabic"),
-            language("de", "German"),
+            language("hy", "Armenian"),
+            language("as", "Assamese"),
+            language("awa", "Awadhi"),
+            language("ay", "Aymara"),
+            language("az", "Azerbaijani"),
+            language("ban", "Balinese"),
+            language("bm", "Bambara"),
+            language("ba", "Bashkir"),
+            language("eu", "Basque"),
+            language("btx", "Batak Karo"),
+            language("bts", "Batak Simalungun"),
+            language("bbc", "Batak Toba"),
+            language("be", "Belarusian"),
+            language("bem", "Bemba"),
+            language("bn", "Bengali"),
+            language("bew", "Betawi"),
+            language("bho", "Bhojpuri"),
+            language("bik", "Bikol"),
+            language("bs", "Bosnian"),
+            language("br", "Breton"),
+            language("bg", "Bulgarian"),
+            language("bua", "Buryat"),
+            language("yue", "Cantonese"),
+            language("ca", "Catalan"),
+            language("ceb", "Cebuano"),
+            language("ny", "Chichewa (Nyanja)"),
+            language("zh", "Chinese (Simplified)"),
+            language("zh-TW", "Chinese (Traditional)"),
+            language("cv", "Chuvash"),
+            language("co", "Corsican"),
+            language("crh", "Crimean Tatar"),
+            language("hr", "Croatian"),
+            language("cs", "Czech"),
+            language("da", "Danish"),
+            language("din", "Dinka"),
+            language("dv", "Divehi"),
+            language("doi", "Dogri"),
+            language("dov", "Dombe"),
+            language("nl", "Dutch"),
+            language("dz", "Dzongkha"),
             language("en", "English"),
-            language("es", "Spanish"),
+            language("eo", "Esperanto"),
+            language("et", "Estonian"),
+            language("ee", "Ewe"),
+            language("fj", "Fijian"),
+            language("tl", "Filipino"),
+            language("fi", "Finnish"),
             language("fr", "French"),
+            language("fr-CA", "French (Canadian)"),
+            language("fr-FR", "French (French)"),
+            language("fy", "Frisian"),
+            language("ff", "Fulfulde"),
+            language("gaa", "Ga"),
+            language("gl", "Galician"),
+            language("lg", "Ganda (Luganda)"),
+            language("ka", "Georgian"),
+            language("de", "German"),
+            language("el", "Greek"),
+            language("gn", "Guarani"),
+            language("gu", "Gujarati"),
+            language("ht", "Haitian Creole"),
+            language("cnh", "Hakha Chin"),
+            language("ha", "Hausa"),
+            language("haw", "Hawaiian"),
+            language("he", "Hebrew"),
+            language("hil", "Hiligaynon"),
             language("hi", "Hindi"),
+            language("hmn", "Hmong"),
+            language("hu", "Hungarian"),
+            language("hrx", "Hunsrik"),
+            language("is", "Icelandic"),
+            language("ig", "Igbo"),
+            language("ilo", "Iloko"),
             language("id", "Indonesian"),
+            language("ga", "Irish"),
             language("it", "Italian"),
             language("ja", "Japanese"),
+            language("jv", "Javanese"),
+            language("kn", "Kannada"),
+            language("pam", "Kapampangan"),
+            language("kk", "Kazakh"),
+            language("km", "Khmer"),
+            language("cgg", "Kiga"),
+            language("rw", "Kinyarwanda"),
+            language("ktu", "Kituba"),
+            language("gom", "Konkani"),
             language("ko", "Korean"),
-            language("nl", "Dutch"),
+            language("kri", "Krio"),
+            language("ku", "Kurdish (Kurmanji)"),
+            language("ckb", "Kurdish (Sorani)"),
+            language("ky", "Kyrgyz"),
+            language("lo", "Lao"),
+            language("ltg", "Latgalian"),
+            language("la", "Latin"),
+            language("lv", "Latvian"),
+            language("lij", "Ligurian"),
+            language("li", "Limburgan"),
+            language("ln", "Lingala"),
+            language("lt", "Lithuanian"),
+            language("lmo", "Lombard"),
+            language("luo", "Luo"),
+            language("lb", "Luxembourgish"),
+            language("mk", "Macedonian"),
+            language("mai", "Maithili"),
+            language("mak", "Makassar"),
+            language("mg", "Malagasy"),
+            language("ms", "Malay"),
+            language("ms-Arab", "Malay (Jawi)"),
+            language("ml", "Malayalam"),
+            language("mt", "Maltese"),
+            language("mi", "Maori"),
+            language("mr", "Marathi"),
+            language("chm", "Meadow Mari"),
+            language("mni-Mtei", "Meiteilon (Manipuri)"),
+            language("min", "Minang"),
+            language("lus", "Mizo"),
+            language("mn", "Mongolian"),
+            language("my", "Myanmar (Burmese)"),
+            language("nr", "Ndebele (South)"),
+            language("new", "Nepalbhasa (Newari)"),
+            language("ne", "Nepali"),
+            language("nso", "Northern Sotho (Sepedi)"),
+            language("no", "Norwegian"),
+            language("nus", "Nuer"),
+            language("oc", "Occitan"),
+            language("or", "Odia (Oriya)"),
+            language("om", "Oromo"),
+            language("pag", "Pangasinan"),
+            language("pap", "Papiamento"),
+            language("ps", "Pashto"),
+            language("fa", "Persian"),
             language("pl", "Polish"),
             language("pt", "Portuguese"),
+            language("pt-BR", "Portuguese (Brazil)"),
+            language("pt-PT", "Portuguese (Portugal)"),
+            language("pa", "Punjabi"),
+            language("pa-Arab", "Punjabi (Shahmukhi)"),
+            language("qu", "Quechua"),
+            language("rom", "Romani"),
+            language("ro", "Romanian"),
+            language("rn", "Rundi"),
             language("ru", "Russian"),
+            language("sm", "Samoan"),
+            language("sg", "Sango"),
+            language("sa", "Sanskrit"),
+            language("gd", "Scots Gaelic"),
+            language("sr", "Serbian"),
+            language("st", "Sesotho"),
+            language("crs", "Seychellois Creole"),
+            language("shn", "Shan"),
+            language("sn", "Shona"),
+            language("scn", "Sicilian"),
+            language("szl", "Silesian"),
+            language("sd", "Sindhi"),
+            language("si", "Sinhala (Sinhalese)"),
+            language("sk", "Slovak"),
+            language("sl", "Slovenian"),
+            language("so", "Somali"),
+            language("es", "Spanish"),
+            language("su", "Sundanese"),
             language("sw", "Swahili"),
+            language("ss", "Swati"),
+            language("sv", "Swedish"),
+            language("tg", "Tajik"),
             language("ta", "Tamil"),
+            language("tt", "Tatar"),
+            language("te", "Telugu"),
+            language("tet", "Tetum"),
             language("th", "Thai"),
+            language("ti", "Tigrinya"),
+            language("ts", "Tsonga"),
+            language("tn", "Tswana"),
             language("tr", "Turkish"),
+            language("tk", "Turkmen"),
+            language("ak", "Twi (Akan)"),
+            language("uk", "Ukrainian"),
+            language("ur", "Urdu"),
+            language("ug", "Uyghur"),
+            language("uz", "Uzbek"),
             language("vi", "Vietnamese"),
-            language("zh", "Chinese"),
+            language("cy", "Welsh"),
+            language("xh", "Xhosa"),
+            language("yi", "Yiddish"),
+            language("yo", "Yoruba"),
+            language("yua", "Yucatec Maya"),
+            language("zu", "Zulu"),
         )
+
+    private val byLowercaseId: Map<String, String> = all.associate { it.id.lowercase() to it.id }
+
+    /**
+     * Resolves any incoming BCP-47 tag to a catalog id, or `null` when nothing
+     * in the catalog can serve it.
+     *
+     * Implements RFC 4647 §3.4 "Lookup": the tag is progressively truncated from
+     * the end until a match is found, and matching is case-insensitive (RFC 4647:
+     * "Matching of language tags to language ranges MUST be done in a
+     * case-insensitive manner"). `lowercase()` is the no-arg, locale-invariant
+     * overload — the Turkish dotless-i would corrupt a `Locale`-sensitive one.
+     *
+     * Deliberately does NOT go through `java.util.Locale`: its legacy-code
+     * canonicalisation differs between the desktop JVM and Android, which would
+     * make unit-test results a lie about device behaviour. The mapping here is
+     * an explicit table, so both platforms agree.
+     */
+    fun canonicalId(tag: String): String? {
+        var candidate = tag.trim().replace('_', '-')
+        while (candidate.isNotEmpty()) {
+            val key = candidate.lowercase()
+            byLowercaseId[key]?.let { return it }
+            legacyAliases[key]?.let { return it }
+            val lastSeparator = candidate.lastIndexOf('-')
+            if (lastSeparator < 0) return null
+            candidate = candidate.substring(0, lastSeparator)
+        }
+        return null
+    }
 
     private fun language(
         id: String,
@@ -45,7 +348,7 @@ internal object BundledLanguageCatalog {
         Language(
             id = id,
             name = name,
-            offlineAvailable = true,
+            offlineAvailable = id in offlineCapableIds,
             offlineDownloaded = false,
         )
 }
