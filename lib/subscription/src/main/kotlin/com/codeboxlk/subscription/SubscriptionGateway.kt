@@ -107,6 +107,13 @@ interface SubscriptionGateway {
      */
     val products: Flow<Map<String, SubscriptionProduct>>
 
+    /**
+     * Ask the store for prices again. Idempotent, and safe to call on every
+     * paywall open — which is the point: a single failed attempt must not leave
+     * the screen permanently unable to sell anything.
+     */
+    suspend fun refreshPrices()
+
     /** Launch a purchase for [offeringId]; returns the resolved entitlement. */
     suspend fun purchase(offeringId: String): Result<Entitlement>
 
@@ -129,6 +136,8 @@ class NoOpSubscriptionGateway(
     /** No store, so no prices — and a host that renders that honestly stays honest here too. */
     override val products: Flow<Map<String, SubscriptionProduct>> =
         MutableStateFlow(emptyMap<String, SubscriptionProduct>()).asStateFlow()
+
+    override suspend fun refreshPrices() = Unit
 
     override suspend fun purchase(offeringId: String): Result<Entitlement> =
         Result.failure(SubscriptionFailure.NotConfigured())

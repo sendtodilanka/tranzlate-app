@@ -69,8 +69,6 @@ private const val YEARLY_CARD_WEIGHT = 1.4f
  * reaches the real billing gateway; a failure is always reported honestly and
  * a user-cancelled sheet says nothing at all.
  *
- * ⚠️ STILL PLACEHOLDER: the displayed prices are string resources, not the
- * store's localized prices. See docs/plan/launch-monetization.md §"Not wired".
  */
 @Composable
 fun PaywallScreen(
@@ -131,6 +129,7 @@ fun PaywallScreen(
             selected = selected,
             purchasing = purchasing,
             prices = prices,
+            onRetryPrices = viewModel::refreshPrices,
             onSelect = viewModel::select,
             onPurchase = viewModel::purchase,
             onRestore = viewModel::restore,
@@ -146,6 +145,7 @@ internal fun PaywallContent(
     purchasing: Boolean,
     /** Store prices keyed by offering id; empty until Play answers. */
     prices: Map<String, PlanPrice>,
+    onRetryPrices: () -> Unit,
     onSelect: (PaywallPlan) -> Unit,
     onPurchase: () -> Unit,
     onRestore: () -> Unit,
@@ -231,13 +231,16 @@ internal fun PaywallContent(
                 )
             }
             Spacer(Modifier.height(spacing.md16))
-            if (prices.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.paywall_price_loading),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("tt_paywall_price_loading"),
-                )
+            // Keyed on the SELECTED plan, not on the map being empty: a partial
+            // answer from the store would otherwise leave the button silently
+            // disabled with nothing on screen explaining why.
+            if (prices[selected.offeringId] == null) {
+                TextButton(
+                    onClick = onRetryPrices,
+                    modifier = Modifier.testTag("tt_paywall_price_retry"),
+                ) {
+                    Text(text = stringResource(R.string.paywall_price_unavailable))
+                }
             }
             Text(
                 text = stringResource(R.string.paywall_cancel_anytime),
@@ -372,6 +375,7 @@ private fun PaywallPreview() {
                 selected = PaywallPlan.YEARLY,
                 purchasing = false,
                 prices = previewPrices,
+                onRetryPrices = {},
                 onSelect = {},
                 onPurchase = {},
                 onRestore = {},
@@ -438,6 +442,30 @@ private fun ctaLabel(price: PlanPrice?): String {
     if (price == null || !price.hasTrial) return stringResource(R.string.paywall_cta_continue)
     val days = price.trialDays ?: return stringResource(R.string.paywall_cta_trial_generic)
     return pluralStringResource(R.plurals.paywall_cta_trial_days, days, days)
+}
+
+/**
+ * The state this change introduced: the store has not answered, so there is no
+ * price to show and nothing may be charged. Rule 7 — it is a meaningful state,
+ * so it is previewable.
+ */
+@PreviewLightDark
+@Composable
+private fun PaywallPricesUnknownPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            PaywallContent(
+                selected = PaywallPlan.YEARLY,
+                purchasing = false,
+                prices = emptyMap(),
+                onRetryPrices = {},
+                onSelect = {},
+                onPurchase = {},
+                onRestore = {},
+                onClose = {},
+            )
+        }
+    }
 }
 
 /** Literal store answers, so the preview shows what a real Play response renders as. */

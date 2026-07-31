@@ -14,8 +14,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -40,12 +42,19 @@ class PaywallViewModelTest {
         var purchaseResult: AppResult<Entitlement> = AppResult.Success(Entitlement.Free),
         var restoreResult: AppResult<Entitlement> = AppResult.Success(Entitlement.Free),
     ) : PurchaseFlow {
+        var refreshes = 0
+            private set
+
         val priceState = MutableStateFlow<Map<String, PlanPrice>>(emptyMap())
 
         override val prices: Flow<Map<String, PlanPrice>> = priceState
 
         var purchases = 0
             private set
+
+        override suspend fun refreshPrices() {
+            refreshes++
+        }
 
         override suspend fun purchase(offeringId: String): AppResult<Entitlement> {
             purchases++
@@ -180,4 +189,42 @@ class PaywallViewModelTest {
                 assertThat(awaitItem()).isTrue()
             }
         }
+
+    /**
+     * The invariant the price work exists to protect: prices are re-asked every
+     * time the paywall opens. As a one-shot, an offline first launch left the
+     * screen unable to sell anything for the whole process — "getting prices"
+     * forever, over a button that could never arm.
+     */
+    @Test
+    fun `opening the paywall re-asks the store for prices`() =
+        runTest {
+            val flow = FakePurchaseFlow()
+
+            PaywallViewModel(flow, FakeFeatureAccess(), FakeRemoteConfig())
+            runCurrent()
+
+            assertThat(flow.refreshes).isEqualTo(1)
+        }
+
+    /** A blank price is not a price: the map must not gain an entry that arms the CTA. */
+    @Test
+    fun `a priced plan reaches the screen and an unpriced one does not`() =
+        runTest {
+            val flow = FakePurchaseFlow()
+            val model = PaywallViewModel(flow, FakeFeatureAccess(), FakeRemoteConfig())
+            model.prices.collectIn(backgroundScope)
+            runCurrent()
+
+            flow.priceState.value = mapOf(PaywallPlan.YEARLY.offeringId to PlanPrice("Rs 10,500.00"))
+            runCurrent()
+
+            assertThat(model.prices.value.keys).containsExactly(PaywallPlan.YEARLY.offeringId)
+            assertThat(model.prices.value[PaywallPlan.WEEKLY.offeringId]).isNull()
+        }
+}
+
+/** `stateIn(WhileSubscribed)` only runs while something collects; this is that something. */
+private fun <T> kotlinx.coroutines.flow.StateFlow<T>.collectIn(scope: kotlinx.coroutines.CoroutineScope) {
+    scope.launch { collect { } }
 }

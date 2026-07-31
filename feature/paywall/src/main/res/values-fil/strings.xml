@@ -19,7 +19,6 @@
     <string name="paywall_restore_nothing">Walang mai-restore na binili sa account na ito.</string>
     <string name="paywall_link_unavailable">Hindi mabuksan ang pahinang iyon. Tingnan ang koneksyon at subukan muli.</string>
     <string name="paywall_price_pending">\u2014</string>
-    <string name="paywall_price_loading">Kinukuha ang mga presyo mula sa Google Play\u2026</string>
     <plurals name="paywall_trial_days">
         <item quantity="one">%1$d araw na libreng subok</item>
         <item quantity="other">%1$d araw na libreng subok</item>
@@ -30,4 +29,5 @@
         <item quantity="other">Simulan ang %1$d araw na libreng subok</item>
     </plurals>
     <string name="paywall_cta_trial_generic">Simulan ang libreng subok</string>
+    <string name="paywall_price_unavailable">Hindi maabot ang Google Play. I-tap para subukan ulit.</string>
 </resources>

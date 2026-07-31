@@ -19,7 +19,6 @@
     <string name="paywall_restore_nothing">Nenhuma compra para restaurar nesta conta.</string>
     <string name="paywall_link_unavailable">Não foi possível abrir essa página. Verifique a conexão e tente novamente.</string>
     <string name="paywall_price_pending">\u2014</string>
-    <string name="paywall_price_loading">Buscando os pre\u00e7os no Google Play\u2026</string>
     <plurals name="paywall_trial_days">
         <item quantity="one">Teste gr\u00e1tis de %1$d dia</item>
         <item quantity="other">Teste gr\u00e1tis de %1$d dias</item>
@@ -30,4 +29,5 @@
         <item quantity="other">Come\u00e7ar meu teste gr\u00e1tis de %1$d dias</item>
     </plurals>
     <string name="paywall_cta_trial_generic">Come\u00e7ar meu teste gr\u00e1tis</string>
+    <string name="paywall_price_unavailable">N\u00e3o foi poss\u00edvel acessar o Google Play. Toque para tentar de novo.</string>
 </resources>

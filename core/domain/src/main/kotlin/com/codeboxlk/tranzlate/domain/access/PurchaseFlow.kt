@@ -18,6 +18,9 @@ interface PurchaseFlow {
      */
     val prices: Flow<Map<String, PlanPrice>>
 
+    /** Re-ask the store for prices; called whenever the paywall opens. */
+    suspend fun refreshPrices()
+
     suspend fun purchase(offeringId: String): AppResult<Entitlement>
 
     suspend fun restore(): AppResult<Entitlement>

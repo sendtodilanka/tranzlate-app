@@ -127,6 +127,18 @@ class PaywallViewModel
                     false,
                 )
 
+        init {
+            // Every open re-asks. The first attempt happens at process start,
+            // when an offline launch or one store error would otherwise leave
+            // this screen unable to sell anything for the rest of the session.
+            refreshPrices()
+        }
+
+        /** Retry affordance behind the "couldn't reach Play" state. */
+        fun refreshPrices() {
+            viewModelScope.launch { purchaseFlow.refreshPrices() }
+        }
+
         fun select(plan: PaywallPlan) {
             _selected.value = plan
         }

@@ -16,6 +16,8 @@ class NoOpPurchaseFlow : PurchaseFlow {
      */
     override val prices: Flow<Map<String, PlanPrice>> = flowOf(emptyMap())
 
+    override suspend fun refreshPrices() = Unit
+
     override suspend fun purchase(offeringId: String): AppResult<Entitlement> =
         AppResult.Failure(UnsupportedOperationException("NoOp purchase flow (fake variant)"))
 

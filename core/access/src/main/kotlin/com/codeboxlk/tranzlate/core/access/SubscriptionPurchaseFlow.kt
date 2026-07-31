@@ -35,6 +35,8 @@ class SubscriptionPurchaseFlow
                 }
             }
 
+        override suspend fun refreshPrices() = gateway.refreshPrices()
+
         override suspend fun purchase(offeringId: String): AppResult<Entitlement> =
             gateway.purchase(offeringId).toAppResult()
 

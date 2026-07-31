@@ -105,15 +105,22 @@ class QonversionSubscriptionGateway(
         // Independent of the entitlement resolve, deliberately: a paywall opened
         // before entitlement settles still needs its prices, and a store lookup
         // that stalls must not hold the entitlement gate behind it.
-        scope.launch { loadPrices() }
+        scope.launch { refreshPrices() }
     }
 
     /**
      * Fetches what the store charges THIS user, and whether they still have a
      * trial coming, then publishes both. Failure leaves [products] empty, which
      * the host renders as "not known yet" — the one thing that is always true.
+     *
+     * Public and re-runnable on purpose. As a one-shot it was a dead end: an
+     * offline first launch, or one store error, left [products] empty for the
+     * whole life of the process, so the paywall showed "getting prices" forever
+     * — a message that was itself false, since nothing was still being
+     * fetched — with a permanently disabled button and no way back but killing
+     * the app. Hosts call this when the paywall opens.
      */
-    private suspend fun loadPrices() {
+    override suspend fun refreshPrices() {
         val instance = ensureReady() ?: return
         val catalogue =
             withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { loadProducts(instance) }
@@ -131,16 +138,25 @@ class QonversionSubscriptionGateway(
             withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { checkTrialEligibility(instance, catalogue.keys.toList()) }
                 .orEmpty()
         productState.value =
-            catalogue.mapValues { (offeringId, product) ->
-                val eligible = eligibility[offeringId] == QIntroEligibilityStatus.Eligible
-                val trial = product.trialPeriod.takeIf { eligible }
-                SubscriptionProduct(
-                    offeringId = offeringId,
-                    price = product.prettyPrice.orEmpty(),
-                    trialDays = trial?.exactDays(),
-                    hasTrial = trial != null,
-                )
-            }
+            catalogue
+                .mapValues { (offeringId, product) ->
+                    val eligible = eligibility[offeringId] == QIntroEligibilityStatus.Eligible
+                    val trial = product.trialPeriod.takeIf { eligible }
+                    SubscriptionProduct(
+                        offeringId = offeringId,
+                        price = product.prettyPrice.orEmpty(),
+                        trialDays = trial?.exactDays(),
+                        hasTrial = trial != null,
+                    )
+                    // A product the store answered for but priced at nothing is
+                    // NOT a known price. Publishing it would put a non-null entry in
+                    // the map, which is what the host's "may I charge yet" gate
+                    // reads — so the button would arm itself over a blank card.
+                    // Reachable whenever a Qonversion product exists but its Play
+                    // base plan is unpublished or unavailable in the buyer's
+                    // country, which the SDK reports as success with no store
+                    // details.
+                }.filterValues { it.price.isNotBlank() }
     }
 
     override suspend fun purchase(offeringId: String): Result<Entitlement> {
