@@ -27,6 +27,10 @@ gradlePlugin {
             id = "tranzlate.android.application.flavors"
             implementationClass = "AndroidApplicationFlavorsConventionPlugin"
         }
+        register("androidApplicationSigning") {
+            id = "tranzlate.android.application.signing"
+            implementationClass = "AndroidApplicationSigningConventionPlugin"
+        }
         register("androidLibrary") {
             id = "tranzlate.android.library"
             implementationClass = "AndroidLibraryConventionPlugin"
