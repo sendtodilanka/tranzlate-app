@@ -1,0 +1,228 @@
+package com.codeboxlk.subscription
+
+import android.app.Application
+import android.util.Log
+import com.qonversion.android.sdk.Qonversion
+import com.qonversion.android.sdk.QonversionConfig
+import com.qonversion.android.sdk.dto.QLaunchMode
+import com.qonversion.android.sdk.dto.QPurchaseResult
+import com.qonversion.android.sdk.dto.QonversionError
+import com.qonversion.android.sdk.dto.entitlements.QEntitlement
+import com.qonversion.android.sdk.dto.products.QProduct
+import com.qonversion.android.sdk.listeners.QonversionEntitlementsCallback
+import com.qonversion.android.sdk.listeners.QonversionProductsCallback
+import com.qonversion.android.sdk.listeners.QonversionPurchaseCallback
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
+
+private const val TAG = "Subscription"
+
+/**
+ * Hard ceiling on the FIRST entitlement resolution.
+ *
+ * This is a correctness bound, not a nicety: consumers are told [entitlement]
+ * leaves [Entitlement.Loading], and some of them wait on exactly that before
+ * metering a paid feature. Qonversion's callbacks carry no timeout of their own,
+ * so a callback that never fires would strand those callers forever. Unresolved
+ * therefore has to decay to a decision, and the safe decision is "not paid".
+ */
+private const val FIRST_RESOLUTION_TIMEOUT_MS = 8_000L
+
+/**
+ * Ceiling on the network calls a user is watching a spinner for — restore, and
+ * the product lookup that precedes a purchase. Deliberately NOT applied to the
+ * purchase itself: that one is slow because the Play sheet is open and the user
+ * is typing, and cancelling it from under them would be worse than waiting.
+ */
+private const val STORE_CALL_TIMEOUT_MS = 15_000L
+
+private fun timedOut(what: String) = Result.failure<Nothing>(SubscriptionFailure.StoreError("$what timed out"))
+
+/**
+ * Qonversion-backed [SubscriptionGateway]. The SDK never escapes this file — the
+ * host still only sees [SubscriptionGateway] / [Entitlement], so this library
+ * stays droppable into another app (Ring 1 rule: zero project dependencies).
+ *
+ * ## Why the config arrives as a suspending provider
+ * The project key is not necessarily known when the DI graph is built: hosts that
+ * serve it from a remote config have nothing on a cold first launch. Taking a
+ * plain [SubscriptionConfig] would therefore hard-wire "no billing" for the whole
+ * of a user's first session. Instead the SDK is initialised **lazily, once**, at
+ * the first moment anything actually needs it, by which time the host's provider
+ * can answer. A host that hardcodes its key just returns immediately.
+ *
+ * ## Why a blank key is not an error
+ * A brand without subscriptions, and a first launch that never reached the
+ * network, both legitimately produce no key. Both resolve [entitlement] to
+ * [Entitlement.Free] — a RESOLVED state, so entitlement gates unblock — while
+ * purchase/restore fail with [SubscriptionFailure.NotConfigured]. Behaviourally
+ * identical to [NoOpSubscriptionGateway], which stays the compiled-in fallback
+ * for hosts that want no SDK at all.
+ *
+ * ## Threading
+ * Qonversion is callback-only (no suspend API), and its purchase flow launches an
+ * Activity, so `initialize` and `purchase` are marshalled onto the main thread
+ * here rather than trusting the caller's dispatcher.
+ */
+class QonversionSubscriptionGateway(
+    private val application: Application,
+    private val activityProvider: ActivityProvider,
+    scope: CoroutineScope,
+    private val configProvider: suspend () -> SubscriptionConfig,
+) : SubscriptionGateway {
+    private val state = MutableStateFlow<Entitlement>(Entitlement.Loading)
+
+    override val entitlement: Flow<Entitlement> = state.asStateFlow()
+
+    private val initLock = Mutex()
+
+    @Volatile
+    private var sdk: Qonversion? = null
+
+    init {
+        // Resolve eagerly: FeatureAccess.awaitResolved() blocks on the first
+        // non-Loading value, so nothing may wait for a UI event to start this.
+        scope.launch { refresh() }
+    }
+
+    override suspend fun purchase(offeringId: String): Result<Entitlement> {
+        val instance = ensureReady() ?: return Result.failure(SubscriptionFailure.NotConfigured())
+        val activity =
+            activityProvider.current()
+                ?: return Result.failure(SubscriptionFailure.NoForegroundActivity())
+        val products =
+            withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { loadProducts(instance) }
+                ?: timedOut("Product lookup")
+        val product =
+            products.getOrElse { return Result.failure(it) }[offeringId]
+                ?: return Result.failure(SubscriptionFailure.ProductUnavailable(offeringId))
+
+        val outcome =
+            withContext(Dispatchers.Main) {
+                suspendCancellableCoroutine { continuation ->
+                    instance.purchase(
+                        activity,
+                        product,
+                        object : QonversionPurchaseCallback {
+                            override fun onResult(result: QPurchaseResult) = continuation.resume(result)
+                        },
+                    )
+                }
+            }
+        return outcome.toResult()
+    }
+
+    override suspend fun restore(): Result<Entitlement> {
+        val instance = ensureReady() ?: return Result.failure(SubscriptionFailure.NotConfigured())
+        // Bounded: the paywall shows a spinner for the whole of this, and a
+        // spinner with no exit is the dead end EDGE_CASES forbids.
+        return (withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { checkEntitlements(instance) } ?: timedOut("Restore"))
+            .onSuccess { state.value = it }
+    }
+
+    /**
+     * Re-reads the provider's entitlement state and publishes it. Every exit —
+     * error, silence, timeout — ends at a resolved value; see
+     * [FIRST_RESOLUTION_TIMEOUT_MS].
+     */
+    private suspend fun refresh() {
+        val instance = ensureReady() ?: return
+        val resolved =
+            withTimeoutOrNull(FIRST_RESOLUTION_TIMEOUT_MS) { checkEntitlements(instance) }
+                ?: timedOut("Entitlement check")
+        resolved
+            .onSuccess { state.value = it }
+            .onFailure {
+                Log.w(TAG, "Entitlement unresolved — treating as Free", it)
+                state.value = Entitlement.Free
+            }
+    }
+
+    /**
+     * Initialises the SDK at most once. Returns null when this build has no key,
+     * having first resolved [entitlement] so nothing waits on it.
+     */
+    private suspend fun ensureReady(): Qonversion? {
+        sdk?.let { return it }
+        return initLock.withLock {
+            sdk ?: createSdk()
+        }
+    }
+
+    private suspend fun createSdk(): Qonversion? {
+        val config = configProvider()
+        if (config.projectKey.isBlank()) {
+            state.value = Entitlement.Free
+            return null
+        }
+        return runCatching {
+            withContext(Dispatchers.Main) {
+                Qonversion.initialize(
+                    QonversionConfig
+                        .Builder(application, config.projectKey, QLaunchMode.SubscriptionManagement)
+                        .build(),
+                )
+            }
+        }.onFailure {
+            Log.e(TAG, "Qonversion initialisation failed", it)
+            state.value = Entitlement.Free
+        }.onSuccess { sdk = it }
+            .getOrNull()
+    }
+
+    private suspend fun checkEntitlements(instance: Qonversion): Result<Entitlement> =
+        suspendCancellableCoroutine { continuation ->
+            instance.checkEntitlements(
+                object : QonversionEntitlementsCallback {
+                    override fun onSuccess(entitlements: Map<String, QEntitlement>) =
+                        continuation.resume(Result.success(entitlements.toEntitlement()))
+
+                    override fun onError(error: QonversionError) =
+                        continuation.resume(Result.failure(SubscriptionFailure.StoreError(error.toString())))
+                },
+            )
+        }
+
+    private suspend fun loadProducts(instance: Qonversion): Result<Map<String, QProduct>> =
+        suspendCancellableCoroutine { continuation ->
+            instance.products(
+                object : QonversionProductsCallback {
+                    override fun onSuccess(products: Map<String, QProduct>) =
+                        continuation.resume(Result.success(products))
+
+                    override fun onError(error: QonversionError) =
+                        continuation.resume(Result.failure(SubscriptionFailure.StoreError(error.toString())))
+                },
+            )
+        }
+
+    /**
+     * Publishes on success so a purchase and the entitlement flow can never
+     * disagree, and keeps the store's own outcomes distinguishable.
+     */
+    private fun QPurchaseResult.toResult(): Result<Entitlement> =
+        when {
+            isSuccessful -> Result.success(entitlements.toEntitlement().also { state.value = it })
+            isCanceledByUser -> Result.failure(SubscriptionFailure.Cancelled())
+            isPending -> Result.failure(SubscriptionFailure.Pending())
+            else -> Result.failure(SubscriptionFailure.StoreError(error?.toString() ?: "Purchase failed"))
+        }
+}
+
+/**
+ * Single-paid-tier reading: ANY active entitlement means paid, and its id names
+ * the purchase. Matching on specific ids here would make a dashboard rename a
+ * silent revenue outage.
+ */
+private fun Map<String, QEntitlement>.toEntitlement(): Entitlement =
+    values.firstOrNull { it.isActive }?.let { Entitlement.Paid(it.id) } ?: Entitlement.Free

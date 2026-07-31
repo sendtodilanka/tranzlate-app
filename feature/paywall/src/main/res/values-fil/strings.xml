@@ -21,8 +21,8 @@
     <string name="paywall_terms">Mga Tuntunin</string>
     <string name="paywall_privacy">Privacy</string>
     <string name="paywall_cd_close">Isara</string>
-    <string name="paywall_purchase_unavailable">Hindi pa available ang billing — walang siningil.</string>
+    <string name="paywall_purchase_unavailable">Hindi makumpleto ang pagbili. Walang siningil.</string>
     <string name="paywall_restore_failed">Hindi maabot ang store para mag-restore. Subukan muli mamaya.</string>
     <string name="paywall_restore_nothing">Walang mai-restore na binili sa account na ito.</string>
-    <string name="paywall_links_coming">Darating ang mga pahina ng Tuntunin at Privacy bago ang release.</string>
+    <string name="paywall_link_unavailable">Hindi mabuksan ang pahinang iyon. Tingnan ang koneksyon at subukan muli.</string>
 </resources>

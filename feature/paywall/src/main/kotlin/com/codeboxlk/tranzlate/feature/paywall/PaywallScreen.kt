@@ -33,9 +33,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,7 +46,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
-import kotlinx.coroutines.launch
 
 /**
  * EXPANDED-window bound for the pricing column (issue #88 lens): medium fills
@@ -62,9 +61,14 @@ private const val YEARLY_CARD_WEIGHT = 1.4f
  * BUSINESS_MODEL §4 — the paywall, verbatim: dismissible ✕ (Play policy),
  * benefit-led bullets, three periods with Yearly pre-selected (trial + save
  * badge), per-day framing, "Cancel anytime", CTA follows the selection,
- * Restore · Terms · Privacy. Display prices are placeholder resources until
- * the store offerings land (gateway is NoOp — purchases surface honest
- * failures, never fake success).
+ * Restore · Terms · Privacy.
+ *
+ * Terms/Privacy open the remote-served URLs in the browser. The purchase CTA
+ * reaches the real billing gateway; a failure is always reported honestly and
+ * a user-cancelled sheet says nothing at all.
+ *
+ * ⚠️ STILL PLACEHOLDER: the displayed prices are string resources, not the
+ * store's localized prices. See docs/plan/launch-monetization.md §"Not wired".
  */
 @Composable
 fun PaywallScreen(
@@ -75,7 +79,9 @@ fun PaywallScreen(
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     val purchasing by viewModel.purchasing.collectAsStateWithLifecycle()
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
+    val legalLinks by viewModel.legalLinks.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val uriHandler = LocalUriHandler.current
 
     // Already-PRO (or a purchase that just resolved) never sees the pitch.
     LaunchedEffect(isPro) {
@@ -84,6 +90,7 @@ fun PaywallScreen(
     val purchaseFailed = stringResource(R.string.paywall_purchase_unavailable)
     val restoreFailed = stringResource(R.string.paywall_restore_failed)
     val restoredFree = stringResource(R.string.paywall_restore_nothing)
+    val linkUnavailable = stringResource(R.string.paywall_link_unavailable)
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             snackbarHostState.showSnackbar(
@@ -91,20 +98,33 @@ fun PaywallScreen(
                     PaywallEvent.PURCHASE_FAILED -> purchaseFailed
                     PaywallEvent.RESTORE_FAILED -> restoreFailed
                     PaywallEvent.RESTORED_FREE -> restoredFree
+                    PaywallEvent.LINK_UNAVAILABLE -> linkUnavailable
                 },
             )
         }
     }
 
-    val linksComing = stringResource(R.string.paywall_links_coming)
-    val scope = rememberCoroutineScope()
+    /**
+     * Play requires Terms and Privacy to be reachable from the purchase screen.
+     * Two things can stop that — the URL has not been fetched yet, or the device
+     * has no browser (`AndroidUriHandler` raises `IllegalArgumentException` when
+     * nothing resolves `ACTION_VIEW`). Both must tell the user, not fail mutely.
+     */
+    val openLink: (String) -> Unit = { url ->
+        val opened =
+            url.isNotBlank() &&
+                runCatching { uriHandler.openUri(url) }.isSuccess
+        if (!opened) viewModel.onLegalLinkUnavailable()
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
         containerColor = MaterialTheme.colorScheme.surface,
     ) { padding ->
         PaywallContent(
-            onLinkNotice = { scope.launch { snackbarHostState.showSnackbar(linksComing) } },
+            onOpenTerms = { openLink(legalLinks.termsUrl) },
+            onOpenPrivacy = { openLink(legalLinks.privacyUrl) },
             selected = selected,
             purchasing = purchasing,
             onSelect = viewModel::select,
@@ -125,7 +145,8 @@ internal fun PaywallContent(
     onRestore: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
-    onLinkNotice: () -> Unit = {},
+    onOpenTerms: () -> Unit = {},
+    onOpenPrivacy: () -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     Column(
@@ -245,8 +266,14 @@ internal fun PaywallContent(
                     onClick = onRestore,
                     modifier = Modifier.testTag("tt_paywall_restore"),
                 ) { Text(stringResource(R.string.paywall_restore)) }
-                TextButton(onClick = onLinkNotice) { Text(stringResource(R.string.paywall_terms)) }
-                TextButton(onClick = onLinkNotice) { Text(stringResource(R.string.paywall_privacy)) }
+                TextButton(
+                    onClick = onOpenTerms,
+                    modifier = Modifier.testTag("tt_paywall_terms"),
+                ) { Text(stringResource(R.string.paywall_terms)) }
+                TextButton(
+                    onClick = onOpenPrivacy,
+                    modifier = Modifier.testTag("tt_paywall_privacy"),
+                ) { Text(stringResource(R.string.paywall_privacy)) }
             }
             Spacer(Modifier.height(spacing.lg24))
         }

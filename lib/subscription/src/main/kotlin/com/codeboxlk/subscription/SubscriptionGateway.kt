@@ -33,6 +33,40 @@ sealed interface Entitlement {
 }
 
 /**
+ * Every way a purchase or restore can fail, named.
+ *
+ * A billing surface that reports one undifferentiated "failed" is what makes
+ * paywalls feel broken: a user who tapped Back gets an error toast, and a brand
+ * with no store products looks identical to a network outage. Hosts are expected
+ * to branch on these — [Cancelled] in particular should show NOTHING.
+ */
+sealed class SubscriptionFailure(
+    message: String,
+) : Exception(message) {
+    /** No project key resolved — this build simply has no billing wired. */
+    class NotConfigured : SubscriptionFailure("Subscriptions are not configured for this build")
+
+    /** Nothing in the foreground to attach the store dialog to. */
+    class NoForegroundActivity : SubscriptionFailure("No foreground activity to launch the store flow")
+
+    /** The store has no product under this id (typo, or not published yet). */
+    class ProductUnavailable(
+        val productId: String,
+    ) : SubscriptionFailure("No store product for id '$productId'")
+
+    /** The USER dismissed the store sheet. Expected, not an error. */
+    class Cancelled : SubscriptionFailure("Purchase cancelled by the user")
+
+    /** Deferred payment (e.g. cash) — the entitlement arrives later, not now. */
+    class Pending : SubscriptionFailure("Purchase is pending approval")
+
+    /** Anything the provider itself reported. */
+    class StoreError(
+        detail: String,
+    ) : SubscriptionFailure(detail)
+}
+
+/**
  * Public subscription API. The billing SDK stays `internal` behind this surface;
  * swapping/adding the real SDK must not change this interface.
  */
@@ -60,8 +94,7 @@ class NoOpSubscriptionGateway(
     override val entitlement: Flow<Entitlement> = state.asStateFlow()
 
     override suspend fun purchase(offeringId: String): Result<Entitlement> =
-        Result.failure(UnsupportedOperationException("Billing SDK not integrated yet"))
+        Result.failure(SubscriptionFailure.NotConfigured())
 
-    override suspend fun restore(): Result<Entitlement> =
-        Result.failure(UnsupportedOperationException("Billing SDK not integrated yet"))
+    override suspend fun restore(): Result<Entitlement> = Result.failure(SubscriptionFailure.NotConfigured())
 }

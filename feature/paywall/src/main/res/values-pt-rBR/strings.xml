@@ -21,8 +21,8 @@
     <string name="paywall_terms">Termos</string>
     <string name="paywall_privacy">Privacidade</string>
     <string name="paywall_cd_close">Fechar</string>
-    <string name="paywall_purchase_unavailable">A cobrança ainda não está disponível — nada foi cobrado.</string>
+    <string name="paywall_purchase_unavailable">Não foi possível concluir a compra. Nada foi cobrado.</string>
     <string name="paywall_restore_failed">Não foi possível acessar a loja para restaurar. Tente mais tarde.</string>
     <string name="paywall_restore_nothing">Nenhuma compra para restaurar nesta conta.</string>
-    <string name="paywall_links_coming">As páginas de Termos e Privacidade chegam antes do lançamento.</string>
+    <string name="paywall_link_unavailable">Não foi possível abrir essa página. Verifique a conexão e tente novamente.</string>
 </resources>

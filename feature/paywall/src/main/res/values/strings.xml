@@ -23,8 +23,8 @@
     <string name="paywall_terms">Terms</string>
     <string name="paywall_privacy">Privacy</string>
     <string name="paywall_cd_close">Close</string>
-    <string name="paywall_purchase_unavailable">Billing isn\'t available yet — nothing was charged.</string>
+    <string name="paywall_purchase_unavailable">Couldn\'t complete the purchase. Nothing was charged.</string>
     <string name="paywall_restore_failed">Couldn\'t reach the store to restore. Try again later.</string>
     <string name="paywall_restore_nothing">No purchases to restore on this account.</string>
-    <string name="paywall_links_coming">Terms and Privacy pages arrive before release.</string>
+    <string name="paywall_link_unavailable">Couldn\'t open that page. Check your connection and try again.</string>
 </resources>

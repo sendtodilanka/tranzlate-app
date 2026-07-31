@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "504392878362",
+    "project_id": "tranzlate-offline",
+    "storage_bucket": "tranzlate-offline.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:504392878362:android:72ec49cba487559ab1c4a3",
+        "android_client_info": {
+          "package_name": "com.codeboxlk.tranzlate.offlinetranslator"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNRgZaF2l7dLQlfXjKXZLsqVtiu1pImQM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

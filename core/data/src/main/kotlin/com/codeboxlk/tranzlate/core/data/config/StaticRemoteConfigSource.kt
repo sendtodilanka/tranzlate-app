@@ -6,11 +6,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * TODO(#4-brains): real implementation — placeholder returns safe defaults.
- * Firebase-Remote-Config-backed source (keys `limit_free_ai`, `limit_pro_fair_use`,
- * `ad_nth`, `ad_min_gap_s`, `ad_daily_cap`, `text_limit_free`, `text_limit_pro`)
- * lands with the brains phase; until then the confirmed BUSINESS_MODEL §7
- * defaults serve.
+ * Offline, deterministic [RemoteConfigSource] — the confirmed BUSINESS_MODEL §7
+ * defaults and nothing else.
+ *
+ * This is no longer a placeholder: it is the **fake variant's** production
+ * binding (`:app/src/fake` FakeConfigModule), so Maestro runs never depend on a
+ * network fetch or on what a console happens to hold that day. The prod variant
+ * binds `FirebaseRemoteConfigSource` instead (`:app/src/prod` TranslateModule).
+ *
+ * Credentials and legal links resolve to empty here ON PURPOSE — a fake build
+ * must not be able to reach a real billing account.
  */
 @Singleton
 class StaticRemoteConfigSource
@@ -35,4 +40,17 @@ class StaticRemoteConfigSource
         override fun gotTimeoutMs(): Long = RemoteConfigDefaults.GOT_TIMEOUT_MS
 
         override fun gctTimeoutMs(): Long = RemoteConfigDefaults.GCT_TIMEOUT_MS
+
+        override fun qonversionKey(): String = RemoteConfigDefaults.UNSET_TEXT
+
+        override fun gctApiKey(): String = RemoteConfigDefaults.UNSET_TEXT
+
+        override fun privacyPolicyUrl(): String = RemoteConfigDefaults.UNSET_TEXT
+
+        override fun termsUrl(): String = RemoteConfigDefaults.UNSET_TEXT
+
+        override fun contactEmail(): String = RemoteConfigDefaults.UNSET_TEXT
+
+        /** Nothing to fetch — returning at once keeps the fake variant instant. */
+        override suspend fun awaitFirstFetch() = Unit
     }
