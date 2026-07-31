@@ -21,7 +21,9 @@ The ground-up rebuild of the **Tranzlate** Android translator. Kotlin · Jetpack
 
 **6. Verify, don't assume (build/test gate).** No feature/fix ships without its tests + acceptance passing (per the feature's TEST_A11Y contract). "Happy path only" is not acceptable (see EDGE_CASES no-dead-end rule). `--no-verify` is a human-only emergency override — Claude never uses it.
 
-**7. Sinhala prose ≥70%** · **No speculation (verified data only)** · **`./gradlew` needs JAVA_HOME=Android Studio JBR** — see `.claude/memory/`.
+**7. Every composable ships `@PreviewLightDark` (BLOCKING).** No Compose UI merges without previews — **screens AND every custom item built from standard M3 parts** (list rows, row action buttons, cards, chips, dialogs, counters…). One preview per meaningful STATE (e.g. an offline row: downloadable / downloading / downloaded / deleting / failed). House style: preview lives in the SAME file, `private`, wrapped in `TranzlateTheme { … }` (items add `Surface(color = colorScheme.surface)`), literal fake data — **never DI**, never a ViewModel. Named `<Composable><State>Preview`. Owner reviews UI from previews, so a missing preview is a missing deliverable.
+
+**8. Sinhala prose ≥70%** · **No speculation (verified data only)** · **`./gradlew` needs JAVA_HOME=Android Studio JBR** — see `.claude/memory/`.
 
 > Rules 3-6 are adopted + adapted from the mature `zw-infra-zyntastack` / `zw-voice` projects (Forgejo→GitHub, voice/hardware→Android). Canonical detail: `CONTRIBUTING.md` + `.claude/memory/`.
 

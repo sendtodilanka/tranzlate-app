@@ -109,4 +109,6 @@
     <string name="cd_text_counter_limit">Naabot na ang %1$d-character na limit</string>
     <string name="cd_speak_stop">Itigil ang pagbabasa</string>
     <string name="text_tts_unavailable">Hindi available ang speech para sa wikang ito sa device na ito.</string>
+    <string name="text_error_title">Hindi na-translate</string>
+    <string name="text_error_edit">I-edit ang teksto</string>
 </resources>

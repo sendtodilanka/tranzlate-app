@@ -21,6 +21,7 @@ import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +63,14 @@ private const val STATE_ERROR = "error"
 private const val STATE_LIMIT = "limit"
 
 private const val PREFS_SUBSCRIBE_TIMEOUT_MS = 5_000L
+
+/**
+ * Minimum time the translating shimmer stays on screen before a NON-success
+ * outcome replaces it (issue #103, debate-ruled). 500ms sits in the
+ * practitioner-tested 300-600ms minimum-display band and under Nielsen's 1s
+ * flow-of-thought limit; successes are never delayed by it.
+ */
+private const val BUSY_FLOOR_MS = 500L
 
 /**
  * The Text vertical's ONE state holder (APP_STRUCTURE — the screen ASKS the
@@ -341,12 +350,24 @@ class TextViewModel
             state = TextUiState.Translating(request)
             translateJob =
                 viewModelScope.launch {
+                    // The floor runs ALONGSIDE the work (not measured after it):
+                    // coroutine time, so it is real elapsed time in production and
+                    // virtual time under test — no clock skew either way.
+                    val busyFloor = launch { delay(BUSY_FLOOR_MS) }
                     val outcome =
                         // io, not default: the engine call becomes network/SDK IO in the
                         // brains phase (A5) — Default is the CPU-sized pool.
                         withContext(dispatchers.io) {
                             translateText(request.text, request.sourceLang, request.targetLang, request.mode)
                         }
+                    // Issue #103 (owner + debate ruling): a failure that returns in
+                    // milliseconds used to flash the shimmer and slam an error over
+                    // it. The shimmer gets a MINIMUM visible time — but only when the
+                    // outcome is NOT a success: a result the user could already have
+                    // (cache hit, offline MLKit) is never held back, and the floor
+                    // stays under Nielsen's 1s flow-of-thought limit. Inside
+                    // translateJob, so clear/retry cancels the floor with the work.
+                    if (outcome is TranslationOutcome.Success) busyFloor.cancel() else busyFloor.join()
                     state =
                         when (outcome) {
                             is TranslationOutcome.Success -> {

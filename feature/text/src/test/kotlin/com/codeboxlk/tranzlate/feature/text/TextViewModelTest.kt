@@ -3,9 +3,11 @@ package com.codeboxlk.tranzlate.feature.text
 import androidx.lifecycle.SavedStateHandle
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
+import com.codeboxlk.tranzlate.core.model.EngineAttempt
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Translation
+import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
 import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
@@ -18,8 +20,10 @@ import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
+import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
@@ -128,7 +132,7 @@ class TextViewModelTest {
 
     @Suppress("LongParameterList") // the test builder aggregates one fake per seam
     private fun viewModel(
-        translator: FakeTranslator = FakeTranslator(),
+        translator: Translator = FakeTranslator(),
         prefs: FakeTranslatePrefsRepository = FakeTranslatePrefsRepository(),
         clock: FakeClock = FakeClock(),
         handle: SavedStateHandle = SavedStateHandle(),
@@ -788,5 +792,64 @@ class TextViewModelTest {
         first.onClearAll()
 
         assertThat(viewModel(handle = handle).uiState.value).isEqualTo(TextUiState.Idle)
+    }
+
+    // ---- issue #103: the shimmer floor (owner: no loading flash) -------------
+
+    /** Takes [afterMs] of VIRTUAL time, then fails — a slow failure. */
+    private class SlowFailingTranslator(
+        private val afterMs: Long,
+    ) : Translator {
+        override suspend fun translate(
+            text: String,
+            srcLang: String,
+            tgtLang: String,
+            mode: ModeId,
+        ): TranslationOutcome {
+            delay(afterMs)
+            return TranslationOutcome.Error(listOf(EngineAttempt(Engine.OFFLINE_MLKIT, AttemptCause.OFFLINE)))
+        }
+    }
+
+    @Test
+    fun `an instant failure holds the shimmer for the floor, then shows the error`() {
+        val vm = viewModel(translator = FakeTranslator(forcedFailure = AttemptCause.OFFLINE))
+        vm.onInputChange("Good morning")
+        settle()
+        vm.onTranslate()
+
+        dispatcher.scheduler.advanceTimeBy(400)
+        assertThat(vm.uiState.value).isInstanceOf(TextUiState.Translating::class.java)
+
+        dispatcher.scheduler.advanceTimeBy(150)
+        assertThat(vm.uiState.value).isInstanceOf(TextUiState.Error::class.java)
+    }
+
+    @Test
+    fun `a failure slower than the floor is NOT delayed further`() {
+        val vm = viewModel(translator = SlowFailingTranslator(afterMs = 900))
+        vm.onInputChange("Good morning")
+        settle()
+        vm.onTranslate()
+
+        dispatcher.scheduler.advanceTimeBy(899)
+        assertThat(vm.uiState.value).isInstanceOf(TextUiState.Translating::class.java)
+
+        dispatcher.scheduler.advanceTimeBy(2)
+        assertThat(vm.uiState.value).isInstanceOf(TextUiState.Error::class.java)
+    }
+
+    /** The floor must never hold back an answer the user could already have (C-8 cache / offline MLKit). */
+    @Test
+    fun `a success is never delayed by the floor`() {
+        val vm = viewModel()
+        vm.onInputChange("Good morning")
+        settle()
+        vm.onTranslate()
+        // runCurrent, NOT advanceUntilIdle: draining virtual time would also
+        // drain a floor if one wrongly applied, so the test could never fail.
+        dispatcher.scheduler.runCurrent()
+
+        assertThat(vm.uiState.value).isInstanceOf(TextUiState.Result::class.java)
     }
 }

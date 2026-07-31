@@ -109,4 +109,6 @@
     <string name="cd_text_counter_limit">Limite de %1$d caracteres atingido</string>
     <string name="cd_speak_stop">Parar a leitura</string>
     <string name="text_tts_unavailable">A fala não está disponível para este idioma neste aparelho.</string>
+    <string name="text_error_title">Não foi possível traduzir</string>
+    <string name="text_error_edit">Editar texto</string>
 </resources>

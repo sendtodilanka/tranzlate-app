@@ -122,4 +122,53 @@ class KonsistArchitectureTest {
         assertThat(translator.single().path.replace('\\', '/'))
             .contains("/core/domain/src/main/")
     }
+
+    /**
+     * CLAUDE.md mandatory rule 7 — every file that declares UI composables must
+     * ship at least one `@PreviewLightDark` in the SAME file. The owner reviews
+     * UI from previews, so a preview-less UI file is an unreviewable deliverable.
+     *
+     * "UI composable" = `@Composable` returning Unit. Value-returning composables
+     * (`rememberWindowInfo()`, `adaptiveScreenMargin()`, `languageLabel()`) draw
+     * nothing and are correctly out of scope. [PREVIEW_EXEMPT] carries the one
+     * structural exception with its reason.
+     *
+     * Scope is FILE level: whether a file's previews cover every meaningful STATE
+     * is a judgement the human co-verify lens makes. What this gate makes
+     * impossible is the regression that keeps recurring — a whole screen or item
+     * file landing with no preview at all.
+     */
+    @Test
+    fun `every UI file ships a PreviewLightDark`() {
+        val uiFiles =
+            filesUnder("/feature/", "/core/ui/src/main/", "/core/designsystem/src/main/")
+                .filter { file -> file.path.contains("/src/main/") }
+                .filter { file -> file.name !in PREVIEW_EXEMPT }
+                .filter { file ->
+                    file.functions().any { function ->
+                        function.hasAnnotationWithName("Composable") &&
+                            !function.annotations.any { it.name.startsWith("Preview") } &&
+                            function.returnType?.name.orEmpty() in setOf("", "Unit")
+                    }
+                }
+
+        val missing =
+            uiFiles
+                .filter { file ->
+                    file.functions().none { function ->
+                        function.annotations.any { it.name == "PreviewLightDark" }
+                    }
+                }.map { it.name }
+
+        assertThat(missing).isEmpty()
+    }
+
+    private companion object {
+        /**
+         * `Theme` is the theme WRAPPER: it renders only whatever content is passed
+         * in, so a preview of it alone would show an empty screen. Every previewed
+         * composable in the app already exercises it (`TranzlateTheme { … }`).
+         */
+        val PREVIEW_EXEMPT = setOf("Theme")
+    }
 }
