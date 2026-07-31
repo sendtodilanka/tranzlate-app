@@ -354,3 +354,39 @@ private fun PaywallPreview() {
         }
     }
 }
+
+/** THE ITEMS: benefit rows + the three plan cards (Yearly is the wide one). */
+@PreviewLightDark
+@Composable
+private fun PaywallItemsPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column(modifier = Modifier.padding(LocalSpacing.current.md16)) {
+                BenefitRow(R.string.paywall_benefit_no_ads)
+                BenefitRow(R.string.paywall_benefit_unlimited_ai)
+                Spacer(Modifier.height(LocalSpacing.current.md16))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm8),
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                ) {
+                    PlanCard(
+                        plan = PaywallPlan.WEEKLY,
+                        titleRes = R.string.paywall_plan_weekly,
+                        priceRes = R.string.paywall_price_weekly,
+                        selected = false,
+                        onSelect = {},
+                        modifier = Modifier.weight(1f),
+                    )
+                    PlanCard(
+                        plan = PaywallPlan.YEARLY,
+                        titleRes = R.string.paywall_plan_yearly,
+                        priceRes = R.string.paywall_price_yearly,
+                        selected = true,
+                        onSelect = {},
+                        modifier = Modifier.weight(YEARLY_CARD_WEIGHT),
+                    )
+                }
+            }
+        }
+    }
+}

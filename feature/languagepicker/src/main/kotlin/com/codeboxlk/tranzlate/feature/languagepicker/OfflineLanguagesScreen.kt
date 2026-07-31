@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,9 +32,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
+import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
@@ -266,6 +269,80 @@ private fun OfflineRow(
             OfflineModelState.OnlineOnly -> {
                 Unit
             } // never listed (VM filters)
+        }
+    }
+}
+
+// ── Previews (owner convention: every screen AND every custom M3 item ships
+// @PreviewLightDark). Literal fake rows — previews never touch DI.
+
+private val previewRows =
+    listOf(
+        OfflineLanguageRow("fr", "French", OfflineModelState.Downloaded),
+        OfflineLanguageRow("de", "German", OfflineModelState.Downloading),
+        OfflineLanguageRow("es", "Spanish", OfflineModelState.NotDownloaded),
+        OfflineLanguageRow("it", "Italian", OfflineModelState.Deleting),
+        OfflineLanguageRow("pt", "Portuguese", OfflineModelState.Failed(OfflineModelFailure.STORAGE)),
+    )
+
+@PreviewLightDark
+@Composable
+private fun OfflineLanguagesScreenPreview() {
+    TranzlateTheme {
+        OfflineLanguagesContent(
+            rows = previewRows,
+            onDownload = {},
+            onDelete = {},
+            onBack = {},
+        )
+    }
+}
+
+/** The metered-consent dialog (issue #90) over the list. */
+@PreviewLightDark
+@Composable
+private fun OfflineLanguagesConsentDialogPreview() {
+    TranzlateTheme {
+        OfflineLanguagesContent(
+            rows = previewRows,
+            onDownload = {},
+            onDelete = {},
+            onBack = {},
+            pendingConsent = "de",
+        )
+    }
+}
+
+/** Empty/loading face — the rows have not arrived yet. */
+@PreviewLightDark
+@Composable
+private fun OfflineLanguagesLoadingPreview() {
+    TranzlateTheme {
+        OfflineLanguagesContent(rows = emptyList(), onDownload = {}, onDelete = {}, onBack = {})
+    }
+}
+
+/**
+ * THE ITEM the owner called out: one row per state, so the single trailing
+ * control (⬇ / spinner+stop / 🗑 / spinner / ↻ + cause line) is reviewable on
+ * both themes without launching the app.
+ */
+@PreviewLightDark
+@Composable
+private fun OfflineRowStatesPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column {
+                previewRows.forEach { row ->
+                    OfflineRow(row = row, onDownload = {}, onDelete = {})
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                OfflineRow(
+                    row = OfflineLanguageRow("nl", "Dutch", OfflineModelState.Failed(OfflineModelFailure.NETWORK)),
+                    onDownload = {},
+                    onDelete = {},
+                )
+            }
         }
     }
 }
