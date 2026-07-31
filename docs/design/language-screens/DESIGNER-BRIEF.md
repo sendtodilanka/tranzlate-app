@@ -221,3 +221,16 @@ that waits on something unbuilt:
 4. **The ten sheets**, then **18a/18b first run**.
 5. **20a–20e snackbars and Manage packs** — last, because 20b and 20e depend on
    7b.
+
+---
+
+## 8. Commissioned: the Manage packs EMPTY state (owner ruling 7, 2026-08-01)
+
+Rev 3 draws Manage packs populated ("5 of 59 packs"), downloading, failed and
+dated — but never with ZERO packs, which is what every fresh install sees on
+first open. That frame is now commissioned. Requirements: same 412×892 light +
+dark treatment as 20b; the storage card degrades honestly (no packs = no "used
+by packs" figure); guidance must not dead-end — the way forward is downloading
+a first pack (the picker's download affordance, or the first-run suggestions
+pattern from 18a); no invented figures, per the rest of this brief. The rev3
+"no packs yet" block from 18a is the obvious vocabulary to reuse.
