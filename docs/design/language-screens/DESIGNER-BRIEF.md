@@ -120,20 +120,36 @@ Notes for it:
   the picker deliberately keeps only download and select.
 - No pause, no queue, no update section.
 
-## 6. Open questions for the owner — please do not design an answer
+## 6. Both open questions are now answered — please design to these
 
-Two things in the guideline are business decisions that do not exist in the app
-today. They are the owner's to make, and until made, nothing should be drawn
-that assumes them:
+### 1. There is NO free pack limit. Offline packs are unlimited and free.
 
-1. **"Free keeps 2 packs on the device. Pro downloads all 65."** Our paid tier
-   currently gates *translation volume*, not pack count. A pack-count limit is a
-   new rule with real consequences, and sheet 19e is built entirely on it.
-   *(Also: the guideline contradicts itself — frame 15b says 2 packs, frame 17b
-   says 3.)*
-2. **Whether pack sizes matter enough** to be worth measuring all 59 by hand and
-   shipping a table that would go stale. The current answer is no; the row says
-   "On device" and the download confirm carries one honest range.
+**Sheet 19e is cut. Every "Free keeps N packs" line is cut.** Decided
+2026-07-31 against a rule written before the evidence was gathered; the full
+record is `docs/research/issue-120-free-pack-limit.md`.
+
+The short version: Google Translate gives away unlimited free offline packs, so
+charging for the third one prices below a free competitor in the one area this
+app is named after. Our live app has never limited packs either, so a limit
+would take something away from existing users — the Evernote path, not the
+Dropbox one. And the packs cost us nothing to serve; the scarcity would be
+visible to the user as artificial.
+
+**But the guideline's underlying instinct was right, and it should be designed
+— just not as a paywall.** ML Kit's own documentation says *"Avoid keeping too
+many language models on the device at once."* That is a case for
+**storage-hygiene UX** on the Manage packs page: a library meter, a nudge for
+packs unused for months, an easy cleanup path. Please design that instead of
+19e. It solves the real problem and asks nothing of the user's wallet.
+
+Pro keeps selling what it already sells: cloud translation volume, the
+higher-quality engine, and the extra modalities.
+
+### 2. No pack sizes on rows. Downloaded rows say "On device".
+
+Confirmed by the owner. Aggregate figures stay welcome — see §3. If a size range
+is useful on the download confirm, one honest sentence ("packs are usually
+20–45 MB") is the form it takes, never a per-language number.
 
 ---
 
