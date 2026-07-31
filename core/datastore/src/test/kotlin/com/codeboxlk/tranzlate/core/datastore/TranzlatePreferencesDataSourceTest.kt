@@ -74,6 +74,60 @@ class TranzlatePreferencesDataSourceTest {
                 .theme
                 .first()
         }
+
+    @Test
+    fun `recorded language uses read back newest-first and deduplicated`() =
+        runTest {
+            val source = TranzlatePreferencesDataSource(FakePreferencesDataStore())
+
+            source.recordLanguageUse("fr", atMillis = 10L)
+            source.recordLanguageUse("es", atMillis = 20L)
+            source.recordLanguageUse("fr", atMillis = 30L)
+
+            // One entry per language — a second use MOVES it, never duplicates it.
+            assertThat(source.recentLanguages.first()).containsExactly("fr", 30L, "es", 20L)
+        }
+
+    @Test
+    fun `the recents store is capped`() =
+        runTest {
+            val source = TranzlatePreferencesDataSource(FakePreferencesDataStore())
+
+            repeat(TranzlatePreferencesDataSource.RECENT_STORE_LIMIT + 5) { index ->
+                source.recordLanguageUse("lang$index", atMillis = index.toLong())
+            }
+
+            val recents = source.recentLanguages.first()
+            assertThat(recents).hasSize(TranzlatePreferencesDataSource.RECENT_STORE_LIMIT)
+            assertThat(recents.keys).doesNotContain("lang0")
+            assertThat(recents.keys).contains("lang${TranzlatePreferencesDataSource.RECENT_STORE_LIMIT + 4}")
+        }
+
+    /**
+     * A corrupt preference must cost the user their recents list, never the
+     * screen — the picker collects this flow, and a throw here would surface as
+     * a crash on open.
+     */
+    @Test
+    fun `a malformed recents entry is dropped, not thrown`() =
+        runTest {
+            val decoded =
+                TranzlatePreferencesDataSource.decodeRecents(
+                    listOf("fr:10", "notanumber", "es:notalong", ":5", "de:20").joinToString(""),
+                )
+
+            assertThat(decoded).containsExactly("fr", 10L, "de", 20L)
+        }
+
+    @Test
+    fun `a blank language id is not recorded`() =
+        runTest {
+            val source = TranzlatePreferencesDataSource(FakePreferencesDataStore())
+
+            source.recordLanguageUse("  ", atMillis = 1L)
+
+            assertThat(source.recentLanguages.first()).isEmpty()
+        }
 }
 
 private class FakePreferencesDataStore : DataStore<Preferences> {

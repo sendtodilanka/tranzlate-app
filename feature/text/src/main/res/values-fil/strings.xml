@@ -90,13 +90,45 @@
     <string name="button_retry">Subukang muli</string>
     <string name="cd_text_retry">Subukang isalin muli</string>
 
-    <!-- Language picker -->
+    <!-- Language picker (issue #117 redesign) -->
     <string name="text_lang_sheet_source_title">Isalin mula sa</string>
     <string name="text_lang_sheet_target_title">Isalin sa</string>
     <string name="text_lang_detect">Tuklasin ang wika</string>
+    <string name="text_lang_recent_header">Kamakailan</string>
     <string name="text_lang_all_header">Lahat ng wika</string>
+    <string name="text_lang_loading">Naglo-load ng mga wika…</string>
     <string name="cd_text_lang_search">Maghanap ng mga wika</string>
-    <string name="text_guided_lang_search">Darating ang paghahanap ng wika sa search update</string>
+    <string name="cd_text_lang_clear">I-clear ang paghahanap</string>
+    <plurals name="text_lang_search_hint">
+        <item quantity="one">Maghanap sa %1$d wika</item>
+        <item quantity="other">Maghanap sa %1$d na wika</item>
+    </plurals>
+    <plurals name="text_lang_on_device_count">
+        <item quantity="one">%1$d sa %2$d ang nasa device</item>
+        <item quantity="other">%1$d sa %2$d ang nasa device</item>
+    </plurals>
+    <string name="text_lang_no_results">Walang wikang tumutugma sa “%1$s”</string>
+    <string name="text_lang_no_results_body">Suriin ang baybay, o subukan ang sariling pangalan ng wika.</string>
+    <string name="text_lang_show_all">Ipakita ang lahat ng wika</string>
+    <string name="text_lang_online_only">Online lang</string>
+    <string name="text_lang_on_device">Nasa device</string>
+    <string name="text_lang_on_device_size">Nasa device · %1$s</string>
+    <string name="text_lang_downloading">Nagda-download…</string>
+    <string name="text_lang_error_network">Walang koneksyon. Kumonekta muli at subukan ulit.</string>
+    <string name="text_lang_error_storage">Kulang ang espasyo. Maglaan ng espasyo at subukan ulit.</string>
+    <string name="text_lang_error_generic">Hindi natapos ang pag-download. Subukan ulit.</string>
+    <string name="cd_text_lang_row_on_device">%1$s, nasa device</string>
+    <string name="cd_text_lang_row_downloading">%1$s, nagda-download</string>
+    <string name="cd_text_lang_row_downloadable">%1$s, puwedeng i-download para offline</string>
+    <string name="cd_text_lang_row_online_only">%1$s, online lang</string>
+    <string name="cd_text_lang_row_failed">%1$s, hindi natuloy ang pag-download</string>
+    <string name="cd_text_lang_download">I-download ang %1$s para magamit offline</string>
+    <string name="cd_text_lang_stop">Ihinto ang pag-download at alisin ang %1$s</string>
+    <string name="cd_text_lang_retry">Subukang i-download muli ang %1$s</string>
+    <string name="text_lang_data_dialog_title">I-download ang %1$s gamit ang mobile data?</string>
+    <string name="text_lang_data_dialog_body">Malalaki ang mga language pack. Puwede kang maghintay ng Wi-Fi.</string>
+    <string name="text_lang_data_dialog_once">I-download nang isang beses</string>
+    <string name="text_lang_data_dialog_wait">Maghintay ng Wi-Fi</string>
 
     <string name="cd_text_reverse">Baligtarin ang direksyon ng pagsasalin</string>
     <string name="a11y_result_ready">Handa na ang pagsasalin: %1$s</string>

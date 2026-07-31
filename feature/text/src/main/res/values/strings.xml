@@ -105,13 +105,58 @@
     <string name="cd_text_retry">Retry translation</string>
 
     <!-- Language picker (issue #15: now a full screen, not a sheet — the two
-         title keys are REUSED verbatim from the interim sheet, C-3). -->
+         title keys are REUSED verbatim from the interim sheet, C-3.
+         Issue #117 production redesign: permanent search, ISO-code avatars,
+         honest per-row offline state, A–Z rail. `text_guided_lang_search` is
+         retired — the search is real, so the placeholder message is a lie. -->
     <string name="text_lang_sheet_source_title">Translate from</string>
     <string name="text_lang_sheet_target_title">Translate to</string>
     <string name="text_lang_detect">Detect language</string>
+    <string name="text_lang_recent_header">Recent</string>
     <string name="text_lang_all_header">All languages</string>
+    <string name="text_lang_loading">Loading languages…</string>
     <string name="cd_text_lang_search">Search languages</string>
-    <string name="text_guided_lang_search">Language search arrives with the search update</string>
+    <string name="cd_text_lang_clear">Clear search</string>
+    <!-- The real catalog size, never the design's hardcoded 65 (plan §4). -->
+    <plurals name="text_lang_search_hint">
+        <item quantity="one">Search %1$d language</item>
+        <item quantity="other">Search %1$d languages</item>
+    </plurals>
+    <!-- Denominator = offline-CAPABLE languages (59), not the 194-row catalog:
+         "12 of 194 on device" would imply the other 182 are downloadable. -->
+    <plurals name="text_lang_on_device_count">
+        <item quantity="one">%1$d of %2$d on device</item>
+        <item quantity="other">%1$d of %2$d on device</item>
+    </plurals>
+    <!-- Empty search is not a dead end (EDGE_CASES): name the query, offer the way back. -->
+    <string name="text_lang_no_results">No languages match “%1$s”</string>
+    <string name="text_lang_no_results_body">Check the spelling, or try the language\'s own name.</string>
+    <string name="text_lang_show_all">Show all languages</string>
+    <!-- Row states. No MB on a row we have not measured (plan R3); no % on a
+         download ML Kit reports no progress for (plan R1). -->
+    <string name="text_lang_online_only">Online only</string>
+    <string name="text_lang_on_device">On device</string>
+    <string name="text_lang_on_device_size">On device · %1$s</string>
+    <string name="text_lang_downloading">Downloading…</string>
+    <string name="text_lang_error_network">No connection. Reconnect and try again.</string>
+    <string name="text_lang_error_storage">Not enough space. Free some up and try again.</string>
+    <string name="text_lang_error_generic">Download didn\'t finish. Try again.</string>
+    <!-- Row a11y: the name AND its state, because the icon alone says nothing. -->
+    <string name="cd_text_lang_row_on_device">%1$s, on device</string>
+    <string name="cd_text_lang_row_downloading">%1$s, downloading</string>
+    <string name="cd_text_lang_row_downloadable">%1$s, available for offline use</string>
+    <string name="cd_text_lang_row_online_only">%1$s, online only</string>
+    <string name="cd_text_lang_row_failed">%1$s, download failed</string>
+    <string name="cd_text_lang_download">Download %1$s for offline use</string>
+    <!-- Never "Cancel": ML Kit has no cancel, so stopping IS removing (plan R2). -->
+    <string name="cd_text_lang_stop">Stop download and remove %1$s</string>
+    <string name="cd_text_lang_retry">Try downloading %1$s again</string>
+    <!-- Metered-data consent (issue #90 ruling) — the picker gained download
+         controls, so it asks the same question the offline manager asks. -->
+    <string name="text_lang_data_dialog_title">Download %1$s over mobile data?</string>
+    <string name="text_lang_data_dialog_body">Language packs are large. You can wait for Wi-Fi instead.</string>
+    <string name="text_lang_data_dialog_once">Download once</string>
+    <string name="text_lang_data_dialog_wait">Wait for Wi-Fi</string>
 
     <!-- C-7 Reverse action (result → input, languages swapped, re-translated) -->
     <string name="cd_text_reverse">Reverse translation direction</string>

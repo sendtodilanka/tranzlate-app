@@ -1,7 +1,11 @@
 package com.codeboxlk.tranzlate.core.data.repository
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import com.codeboxlk.tranzlate.core.database.LanguageDao
 import com.codeboxlk.tranzlate.core.database.LanguageEntity
+import com.codeboxlk.tranzlate.core.datastore.TranzlatePreferencesDataSource
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
@@ -135,10 +139,99 @@ class LanguageRepositoryImplTest {
             assertThat(dao.lastUsedWrites).containsExactly("zzz" to 7L)
         }
 
+    /**
+     * The picker's whole Recent section hangs off this. It used to hang off the
+     * DAO's `UPDATE … WHERE id = ?`, against a table nothing ever seeds — so the
+     * write matched zero rows, `lastUsedAt` stayed null on every row, and Recent
+     * rendered empty for every user while looking implemented.
+     *
+     * This asserts the overlay reaches the row, which is the part that was
+     * missing; `a last-used write survives without the table` proves it does not
+     * depend on the table at all.
+     */
+    @Test
+    fun `a recorded use is overlaid onto the catalog row`() =
+        runTest {
+            val repository = repository()
+
+            repository.setLastUsed("fr", atMillis = 1_234L)
+            val languages = repository.languages().first()
+
+            assertThat(languages.single { it.id == "fr" }.lastUsedAt).isEqualTo(1_234L)
+            assertThat(languages.filter { it.lastUsedAt != null }.map { it.id }).containsExactly("fr")
+        }
+
+    @Test
+    fun `a last-used write survives without the table`() =
+        runTest {
+            val dao = FakeLanguageDao()
+            val repository = repository(dao = dao)
+
+            repository.setLastUsed("es", atMillis = 99L)
+
+            // The table is empty, so the DAO update matched nothing — and the
+            // recent is still readable. That is the regression this guards.
+            assertThat(dao.languages().first()).isEmpty()
+            assertThat(
+                repository
+                    .languages()
+                    .first()
+                    .single { it.id == "es" }
+                    .lastUsedAt,
+            ).isEqualTo(99L)
+        }
+
+    /** The legacy spelling must be canonical BEFORE it is recorded, or it can never match a row. */
+    @Test
+    fun `a legacy id is canonical in the recents overlay too`() =
+        runTest {
+            val repository = repository()
+
+            repository.setLastUsed("iw", atMillis = 5L)
+
+            assertThat(
+                repository
+                    .languages()
+                    .first()
+                    .single { it.id == "he" }
+                    .lastUsedAt,
+            ).isEqualTo(5L)
+        }
+
+    /** Unbounded growth would put every language the user ever touched in one preference. */
+    @Test
+    fun `the recents store keeps only the newest entries`() =
+        runTest {
+            val store = FakeLanguagePreferencesStore()
+            val repository = repository(store = store)
+            val ids = BundledLanguageCatalog.all.take(TranzlatePreferencesDataSource.RECENT_STORE_LIMIT + 3)
+
+            ids.forEachIndexed { index, language -> repository.setLastUsed(language.id, atMillis = index.toLong()) }
+            val remembered = repository.languages().first().filter { it.lastUsedAt != null }
+
+            assertThat(remembered).hasSize(TranzlatePreferencesDataSource.RECENT_STORE_LIMIT)
+            // Newest survive: the first three writes are the ones dropped.
+            assertThat(remembered.map { it.id }).containsNoneIn(ids.take(3).map { it.id })
+        }
+
     private fun repository(
         dao: LanguageDao = FakeLanguageDao(),
         models: OfflineModelManager = FakeOfflineModelManager(),
-    ) = LanguageRepositoryImpl(dao, models)
+        store: FakeLanguagePreferencesStore = FakeLanguagePreferencesStore(),
+    ) = LanguageRepositoryImpl(dao, models, TranzlatePreferencesDataSource(store))
+}
+
+/** In-memory `DataStore`, so the real preference codec is what these tests exercise. */
+private class FakeLanguagePreferencesStore : DataStore<Preferences> {
+    private val state = MutableStateFlow<Preferences>(emptyPreferences())
+
+    override val data: Flow<Preferences> = state
+
+    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+        val updated = transform(state.value)
+        state.value = updated
+        return updated
+    }
 }
 
 private class FakeLanguageDao(
