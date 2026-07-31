@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.core.database.di
 import android.content.Context
 import androidx.room.Room
 import com.codeboxlk.tranzlate.core.database.LanguageDao
+import com.codeboxlk.tranzlate.core.database.TRANZLATE_MIGRATIONS
 import com.codeboxlk.tranzlate.core.database.TranslationDao
 import com.codeboxlk.tranzlate.core.database.TranzlateDatabase
 import dagger.Module
@@ -22,12 +23,21 @@ internal object DatabaseModule {
     ): TranzlateDatabase =
         Room
             .databaseBuilder(context, TranzlateDatabase::class.java, "tranzlate.db")
-            // ⚠ PRE-LAUNCH ONLY (issue #53 / A8, DATA_MODEL "Migration policy"): with no
-            // policy at all, the first version bump throws for every existing install.
-            // There are no shipped users yet, so a schema change may drop data. This
-            // line MUST be replaced by real Migration objects before the first release
-            // — release-checklist item; grep for fallbackToDestructiveMigration.
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            // The pre-launch `fallbackToDestructiveMigration(dropAllTables = true)`
+            // is GONE (A8). This ships as an update over a live install base, and a
+            // forward destructive fallback means every future schema bump silently
+            // deletes the user's whole translation history. Real migrations instead —
+            // see TRANZLATE_MIGRATIONS for the binding schema stance. Registered by
+            // iterating the ONE list rather than spelling the migrations out here —
+            // a second hand-written list is exactly the drift MigrationCoverageTest
+            // exists to catch, and it would be invisible to it.
+            .apply { TRANZLATE_MIGRATIONS.forEach { migration -> addMigrations(migration) } }
+            // Downgrade-only, and deliberately kept. It cannot fire on an upgrade, so
+            // no user's data is destroyed going forward. It covers the one case Room
+            // otherwise answers with an IllegalStateException on every launch — a
+            // hand-sideloaded OLDER build — where an unrecoverable crash loop is a
+            // worse outcome for that user than a reset.
+            .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .build()
 
     @Provides
