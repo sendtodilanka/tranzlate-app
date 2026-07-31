@@ -1422,14 +1422,155 @@ private fun ComposerItemsPreview() {
                 verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm8),
                 modifier = Modifier.padding(LocalSpacing.current.md16),
             ) {
-                CharCounter(length = 0, overLimit = false, counterDescription = "")
-                CharCounter(length = TEXT_CHAR_LIMIT, overLimit = false, counterDescription = "")
-                CharCounter(length = TEXT_CHAR_LIMIT + 12, overLimit = true, counterDescription = "")
+                CharCounter(length = 0, overLimit = false, counterDescription = "0 of 500 characters")
+                CharCounter(length = TEXT_CHAR_LIMIT, overLimit = false, counterDescription = "Character limit reached")
+                CharCounter(
+                    length = TEXT_CHAR_LIMIT + 12,
+                    overLimit = true,
+                    counterDescription = "Over the character limit",
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm8)) {
                     EditAction(hasText = false, overLimit = false, onMic = {}, onTranslate = {})
                     EditAction(hasText = true, overLimit = false, onMic = {}, onTranslate = {})
                     EditAction(hasText = true, overLimit = true, onMic = {}, onTranslate = {})
                 }
+            }
+        }
+    }
+}
+
+private val previewRequest =
+    TranslateRequest(
+        text = "Good morning",
+        sourceLang = "en",
+        targetLang = "fr",
+        mode = ModeId.AUTO,
+    )
+
+/** Translating — the shimmer face while an engine runs. */
+@PreviewLightDark
+@Composable
+private fun ComposerTranslatingPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            ComposerPaneContent(
+                input = "Good morning",
+                sourceLangId = "en",
+                targetLangId = "fr",
+                uiState = TextUiState.Translating(request = previewRequest),
+                onInputChange = {},
+                onTranslate = { true },
+                onRetry = {},
+                onSwapLanguages = { true },
+                onPickLanguage = {},
+                onBack = {},
+                onNotify = {},
+                onClearAll = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/**
+ * Error face — the EDGE_CASES no-dead-end surface the owner must be able to
+ * review without reproducing a failure: cause-specific copy + Retry.
+ */
+@PreviewLightDark
+@Composable
+private fun ComposerErrorPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            ComposerPaneContent(
+                input = "Good morning",
+                sourceLangId = "en",
+                targetLangId = "fr",
+                uiState = TextUiState.Error(request = previewRequest, cause = AttemptCause.OFFLINE),
+                onInputChange = {},
+                onTranslate = { true },
+                onRetry = {},
+                onSwapLanguages = { true },
+                onPickLanguage = {},
+                onBack = {},
+                onNotify = {},
+                onClearAll = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/** Limit face — quota exhausted (guidance, never an error card) + the AI meter. */
+@PreviewLightDark
+@Composable
+private fun ComposerLimitPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            ComposerPaneContent(
+                input = "Good morning",
+                sourceLangId = "en",
+                targetLangId = "fr",
+                uiState = TextUiState.Limit(request = previewRequest),
+                aiMeter = 0 to 5,
+                onInputChange = {},
+                onTranslate = { true },
+                onRetry = {},
+                onSwapLanguages = { true },
+                onPickLanguage = {},
+                onBack = {},
+                onNotify = {},
+                onClearAll = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/** Not-entitled face — access denial, distinct copy from quota exhaustion. */
+@PreviewLightDark
+@Composable
+private fun ComposerNotEntitledPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            ComposerPaneContent(
+                input = "Good morning",
+                sourceLangId = "en",
+                targetLangId = "fr",
+                uiState = TextUiState.Limit(request = previewRequest, notEntitled = true),
+                aiMeter = 3 to 5,
+                onInputChange = {},
+                onTranslate = { true },
+                onRetry = {},
+                onSwapLanguages = { true },
+                onPickLanguage = {},
+                onBack = {},
+                onNotify = {},
+                onClearAll = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/** THE ITEMS: the top row (back + pills + swap) and the source label row. */
+@PreviewLightDark
+@Composable
+private fun ComposerChromeItemsPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column(modifier = Modifier.padding(LocalSpacing.current.md16)) {
+                ComposerTopRow(
+                    sourceLabel = "English",
+                    targetLabel = "French",
+                    onBack = {},
+                    onSourceClick = {},
+                    onTargetClick = {},
+                    onSwap = {},
+                    swapEnabled = true,
+                )
+                Spacer(Modifier.height(LocalSpacing.current.md16))
+                SourceLabelRow(label = "English", showClear = true, onClear = {})
+                SourceLabelRow(label = "Detect language", showClear = false, onClear = {})
             }
         }
     }

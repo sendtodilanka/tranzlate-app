@@ -885,6 +885,8 @@ private fun InputPreviewCardPreview() {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Column(modifier = Modifier.padding(LocalSpacing.current.md16)) {
                 InputPreviewCard(onOpen = {}, onMic = {})
+                Spacer(Modifier.height(LocalSpacing.current.md16))
+                TokenProChip(onClick = {})
             }
         }
     }
