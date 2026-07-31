@@ -12,6 +12,7 @@ import com.qonversion.android.sdk.dto.products.QProduct
 import com.qonversion.android.sdk.listeners.QonversionEntitlementsCallback
 import com.qonversion.android.sdk.listeners.QonversionProductsCallback
 import com.qonversion.android.sdk.listeners.QonversionPurchaseCallback
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -126,7 +127,7 @@ class QonversionSubscriptionGateway(
         val instance = ensureReady() ?: return Result.failure(SubscriptionFailure.NotConfigured())
         // Bounded: the paywall shows a spinner for the whole of this, and a
         // spinner with no exit is the dead end EDGE_CASES forbids.
-        return (withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { checkEntitlements(instance) } ?: timedOut("Restore"))
+        return (withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { restorePurchases(instance) } ?: timedOut("Restore"))
             .onSuccess { state.value = it }
     }
 
@@ -182,15 +183,35 @@ class QonversionSubscriptionGateway(
 
     private suspend fun checkEntitlements(instance: Qonversion): Result<Entitlement> =
         suspendCancellableCoroutine { continuation ->
-            instance.checkEntitlements(
-                object : QonversionEntitlementsCallback {
-                    override fun onSuccess(entitlements: Map<String, QEntitlement>) =
-                        continuation.resume(Result.success(entitlements.toEntitlement()))
+            instance.checkEntitlements(entitlementsCallback(continuation))
+        }
 
-                    override fun onError(error: QonversionError) =
-                        continuation.resume(Result.failure(SubscriptionFailure.StoreError(error.toString())))
-                },
-            )
+    /**
+     * The recovery path, and NOT [checkEntitlements].
+     *
+     * `checkEntitlements` answers "what does the CURRENT identity own" — on a
+     * reinstall or a new phone that identity is a fresh anonymous one, so a
+     * paying subscriber would be told they have nothing to restore. `restore`
+     * is the call that reads the store's own purchase history and re-attaches
+     * it to this identity; verified present on the SDK we ship
+     * (`javap` on sdk-9.7.0.aar: `restore(QonversionEntitlementsCallback)`).
+     *
+     * Play requires a working restore path for a subscription app, so this
+     * distinction is a policy obligation, not a refinement.
+     */
+    private suspend fun restorePurchases(instance: Qonversion): Result<Entitlement> =
+        suspendCancellableCoroutine { continuation ->
+            instance.restore(entitlementsCallback(continuation))
+        }
+
+    /** Shared bridge: both entitlement calls answer on the same callback type. */
+    private fun entitlementsCallback(continuation: CancellableContinuation<Result<Entitlement>>) =
+        object : QonversionEntitlementsCallback {
+            override fun onSuccess(entitlements: Map<String, QEntitlement>) =
+                continuation.resume(Result.success(entitlements.toEntitlement()))
+
+            override fun onError(error: QonversionError) =
+                continuation.resume(Result.failure(SubscriptionFailure.StoreError(error.toString())))
         }
 
     private suspend fun loadProducts(instance: Qonversion): Result<Map<String, QProduct>> =
