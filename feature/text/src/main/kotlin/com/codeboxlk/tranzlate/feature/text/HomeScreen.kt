@@ -855,6 +855,16 @@ private fun LanguageRowPreview() {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Column(modifier = Modifier.padding(LocalSpacing.current.md16)) {
                 LanguageRow(
+                    sourceLabel = "English",
+                    targetLabel = "French",
+                    onSourceClick = {},
+                    onTargetClick = {},
+                    onSwap = {},
+                    swapEnabled = true,
+                )
+                Spacer(Modifier.height(LocalSpacing.current.sm8))
+                // Detect-language source: swap has nothing to swap TO yet.
+                LanguageRow(
                     sourceLabel = "Detect language",
                     targetLabel = "Sinhala",
                     onSourceClick = {},
