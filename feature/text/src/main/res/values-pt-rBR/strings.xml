@@ -30,7 +30,7 @@
     <string name="home_tools">Ferramentas</string>
     <string name="home_translate">Traduzir</string>
     <string name="home_tool_offline">Modo offline</string>
-    <string name="home_tool_offline_sub">6 idiomas prontos</string>
+    <string name="home_tool_offline_sub">Traduza sem conexão</string>
     <string name="home_tool_voice">Voz</string>
     <string name="home_tool_voice_sub">Fale e ouça</string>
     <string name="home_tool_camera">Câmera</string>
@@ -38,15 +38,17 @@
     <string name="home_tool_conversation">Conversa</string>
     <string name="home_tool_conversation_sub">Diálogo em dois idiomas</string>
     <string name="home_row_download">Baixar idiomas</string>
-    <string name="home_row_download_sub">133 disponíveis · 2 atualizações prontas</string>
+    <plurals name="home_row_download_sub">
+        <item quantity="one">%1$d idioma disponível offline</item>
+        <item quantity="other">%1$d idiomas disponíveis offline</item>
+    </plurals>
     <string name="home_mini_phrasebook">Frases úteis</string>
     <string name="home_mini_quotes">Citações</string>
     <string name="home_phrasing_title">Fraseado natural</string>
     <string name="home_phrasing_sub">Reescreve expressões para soarem certas</string>
-    <string name="home_badge_new">NOVO</string>
     <string name="cd_home_settings">Configurações</string>
     <string name="home_guided_phrasebook">As frases úteis chegam em uma próxima atualização</string>
-    <string name="home_guided_quotes">As citações salvas chegam com a atualização do histórico</string>
+    <string name="home_guided_quotes">As citações ainda não fazem parte desta versão — suas traduções salvas estão em Configurações</string>
     <string name="home_guided_phrasing">O fraseado natural chega com a atualização de IA</string>
 
     <!-- Guided messages -->

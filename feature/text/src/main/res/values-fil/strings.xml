@@ -30,7 +30,7 @@
     <string name="home_tools">Mga Tool</string>
     <string name="home_translate">Isalin</string>
     <string name="home_tool_offline">Offline mode</string>
-    <string name="home_tool_offline_sub">6 wika ang handa na</string>
+    <string name="home_tool_offline_sub">Magsalin nang walang koneksyon</string>
     <string name="home_tool_voice">Boses</string>
     <string name="home_tool_voice_sub">Magsalita at pakinggan</string>
     <string name="home_tool_camera">Camera</string>
@@ -38,15 +38,17 @@
     <string name="home_tool_conversation">Pag-uusap</string>
     <string name="home_tool_conversation_sub">Dalawang-panig na usapan</string>
     <string name="home_row_download">Mag-download ng mga wika</string>
-    <string name="home_row_download_sub">133 available · 2 update ang handa</string>
+    <plurals name="home_row_download_sub">
+        <item quantity="one">%1$d wika ang available offline</item>
+        <item quantity="other">%1$d wika ang available offline</item>
+    </plurals>
     <string name="home_mini_phrasebook">Phrasebook</string>
     <string name="home_mini_quotes">Mga Quote</string>
     <string name="home_phrasing_title">Natural na pananalita</string>
     <string name="home_phrasing_sub">Isinusulat muli ang mga idyoma para tumama</string>
-    <string name="home_badge_new">BAGO</string>
     <string name="cd_home_settings">Mga Setting</string>
     <string name="home_guided_phrasebook">Darating ang Phrasebook sa susunod na update</string>
-    <string name="home_guided_quotes">Darating ang mga naka-save na quote sa history update</string>
+    <string name="home_guided_quotes">Wala pa sa bersyong ito ang mga quote — nasa Mga Setting ang mga naka-save mong pagsasalin</string>
     <string name="home_guided_phrasing">Darating ang natural na pananalita sa AI update</string>
 
     <!-- Guided messages -->

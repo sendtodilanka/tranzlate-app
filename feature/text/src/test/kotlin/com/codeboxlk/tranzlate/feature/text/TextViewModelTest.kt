@@ -22,8 +22,12 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
@@ -103,19 +107,23 @@ class TextViewModelTest {
         }
     }
 
-    private class FakeLanguageRepository : LanguageRepository {
-        override fun languages(): Flow<List<Language>> =
-            flowOf(
-                listOf(
-                    Language("en", "English", offlineAvailable = true, offlineDownloaded = false),
-                    Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
-                ),
-            )
+    private class FakeLanguageRepository(
+        private val catalog: List<Language> = DEFAULT_CATALOG,
+    ) : LanguageRepository {
+        override fun languages(): Flow<List<Language>> = flowOf(catalog)
 
         override suspend fun setLastUsed(
             languageId: String,
             atMillis: Long,
         ) = Unit
+
+        companion object {
+            val DEFAULT_CATALOG =
+                listOf(
+                    Language("en", "English", offlineAvailable = true, offlineDownloaded = false),
+                    Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
+                )
+        }
     }
 
     @Suppress("LongParameterList") // the test builder aggregates one fake per seam
@@ -128,6 +136,7 @@ class TextViewModelTest {
         access: FakeFeatureAccess = FakeFeatureAccess(),
         repository: FakeTranslationRepository = FakeTranslationRepository(),
         speaker: FakeResultSpeaker = FakeResultSpeaker(),
+        catalog: List<Language> = FakeLanguageRepository.DEFAULT_CATALOG,
     ): TextViewModel {
         val useCase =
             TranslateTextUseCase(
@@ -142,7 +151,7 @@ class TextViewModelTest {
             translateText = useCase,
             prefs = prefs,
             translationRepository = repository,
-            languageRepository = FakeLanguageRepository(),
+            languageRepository = FakeLanguageRepository(catalog),
             usagePolicy = usage,
             featureAccess = access,
             config = FakeRemoteConfig(),
@@ -154,6 +163,49 @@ class TextViewModelTest {
     }
 
     private fun settle() = dispatcher.scheduler.advanceUntilIdle()
+
+    // ---- launch honesty: Home's download-row count is REAL -------------------
+    // Home used to print "133 available · 2 updates ready", a design-mock string
+    // nothing computed. These pin the replacement to the catalog so the number
+    // can never drift back into fiction.
+
+    @Test
+    fun `offline language count reports only the offline-capable catalog rows`() =
+        runTest(dispatcher) {
+            val vm =
+                viewModel(
+                    catalog =
+                        listOf(
+                            Language("en", "English", offlineAvailable = true, offlineDownloaded = false),
+                            Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
+                            // Online-only: it belongs in the picker, never in the
+                            // "available offline" count.
+                            Language("cy", "Welsh", offlineAvailable = false, offlineDownloaded = false),
+                        ),
+                )
+            backgroundScope.launch { vm.offlineLanguageCount.collect() }
+            advanceUntilIdle()
+
+            assertThat(vm.offlineLanguageCount.value).isEqualTo(2)
+        }
+
+    @Test
+    fun `offline language count is zero for a catalog with nothing offline-capable`() =
+        runTest(dispatcher) {
+            val vm =
+                viewModel(
+                    catalog =
+                        listOf(
+                            Language("cy", "Welsh", offlineAvailable = false, offlineDownloaded = false),
+                        ),
+                )
+            backgroundScope.launch { vm.offlineLanguageCount.collect() }
+            advanceUntilIdle()
+
+            // Not a placeholder: the plural resource reads correctly at 0, so an
+            // empty catalog says so instead of inventing a number.
+            assertThat(vm.offlineLanguageCount.value).isEqualTo(0)
+        }
 
     // ---- issue #70: swap never writes "auto" into TARGET ---------------------
 

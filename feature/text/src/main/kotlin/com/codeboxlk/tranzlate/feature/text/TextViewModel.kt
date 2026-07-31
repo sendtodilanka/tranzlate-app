@@ -111,6 +111,24 @@ class TextViewModel
                 .languages()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(PREFS_SUBSCRIBE_TIMEOUT_MS), emptyList())
 
+        /**
+         * How many catalog languages can actually be held offline — Home's download
+         * row prints THIS instead of the design mock's invented "133 available".
+         *
+         * Deliberately derived from the catalog, not from
+         * [com.codeboxlk.tranzlate.domain.translate.OfflineModelManager]: that seam
+         * reaches ML Kit's `RemoteModelManager`, and Home is the cold-start screen.
+         * The count of already-DOWNLOADED models needs that seam, which is why the
+         * offline card no longer claims one at all (plan launch-blockers §2).
+         *
+         * 0 while the first catalog emission is in flight — the plural resource
+         * reads correctly for it, so there is no placeholder frame to hide.
+         */
+        val offlineLanguageCount: StateFlow<Int> =
+            languages
+                .map { catalog -> catalog.count(Language::offlineAvailable) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(PREFS_SUBSCRIBE_TIMEOUT_MS), 0)
+
         private val _uiState = MutableStateFlow<TextUiState>(TextUiState.Idle)
         val uiState: StateFlow<TextUiState> = _uiState.asStateFlow()
 

@@ -35,7 +35,11 @@
     <string name="home_tools">Tools</string>
     <string name="home_translate">Translate</string>
     <string name="home_tool_offline">Offline mode</string>
-    <string name="home_tool_offline_sub">6 languages ready</string>
+    <!-- Was the design mock's "6 languages ready" — a number nothing computed.
+         The downloaded count is only knowable through ML Kit's RemoteModelManager,
+         which we will not put on the cold-start path (plan launch-blockers §2), so
+         the claim is dropped rather than faked. -->
+    <string name="home_tool_offline_sub">Translate without a connection</string>
     <string name="home_tool_voice">Voice</string>
     <string name="home_tool_voice_sub">Speak and hear it</string>
     <string name="home_tool_camera">Camera</string>
@@ -43,15 +47,22 @@
     <string name="home_tool_conversation">Conversation</string>
     <string name="home_tool_conversation_sub">Two-way talk</string>
     <string name="home_row_download">Download languages</string>
-    <string name="home_row_download_sub">133 available \u00b7 2 updates ready</string>
+    <!-- Was "133 available \u00b7 2 updates ready" \u2014 both numbers were invented. The
+         count now comes from LanguageRepository; "updates ready" is gone for good,
+         because ML Kit reports downloaded models, never model versions. -->
+    <plurals name="home_row_download_sub">
+        <item quantity="one">%1$d language available offline</item>
+        <item quantity="other">%1$d languages available offline</item>
+    </plurals>
     <string name="home_mini_phrasebook">Phrasebook</string>
     <string name="home_mini_quotes">Quotes</string>
     <string name="home_phrasing_title">Natural phrasing</string>
     <string name="home_phrasing_sub">Rewrites idioms so they land right</string>
-    <string name="home_badge_new">NEW</string>
     <string name="cd_home_settings">Settings</string>
     <string name="home_guided_phrasebook">Phrasebook arrives in a later update</string>
-    <string name="home_guided_quotes">Saved quotes arrive with the history update</string>
+    <!-- Was "arrives with the history update" — History/Saved already shipped, so
+         that promise had already come true and the sentence had become false. -->
+    <string name="home_guided_quotes">Quotes aren\'t part of this version yet — your saved translations are under Settings</string>
     <string name="home_guided_phrasing">Natural phrasing arrives with the AI update</string>
 
     <!-- Guided messages (EDGE_CASES no-dead-end rule: a tap never lands nowhere) -->
