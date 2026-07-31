@@ -23,8 +23,8 @@ object Alpha {
     // Shimmer placeholder (translating state — UI_SPEC §2.5)
 
     /** Resting shimmer line fill. */
-    const val SHIMMER_BASE = 0.10f
+    const val SHIMMER_BASE = 0.12f
 
     /** Moving shimmer highlight band. */
-    const val SHIMMER_HIGHLIGHT = 0.24f
+    const val SHIMMER_HIGHLIGHT = 0.38f
 }
