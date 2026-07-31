@@ -5,6 +5,12 @@ plugins {
     alias(libs.plugins.tranzlate.android.application.signing)
     alias(libs.plugins.tranzlate.hilt)
     alias(libs.plugins.kotlin.serialization)
+    // Reads app/google-services.json into the resources Firebase Remote Config
+    // needs at runtime. Without it `FirebaseRemoteConfig.getInstance()` throws,
+    // the source falls back to its defaults, and every credential arrives blank
+    // — a paywall that cannot take money and legal links that go nowhere. The
+    // failure is silent, so this line is load-bearing, not boilerplate.
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -81,6 +87,48 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+// ---------------------------------------------------------------------------------
+// R4-O7: the Fake variant must NOT initialise the LIVE Firebase project.
+//
+// The google-services plugin generates a `google_app_id` string resource for
+// EVERY variant, and Firebase's `FirebaseInitProvider` (a ContentProvider merged
+// into the manifest by the Firebase SDK) initialises the default FirebaseApp at
+// process start from exactly that resource — before any code of ours runs, DI
+// bindings notwithstanding. So the fake/Maestro APK, which binds
+// `FakeConfigModule` and never touches `RemoteConfigSource`, was still
+// auto-initialising the PRODUCTION Firebase project on every test launch.
+//
+// Disabling the per-variant `process<Variant>GoogleServices` task keeps the
+// generated resource out of the fake variant's resource merge. Without a
+// `google_app_id` resource, `FirebaseInitProvider` skips initialisation cleanly
+// (FirebaseApp.initializeApp returns null and logs a warning — documented,
+// non-fatal). Prod variants keep the task, and the credentials it feeds.
+//
+// Task names as of AGP/google-services in this tree (`:app:tasks --all`):
+//   processTranzlateFakeDebugGoogleServices   ← disabled here
+//   processTranzlateProdDebugGoogleServices   ← kept
+//   processTranzlateProdReleaseGoogleServices ← kept
+// Matched by pattern so a future brand flavor's Fake variants are covered too.
+// ---------------------------------------------------------------------------------
+tasks.configureEach {
+    if (name.contains("Fake") && name.endsWith("GoogleServices")) {
+        enabled = false
+        // A machine that built a Fake variant BEFORE this guard existed still has
+        // the generated resource on disk (build/generated/res/<taskName>/), a
+        // disabled task never runs to replace it, and the resource merger — whose
+        // input dir is then unchanged — stays UP-TO-DATE and keeps packaging the
+        // live google_app_id silently. Deleting the stale output here makes
+        // incremental builds converge without a manual clean. (Verified: the dir
+        // is named after the task; deleting it invalidates the merge task.)
+        project.layout.buildDirectory
+            .dir("generated/res/$name")
+            .get()
+            .asFile
+            .takeIf(File::exists)
+            ?.deleteRecursively()
     }
 }
 

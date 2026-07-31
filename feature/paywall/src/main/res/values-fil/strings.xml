@@ -8,21 +8,29 @@
     <string name="paywall_plan_weekly">Lingguhan</string>
     <string name="paywall_plan_monthly">Buwanan</string>
     <string name="paywall_plan_yearly">★ Taunan</string>
-    <string name="paywall_price_weekly">US$1.99</string>
-    <string name="paywall_price_monthly">US$4.99</string>
-    <string name="paywall_price_yearly">US$29.99</string>
-    <string name="paywall_badge_save">TIPID ~60%</string>
-    <string name="paywall_trial_line">7 araw na libreng trial</string>
-    <string name="paywall_per_day">Mga US$0.08 lang kada araw</string>
     <string name="paywall_cancel_anytime">Kanselahin anumang oras sa Google Play</string>
-    <string name="paywall_cta_trial">Simulan ang 7-araw na libreng trial</string>
     <string name="paywall_cta_continue">Magpatuloy</string>
     <string name="paywall_restore">I-restore ang mga binili</string>
     <string name="paywall_terms">Mga Tuntunin</string>
     <string name="paywall_privacy">Privacy</string>
     <string name="paywall_cd_close">Isara</string>
-    <string name="paywall_purchase_unavailable">Hindi pa available ang billing — walang siningil.</string>
+    <string name="paywall_purchase_unavailable">Hindi makumpleto ang pagbili. Walang siningil.</string>
     <string name="paywall_restore_failed">Hindi maabot ang store para mag-restore. Subukan muli mamaya.</string>
     <string name="paywall_restore_nothing">Walang mai-restore na binili sa account na ito.</string>
-    <string name="paywall_links_coming">Darating ang mga pahina ng Tuntunin at Privacy bago ang release.</string>
+    <string name="paywall_link_unavailable">Hindi mabuksan ang pahinang iyon. Tingnan ang koneksyon at subukan muli.</string>
+    <string name="paywall_price_pending">\u2014</string>
+    <plurals name="paywall_trial_days">
+        <item quantity="one">%1$d araw na libreng subok</item>
+        <item quantity="other">%1$d araw na libreng subok</item>
+    </plurals>
+    <string name="paywall_trial_generic">Kasama ang libreng subok</string>
+    <plurals name="paywall_cta_trial_days">
+        <item quantity="one">Simulan ang %1$d araw na libreng subok</item>
+        <item quantity="other">Simulan ang %1$d araw na libreng subok</item>
+    </plurals>
+    <string name="paywall_cta_trial_generic">Simulan ang libreng subok</string>
+    <string name="paywall_price_loading">Kinukuha ang mga presyo mula sa Google Play\u2026</string>
+    <string name="paywall_price_unavailable">Hindi maabot ang Google Play. I-tap para subukan ulit.</string>
+    <string name="paywall_plan_unavailable">Hindi available ang plan na ito sa Google Play ngayon. I-tap para tingnan ulit.</string>
+    <string name="paywall_purchase_pending">Pinoproseso pa ang bayad. Kapag natapos ito, buksan ulit ang app o i-tap ang I-restore ang mga binili para ma-unlock ang Pro.</string>
 </resources>

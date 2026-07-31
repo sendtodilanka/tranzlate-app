@@ -21,6 +21,11 @@ kotlinxSerialization = "1.11.0"
 mlkitTranslate = "17.0.3"
 mlkitLanguageId = "17.0.6"
 okhttp = "4.12.0"
+# Monetization (launch batch) — versions verified 2026-07-31 against Google Maven
+# (google-services, firebase-bom) and Maven Central (qonversion) metadata.
+firebaseBom = "34.17.0"
+googleServices = "4.5.0"
+qonversion = "9.7.0"
 desugarJdkLibs = "2.1.5"
 coreKtx = "1.19.0"
 junit = "4.13.2"
@@ -93,6 +98,18 @@ mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref 
 mlkit-language-id = { group = "com.google.mlkit", name = "language-id", version.ref = "mlkitLanguageId" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 
+# Firebase — the BOM pins module versions; ONLY firebase-config is consumed.
+# firebase-analytics is deliberately absent: Google's docs require it for
+# CONDITIONAL targeting (audiences / user properties / A-B), not for
+# fetch+activate, and it is an analytics-consent surface we have not designed.
+# `-ktx` artifacts are gone from BOM 34.x — the KTX API lives in the main module.
+google-firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+google-firebase-config = { group = "com.google.firebase", name = "firebase-config" }
+
+# Billing provider. Pulls Play Billing 8.1.0 transitively through an `api` scope,
+# so it must stay inside :lib:subscription and never leak into a feature module.
+qonversion = { group = "io.qonversion.android.sdk", name = "sdk", version.ref = "qonversion" }
+
 # Desugaring
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 
@@ -123,6 +140,12 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "room" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+# Reads app/google-services.json into the Firebase config resources. Google Maven
+# ONLY (Maven Central stopped at 3.1.1, 2017) — settings.gradle.kts already routes
+# `com.google.*` to google(). Applies to :app alone: the plugin's own README and
+# source restrict it to com.android.application / com.android.dynamic-feature, and
+# on a library module it merely logs an error and generates nothing.
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 
 # Convention plugins (build-logic included build)
 tranzlate-android-application = { id = "tranzlate.android.application" }

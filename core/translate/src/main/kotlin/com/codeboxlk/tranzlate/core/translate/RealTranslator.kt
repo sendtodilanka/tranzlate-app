@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.core.translate
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
+import com.codeboxlk.tranzlate.core.config.effectiveGctApiKey
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.EngineAttempt
 import com.codeboxlk.tranzlate.core.model.Entitlement
@@ -256,5 +257,8 @@ class RealTranslator internal constructor(
         }
     }
 
-    private fun gctConfigured(): Boolean = appConfig.gctApiKey.isNotBlank()
+    // Remote-first (see effectiveGctApiKey): a brand can ship keyless and be
+    // switched on from the console, and a revoked key can be replaced without a
+    // Play release. Blank on either side still means "no paid tier at all".
+    private fun gctConfigured(): Boolean = config.effectiveGctApiKey(appConfig).isNotBlank()
 }

@@ -33,12 +33,108 @@ sealed interface Entitlement {
 }
 
 /**
+ * Every way a purchase or restore can fail, named.
+ *
+ * A billing surface that reports one undifferentiated "failed" is what makes
+ * paywalls feel broken: a user who tapped Back gets an error toast, and a brand
+ * with no store products looks identical to a network outage. Hosts are expected
+ * to branch on these — [Cancelled] in particular should show NOTHING.
+ */
+sealed class SubscriptionFailure(
+    message: String,
+) : Exception(message) {
+    /** No project key resolved — this build simply has no billing wired. */
+    class NotConfigured : SubscriptionFailure("Subscriptions are not configured for this build")
+
+    /** Nothing in the foreground to attach the store dialog to. */
+    class NoForegroundActivity : SubscriptionFailure("No foreground activity to launch the store flow")
+
+    /** The store has no product under this id (typo, or not published yet). */
+    class ProductUnavailable(
+        val productId: String,
+    ) : SubscriptionFailure("No store product for id '$productId'")
+
+    /** The USER dismissed the store sheet. Expected, not an error. */
+    class Cancelled : SubscriptionFailure("Purchase cancelled by the user")
+
+    /** Deferred payment (e.g. cash) — the entitlement arrives later, not now. */
+    class Pending : SubscriptionFailure("Purchase is pending approval")
+
+    /** Anything the provider itself reported. */
+    class StoreError(
+        detail: String,
+    ) : SubscriptionFailure(detail)
+}
+
+/**
+ * What the STORE says a plan costs — never what we think it costs.
+ *
+ * A paywall that prints its prices from a string resource is telling every
+ * buyer outside that currency a false number, and it does so at the exact
+ * moment money changes hands. The store already knows the localized price and
+ * whether *this* account still has a trial coming; both come from there.
+ *
+ * @property offeringId the id the host asked for.
+ * @property price store-formatted and already localized ("Rs 1,200.00", "€4,99").
+ *   Display it verbatim — reformatting it would reintroduce the same class of bug.
+ * @property trialDays exact free-trial length, when the store expresses it in a
+ *   unit that converts without rounding. Null when there is no trial, when this
+ *   account is not eligible for one, or when the period is a month or a year —
+ *   see [hasTrial], which stays true in that last case.
+ * @property hasTrial whether an eligible trial exists at all, whatever its unit.
+ */
+data class SubscriptionProduct(
+    val offeringId: String,
+    val price: String,
+    val trialDays: Int? = null,
+    val hasTrial: Boolean = false,
+)
+
+/**
+ * What the store has told us so far.
+ *
+ * Three states, not two, because "we have not asked yet" and "we asked and could
+ * not reach Play" are different facts and the screen must not print one while
+ * the other is true. An empty map used to mean both: the paywall opened onto
+ * "Couldn't reach Google Play" before a single call had been made, which is the
+ * same class of falsehood the hardcoded prices were.
+ */
+sealed interface StorePrices {
+    /** No answer yet — a request is in flight, or none has been made. */
+    data object Loading : StorePrices
+
+    /** The store answered. May be empty if it published nothing we asked for. */
+    data class Known(
+        val products: Map<String, SubscriptionProduct>,
+    ) : StorePrices
+
+    /** The store could not be reached, or this build has no billing configured. */
+    data object Unavailable : StorePrices
+}
+
+/**
  * Public subscription API. The billing SDK stays `internal` behind this surface;
  * swapping/adding the real SDK must not change this interface.
  */
 interface SubscriptionGateway {
     /** Hot entitlement state; starts at [Entitlement.Loading] until resolved. */
     val entitlement: Flow<Entitlement>
+
+    /**
+     * What the store has said, as one of [StorePrices]' three states.
+     *
+     * A host must render the distinction rather than collapsing it: telling a
+     * user we could not reach Play, while the request is still in flight, is a
+     * statement we cannot support.
+     */
+    val products: Flow<StorePrices>
+
+    /**
+     * Ask the store for prices again. Idempotent, and safe to call on every
+     * paywall open — which is the point: a single failed attempt must not leave
+     * the screen permanently unable to sell anything.
+     */
+    suspend fun refreshPrices()
 
     /** Launch a purchase for [offeringId]; returns the resolved entitlement. */
     suspend fun purchase(offeringId: String): Result<Entitlement>
@@ -59,9 +155,14 @@ class NoOpSubscriptionGateway(
 
     override val entitlement: Flow<Entitlement> = state.asStateFlow()
 
-    override suspend fun purchase(offeringId: String): Result<Entitlement> =
-        Result.failure(UnsupportedOperationException("Billing SDK not integrated yet"))
+    /** No store at all — that is settled, not pending, so it reports Unavailable. */
+    override val products: Flow<StorePrices> =
+        MutableStateFlow<StorePrices>(StorePrices.Unavailable).asStateFlow()
 
-    override suspend fun restore(): Result<Entitlement> =
-        Result.failure(UnsupportedOperationException("Billing SDK not integrated yet"))
+    override suspend fun refreshPrices() = Unit
+
+    override suspend fun purchase(offeringId: String): Result<Entitlement> =
+        Result.failure(SubscriptionFailure.NotConfigured())
+
+    override suspend fun restore(): Result<Entitlement> = Result.failure(SubscriptionFailure.NotConfigured())
 }

@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate.core.translate.engine
 
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
+import com.codeboxlk.tranzlate.core.config.effectiveGctApiKey
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import kotlinx.serialization.json.Json
@@ -46,7 +47,7 @@ internal class GctEngine
                     .scheme("https")
                     .host("translation.googleapis.com")
                     .addPathSegments("language/translate/v2")
-                    .addQueryParameter("key", appConfig.gctApiKey)
+                    .addQueryParameter("key", config.effectiveGctApiKey(appConfig))
                     .build()
             val body =
                 FormBody

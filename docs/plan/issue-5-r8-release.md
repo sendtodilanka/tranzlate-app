@@ -38,3 +38,15 @@ for the Qonversion/ads batch (which reopens rules anyway).
 
 Per-brand signing keystores · Qonversion/AdMob rule verification · GCT key
 path under R8 · mlkit-keep narrowing · Play-ready bundle (AAB) config.
+
+## Pre-upload verification items added by the PR #109 review (rounds 2 and 5)
+
+- **Verify Cloud Console API restrictions on BOTH keys, separately.** The
+  Firebase Android key committed in `app/google-services.json` and the GCT key
+  served through Remote Config are DIFFERENT keys. Each needs its own check:
+  application restriction (package + SHA-1) and an API allowlist that does NOT
+  include billable APIs the client never calls. The owner confirmed the GCT
+  key; the Firebase key's restriction has not been independently verified.
+- **One real sandbox purchase on a MINIFIED release build** (licence-tester
+  account) before upload — R8 keep-rules for the billing stack have never been
+  exercised by a live purchase (R1-O6).

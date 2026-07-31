@@ -8,6 +8,11 @@ class FakeRemoteConfig(
     private val limitFreeAi: Int = RemoteConfigDefaults.LIMIT_FREE_AI,
     private val limitProFairUse: Int = RemoteConfigDefaults.LIMIT_PRO_FAIR_USE,
     private val gotEnabled: Boolean = RemoteConfigDefaults.GOT_ENABLED,
+    private val qonversionKey: String = RemoteConfigDefaults.UNSET_TEXT,
+    private val gctApiKey: String = RemoteConfigDefaults.UNSET_TEXT,
+    private val privacyPolicyUrl: String = RemoteConfigDefaults.UNSET_TEXT,
+    private val termsUrl: String = RemoteConfigDefaults.UNSET_TEXT,
+    private val contactEmail: String = RemoteConfigDefaults.UNSET_TEXT,
 ) : RemoteConfigSource {
     override fun limitFreeAi(): Int = limitFreeAi
 
@@ -28,4 +33,16 @@ class FakeRemoteConfig(
     override fun gotTimeoutMs(): Long = RemoteConfigDefaults.GOT_TIMEOUT_MS
 
     override fun gctTimeoutMs(): Long = RemoteConfigDefaults.GCT_TIMEOUT_MS
+
+    override fun qonversionKey(): String = qonversionKey
+
+    override fun gctApiKey(): String = gctApiKey
+
+    override fun privacyPolicyUrl(): String = privacyPolicyUrl
+
+    override fun termsUrl(): String = termsUrl
+
+    override fun contactEmail(): String = contactEmail
+
+    override suspend fun awaitFirstFetch() = Unit
 }

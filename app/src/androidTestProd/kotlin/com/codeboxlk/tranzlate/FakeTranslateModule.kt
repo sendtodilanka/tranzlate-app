@@ -4,11 +4,13 @@ import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.common.DefaultDispatcherProvider
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
+import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
+import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
 import com.codeboxlk.tranzlate.core.testing.FakeTranslator
 import com.codeboxlk.tranzlate.core.testing.FakeUsagePolicy
 import com.codeboxlk.tranzlate.di.TranslateModule
@@ -64,6 +66,13 @@ object FakeTranslateModule {
     @Provides
     @Singleton
     fun dispatcherProvider(): DispatcherProvider = DefaultDispatcherProvider()
+
+    // Moved into TranslateModule with the Firebase integration (it is now a
+    // per-flavor binding, not a shared one), so `replaces` takes it away and the
+    // deterministic fake has to be re-supplied here.
+    @Provides
+    @Singleton
+    fun remoteConfig(): RemoteConfigSource = FakeRemoteConfig()
 
     @Provides
     @Singleton

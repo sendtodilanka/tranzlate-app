@@ -1,9 +1,17 @@
 package com.codeboxlk.tranzlate.core.access
 
+import com.codeboxlk.subscription.StorePrices
+import com.codeboxlk.subscription.SubscriptionFailure
 import com.codeboxlk.subscription.SubscriptionGateway
 import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.model.Entitlement
+import com.codeboxlk.tranzlate.core.model.PlanPrice
+import com.codeboxlk.tranzlate.core.model.PlanPrices
+import com.codeboxlk.tranzlate.domain.access.PurchaseCancelledException
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
+import com.codeboxlk.tranzlate.domain.access.PurchasePendingException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,15 +27,58 @@ class SubscriptionPurchaseFlow
     constructor(
         private val gateway: SubscriptionGateway,
     ) : PurchaseFlow {
-        // (Gateway today = NoOpSubscriptionGateway; mapping shape is final, data isn't.)
+        override val prices: Flow<PlanPrices> =
+            gateway.products.map { store ->
+                when (store) {
+                    StorePrices.Loading -> {
+                        PlanPrices.Loading
+                    }
+
+                    StorePrices.Unavailable -> {
+                        PlanPrices.Unavailable
+                    }
+
+                    is StorePrices.Known -> {
+                        PlanPrices.Known(
+                            store.products.mapValues { (_, product) ->
+                                PlanPrice(
+                                    formattedPrice = product.price,
+                                    trialDays = product.trialDays,
+                                    hasTrial = product.hasTrial,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+
+        override suspend fun refreshPrices() = gateway.refreshPrices()
+
         override suspend fun purchase(offeringId: String): AppResult<Entitlement> =
             gateway.purchase(offeringId).toAppResult()
 
         override suspend fun restore(): AppResult<Entitlement> = gateway.restore().toAppResult()
     }
 
+/**
+ * Provider failures cross into the domain unchanged EXCEPT the two the paywall
+ * must treat specially: cancellation becomes the neutral
+ * [PurchaseCancelledException] (the screen stays silent on a user's own
+ * back-tap), and a deferred payment becomes [PurchasePendingException] (the
+ * screen must say "processing", never "nothing was charged" — a pending
+ * payment may still charge). The translation happens here, at the one boundary
+ * that knows both vocabularies, so no feature module imports the billing SDK.
+ */
 private fun Result<com.codeboxlk.subscription.Entitlement>.toAppResult(): AppResult<Entitlement> =
     fold(
         onSuccess = { AppResult.Success(it.toDomain()) },
-        onFailure = { AppResult.Failure(it) },
+        onFailure = { failure ->
+            AppResult.Failure(
+                when (failure) {
+                    is SubscriptionFailure.Cancelled -> PurchaseCancelledException()
+                    is SubscriptionFailure.Pending -> PurchasePendingException()
+                    else -> failure
+                },
+            )
+        },
     )

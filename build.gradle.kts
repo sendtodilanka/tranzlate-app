@@ -8,6 +8,9 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.room) apply false
+    // Declared here so :app only needs the one-line `alias(...)` in its own
+    // plugins block. Library modules must NOT apply it — see the catalog note.
+    alias(libs.plugins.google.services) apply false
     alias(libs.plugins.detekt)
     alias(libs.plugins.spotless)
 }

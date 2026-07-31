@@ -62,6 +62,18 @@ class RealTranslatorTest {
         override fun gotTimeoutMs(): Long = 10_000L
 
         override fun gctTimeoutMs(): Long = 15_000L
+
+        override fun qonversionKey(): String = ""
+
+        override fun gctApiKey(): String = ""
+
+        override fun privacyPolicyUrl(): String = ""
+
+        override fun termsUrl(): String = ""
+
+        override fun contactEmail(): String = ""
+
+        override suspend fun awaitFirstFetch() = Unit
     }
 
     private class TestAppConfig(
