@@ -201,3 +201,38 @@ rather than measured — `layout.permanentTwoPane -> ComposerFit.FULL` pins the
 band before any measurement is consulted, and the two-pane branch calls
 `ComposerEditBody` with the default (false) chrome flags, untouched by this
 change. Tablet **portrait** with the IME up was verified as FULL.
+
+## Lens round (cross-model, PR #105) — both OPEN items resolved
+
+**OPEN-1 (branch predated #100/#103):** merged `main` in and re-verified on the
+merged tree. `showsOutcome = uiState !is Idle` (#103's landscape outcome
+routing) and `composerFitFor()` coexist; the merged tree compiles and the
+feature suite is green. The device calibration below was re-checked after the
+merge.
+
+**OPEN-2 (small phones were never measured) — CONFIRMED, and the behaviour is
+correct.** Measured on 720×1280 @320dpi = **360×640dp portrait**, keyboard up:
+the pane reports well under `FULL_CHROME_MIN_HEIGHT`, so the chrome folds.
+
+The plan's earlier claim "phone portrait (any phone) → FULL" was **wrong** and
+is corrected here. What the screenshot
+(`scratchpad/i99-smallphone-portrait-ime.png`) shows is the folded row —
+label + counter + mic in one line, then a full-height field, then Paste — i.e.
+every control still reachable and the field still usable. The alternative on
+that window is the full stack squeezed into the same space, which is the exact
+defect this issue exists to fix. So small phones fold **by design**; the change
+is disclosed rather than hidden.
+
+**NOTE (threshold justification was post-hoc):** the FULL sum charged 48dp for
+the label row AND 40dp for the Paste chip, but the ✕ only appears with text and
+Paste only without it, so they cannot coexist — the true worst case is ~344dp.
+376dp is KEPT (359.2dp must fold to preserve the 914dp-landscape guard), with
+the arithmetic corrected to say the number is the guard, not a sum.
+
+**NOTE (first frame):** `paneHeight` starts unset, so one frame renders FULL
+before the measurement lands. Field identity survives (#97 invariant intact),
+so this is a cosmetic single-frame flash on rotate-with-IME.
+
+**Boundary tests added** (`ComposerFitTest`, 7 cases): 271.9/272 and 375.9/376
+pin both floors, plus the reported 832×384 window at 107.7dp (MINIMAL) and
+332dp (FOLDED), and phone portrait at 549.7dp (FULL).
