@@ -4,8 +4,11 @@ import com.codeboxlk.subscription.SubscriptionFailure
 import com.codeboxlk.subscription.SubscriptionGateway
 import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.model.Entitlement
+import com.codeboxlk.tranzlate.core.model.PlanPrice
 import com.codeboxlk.tranzlate.domain.access.PurchaseCancelledException
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,6 +24,17 @@ class SubscriptionPurchaseFlow
     constructor(
         private val gateway: SubscriptionGateway,
     ) : PurchaseFlow {
+        override val prices: Flow<Map<String, PlanPrice>> =
+            gateway.products.map { products ->
+                products.mapValues { (_, product) ->
+                    PlanPrice(
+                        formattedPrice = product.price,
+                        trialDays = product.trialDays,
+                        hasTrial = product.hasTrial,
+                    )
+                }
+            }
+
         override suspend fun purchase(offeringId: String): AppResult<Entitlement> =
             gateway.purchase(offeringId).toAppResult()
 

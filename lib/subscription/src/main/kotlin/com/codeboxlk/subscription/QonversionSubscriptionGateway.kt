@@ -7,8 +7,12 @@ import com.qonversion.android.sdk.QonversionConfig
 import com.qonversion.android.sdk.dto.QLaunchMode
 import com.qonversion.android.sdk.dto.QPurchaseResult
 import com.qonversion.android.sdk.dto.QonversionError
+import com.qonversion.android.sdk.dto.eligibility.QEligibility
+import com.qonversion.android.sdk.dto.eligibility.QIntroEligibilityStatus
 import com.qonversion.android.sdk.dto.entitlements.QEntitlement
 import com.qonversion.android.sdk.dto.products.QProduct
+import com.qonversion.android.sdk.dto.products.QSubscriptionPeriod
+import com.qonversion.android.sdk.listeners.QonversionEligibilityCallback
 import com.qonversion.android.sdk.listeners.QonversionEntitlementsCallback
 import com.qonversion.android.sdk.listeners.QonversionProductsCallback
 import com.qonversion.android.sdk.listeners.QonversionPurchaseCallback
@@ -85,6 +89,10 @@ class QonversionSubscriptionGateway(
 
     override val entitlement: Flow<Entitlement> = state.asStateFlow()
 
+    private val productState = MutableStateFlow<Map<String, SubscriptionProduct>>(emptyMap())
+
+    override val products: Flow<Map<String, SubscriptionProduct>> = productState.asStateFlow()
+
     private val initLock = Mutex()
 
     @Volatile
@@ -94,6 +102,45 @@ class QonversionSubscriptionGateway(
         // Resolve eagerly: FeatureAccess.awaitResolved() blocks on the first
         // non-Loading value, so nothing may wait for a UI event to start this.
         scope.launch { refresh() }
+        // Independent of the entitlement resolve, deliberately: a paywall opened
+        // before entitlement settles still needs its prices, and a store lookup
+        // that stalls must not hold the entitlement gate behind it.
+        scope.launch { loadPrices() }
+    }
+
+    /**
+     * Fetches what the store charges THIS user, and whether they still have a
+     * trial coming, then publishes both. Failure leaves [products] empty, which
+     * the host renders as "not known yet" — the one thing that is always true.
+     */
+    private suspend fun loadPrices() {
+        val instance = ensureReady() ?: return
+        val catalogue =
+            withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { loadProducts(instance) }
+                ?.getOrNull()
+                ?: run {
+                    Log.w(TAG, "Store prices unresolved — the paywall will show no figures")
+                    return
+                }
+        // Eligibility is per ACCOUNT, not per product: a user who already spent
+        // the intro offer is not getting another one, and printing "7-day free
+        // trial" at them would be the same lie as printing the wrong currency.
+        // An unresolved answer is treated as NOT eligible — under-promising is
+        // recoverable, over-promising is a policy problem.
+        val eligibility =
+            withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { checkTrialEligibility(instance, catalogue.keys.toList()) }
+                .orEmpty()
+        productState.value =
+            catalogue.mapValues { (offeringId, product) ->
+                val eligible = eligibility[offeringId] == QIntroEligibilityStatus.Eligible
+                val trial = product.trialPeriod.takeIf { eligible }
+                SubscriptionProduct(
+                    offeringId = offeringId,
+                    price = product.prettyPrice.orEmpty(),
+                    trialDays = trial?.exactDays(),
+                    hasTrial = trial != null,
+                )
+            }
     }
 
     override suspend fun purchase(offeringId: String): Result<Entitlement> {
@@ -227,6 +274,26 @@ class QonversionSubscriptionGateway(
             )
         }
 
+    /** Empty on any error — an unknown eligibility must read as "no trial", never as "yes". */
+    private suspend fun checkTrialEligibility(
+        instance: Qonversion,
+        offeringIds: List<String>,
+    ): Map<String, QIntroEligibilityStatus> =
+        suspendCancellableCoroutine { continuation ->
+            instance.checkTrialIntroEligibility(
+                offeringIds,
+                object : QonversionEligibilityCallback {
+                    override fun onSuccess(eligibilities: Map<String, QEligibility>) =
+                        continuation.resume(eligibilities.mapValues { it.value.status })
+
+                    override fun onError(error: QonversionError) {
+                        Log.w(TAG, "Trial eligibility unresolved — treating as not eligible: $error")
+                        continuation.resume(emptyMap())
+                    }
+                },
+            )
+        }
+
     /**
      * Publishes on success so a purchase and the entitlement flow can never
      * disagree, and keeps the store's own outcomes distinguishable.
@@ -247,3 +314,23 @@ class QonversionSubscriptionGateway(
  */
 private fun Map<String, QEntitlement>.toEntitlement(): Entitlement =
     values.firstOrNull { it.isActive }?.let { Entitlement.Paid(it.id) } ?: Entitlement.Free
+
+/**
+ * The trial length in days, but only when the store's own unit converts without
+ * rounding.
+ *
+ * A day is a day and a billing week is exactly seven of them, so both are
+ * exact. A month is not: printing "30-day free trial" for a P1M offer would be
+ * wrong in seven months of the year, and this whole change exists to stop the
+ * paywall stating figures it cannot source. Those periods return null and the
+ * host falls back to naming the trial without a number — `hasTrial` still
+ * carries the fact that one exists.
+ */
+private fun QSubscriptionPeriod.exactDays(): Int? =
+    when (unit) {
+        QSubscriptionPeriod.Unit.Day -> unitCount
+        QSubscriptionPeriod.Unit.Week -> unitCount * DAYS_PER_WEEK
+        else -> null
+    }
+
+private const val DAYS_PER_WEEK = 7

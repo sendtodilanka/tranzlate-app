@@ -5,6 +5,12 @@ plugins {
     alias(libs.plugins.tranzlate.android.application.signing)
     alias(libs.plugins.tranzlate.hilt)
     alias(libs.plugins.kotlin.serialization)
+    // Reads app/google-services.json into the resources Firebase Remote Config
+    // needs at runtime. Without it `FirebaseRemoteConfig.getInstance()` throws,
+    // the source falls back to its defaults, and every credential arrives blank
+    // — a paywall that cannot take money and legal links that go nowhere. The
+    // failure is silent, so this line is load-bearing, not boilerplate.
+    alias(libs.plugins.google.services)
 }
 
 android {

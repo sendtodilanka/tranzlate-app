@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
 import com.codeboxlk.tranzlate.core.model.Entitlement
+import com.codeboxlk.tranzlate.core.model.PlanPrice
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.access.PurchaseCancelledException
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
@@ -103,6 +104,18 @@ class PaywallViewModel
         fun onLegalLinkUnavailable() {
             _events.tryEmit(PaywallEvent.LINK_UNAVAILABLE)
         }
+
+        /**
+         * The store's own prices, keyed by offering id. Empty until it answers —
+         * the screen renders that absence rather than filling it in, because a
+         * price we have not been told is not a price we may print.
+         */
+        val prices: StateFlow<Map<String, PlanPrice>> =
+            purchaseFlow.prices.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(ENTITLEMENT_SUBSCRIBE_TIMEOUT_MS),
+                emptyMap(),
+            )
 
         /** PRO auto-dismisses the paywall (already-subscribed or just purchased). */
         val isPro: StateFlow<Boolean> =

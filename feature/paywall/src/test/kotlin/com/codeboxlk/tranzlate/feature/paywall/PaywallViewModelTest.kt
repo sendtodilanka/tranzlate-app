@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.feature.paywall
 import app.cash.turbine.test
 import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.model.Entitlement
+import com.codeboxlk.tranzlate.core.model.PlanPrice
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
 import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
@@ -11,6 +12,8 @@ import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -37,6 +40,10 @@ class PaywallViewModelTest {
         var purchaseResult: AppResult<Entitlement> = AppResult.Success(Entitlement.Free),
         var restoreResult: AppResult<Entitlement> = AppResult.Success(Entitlement.Free),
     ) : PurchaseFlow {
+        val priceState = MutableStateFlow<Map<String, PlanPrice>>(emptyMap())
+
+        override val prices: Flow<Map<String, PlanPrice>> = priceState
+
         var purchases = 0
             private set
 

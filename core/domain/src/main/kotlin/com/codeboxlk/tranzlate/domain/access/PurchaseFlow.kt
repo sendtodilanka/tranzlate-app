@@ -2,6 +2,8 @@ package com.codeboxlk.tranzlate.domain.access
 
 import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.model.Entitlement
+import com.codeboxlk.tranzlate.core.model.PlanPrice
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Purchase/restore ask-surface (Access brain; paywall screens ASK — they never talk
@@ -9,6 +11,13 @@ import com.codeboxlk.tranzlate.core.model.Entitlement
  * (plan §6.4).
  */
 interface PurchaseFlow {
+    /**
+     * What the store charges THIS user per offering id, and whether a trial is
+     * still coming to them. Empty until the store answers — a screen must render
+     * that as "not known yet" and never substitute a figure of its own.
+     */
+    val prices: Flow<Map<String, PlanPrice>>
+
     suspend fun purchase(offeringId: String): AppResult<Entitlement>
 
     suspend fun restore(): AppResult<Entitlement>

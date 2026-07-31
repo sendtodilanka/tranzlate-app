@@ -67,12 +67,45 @@ sealed class SubscriptionFailure(
 }
 
 /**
+ * What the STORE says a plan costs — never what we think it costs.
+ *
+ * A paywall that prints its prices from a string resource is telling every
+ * buyer outside that currency a false number, and it does so at the exact
+ * moment money changes hands. The store already knows the localized price and
+ * whether *this* account still has a trial coming; both come from there.
+ *
+ * @property offeringId the id the host asked for.
+ * @property price store-formatted and already localized ("Rs 1,200.00", "€4,99").
+ *   Display it verbatim — reformatting it would reintroduce the same class of bug.
+ * @property trialDays exact free-trial length, when the store expresses it in a
+ *   unit that converts without rounding. Null when there is no trial, when this
+ *   account is not eligible for one, or when the period is a month or a year —
+ *   see [hasTrial], which stays true in that last case.
+ * @property hasTrial whether an eligible trial exists at all, whatever its unit.
+ */
+data class SubscriptionProduct(
+    val offeringId: String,
+    val price: String,
+    val trialDays: Int? = null,
+    val hasTrial: Boolean = false,
+)
+
+/**
  * Public subscription API. The billing SDK stays `internal` behind this surface;
  * swapping/adding the real SDK must not change this interface.
  */
 interface SubscriptionGateway {
     /** Hot entitlement state; starts at [Entitlement.Loading] until resolved. */
     val entitlement: Flow<Entitlement>
+
+    /**
+     * Store-reported plan details, keyed by offering id.
+     *
+     * EMPTY until the store answers, and a host must render that state rather
+     * than substituting anything: an absent price is a price we do not know
+     * yet, and the only honest thing to show is that we do not know it.
+     */
+    val products: Flow<Map<String, SubscriptionProduct>>
 
     /** Launch a purchase for [offeringId]; returns the resolved entitlement. */
     suspend fun purchase(offeringId: String): Result<Entitlement>
@@ -92,6 +125,10 @@ class NoOpSubscriptionGateway(
     private val state = MutableStateFlow<Entitlement>(Entitlement.Free)
 
     override val entitlement: Flow<Entitlement> = state.asStateFlow()
+
+    /** No store, so no prices — and a host that renders that honestly stays honest here too. */
+    override val products: Flow<Map<String, SubscriptionProduct>> =
+        MutableStateFlow(emptyMap<String, SubscriptionProduct>()).asStateFlow()
 
     override suspend fun purchase(offeringId: String): Result<Entitlement> =
         Result.failure(SubscriptionFailure.NotConfigured())

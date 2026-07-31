@@ -8,14 +8,7 @@
     <string name="paywall_plan_weekly">Semanal</string>
     <string name="paywall_plan_monthly">Mensal</string>
     <string name="paywall_plan_yearly">★ Anual</string>
-    <string name="paywall_price_weekly">US$1.99</string>
-    <string name="paywall_price_monthly">US$4.99</string>
-    <string name="paywall_price_yearly">US$29.99</string>
-    <string name="paywall_badge_save">ECONOMIZE ~60%</string>
-    <string name="paywall_trial_line">7 dias de teste grátis</string>
-    <string name="paywall_per_day">Cerca de US$0.08 por dia</string>
     <string name="paywall_cancel_anytime">Cancele quando quiser no Google Play</string>
-    <string name="paywall_cta_trial">Começar meus 7 dias grátis</string>
     <string name="paywall_cta_continue">Continuar</string>
     <string name="paywall_restore">Restaurar compras</string>
     <string name="paywall_terms">Termos</string>
@@ -25,4 +18,16 @@
     <string name="paywall_restore_failed">Não foi possível acessar a loja para restaurar. Tente mais tarde.</string>
     <string name="paywall_restore_nothing">Nenhuma compra para restaurar nesta conta.</string>
     <string name="paywall_link_unavailable">Não foi possível abrir essa página. Verifique a conexão e tente novamente.</string>
+    <string name="paywall_price_pending">\u2014</string>
+    <string name="paywall_price_loading">Buscando os pre\u00e7os no Google Play\u2026</string>
+    <plurals name="paywall_trial_days">
+        <item quantity="one">Teste gr\u00e1tis de %1$d dia</item>
+        <item quantity="other">Teste gr\u00e1tis de %1$d dias</item>
+    </plurals>
+    <string name="paywall_trial_generic">Teste gr\u00e1tis inclu\u00eddo</string>
+    <plurals name="paywall_cta_trial_days">
+        <item quantity="one">Come\u00e7ar meu teste gr\u00e1tis de %1$d dia</item>
+        <item quantity="other">Come\u00e7ar meu teste gr\u00e1tis de %1$d dias</item>
+    </plurals>
+    <string name="paywall_cta_trial_generic">Come\u00e7ar meu teste gr\u00e1tis</string>
 </resources>

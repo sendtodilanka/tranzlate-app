@@ -10,14 +10,7 @@
     <string name="paywall_plan_weekly">Weekly</string>
     <string name="paywall_plan_monthly">Monthly</string>
     <string name="paywall_plan_yearly">★ Yearly</string>
-    <string name="paywall_price_weekly">US$1.99</string>
-    <string name="paywall_price_monthly">US$4.99</string>
-    <string name="paywall_price_yearly">US$29.99</string>
-    <string name="paywall_badge_save">SAVE ~60%</string>
-    <string name="paywall_trial_line">7-day free trial</string>
-    <string name="paywall_per_day">That\'s about US$0.08 a day</string>
     <string name="paywall_cancel_anytime">Cancel anytime in Google Play</string>
-    <string name="paywall_cta_trial">Start my 7-day free trial</string>
     <string name="paywall_cta_continue">Continue</string>
     <string name="paywall_restore">Restore purchases</string>
     <string name="paywall_terms">Terms</string>
@@ -27,4 +20,22 @@
     <string name="paywall_restore_failed">Couldn\'t reach the store to restore. Try again later.</string>
     <string name="paywall_restore_nothing">No purchases to restore on this account.</string>
     <string name="paywall_link_unavailable">Couldn\'t open that page. Check your connection and try again.</string>
+    <!-- Prices come from the STORE, never from here: a hardcoded "US$1.99"
+         tells every buyer outside that currency a false number, at the moment
+         money changes hands. These three cover only what the store has not
+         told us yet. -->
+    <string name="paywall_price_pending">\u2014</string>
+    <string name="paywall_price_loading">Getting prices from Google Play\u2026</string>
+    <plurals name="paywall_trial_days">
+        <item quantity="one">%1$d-day free trial</item>
+        <item quantity="other">%1$d-day free trial</item>
+    </plurals>
+    <!-- The store says a trial applies but expresses it in months or years,
+         where a day count would be an invention. -->
+    <string name="paywall_trial_generic">Free trial included</string>
+    <plurals name="paywall_cta_trial_days">
+        <item quantity="one">Start my %1$d-day free trial</item>
+        <item quantity="other">Start my %1$d-day free trial</item>
+    </plurals>
+    <string name="paywall_cta_trial_generic">Start my free trial</string>
 </resources>

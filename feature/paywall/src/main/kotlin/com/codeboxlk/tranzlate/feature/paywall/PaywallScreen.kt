@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
+import com.codeboxlk.tranzlate.core.model.PlanPrice
 import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 
 /**
@@ -87,6 +89,7 @@ fun PaywallScreen(
     LaunchedEffect(isPro) {
         if (isPro) onClose()
     }
+    val prices by viewModel.prices.collectAsStateWithLifecycle()
     val purchaseFailed = stringResource(R.string.paywall_purchase_unavailable)
     val restoreFailed = stringResource(R.string.paywall_restore_failed)
     val restoredFree = stringResource(R.string.paywall_restore_nothing)
@@ -127,6 +130,7 @@ fun PaywallScreen(
             onOpenPrivacy = { openLink(legalLinks.privacyUrl) },
             selected = selected,
             purchasing = purchasing,
+            prices = prices,
             onSelect = viewModel::select,
             onPurchase = viewModel::purchase,
             onRestore = viewModel::restore,
@@ -140,6 +144,8 @@ fun PaywallScreen(
 internal fun PaywallContent(
     selected: PaywallPlan,
     purchasing: Boolean,
+    /** Store prices keyed by offering id; empty until Play answers. */
+    prices: Map<String, PlanPrice>,
     onSelect: (PaywallPlan) -> Unit,
     onPurchase: () -> Unit,
     onRestore: () -> Unit,
@@ -197,7 +203,7 @@ internal fun PaywallContent(
                 PlanCard(
                     plan = PaywallPlan.WEEKLY,
                     titleRes = R.string.paywall_plan_weekly,
-                    priceRes = R.string.paywall_price_weekly,
+                    price = prices[PaywallPlan.WEEKLY.offeringId],
                     selected = selected == PaywallPlan.WEEKLY,
                     onSelect = onSelect,
                     modifier = Modifier.weight(1f),
@@ -205,29 +211,32 @@ internal fun PaywallContent(
                 PlanCard(
                     plan = PaywallPlan.MONTHLY,
                     titleRes = R.string.paywall_plan_monthly,
-                    priceRes = R.string.paywall_price_monthly,
+                    price = prices[PaywallPlan.MONTHLY.offeringId],
                     selected = selected == PaywallPlan.MONTHLY,
                     onSelect = onSelect,
                     modifier = Modifier.weight(1f),
                 )
+                // No "SAVE ~60%" badge and no per-day figure: both were computed
+                // from the prices we invented, so with real ones they would have
+                // to be derived from real amounts. That plumbing does not exist
+                // yet, and an uncomputed discount claim is exactly the class of
+                // statement this screen is being cleaned of.
                 PlanCard(
                     plan = PaywallPlan.YEARLY,
                     titleRes = R.string.paywall_plan_yearly,
-                    priceRes = R.string.paywall_price_yearly,
+                    price = prices[PaywallPlan.YEARLY.offeringId],
                     selected = selected == PaywallPlan.YEARLY,
                     onSelect = onSelect,
-                    badgeRes = R.string.paywall_badge_save,
-                    subRes = R.string.paywall_trial_line,
                     modifier = Modifier.weight(YEARLY_CARD_WEIGHT),
                 )
             }
             Spacer(Modifier.height(spacing.md16))
-            // §4 anchoring: per-day framing on the pre-selected Yearly.
-            if (selected == PaywallPlan.YEARLY) {
+            if (prices.isEmpty()) {
                 Text(
-                    text = stringResource(R.string.paywall_per_day),
+                    text = stringResource(R.string.paywall_price_loading),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("tt_paywall_price_loading"),
                 )
             }
             Text(
@@ -236,9 +245,12 @@ internal fun PaywallContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(spacing.md16))
+            val selectedPrice = prices[selected.offeringId]
             Button(
                 onClick = onPurchase,
-                enabled = !purchasing,
+                // A button that can charge must not be tappable while the amount
+                // it will charge is unknown. This is the gate, not a nicety.
+                enabled = !purchasing && selectedPrice != null,
                 modifier = Modifier.fillMaxWidth().testTag("tt_paywall_cta"),
             ) {
                 if (purchasing) {
@@ -247,15 +259,7 @@ internal fun PaywallContent(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Text(
-                        stringResource(
-                            if (selected == PaywallPlan.YEARLY) {
-                                R.string.paywall_cta_trial
-                            } else {
-                                R.string.paywall_cta_continue
-                            },
-                        ),
-                    )
+                    Text(text = ctaLabel(selectedPrice))
                 }
             }
             Row(
@@ -302,12 +306,11 @@ private fun BenefitRow(textRes: Int) {
 private fun PlanCard(
     plan: PaywallPlan,
     titleRes: Int,
-    priceRes: Int,
+    /** The store's own figure, or null while it has not answered. */
+    price: PlanPrice?,
     selected: Boolean,
     onSelect: (PaywallPlan) -> Unit,
     modifier: Modifier = Modifier,
-    badgeRes: Int? = null,
-    subRes: Int? = null,
 ) {
     val spacing = LocalSpacing.current
     val borderColor =
@@ -335,27 +338,22 @@ private fun PlanCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(spacing.sm8).fillMaxWidth(),
         ) {
-            if (badgeRes != null) {
-                Text(
-                    text = stringResource(badgeRes),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
             Text(
                 text = stringResource(titleRes),
                 style = MaterialTheme.typography.titleSmall,
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = stringResource(priceRes),
+                text = price?.formattedPrice ?: stringResource(R.string.paywall_price_pending),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
-            if (subRes != null) {
+            // Shown only when the STORE says this account still has a trial
+            // coming — eligibility is per account, and a user who already spent
+            // the intro offer must not be promised another one.
+            trialLabel(price)?.let { label ->
                 Text(
-                    text = stringResource(subRes),
+                    text = label,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -373,6 +371,7 @@ private fun PaywallPreview() {
             PaywallContent(
                 selected = PaywallPlan.YEARLY,
                 purchasing = false,
+                prices = previewPrices,
                 onSelect = {},
                 onPurchase = {},
                 onRestore = {},
@@ -399,7 +398,7 @@ private fun PaywallItemsPreview() {
                     PlanCard(
                         plan = PaywallPlan.WEEKLY,
                         titleRes = R.string.paywall_plan_weekly,
-                        priceRes = R.string.paywall_price_weekly,
+                        price = previewPrices[PaywallPlan.WEEKLY.offeringId],
                         selected = false,
                         onSelect = {},
                         modifier = Modifier.weight(1f),
@@ -407,7 +406,7 @@ private fun PaywallItemsPreview() {
                     PlanCard(
                         plan = PaywallPlan.YEARLY,
                         titleRes = R.string.paywall_plan_yearly,
-                        priceRes = R.string.paywall_price_yearly,
+                        price = previewPrices[PaywallPlan.YEARLY.offeringId],
                         selected = true,
                         onSelect = {},
                         modifier = Modifier.weight(YEARLY_CARD_WEIGHT),
@@ -417,3 +416,34 @@ private fun PaywallItemsPreview() {
         }
     }
 }
+
+/**
+ * The trial line, or null when there is nothing true to say.
+ *
+ * Three cases, deliberately distinct: an exact day count when the store's own
+ * unit converts without rounding, a bare "free trial included" when it is a
+ * month or a year (where "30-day" would be an invention), and silence when this
+ * account is not eligible.
+ */
+@Composable
+private fun trialLabel(price: PlanPrice?): String? {
+    if (price == null || !price.hasTrial) return null
+    val days = price.trialDays ?: return stringResource(R.string.paywall_trial_generic)
+    return pluralStringResource(R.plurals.paywall_trial_days, days, days)
+}
+
+/** The call to action names the trial only when the buyer actually gets one. */
+@Composable
+private fun ctaLabel(price: PlanPrice?): String {
+    if (price == null || !price.hasTrial) return stringResource(R.string.paywall_cta_continue)
+    val days = price.trialDays ?: return stringResource(R.string.paywall_cta_trial_generic)
+    return pluralStringResource(R.plurals.paywall_cta_trial_days, days, days)
+}
+
+/** Literal store answers, so the preview shows what a real Play response renders as. */
+private val previewPrices =
+    mapOf(
+        PaywallPlan.WEEKLY.offeringId to PlanPrice("Rs 690.00"),
+        PaywallPlan.MONTHLY.offeringId to PlanPrice("Rs 1,750.00"),
+        PaywallPlan.YEARLY.offeringId to PlanPrice("Rs 10,500.00", trialDays = 7, hasTrial = true),
+    )
