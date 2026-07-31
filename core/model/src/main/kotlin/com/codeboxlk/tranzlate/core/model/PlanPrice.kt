@@ -24,3 +24,28 @@ data class PlanPrice(
     val trialDays: Int? = null,
     val hasTrial: Boolean = false,
 )
+
+/**
+ * What the store has told us so far — three states, not two.
+ *
+ * "Not asked yet" and "asked and could not reach Play" are different facts, and
+ * the paywall must not print one while the other is true. Collapsing them into
+ * an empty map made the screen open onto "Couldn't reach Google Play" before a
+ * single call had been made — the same class of falsehood as the hardcoded
+ * prices this replaced.
+ */
+sealed interface PlanPrices {
+    /** A request is in flight, or none has been made yet. */
+    data object Loading : PlanPrices
+
+    /** The store answered. May be empty if it published nothing we asked for. */
+    data class Known(
+        val plans: Map<String, PlanPrice>,
+    ) : PlanPrices
+
+    /** Unreachable, or this build has no billing at all. */
+    data object Unavailable : PlanPrices
+
+    /** The price of [offeringId], or null unless the store actually named one. */
+    operator fun get(offeringId: String): PlanPrice? = (this as? Known)?.plans?.get(offeringId)
+}

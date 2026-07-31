@@ -28,6 +28,7 @@ import com.codeboxlk.tranzlate.core.translate.RealTranslator
 import com.codeboxlk.tranzlate.core.usage.DataStoreUsagePersistence
 import com.codeboxlk.tranzlate.core.usage.RealUsagePolicy
 import com.codeboxlk.tranzlate.core.usage.UsagePersistence
+import com.codeboxlk.tranzlate.di.AppStartupTask
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
@@ -40,6 +41,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
@@ -161,10 +163,11 @@ object TranslateModule {
         appConfig: AppConfig,
         remoteConfig: RemoteConfigSource,
         @BillingScope scope: CoroutineScope,
+        activityProvider: ForegroundActivityProvider,
     ): SubscriptionGateway =
         QonversionSubscriptionGateway(
             application = application,
-            activityProvider = ForegroundActivityProvider.install(application),
+            activityProvider = activityProvider,
             scope = scope,
             configProvider = {
                 remoteConfig.awaitFirstFetch()
@@ -202,3 +205,21 @@ object TranslateModule {
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class BillingScope
+
+/**
+ * Prod-only startup work. The store-launch Activity tracker has to be listening
+ * before the first Activity resumes, and Android never replays that callback —
+ * so it cannot wait for the billing graph to be built on demand.
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+object BillingStartupModule {
+    @Provides
+    @Singleton
+    fun provideForegroundActivityProvider(): ForegroundActivityProvider = ForegroundActivityProvider()
+
+    @Provides
+    @IntoSet
+    fun provideActivityTrackingStartup(provider: ForegroundActivityProvider): AppStartupTask =
+        AppStartupTask { application -> provider.register(application) }
+}

@@ -2,7 +2,7 @@ package com.codeboxlk.tranzlate.domain.access
 
 import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.model.Entitlement
-import com.codeboxlk.tranzlate.core.model.PlanPrice
+import com.codeboxlk.tranzlate.core.model.PlanPrices
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -12,11 +12,10 @@ import kotlinx.coroutines.flow.Flow
  */
 interface PurchaseFlow {
     /**
-     * What the store charges THIS user per offering id, and whether a trial is
-     * still coming to them. Empty until the store answers — a screen must render
-     * that as "not known yet" and never substitute a figure of its own.
+     * What the store charges THIS user, as one of [PlanPrices]' three states.
+     * A screen renders the distinction; it never substitutes a figure of its own.
      */
-    val prices: Flow<Map<String, PlanPrice>>
+    val prices: Flow<PlanPrices>
 
     /** Re-ask the store for prices; called whenever the paywall opens. */
     suspend fun refreshPrices()

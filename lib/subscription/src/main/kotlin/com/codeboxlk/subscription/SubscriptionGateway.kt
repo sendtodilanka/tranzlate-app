@@ -91,6 +91,28 @@ data class SubscriptionProduct(
 )
 
 /**
+ * What the store has told us so far.
+ *
+ * Three states, not two, because "we have not asked yet" and "we asked and could
+ * not reach Play" are different facts and the screen must not print one while
+ * the other is true. An empty map used to mean both: the paywall opened onto
+ * "Couldn't reach Google Play" before a single call had been made, which is the
+ * same class of falsehood the hardcoded prices were.
+ */
+sealed interface StorePrices {
+    /** No answer yet — a request is in flight, or none has been made. */
+    data object Loading : StorePrices
+
+    /** The store answered. May be empty if it published nothing we asked for. */
+    data class Known(
+        val products: Map<String, SubscriptionProduct>,
+    ) : StorePrices
+
+    /** The store could not be reached, or this build has no billing configured. */
+    data object Unavailable : StorePrices
+}
+
+/**
  * Public subscription API. The billing SDK stays `internal` behind this surface;
  * swapping/adding the real SDK must not change this interface.
  */
@@ -99,13 +121,13 @@ interface SubscriptionGateway {
     val entitlement: Flow<Entitlement>
 
     /**
-     * Store-reported plan details, keyed by offering id.
+     * What the store has said, as one of [StorePrices]' three states.
      *
-     * EMPTY until the store answers, and a host must render that state rather
-     * than substituting anything: an absent price is a price we do not know
-     * yet, and the only honest thing to show is that we do not know it.
+     * A host must render the distinction rather than collapsing it: telling a
+     * user we could not reach Play, while the request is still in flight, is a
+     * statement we cannot support.
      */
-    val products: Flow<Map<String, SubscriptionProduct>>
+    val products: Flow<StorePrices>
 
     /**
      * Ask the store for prices again. Idempotent, and safe to call on every
@@ -133,9 +155,9 @@ class NoOpSubscriptionGateway(
 
     override val entitlement: Flow<Entitlement> = state.asStateFlow()
 
-    /** No store, so no prices — and a host that renders that honestly stays honest here too. */
-    override val products: Flow<Map<String, SubscriptionProduct>> =
-        MutableStateFlow(emptyMap<String, SubscriptionProduct>()).asStateFlow()
+    /** No store at all — that is settled, not pending, so it reports Unavailable. */
+    override val products: Flow<StorePrices> =
+        MutableStateFlow<StorePrices>(StorePrices.Unavailable).asStateFlow()
 
     override suspend fun refreshPrices() = Unit
 

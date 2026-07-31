@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.PlanPrice
+import com.codeboxlk.tranzlate.core.model.PlanPrices
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
 import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
@@ -45,9 +46,9 @@ class PaywallViewModelTest {
         var refreshes = 0
             private set
 
-        val priceState = MutableStateFlow<Map<String, PlanPrice>>(emptyMap())
+        val priceState = MutableStateFlow<PlanPrices>(PlanPrices.Loading)
 
-        override val prices: Flow<Map<String, PlanPrice>> = priceState
+        override val prices: Flow<PlanPrices> = priceState
 
         var purchases = 0
             private set
@@ -207,19 +208,26 @@ class PaywallViewModelTest {
             assertThat(flow.refreshes).isEqualTo(1)
         }
 
-    /** A blank price is not a price: the map must not gain an entry that arms the CTA. */
+    /**
+     * Plumbing only — that what the flow emits reaches the screen unchanged. The
+     * RULES it carries are tested where they live: the blank-price filter in
+     * `:lib:subscription`'s StorePricesTest, the purchase gate in CanPurchaseTest.
+     * This test used to claim both and could reach neither.
+     */
     @Test
-    fun `a priced plan reaches the screen and an unpriced one does not`() =
+    fun `store prices reach the screen as published`() =
         runTest {
             val flow = FakePurchaseFlow()
             val model = PaywallViewModel(flow, FakeFeatureAccess(), FakeRemoteConfig())
             model.prices.collectIn(backgroundScope)
             runCurrent()
 
-            flow.priceState.value = mapOf(PaywallPlan.YEARLY.offeringId to PlanPrice("Rs 10,500.00"))
+            flow.priceState.value =
+                PlanPrices.Known(mapOf(PaywallPlan.YEARLY.offeringId to PlanPrice("Rs 10,500.00")))
             runCurrent()
 
-            assertThat(model.prices.value.keys).containsExactly(PaywallPlan.YEARLY.offeringId)
+            assertThat(model.prices.value[PaywallPlan.YEARLY.offeringId]?.formattedPrice)
+                .isEqualTo("Rs 10,500.00")
             assertThat(model.prices.value[PaywallPlan.WEEKLY.offeringId]).isNull()
         }
 }

@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
 import com.codeboxlk.tranzlate.core.model.Entitlement
-import com.codeboxlk.tranzlate.core.model.PlanPrice
+import com.codeboxlk.tranzlate.core.model.PlanPrices
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.access.PurchaseCancelledException
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
@@ -110,11 +110,14 @@ class PaywallViewModel
          * the screen renders that absence rather than filling it in, because a
          * price we have not been told is not a price we may print.
          */
-        val prices: StateFlow<Map<String, PlanPrice>> =
+        val prices: StateFlow<PlanPrices> =
             purchaseFlow.prices.stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(ENTITLEMENT_SUBSCRIBE_TIMEOUT_MS),
-                emptyMap(),
+                // Loading, never Unavailable: the initial value is shown before
+                // the flow has said anything, and "couldn't reach Play" is not
+                // something we may claim on an attempt that has not finished.
+                PlanPrices.Loading,
             )
 
         /** PRO auto-dismisses the paywall (already-subscribed or just purchased). */
@@ -179,3 +182,21 @@ class PaywallViewModel
             }
         }
     }
+
+/**
+ * **May this button charge?**
+ *
+ * A control that takes money must not be tappable while the amount it will take
+ * is unknown. That is the rule the whole price change exists to enforce, and it
+ * is a named function rather than a condition inside the Composable because a
+ * review round deleted the inline version and every test still passed. An
+ * invariant nothing can fail is not enforced.
+ *
+ * Two ways to be un-tappable, and they are different: a purchase already in
+ * flight (double-tap guard), and a price the store has not given us.
+ */
+fun canPurchase(
+    prices: PlanPrices,
+    selected: PaywallPlan,
+    purchasing: Boolean,
+): Boolean = !purchasing && prices[selected.offeringId] != null

@@ -29,5 +29,6 @@
         <item quantity="other">Simulan ang %1$d araw na libreng subok</item>
     </plurals>
     <string name="paywall_cta_trial_generic">Simulan ang libreng subok</string>
+    <string name="paywall_price_loading">Kinukuha ang mga presyo mula sa Google Play\u2026</string>
     <string name="paywall_price_unavailable">Hindi maabot ang Google Play. I-tap para subukan ulit.</string>
 </resources>

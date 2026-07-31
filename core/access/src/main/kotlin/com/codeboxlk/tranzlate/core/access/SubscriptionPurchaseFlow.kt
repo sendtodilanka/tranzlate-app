@@ -1,10 +1,12 @@
 package com.codeboxlk.tranzlate.core.access
 
+import com.codeboxlk.subscription.StorePrices
 import com.codeboxlk.subscription.SubscriptionFailure
 import com.codeboxlk.subscription.SubscriptionGateway
 import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.PlanPrice
+import com.codeboxlk.tranzlate.core.model.PlanPrices
 import com.codeboxlk.tranzlate.domain.access.PurchaseCancelledException
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
 import kotlinx.coroutines.flow.Flow
@@ -24,14 +26,28 @@ class SubscriptionPurchaseFlow
     constructor(
         private val gateway: SubscriptionGateway,
     ) : PurchaseFlow {
-        override val prices: Flow<Map<String, PlanPrice>> =
-            gateway.products.map { products ->
-                products.mapValues { (_, product) ->
-                    PlanPrice(
-                        formattedPrice = product.price,
-                        trialDays = product.trialDays,
-                        hasTrial = product.hasTrial,
-                    )
+        override val prices: Flow<PlanPrices> =
+            gateway.products.map { store ->
+                when (store) {
+                    StorePrices.Loading -> {
+                        PlanPrices.Loading
+                    }
+
+                    StorePrices.Unavailable -> {
+                        PlanPrices.Unavailable
+                    }
+
+                    is StorePrices.Known -> {
+                        PlanPrices.Known(
+                            store.products.mapValues { (_, product) ->
+                                PlanPrice(
+                                    formattedPrice = product.price,
+                                    trialDays = product.trialDays,
+                                    hasTrial = product.hasTrial,
+                                )
+                            },
+                        )
+                    }
                 }
             }
 

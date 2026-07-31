@@ -29,5 +29,6 @@
         <item quantity="other">Come\u00e7ar meu teste gr\u00e1tis de %1$d dias</item>
     </plurals>
     <string name="paywall_cta_trial_generic">Come\u00e7ar meu teste gr\u00e1tis</string>
+    <string name="paywall_price_loading">Buscando os pre\u00e7os no Google Play\u2026</string>
     <string name="paywall_price_unavailable">N\u00e3o foi poss\u00edvel acessar o Google Play. Toque para tentar de novo.</string>
 </resources>

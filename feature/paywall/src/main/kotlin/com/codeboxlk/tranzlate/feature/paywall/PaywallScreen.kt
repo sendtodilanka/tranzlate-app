@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.PlanPrice
+import com.codeboxlk.tranzlate.core.model.PlanPrices
 import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 
 /**
@@ -143,8 +144,8 @@ fun PaywallScreen(
 internal fun PaywallContent(
     selected: PaywallPlan,
     purchasing: Boolean,
-    /** Store prices keyed by offering id; empty until Play answers. */
-    prices: Map<String, PlanPrice>,
+    /** What the store has said so far — loading, known, or unreachable. */
+    prices: PlanPrices,
     onRetryPrices: () -> Unit,
     onSelect: (PaywallPlan) -> Unit,
     onPurchase: () -> Unit,
@@ -231,15 +232,26 @@ internal fun PaywallContent(
                 )
             }
             Spacer(Modifier.height(spacing.md16))
-            // Keyed on the SELECTED plan, not on the map being empty: a partial
-            // answer from the store would otherwise leave the button silently
-            // disabled with nothing on screen explaining why.
-            if (prices[selected.offeringId] == null) {
-                TextButton(
-                    onClick = onRetryPrices,
-                    modifier = Modifier.testTag("tt_paywall_price_retry"),
-                ) {
-                    Text(text = stringResource(R.string.paywall_price_unavailable))
+            // Three states, three different things to say. Keyed on the SELECTED
+            // plan rather than on the map as a whole, so a partial answer cannot
+            // leave the button silently disabled with nothing explaining why.
+            when {
+                prices is PlanPrices.Loading -> {
+                    Text(
+                        text = stringResource(R.string.paywall_price_loading),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("tt_paywall_price_loading"),
+                    )
+                }
+
+                prices[selected.offeringId] == null -> {
+                    TextButton(
+                        onClick = onRetryPrices,
+                        modifier = Modifier.testTag("tt_paywall_price_retry"),
+                    ) {
+                        Text(text = stringResource(R.string.paywall_price_unavailable))
+                    }
                 }
             }
             Text(
@@ -251,9 +263,9 @@ internal fun PaywallContent(
             val selectedPrice = prices[selected.offeringId]
             Button(
                 onClick = onPurchase,
-                // A button that can charge must not be tappable while the amount
-                // it will charge is unknown. This is the gate, not a nicety.
-                enabled = !purchasing && selectedPrice != null,
+                // The gate is `canPurchase`, and it is tested there — see its KDoc
+                // for why it is not written inline here any more.
+                enabled = canPurchase(prices, selected, purchasing),
                 modifier = Modifier.fillMaxWidth().testTag("tt_paywall_cta"),
             ) {
                 if (purchasing) {
@@ -374,7 +386,7 @@ private fun PaywallPreview() {
             PaywallContent(
                 selected = PaywallPlan.YEARLY,
                 purchasing = false,
-                prices = previewPrices,
+                prices = PlanPrices.Known(previewPrices),
                 onRetryPrices = {},
                 onSelect = {},
                 onPurchase = {},
@@ -457,7 +469,7 @@ private fun PaywallPricesUnknownPreview() {
             PaywallContent(
                 selected = PaywallPlan.YEARLY,
                 purchasing = false,
-                prices = emptyMap(),
+                prices = PlanPrices.Unavailable,
                 onRetryPrices = {},
                 onSelect = {},
                 onPurchase = {},

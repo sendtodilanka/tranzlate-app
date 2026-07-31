@@ -35,5 +35,6 @@
         <item quantity="other">Start my %1$d-day free trial</item>
     </plurals>
     <string name="paywall_cta_trial_generic">Start my free trial</string>
+    <string name="paywall_price_loading">Getting prices from Google Play\u2026</string>
     <string name="paywall_price_unavailable">Couldn\u2019t reach Google Play. Tap to try again.</string>
 </resources>

@@ -89,9 +89,9 @@ class QonversionSubscriptionGateway(
 
     override val entitlement: Flow<Entitlement> = state.asStateFlow()
 
-    private val productState = MutableStateFlow<Map<String, SubscriptionProduct>>(emptyMap())
+    private val productState = MutableStateFlow<StorePrices>(StorePrices.Loading)
 
-    override val products: Flow<Map<String, SubscriptionProduct>> = productState.asStateFlow()
+    override val products: Flow<StorePrices> = productState.asStateFlow()
 
     private val initLock = Mutex()
 
@@ -110,23 +110,30 @@ class QonversionSubscriptionGateway(
 
     /**
      * Fetches what the store charges THIS user, and whether they still have a
-     * trial coming, then publishes both. Failure leaves [products] empty, which
-     * the host renders as "not known yet" — the one thing that is always true.
+     * trial coming, then publishes a [StorePrices] the host can render without
+     * guessing: Loading while the call is out, Known on an answer, Unavailable
+     * when there is nothing to reach.
      *
      * Public and re-runnable on purpose. As a one-shot it was a dead end: an
-     * offline first launch, or one store error, left [products] empty for the
-     * whole life of the process, so the paywall showed "getting prices" forever
-     * — a message that was itself false, since nothing was still being
-     * fetched — with a permanently disabled button and no way back but killing
-     * the app. Hosts call this when the paywall opens.
+     * offline first launch, or one store error, left the paywall unable to sell
+     * anything for the whole life of the process, with a permanently disabled
+     * button and no way back but killing the app. Hosts call this on every open.
      */
     override suspend fun refreshPrices() {
-        val instance = ensureReady() ?: return
+        productState.value = StorePrices.Loading
+        val instance =
+            ensureReady() ?: run {
+                // No key: settled, not pending. Saying "loading" here would spin
+                // forever on a brand that simply has no billing.
+                productState.value = StorePrices.Unavailable
+                return
+            }
         val catalogue =
             withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { loadProducts(instance) }
                 ?.getOrNull()
                 ?: run {
-                    Log.w(TAG, "Store prices unresolved — the paywall will show no figures")
+                    Log.w(TAG, "Store prices unresolved — the paywall will offer a retry")
+                    productState.value = StorePrices.Unavailable
                     return
                 }
         // Eligibility is per ACCOUNT, not per product: a user who already spent
@@ -137,26 +144,21 @@ class QonversionSubscriptionGateway(
         val eligibility =
             withTimeoutOrNull(STORE_CALL_TIMEOUT_MS) { checkTrialEligibility(instance, catalogue.keys.toList()) }
                 .orEmpty()
+        // The SDK's own types stop here. Everything that DECIDES anything below
+        // this line is pure and tested — see `storePricesFrom`.
         productState.value =
-            catalogue
-                .mapValues { (offeringId, product) ->
+            storePricesFrom(
+                catalogue.map { (offeringId, product) ->
                     val eligible = eligibility[offeringId] == QIntroEligibilityStatus.Eligible
                     val trial = product.trialPeriod.takeIf { eligible }
-                    SubscriptionProduct(
+                    StoreProductFacts(
                         offeringId = offeringId,
-                        price = product.prettyPrice.orEmpty(),
+                        price = product.prettyPrice,
                         trialDays = trial?.exactDays(),
                         hasTrial = trial != null,
                     )
-                    // A product the store answered for but priced at nothing is
-                    // NOT a known price. Publishing it would put a non-null entry in
-                    // the map, which is what the host's "may I charge yet" gate
-                    // reads — so the button would arm itself over a blank card.
-                    // Reachable whenever a Qonversion product exists but its Play
-                    // base plan is unpublished or unavailable in the buyer's
-                    // country, which the SDK reports as success with no store
-                    // details.
-                }.filterValues { it.price.isNotBlank() }
+                },
+            )
     }
 
     override suspend fun purchase(offeringId: String): Result<Entitlement> {
@@ -350,3 +352,46 @@ private fun QSubscriptionPeriod.exactDays(): Int? =
     }
 
 private const val DAYS_PER_WEEK = 7
+
+/**
+ * What the provider told us about one product, with its SDK types already
+ * stripped off. Exists so the rule below can be tested without a Play
+ * connection, an Activity, or a mocking framework.
+ */
+internal data class StoreProductFacts(
+    val offeringId: String,
+    val price: String?,
+    val trialDays: Int?,
+    val hasTrial: Boolean,
+)
+
+/**
+ * The rule: **a product without a price is not published.**
+ *
+ * This is the invariant the purchase gate rests on — the host asks the map
+ * whether it knows what the selected plan costs, and arms its button on the
+ * answer. A product the store answered for but priced at nothing would put an
+ * entry in that map and arm the button over a blank card. Reachable whenever a
+ * Qonversion product exists whose Play base plan is unpublished or unavailable
+ * in the buyer's country, which the SDK reports as success with no store
+ * details.
+ *
+ * It is a named function rather than a `filterValues` in the middle of a
+ * coroutine because a review round proved what the inline version was worth:
+ * deleting it left the entire test suite green. A rule nothing can fail is not
+ * enforced, it is merely written down.
+ */
+internal fun storePricesFrom(facts: List<StoreProductFacts>): StorePrices.Known =
+    StorePrices.Known(
+        facts
+            .filter { !it.price.isNullOrBlank() }
+            .associate { fact ->
+                fact.offeringId to
+                    SubscriptionProduct(
+                        offeringId = fact.offeringId,
+                        price = fact.price.orEmpty(),
+                        trialDays = fact.trialDays,
+                        hasTrial = fact.hasTrial,
+                    )
+            },
+    )

@@ -284,3 +284,33 @@ Also verified empirically, not assumed — dex-string counts in the built APKs:
 | `com/qonversion/android/sdk` | 1651 | **0** |
 | `com/android/billingclient` | 446 | **0** |
 | `com/google/firebase/remoteconfig` | 253 | 253 (compiled in, never bound — §5) |
+
+## Corrections after three review rounds (2026-07-31)
+
+Sections above were written before the review and no longer describe this
+branch. Recorded here rather than silently edited, because the gap between what
+a plan claims and what the code does is itself the thing three rounds kept
+finding.
+
+- **§2 said this branch does not touch `app/build.gradle.kts`.** It does now —
+  `alias(libs.plugins.google.services)` is applied here. Without it
+  `FirebaseRemoteConfig.getInstance()` throws, every credential arrives blank,
+  and the paywall ships unable to take money, silently. That was round 1's
+  merge-order finding, and #107 landing freed the file.
+- **§7.1 said prices are still hardcoded strings.** They are not. `US$1.99` and
+  its siblings are gone; prices and trial eligibility come from the store, per
+  user. So are `SAVE ~60%` and the per-day line, which were arithmetic on the
+  invented figures.
+- **§7.7 said the new paths have unit tests.** For prices that was false, and
+  round 3 proved it by deleting both safety rules and watching the suite stay
+  green. Both are now named functions with tests that fail on that mutation:
+  `storePricesFrom` in `:lib:subscription` (which had no test source set at all)
+  and `canPurchase` in the paywall.
+- **The Activity tracker registered itself from a lazy `@Provides`**, which made
+  the first purchase of every session fail. It now runs from
+  `Application.onCreate` through an `AppStartupTask` multibinding — a seam that
+  exists because the fake variant ships no billing and must contribute nothing.
+
+Open, tracked rather than fixed here: the unbounded `awaitResolved()` in
+`TranslateTextUseCase` (harmless while the NoOp gateway starts `Free`, now
+network-bounded), and a `Pending` purchase being told "Nothing was charged".

@@ -32,42 +32,55 @@ fun interface ActivityProvider {
  * Host-agnostic on purpose (Ring 1 rule): it takes an [Application] and knows
  * nothing else about the app installing it.
  */
-class ForegroundActivityProvider private constructor() :
+class ForegroundActivityProvider :
     ActivityProvider,
     Application.ActivityLifecycleCallbacks {
-        private var resumed: WeakReference<Activity>? = null
+    private var resumed: WeakReference<Activity>? = null
 
-        override fun current(): Activity? = resumed?.get()?.takeUnless { it.isFinishing || it.isDestroyed }
+    override fun current(): Activity? = resumed?.get()?.takeUnless { it.isFinishing || it.isDestroyed }
 
-        override fun onActivityResumed(activity: Activity) {
-            resumed = WeakReference(activity)
-        }
-
-        override fun onActivityPaused(activity: Activity) {
-            if (resumed?.get() === activity) resumed = null
-        }
-
-        override fun onActivityCreated(
-            activity: Activity,
-            savedInstanceState: Bundle?,
-        ) = Unit
-
-        override fun onActivityStarted(activity: Activity) = Unit
-
-        override fun onActivityStopped(activity: Activity) = Unit
-
-        override fun onActivitySaveInstanceState(
-            activity: Activity,
-            outState: Bundle,
-        ) = Unit
-
-        override fun onActivityDestroyed(activity: Activity) {
-            if (resumed?.get() === activity) resumed = null
-        }
-
-        companion object {
-            /** Registers and returns the provider. Call once, from the host's DI graph. */
-            fun install(application: Application): ForegroundActivityProvider =
-                ForegroundActivityProvider().also(application::registerActivityLifecycleCallbacks)
-        }
+    override fun onActivityResumed(activity: Activity) {
+        resumed = WeakReference(activity)
     }
+
+    override fun onActivityPaused(activity: Activity) {
+        if (resumed?.get() === activity) resumed = null
+    }
+
+    override fun onActivityCreated(
+        activity: Activity,
+        savedInstanceState: Bundle?,
+    ) = Unit
+
+    override fun onActivityStarted(activity: Activity) = Unit
+
+    override fun onActivityStopped(activity: Activity) = Unit
+
+    override fun onActivitySaveInstanceState(
+        activity: Activity,
+        outState: Bundle,
+    ) = Unit
+
+    override fun onActivityDestroyed(activity: Activity) {
+        if (resumed?.get() === activity) resumed = null
+    }
+
+    /**
+     * Starts listening. **Call from `Application.onCreate`, never from a lazy
+     * DI provider.**
+     *
+     * Android does not replay lifecycle callbacks, so a listener registered
+     * after the first `onResume` never learns about it and [current] answers
+     * null until something else resumes an Activity. Registering from a lazy
+     * `@Provides` is the trap: nothing necessarily builds that node before
+     * the first composition, and first composition happens after the first
+     * resume — so the first purchase of a session fails and everything after
+     * a rotation works, which reads as flakiness rather than as a bug.
+     *
+     * Idempotent: re-registering the same callbacks object is harmless, and
+     * `Application` keeps one entry per instance.
+     */
+    fun register(application: Application) {
+        application.registerActivityLifecycleCallbacks(this)
+    }
+}
