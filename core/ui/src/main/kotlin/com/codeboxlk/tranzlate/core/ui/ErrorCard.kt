@@ -75,13 +75,7 @@ fun ErrorCard(
                 containerColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
             ),
-        modifier =
-            modifier
-                .testTag(containerTestTag)
-                .semantics {
-                    liveRegion = LiveRegionMode.Assertive
-                    if (announcement != null) contentDescription = announcement
-                },
+        modifier = modifier.testTag(containerTestTag),
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(spacing.sm8),
@@ -108,7 +102,18 @@ fun ErrorCard(
                     )
                 }
             }
-            Text(text = message, style = MaterialTheme.typography.bodyLarge)
+            // Lens catch (#104): the assertive region lives on this LEAF. On the
+            // Card container it wrapped children that repeat the same copy, so
+            // TalkBack could read the failure twice.
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier =
+                    Modifier.semantics {
+                        liveRegion = LiveRegionMode.Assertive
+                        if (announcement != null) contentDescription = announcement
+                    },
+            )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
                 verticalAlignment = Alignment.CenterVertically,

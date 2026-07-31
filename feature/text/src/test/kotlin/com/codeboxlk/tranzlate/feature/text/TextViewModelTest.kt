@@ -794,7 +794,9 @@ class TextViewModelTest {
         vm.onInputChange("Good morning")
         settle()
         vm.onTranslate()
-        settle()
+        // runCurrent, NOT advanceUntilIdle: draining virtual time would also
+        // drain a floor if one wrongly applied, so the test could never fail.
+        dispatcher.scheduler.runCurrent()
 
         assertThat(vm.uiState.value).isInstanceOf(TextUiState.Result::class.java)
     }
