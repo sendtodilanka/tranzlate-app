@@ -128,6 +128,7 @@ spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 tranzlate-android-application = { id = "tranzlate.android.application" }
 tranzlate-android-application-compose = { id = "tranzlate.android.application.compose" }
 tranzlate-android-application-flavors = { id = "tranzlate.android.application.flavors" }
+tranzlate-android-application-signing = { id = "tranzlate.android.application.signing" }
 tranzlate-android-library = { id = "tranzlate.android.library" }
 tranzlate-android-library-compose = { id = "tranzlate.android.library.compose" }
 tranzlate-android-feature = { id = "tranzlate.android.feature" }

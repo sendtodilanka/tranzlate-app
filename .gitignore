@@ -11,8 +11,20 @@ build/
 .kotlin/
 *.apk
 *.aab
+# ---- Release signing material — NEVER commit (launch track A) ----------------
+# Belt-and-braces: the private key itself is expected to live OUTSIDE this repo
+# (keystore.properties -> storeFile points at an absolute path), but if anyone
+# ever drops one in, these rules catch it first.
 *.jks
+*.keystore
+*.p12
+*.pepk
+# The signing pointer file read by the `tranzlate.android.application.signing`
+# convention plugin. `*-keystore.properties` does NOT match a bare
+# `keystore.properties`, so it is listed explicitly.
+keystore.properties
 *-keystore.properties
+keystore*.properties
 # Claude local
 .claude/settings.local.json
 # Agent worktrees — checkouts of this repo; committing them would nest a copy

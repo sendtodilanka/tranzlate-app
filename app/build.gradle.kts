@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.tranzlate.android.application)
     alias(libs.plugins.tranzlate.android.application.compose)
     alias(libs.plugins.tranzlate.android.application.flavors)
+    alias(libs.plugins.tranzlate.android.application.signing)
     alias(libs.plugins.tranzlate.hilt)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -10,8 +11,15 @@ android {
     namespace = "com.codeboxlk.tranzlate"
 
     defaultConfig {
-        versionCode = 1
-        versionName = "0.1.0"
+        // PLAY UPDATE TRACK (docs/plan/launch-signing-aab.md). The live listing under
+        // applicationId com.codeboxlk.tranzlate.offlinetranslator last shipped
+        // versionCode 4 / versionName "1.0.4" from the OLD repo, so an update must be
+        // strictly greater: 5. versionName "1.1.0" (minor bump, not 1.0.5) because this
+        // is the ground-up rebuild, not a patch on the old binary.
+        // White-label note: version lineage is per Play listing = per applicationId, so
+        // when a second brand lands it overrides these inside its own flavor block.
+        versionCode = 5
+        versionName = "1.1.0"
         testInstrumentationRunner = "com.codeboxlk.tranzlate.HiltTestRunner"
     }
 
@@ -20,9 +28,10 @@ android {
             // Issue #5 (debate-ruled): R8 on, default-optimize file + ONE
             // justified project rule (persisted enums). Library consumer rules
             // (MLKit/OkHttp/Hilt/Room/Compose) cover the rest — no hand keeps.
-            // NO signingConfig on purpose: per-brand keystores land with the
-            // Qonversion/ads/release batch; CI's `gradlew build` already
-            // assembles tranzlateProdRelease, so R8 gates every PR.
+            // signingConfig is attached by the `tranzlate.android.application.signing`
+            // convention plugin when a gitignored keystore.properties is present;
+            // without it the release variant stays UNSIGNED so CI's `gradlew build`
+            // (which assembles tranzlateProdRelease, gating R8 on every PR) stays green.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
