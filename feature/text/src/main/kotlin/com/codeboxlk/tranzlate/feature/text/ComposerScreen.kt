@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.feature.text
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -1407,6 +1408,29 @@ private fun ComposerResultPreview() {
                 onClearAll = {},
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+    }
+}
+
+/** THE ITEMS: the counter at three states + the one action slot (mic ⇄ Translate). */
+@PreviewLightDark
+@Composable
+private fun ComposerItemsPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm8),
+                modifier = Modifier.padding(LocalSpacing.current.md16),
+            ) {
+                CharCounter(length = 0, overLimit = false, counterDescription = "")
+                CharCounter(length = TEXT_CHAR_LIMIT, overLimit = false, counterDescription = "")
+                CharCounter(length = TEXT_CHAR_LIMIT + 12, overLimit = true, counterDescription = "")
+                Row(horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm8)) {
+                    EditAction(hasText = false, overLimit = false, onMic = {}, onTranslate = {})
+                    EditAction(hasText = true, overLimit = false, onMic = {}, onTranslate = {})
+                    EditAction(hasText = true, overLimit = true, onMic = {}, onTranslate = {})
+                }
+            }
         }
     }
 }
