@@ -1,17 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-   Sample data extraction rules file; uncomment and customize as needed.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+    Backup + transfer rules, Android 12 (API 31) and above.
+
+    WHAT IS AT STAKE: the `translation` table stores `source_text` and
+    `target_text` — literally the sentences the user typed to be translated
+    (TranslationEntity). With the stock template (every rule commented out) all of
+    it was copied to the user's Google Drive. Passwords, medical notes and private
+    messages get pasted into translators; that content must not leave the device
+    because we never made a decision.
+
+    THE DECISION (docs/plan/launch-blockers.md §4):
+      * cloud-backup   — the database is EXCLUDED. Nothing the user typed is
+                         copied off the device.
+      * device-transfer — the database is INCLUDED. D2D moves data directly
+                         between two phones the same person is holding; keeping
+                         history through a phone upgrade is the behaviour users
+                         expect, and it never reaches a third party.
+
+    Android supports exactly this split: "exclude a file or directory from Google
+    Drive backups while still transferring it during device-to-device (D2D)
+    transfers" — developer.android.com/identity/data/autobackup.
+
+    These are EXCLUDE-ONLY rule sets on purpose. Adding a single <include> would
+    switch each section to allow-list mode and silently drop everything else, so
+    DataStore preferences (theme, language pair, mobile-data consent, usage
+    counters) keep their default backed-up behaviour.
+
+    The journals are named explicitly: they live beside the database in the same
+    `database` domain and hold recently written rows, so excluding only the `.db`
+    would leak the newest translations. All three journal suffixes are listed
+    because Room's default `JournalMode.AUTOMATIC` resolves to WAL (-wal/-shm) on
+    most devices but to TRUNCATE (-journal) on low-RAM ones — the file we do not
+    name is the one that leaks.
+
+    BOTH databases are excluded. This release upgrades v1.0.4 IN PLACE (same
+    applicationId), and that build wrote its own `translator.db`
+    (Tranzlate DatabaseModule DBNAME, created from a bundled asset so the file is
+    present on EVERY install). We do not read it, but it survives the upgrade in
+    this same `database` domain carrying the old app's typed source/target text —
+    so excluding only our file would keep every upgraded user's old history
+    flowing to Drive and make the promise above false for exactly the people this
+    release ships to. It is excluded, NOT deleted: it is the only copy of that
+    history, and an importer is follow-up work.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up. -->
+        <exclude domain="database" path="tranzlate.db" />
+        <exclude domain="database" path="tranzlate.db-wal" />
+        <exclude domain="database" path="tranzlate.db-shm" />
+        <exclude domain="database" path="tranzlate.db-journal" />
+        <exclude domain="database" path="translator.db" />
+        <exclude domain="database" path="translator.db-wal" />
+        <exclude domain="database" path="translator.db-shm" />
+        <exclude domain="database" path="translator.db-journal" />
     </cloud-backup>
     <!--
-    <device-transfer>
-        <include .../>
-        <exclude .../>
-    </device-transfer>
+        Declared even though it carries no exclusions: an ABSENT <device-transfer>
+        section already means "everything", so writing it down is what makes the
+        difference between the two modes a decision instead of an accident.
     -->
+    <device-transfer />
 </data-extraction-rules>

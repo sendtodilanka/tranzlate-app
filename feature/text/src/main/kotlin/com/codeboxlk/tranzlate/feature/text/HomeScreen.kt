@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -112,10 +113,15 @@ fun HomeScreen(
     val swapAvailable by viewModel.swapAvailable.collectAsStateWithLifecycle()
     val isPro by viewModel.isPro.collectAsStateWithLifecycle()
     val targetLang by viewModel.targetLang.collectAsStateWithLifecycle()
+    // The download row's subtitle used to read "133 available · 2 updates ready" —
+    // a design-mock number nothing computed. It is the catalog's own count now, so
+    // it cannot drift from what the offline manager actually offers.
+    val offlineLanguageCount by viewModel.offlineLanguageCount.collectAsStateWithLifecycle()
 
     HomeContent(
         sourceLangId = sourceLang,
         targetLangId = targetLang,
+        offlineLanguageCount = offlineLanguageCount,
         onOpenComposer = onOpenComposer,
         onSwapLanguages = viewModel::onSwapLanguages,
         swapAvailable = swapAvailable,
@@ -138,6 +144,8 @@ fun HomeScreen(
 fun HomeContent(
     sourceLangId: String,
     targetLangId: String,
+    /** Real catalog count behind the download row's subtitle — never a fixed number. */
+    offlineLanguageCount: Int,
     onOpenComposer: () -> Unit,
     onSwapLanguages: () -> Boolean,
     swapAvailable: Boolean,
@@ -236,6 +244,7 @@ fun HomeContent(
                             guidedPhrasebook = guidedPhrasebook,
                             guidedQuotes = guidedQuotes,
                             guidedPhrasing = guidedPhrasing,
+                            offlineLanguageCount = offlineLanguageCount,
                             onOpenCamera = onOpenCamera,
                             onOpenLanguages = onOpenLanguages,
                             onOpenConversation = onOpenConversation,
@@ -346,6 +355,7 @@ fun HomeContent(
                         guidedPhrasebook = guidedPhrasebook,
                         guidedQuotes = guidedQuotes,
                         guidedPhrasing = guidedPhrasing,
+                        offlineLanguageCount = offlineLanguageCount,
                         onOpenCamera = onOpenCamera,
                         onOpenLanguages = onOpenLanguages,
                         onOpenConversation = onOpenConversation,
@@ -366,6 +376,7 @@ private fun ColumnScope.ToolsStack(
     guidedPhrasebook: String,
     guidedQuotes: String,
     guidedPhrasing: String,
+    offlineLanguageCount: Int,
     onOpenCamera: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenConversation: () -> Unit,
@@ -424,7 +435,12 @@ private fun ColumnScope.ToolsStack(
     ListRowCard(
         icon = painterResource(DsR.drawable.ic_download_for_offline),
         title = stringResource(R.string.home_row_download),
-        subtitle = stringResource(R.string.home_row_download_sub),
+        subtitle =
+            pluralStringResource(
+                R.plurals.home_row_download_sub,
+                offlineLanguageCount,
+                offlineLanguageCount,
+            ),
         onClick = onOpenLanguages,
         testTag = "tt_home_row_download",
     )
@@ -799,24 +815,14 @@ private fun PhrasingBanner(onClick: () -> Unit) {
                 modifier = Modifier.size(Dimensions.iconMd),
             )
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(R.string.home_phrasing_title),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Spacer(Modifier.size(spacing.sm8))
-                    Surface(
-                        shape = MaterialTheme.shapes.extraSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.home_badge_new),
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = spacing.sm8),
-                        )
-                    }
-                }
+                // No "NEW" badge (issue: launch honesty sweep). The badge shipped in
+                // the design mock, but Natural phrasing does not exist yet — the tap
+                // only raises a snackbar. A NEW badge on a feature that is not there
+                // is the same lie as a fabricated count, just smaller.
+                Text(
+                    text = stringResource(R.string.home_phrasing_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 Text(
                     text = stringResource(R.string.home_phrasing_sub),
                     style = MaterialTheme.typography.bodyMedium,
@@ -834,6 +840,7 @@ private fun HomeContentPreview() {
         HomeContent(
             sourceLangId = "en",
             targetLangId = "es",
+            offlineLanguageCount = 20,
             onOpenComposer = {},
             onSwapLanguages = { true },
             swapAvailable = true,
@@ -846,6 +853,9 @@ private fun HomeContentPreview() {
         )
     }
 }
+
+/** Preview-only stand-in for the real catalog count (issue #108 made it a plural). */
+private const val PREVIEW_LANG_COUNT = 20
 
 /** THE ITEMS: the language row + its pills, on both themes. */
 @PreviewLightDark
@@ -927,7 +937,8 @@ private fun HomeItemsPreview() {
                 ListRowCard(
                     icon = painterResource(DsR.drawable.ic_download_for_offline),
                     title = stringResource(R.string.home_row_download),
-                    subtitle = stringResource(R.string.home_row_download_sub),
+                    subtitle =
+                        pluralStringResource(R.plurals.home_row_download_sub, PREVIEW_LANG_COUNT, PREVIEW_LANG_COUNT),
                     onClick = {},
                     testTag = "tt_preview_row_download",
                 )

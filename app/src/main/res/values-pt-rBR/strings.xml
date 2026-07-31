@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shell strings — Brazilian Portuguese. Authored in-issue; queued for
+     native-speaker review before the store lists this locale (C-12, DoD gate 12). -->
+<resources>
+    <string name="nav_home">Início</string>
+    <string name="nav_chat">Conversa</string>
+    <string name="nav_camera">Câmera</string>
+
+    <string name="chat_coming_soon_title">Conversa</string>
+    <string name="chat_coming_soon_body">O diálogo em dois idiomas ainda não faz parte desta versão. Você continua podendo traduzir tudo o que digitar na tela inicial.</string>
+    <string name="camera_coming_soon_title">Câmera</string>
+    <string name="camera_coming_soon_body">A tradução de placas e cardápios pela câmera ainda não faz parte desta versão. Você continua podendo digitar ou colar o texto na tela inicial.</string>
+    <string name="cd_coming_soon_back">Voltar</string>
+
+</resources>

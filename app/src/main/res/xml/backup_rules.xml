@@ -1,12 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-   Sample backup rules file; uncomment and customize as needed.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
+    Auto Backup rules for Android 11 (API 30) and below — minSdk is 24, so this
+    file governs a real slice of the install base. See data_extraction_rules.xml
+    for the Android 12+ version and docs/plan/launch-blockers.md §4 for the
+    reasoning.
+
+    This format predates the cloud-backup / device-transfer split, so one rule set
+    covers both. The conservative reading wins: the translation database — the
+    text the user typed — is excluded, and never leaves the device on these
+    releases either.
+
+    Exclude-only on purpose: a single <include> would flip this to allow-list mode
+    and drop the DataStore preferences with it.
+
+    The old app's `translator.db` is excluded for the same reason it is in
+    data_extraction_rules.xml: this release upgrades v1.0.4 in place, that file
+    survives in the same `database` domain, and it holds the text the user typed
+    into the previous version. Excluded, not deleted — it is the only copy left.
+    All three journal suffixes are named because Room's AUTOMATIC journal mode is
+    WAL on most devices and TRUNCATE (-journal) on low-RAM ones.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="database" path="tranzlate.db" />
+    <exclude domain="database" path="tranzlate.db-wal" />
+    <exclude domain="database" path="tranzlate.db-shm" />
+    <exclude domain="database" path="tranzlate.db-journal" />
+    <exclude domain="database" path="translator.db" />
+    <exclude domain="database" path="translator.db-wal" />
+    <exclude domain="database" path="translator.db-shm" />
+    <exclude domain="database" path="translator.db-journal" />
 </full-backup-content>

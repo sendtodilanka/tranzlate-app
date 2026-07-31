@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shell strings — Filipino. Authored in-issue; queued for native-speaker
+     review before the store lists this locale (C-12, DoD gate 12). -->
+<resources>
+    <string name="nav_home">Home</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_camera">Camera</string>
+
+    <string name="chat_coming_soon_title">Usapan</string>
+    <string name="chat_coming_soon_body">Wala pa sa bersyong ito ang dalawang-panig na usapan. Puwede mo pa ring isalin ang anumang i-type mo sa home screen.</string>
+    <string name="camera_coming_soon_title">Camera</string>
+    <string name="camera_coming_soon_body">Wala pa sa bersyong ito ang pagsasalin ng mga karatula at menu gamit ang camera. Puwede mo pang i-type o i-paste ang teksto sa home screen.</string>
+    <string name="cd_coming_soon_back">Bumalik</string>
+
+</resources>

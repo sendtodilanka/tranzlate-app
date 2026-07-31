@@ -65,4 +65,31 @@ class NavShellSmokeTest {
         compose.onNodeWithTag("tt_home_tool_camera").performClick()
         compose.onNodeWithTag("tt_home_tool_camera").assertDoesNotExist()
     }
+
+    /**
+     * The launch blocker this replaced: Camera opened a bare `Box` with one line of
+     * centred text — no bar, no arrow, nothing but the invisible system gesture to
+     * get out of it. Both halves are asserted, because "it navigated" was already
+     * true when it was a dead end; the visible way back is the fix.
+     */
+    @Test
+    fun home_cameraToolLandsOnAnHonestScreenWithAWayBack() {
+        compose.onNodeWithTag("tt_home_tool_camera").performClick()
+
+        compose.onNodeWithTag("tt_coming_soon").assertIsDisplayed()
+        compose.onNodeWithTag("tt_coming_soon_message").assertIsDisplayed()
+        compose.onNodeWithTag("tt_coming_soon_back").assertIsDisplayed().performClick()
+
+        compose.onNodeWithTag("tt_home_tool_camera").assertIsDisplayed()
+    }
+
+    @Test
+    fun home_conversationToolLandsOnAnHonestScreenWithAWayBack() {
+        compose.onNodeWithTag("tt_home_tool_conversation").performClick()
+
+        compose.onNodeWithTag("tt_coming_soon").assertIsDisplayed()
+        compose.onNodeWithTag("tt_coming_soon_back").assertIsDisplayed().performClick()
+
+        compose.onNodeWithTag("tt_home_tool_conversation").assertIsDisplayed()
+    }
 }
