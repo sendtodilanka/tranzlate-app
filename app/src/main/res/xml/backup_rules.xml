@@ -12,9 +12,21 @@
 
     Exclude-only on purpose: a single <include> would flip this to allow-list mode
     and drop the DataStore preferences with it.
+
+    The old app's `translator.db` is excluded for the same reason it is in
+    data_extraction_rules.xml: this release upgrades v1.0.4 in place, that file
+    survives in the same `database` domain, and it holds the text the user typed
+    into the previous version. Excluded, not deleted — it is the only copy left.
+    All three journal suffixes are named because Room's AUTOMATIC journal mode is
+    WAL on most devices and TRUNCATE (-journal) on low-RAM ones.
 -->
 <full-backup-content>
     <exclude domain="database" path="tranzlate.db" />
     <exclude domain="database" path="tranzlate.db-wal" />
     <exclude domain="database" path="tranzlate.db-shm" />
+    <exclude domain="database" path="tranzlate.db-journal" />
+    <exclude domain="database" path="translator.db" />
+    <exclude domain="database" path="translator.db-wal" />
+    <exclude domain="database" path="translator.db-shm" />
+    <exclude domain="database" path="translator.db-journal" />
 </full-backup-content>
