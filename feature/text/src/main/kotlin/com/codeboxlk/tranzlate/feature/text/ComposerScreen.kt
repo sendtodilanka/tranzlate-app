@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.feature.text
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -75,6 +76,7 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.ui.ErrorCard
 import com.codeboxlk.tranzlate.core.ui.ShimmerResult
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 import com.codeboxlk.tranzlate.core.ui.adaptiveScreenMargin
@@ -85,6 +87,12 @@ import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 // Split panes (issue #56 frames 3/5): source/input 2 : result 3; a hinge → 1 : 1.
 private const val PANE_WEIGHT_INPUT = 2f
 private const val PANE_WEIGHT_RESULT = 3f
+
+/**
+ * Air between the source card and whatever sits under it (result / loading /
+ * error). Issue #103 (owner): 16dp read as cramped — the cards now breathe.
+ */
+private val ResultCardGap @Composable get() = LocalSpacing.current.lg24
 
 /** SharedTransition key for the ONE morph anchor — the input/composer card. */
 const val COMPOSER_CARD_SHARED_KEY = "composer_card"
@@ -400,8 +408,12 @@ internal fun ComposerPaneContent(
             return
         }
 
-        val showsResult = uiState is TextUiState.Result || uiState is TextUiState.Translating
-        if (layout.splitResultOnly && !isEditing && showsResult) {
+        // Issue #103 (owner, landscape): EVERY outcome — result, loading AND
+        // failure — belongs in the right pane. Excluding Error/Limit dropped the
+        // failure into the single-column path, where it rendered INSIDE the
+        // source card while a result rendered beside it.
+        val showsOutcome = uiState !is TextUiState.Idle
+        if (layout.splitResultOnly && !isEditing && showsOutcome) {
             // Phone landscape read face (issue #56, frame 3): source | result side
             // by side — no vertical scroll in a 412dp-tall window.
             Row(
@@ -943,23 +955,22 @@ private fun ColumnScope.ComposerReadBody(
         }
 
         is TextUiState.Error -> {
-            val readErrorAnnounce = stringResource(R.string.a11y_error, errorBodyFor(uiState.cause))
-            Text(
-                text = errorBodyFor(uiState.cause),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier =
-                    Modifier
-                        .padding(top = spacing.md16)
-                        // C-4: a failure interrupts — assertive, formatted.
-                        .semantics {
-                            liveRegion = LiveRegionMode.Assertive
-                            contentDescription = readErrorAnnounce
-                        }.testTag("tt_text_error"),
+            // Issue #103 (owner): a real error CARD, not a line of red text —
+            // icon + title + cause copy + a filled Retry (ErrorCard owns the
+            // assertive live region and the M3 colour roles).
+            ErrorCard(
+                title = stringResource(R.string.text_error_title),
+                message = errorBodyFor(uiState.cause),
+                actionLabel = stringResource(R.string.button_retry),
+                onAction = onRetry,
+                secondaryLabel = stringResource(R.string.text_error_edit),
+                onSecondary = onEditRequest,
+                announcement = stringResource(R.string.a11y_error, errorBodyFor(uiState.cause)),
+                containerTestTag = "tt_text_error",
+                actionTestTag = "tt_text_retry",
+                secondaryTestTag = "tt_text_error_edit",
+                modifier = Modifier.fillMaxWidth().padding(top = ResultCardGap),
             )
-            TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
-                Text(stringResource(R.string.button_retry))
-            }
         }
 
         is TextUiState.Limit -> {
@@ -1168,23 +1179,39 @@ private fun ResultPane(
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             }
+        if (isError) {
+            // Same card the portrait face uses (issue #103) — one failure shell
+            // everywhere, so radius, padding, gaps and type match.
+            ErrorCard(
+                title = stringResource(R.string.text_error_title),
+                message = body,
+                actionLabel = stringResource(R.string.button_retry),
+                onAction = onRetry,
+                announcement = paneErrorAnnounce,
+                containerTestTag = "tt_text_error",
+                actionTestTag = "tt_text_retry",
+                modifier = modifier,
+            )
+            return
+        }
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = LocalFloatingSurface.current,
             shadowElevation = Elevation.level1,
             modifier = modifier,
         ) {
-            Column(modifier = Modifier.padding(spacing.md16)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(spacing.sm8),
+                modifier = Modifier.padding(spacing.md16),
+            ) {
                 Text(
                     text = body,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = bodyColor,
                     modifier =
                         Modifier
-                            .semantics {
-                                liveRegion = LiveRegionMode.Assertive
-                                if (isError) contentDescription = paneErrorAnnounce
-                            }.testTag(if (isError) "tt_text_error" else "tt_text_limit"),
+                            .semantics { liveRegion = LiveRegionMode.Assertive }
+                            .testTag("tt_text_limit"),
                 )
                 TextButton(onClick = onRetry, modifier = Modifier.testTag("tt_text_retry")) {
                     Text(stringResource(R.string.button_retry))
@@ -1198,13 +1225,15 @@ private fun ResultPane(
         color = colors.container,
         modifier = modifier.testTag("tt_text_result_card"),
     ) {
-        Column(modifier = Modifier.padding(horizontal = spacing.md16, vertical = spacing.md16)) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(spacing.sm8),
+            modifier = Modifier.padding(spacing.md16),
+        ) {
             Text(
                 text = targetLabel.uppercase(),
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.label,
             )
-            Spacer(Modifier.height(spacing.sm8))
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when (uiState) {
                     is TextUiState.Translating -> {
@@ -1266,23 +1295,34 @@ private fun ResultCard(
 ) {
     val spacing = LocalSpacing.current
     val colors = LocalResultCardColors.current
+    // Issue #103 (owner): every card under the source — result, loading and
+    // error — shares ONE shell: extraLarge radius, 16dp interior on all four
+    // sides, 8dp between the label, the body and the actions, and 24dp of air
+    // from the source card above. Only the result's auto-sized body text is
+    // allowed to differ.
     Surface(
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         color = colors.container,
-        modifier = modifier.fillMaxWidth().padding(top = spacing.md16).testTag("tt_text_result_card"),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(top = ResultCardGap)
+                .testTag("tt_text_result_card"),
     ) {
-        Column(modifier = Modifier.padding(horizontal = spacing.md16, vertical = spacing.sm8)) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(spacing.sm8),
+            modifier = Modifier.padding(spacing.md16),
+        ) {
             Text(
                 text = targetLabel.uppercase(),
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.label,
             )
-            Spacer(Modifier.height(spacing.xs4))
             content()
             if (actions != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(top = spacing.xs4),
+                    modifier = Modifier.fillMaxWidth(),
                     content = actions,
                 )
             }

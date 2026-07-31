@@ -116,4 +116,6 @@
     <string name="cd_text_counter_limit">%1$d-character limit reached</string>
     <string name="cd_speak_stop">Stop reading</string>
     <string name="text_tts_unavailable">Speech isn\'t available for this language on this device.</string>
+    <string name="text_error_title">Couldn\'t translate</string>
+    <string name="text_error_edit">Edit text</string>
 </resources>

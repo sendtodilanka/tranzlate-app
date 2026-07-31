@@ -46,7 +46,7 @@ object Motion {
      * outside the M3 short/medium/long scale — a continuous indeterminate loop,
      * not a one-shot transition.
      */
-    const val SHIMMER_CYCLE = 1200
+    const val SHIMMER_CYCLE = 1000
 
     // Easing (cubic-bezier)
 
