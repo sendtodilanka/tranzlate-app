@@ -854,6 +854,9 @@ private fun HomeContentPreview() {
     }
 }
 
+/** Preview-only stand-in for the real catalog count (issue #108 made it a plural). */
+private const val PREVIEW_LANG_COUNT = 20
+
 /** THE ITEMS: the language row + its pills, on both themes. */
 @PreviewLightDark
 @Composable
@@ -934,7 +937,8 @@ private fun HomeItemsPreview() {
                 ListRowCard(
                     icon = painterResource(DsR.drawable.ic_download_for_offline),
                     title = stringResource(R.string.home_row_download),
-                    subtitle = stringResource(R.string.home_row_download_sub),
+                    subtitle =
+                        pluralStringResource(R.plurals.home_row_download_sub, PREVIEW_LANG_COUNT, PREVIEW_LANG_COUNT),
                     onClick = {},
                     testTag = "tt_preview_row_download",
                 )
