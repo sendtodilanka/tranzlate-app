@@ -1,6 +1,12 @@
-# Offline Translator — Language screens spec
+# Offline Translator — Language screens spec · rev 4
 
-`Offline Translator - Language Screens Spec.html` — open in any browser. Self-contained: fonts, icons and frame code are inlined, so it works offline and can be shared as one file.
+`Offline Translator - Language Screens Spec rev4.html` — open in any browser. Self-contained: fonts, icons and frame code are inlined, so it works offline and can be shared as one file.
+
+## Rev 4 — what changed since rev 3
+
+- **20f · Manage packs with zero packs.** The state every fresh install opens on. The storage card degrades honestly (free space is the only figure; the packs legend reads "none yet"), the 18a "No packs yet" block and its keyboard/locale suggestions carry the way forward, and the hygiene nudge, dated rows and "of 59" counter are all absent because nothing exists yet to be stale or counted.
+- **Section 7 · Ads for free users.** Two slots in the whole feature — an anchored adaptive banner on the picker and Manage packs, and one native card at the tail of the Manage packs list — plus the refused placements (21c) and a full implementation guide: every screen ruled, layout numbers, no-fill behaviour, UMP consent, build order, open owner decisions.
+- **Two documentation leftovers fixed**, both flagged in the brief's §7a: the "three rules" no longer claims rows state pack size, and the sanctioned range reads 20–45 MB throughout.
 
 ## What is inside
 
@@ -9,14 +15,16 @@
 3. **First run, no packs** — 18a phone (list + download confirm sheet), 18b foldable.
 4. **Adaptive layouts** — 17a landscape phone 892×412, 17b foldable 760×812, 17c tablet portrait 800×1280, 17d tablet landscape 1280×800; each drawn for both From and To.
 5. **Sheets** — ten cases (mobile data, no space, failed download, remove, remove-in-use, offline, detect offline, no offline voice, already-the-source, how it works), light + dark.
-6. **Snackbars and Manage packs** — 20a five snackbars (download started, ready, removed with "Download again", failed, waiting for Wi-Fi), 20b Manage packs on phone with the storage-hygiene nudge, 20c pack actions list sheet, 20d Manage packs at 1280×800 as list-detail, 20e the Free up space cleanup sheet.
+6. **Snackbars and Manage packs** — 20a five snackbars (download started, ready, removed with "Download again", failed, waiting for Wi-Fi), 20b Manage packs on phone with the storage-hygiene nudge, 20c pack actions list sheet, 20d Manage packs at 1280×800 as list-detail, 20e the Free up space cleanup sheet, 20f Manage packs with zero packs — the fresh-install state.
+
+7. **Ads for free users** — 21a Manage packs with both slots (anchored banner + native card), 21b Translate from with the banner, 21c the two refused placements, and the implementation guide: every screen ruled, the slot inventory, layout numbers, no-fill behaviour, UMP consent, build order and the open owner decisions.
 
 Every frame is at real device size — measure directly off the page.
 
 ## The three rules
 
 - No flags. An ISO-code avatar whose fill states whether the pack is on the device.
-- Every row states offline status and pack size.
+- Every row states its offline status.
 - Search is a permanent field, never an icon that hides it.
 
 ## Tokens (Material 3, Google Blue)
@@ -40,7 +48,7 @@ Every figure the app cannot source has been removed from the drawings, per `DESI
 
 | Removed | Replaced with |
 |---|---|
-| Per-row pack size ("38 MB") | Downloaded rows say "On device". One honest range ("usually 20–50 MB") appears only on the download confirm. |
+| Per-row pack size ("38 MB") | Downloaded rows say "On device". One honest range ("usually 20–45 MB") appears only on the download confirm, and on 20f's storage card where no pack figure can exist yet. |
 | Download percentage, "15 MB left" | Indeterminate progress — the row says "Downloading…". |
 | Pause, queue, "Move to front", resume | Nothing. ✕ is labelled as stopping and removing; a failure offers Retry, never Resume. |
 | Pack version, changelog, update available / required (old sheets 19k, 19l) | Dropped entirely — no version API exists, so the sheets had no trigger. |
@@ -65,6 +73,26 @@ Sheets are now ten (19a, 19b, 19d, 19f, 19g, 19h, 19i, 19j, 19m, 19n) and snackb
 ## Sheet or snackbar
 
 If the user still has something to decide it is a bottom sheet. If the answer is already settled and only needs reporting, it is a snackbar with a single action — 48dp minimum, 4dp corner, inverse surface, 8dp side margins.
+
+## The empty state (20f)
+
+A fresh install has no packs, so 20b's furniture cannot be reused as drawn. What changes, and why:
+
+- **The storage card degrades.** With zero packs there is no "used by packs" figure to source, so free space is the only number on the card and the packs legend reads "none yet" rather than a fabricated 0. The card also drops below the action path — nothing about storage is actionable until a pack exists.
+- **The way forward is a first pack.** The 18a "No packs yet" block leads, followed by its suggestions — device language and keyboard languages, both real platform signals — each with a Get action, then Browse all languages for the rest.
+- **Removed entirely:** the hygiene nudge, dated rows, Downloading, Did not download, and the "of 59" counter over an empty list. Nothing exists yet to be stale, failed or counted.
+
+## Ads (section 7)
+
+Two slots across the whole feature. **A1**, an anchored adaptive banner, on the picker (15a/15b/16a) and on Manage packs (20b/20d). **A2**, one native card, at the tail of the Manage packs list. Everything else was refused and the refusals are drawn in 21c.
+
+- **Never**: inside a sheet or dialog, in a snackbar, between list rows, on first run (18a/18b/20f), or in landscape under 480dp of height.
+- **Never a rewarded ad for a pack.** Packs are unlimited and free by owner ruling; putting one behind a video rebuilds the ceiling that was just removed. The only honest exchange is cloud-engine volume, which is Pro's actual product, at the quota-exhausted moment.
+- **Absent, not degraded**: Pro, offline, no fill, or a pack downloading all remove the slot from the layout. A reserved box labelled AD with nothing in it would state an ad exists when none does — the same rule as the rest of this spec.
+- Ad mocks draw their asset names in braces, because the creative is the one thing on the page the app cannot know.
+- Adds one Settings row, **Ad privacy**, to reopen the UMP consent form.
+
+Open owner decisions: whether Pro removes ads, the first-run grace period, whether the picker carries a banner at all, and whether app-open/interstitial ads are built at all (recommendation: not this release).
 
 ## Not drawn yet
 

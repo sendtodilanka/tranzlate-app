@@ -25,7 +25,7 @@ date) · ⛔ blocked (by what).
 | 4 | 19n privacy copy | Flavor-scoped strings — each brand states only what is true for it |
 | 5 | Home row label | **"Language packs"** (en/fil/pt-BR) |
 | 6 | Folded cover screen | No separate design now — phone portrait covers it; revisit v2 |
-| 7 | Manage packs empty state | Commissioned from Claude Design (brief §8; prompt given to owner) |
+| 7 | Manage packs empty state | ✅ **delivered** — rev4 frame **20f**, light+dark, accepted as drawn (brief §8 outcome). Builds in PR-23 |
 | 8 | 19a interim actions | Pre-approved: if experiment E-W1 fails, ship "Not now"/"Download now" |
 
 ## Architecture (the ruling, in one block)
@@ -49,6 +49,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR | Scope | Status |
 |---|---|---|
 | PR-0 | This plan + preserved ruling + designer-brief §8 (empty-state commission) | ✅ #131, 2026-08-01 |
+| PR-0b | Spec of record → rev4 + frame-by-frame review (brief §9) + ad-layer verdict (§10, → #139) + §3 Detect correction | ⬜ |
 
 ### Phase 1 — shipped-truth stabilisation (no UI change)
 | PR | Scope | Closes | Status |
@@ -99,12 +100,30 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 7 — Manage packs
 | PR | Scope | Status |
 |---|---|---|
-| PR-23 | 20b rewrite behind the SAME Home row + relabel "Language packs" (ruling 5) + empty state (ruling 7 drawing) | ⬜ |
+| PR-23 | 20b rewrite behind the SAME Home row + relabel "Language packs" (ruling 5) + **20f** empty state (ruling 7 — drawn in rev4) | ⬜ |
 | PR-24 | 20c pack-actions sheet | ⬜ |
 | PR-25 | 20e Free up space | ⬜ |
 | PR-26 | 20d list-detail (camera card + pair-share line omitted) | ⬜ |
 | PR-27 | Ruling 2 execution: remove the Detect "ONLINE ONLY" chip; 19i never built | ⬜ |
 | PR-28 | 19n flavor-scoped copy (ruling 4) | ⬜ |
+
+## Spec of record — rev 4 (2026-08-01)
+
+`docs/design/language-screens/language-screens-spec.html` is now **rev 4**.
+Reviewed frame by frame (brief §9): 20f delivered, both rev3 README leftovers
+fixed, three stale captions logged as copy-only, and one conflict that is ours —
+rev4 still draws the Detect `ONLINE ONLY` chip and sheet 19i because brief §3
+listed 19i as having a real trigger. §3 is corrected; **ruling 2 stands and
+PR-27 is unchanged**.
+
+**Rev 4 also adds an ad layer (spec §7) — deliberately OUT of this epic.** Two
+slots, a refusal list and a UMP-first build order, all good, but `:ads` and
+`:consent` do not exist yet, step 1 is a startup privacy gate, and its own owner
+decision 1 ("does Pro remove ads?") is unsettled while every frame assumes the
+answer. Tracked separately as **#139** (brief §10). **The one thing this epic adopts now:**
+picker/Manage-packs list `contentPadding.bottom` and the A–Z rail's bottom stop
+stay **parameterised**, never hardcoded to a bare-screen value, so hosting a
+slot later is not a re-layout.
 
 ## Per-PR gate (unchanged standing rules)
 
