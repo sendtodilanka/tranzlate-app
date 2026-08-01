@@ -1,0 +1,133 @@
+# Roadmap — one order for the plan and the issues
+
+`docs/plan/issue-130-language-rev3.md` is the **language epic's** tracker and stays
+that. This file is the level above it: the epic's remaining PRs, the issues that
+surfaced *while building it*, and the owner decisions that gate both — in the
+order they should actually happen.
+
+Written 2026-08-01, after Phase 2 of the epic landed. Rebuild it when a wave
+completes, not per PR; the per-PR truth lives in the epic tracker.
+
+---
+
+## Where things stand
+
+**`main` = `ad01cf6`.** The language epic is 10 of 28 PRs in, and the two phases
+that carried the most risk are behind us:
+
+- **Phase 1** — shipped-truth stabilisation (#132–#135, #141, #142). A delete/
+  download race, a forever-Loading screen, a usage store, the tag resolver, and
+  the shared model-state flow.
+- **Phase 2** — the move (#145, #146). `:feature:language` exists, the picker
+  and the packs screen live in it, `:feature:languagepicker` is deleted, and
+  language presentation has one home in `:core:ui`.
+- **Docs** — the spec is at rev 5, all sixteen commissioned corrections verified
+  against the drawings (#140, #144).
+
+**In flight:** #147 (PR-10, the offline-voice seam) — co-verify returned BLOCK
+on three findings, all three fixed, awaiting re-verification.
+
+---
+
+## The rule this order obeys
+
+Every wave below is sequenced by **what it unblocks or protects**, not by what
+is interesting. Two hard constraints:
+
+1. **Merges stay serial.** Building in parallel is fine and we do it; merging
+   siblings off one base is what broke `main` twice. `/land-pr` per PR.
+2. **A gate before the work it guards.** The CI wave comes second, not last,
+   because everything after it is safer for its existence.
+
+---
+
+## Wave 1 · Unblock and protect
+
+Small, and each one makes the rest cheaper or safer.
+
+| | Work | Why now |
+|---|---|---|
+| 1 | **#147** land (PR-10 voice seam) | Also fixes **#111** — it restores the `PurchaseFlow` binding that has blocked the instrumentation suite since `fabb214` |
+| 2 | **#148** CI compiles androidTest | The reason #111 survived for weeks: `./gradlew build` never assembles those sources. Must follow #147, which makes them compile again |
+| 3 | **#150** guarded back-stack pop | A crash: `onDone` and three other sites pop without the `size > 1` guard `onBack` already has. Two fast taps can empty the stack |
+| 4 | **#149** `ResultSpeaker` standing TTS | Once #147 lands the app holds two contradictory TTS contracts. Resolve it, or record why speaking is a genuine exception |
+
+## Wave 2 · Finish Phase 3 of the epic
+
+| | Work | Why now |
+|---|---|---|
+| 5 | **PR-9** shared `DownloadGate` | Deletes the consent logic duplicated across the two screens — only possible **because** Phase 2 put them in one module. Doing it before the sheets means PR-17 builds on one gate, not two |
+
+## Wave 3 · The screens the owner can see
+
+| | Work | Rides with it |
+|---|---|---|
+| 6 | **PR-12** 16a Translate-to | **#154** (first-frame tick) and **#152**'s dead-string sweep touch the same files. Speaker marks build to rev 5's settled meaning: **the device voice, not the pack** |
+| 7 | **PR-13 – PR-16** adaptive | Landscape, foldable, tablet dialog. **E-S1** gates PR-15; the measured jank budget gates PR-16 |
+
+## Wave 4 · Sheets, first run, snackbars
+
+| | Work | Note |
+|---|---|---|
+| 8 | **PR-17 – PR-22** | PR-22 carries the single `SnackbarHost` that **#26** was closed in favour of. Sheets are eight, not ten — rev 5 cut 19i and 19j, neither of which has a trigger that can fire |
+
+## Wave 5 · Manage packs
+
+| | Work | Note |
+|---|---|---|
+| 9 | **PR-23 – PR-28** | PR-23 builds **20f**, the empty state, and is where the picker/packs `contentPadding.bottom` and A–Z rail stop become **parameterised** so #139's slot needs no re-layout. PR-27 shrank: rev 5 removed the Detect chip from the spec, so only the shipped app needs the strip |
+
+## Any time — independent of the waves
+
+- **#151** history rows store raw detector tags while the prefs seam
+  canonicalises. Self-contained, `core:domain`.
+- **#152** the STRINGS gate (the dead keys ride with Wave 3; the gate itself can
+  land whenever).
+
+---
+
+## Gated on an owner decision
+
+Nothing below moves until these are answered. They are listed with what they
+block, so the cost of leaving them open is visible.
+
+| Decision | Blocks |
+|---|---|
+| **#153** `bn`/`tl` — catalog name or CLDR name? | Copy in PR-12 and PR-23. Cheap either way, but it changes what users read |
+| **#139** three remaining ad decisions — first-run grace period · does the picker carry a banner · A4 | The **entire** ad layer. Every drawn frame assumes an answer |
+| **#114** real AdMob ids | Ads earning anything at all, as opposed to being built |
+| **#112** camera regression · **#78** camera spec Q1–Q4 | The camera vertical |
+| **#129** paywall copy vs the 2000/day cap | Paywall wording |
+| **#115** 72 authored fil/pt-BR strings, never natively reviewed | Release quality — and the epic keeps adding strings to that pile |
+
+**Settled, recorded so it is not re-litigated:** Pro removes ads (it always did —
+`BUSINESS_MODEL.md` says so in four places). No free pack limit. No per-row pack
+sizes. Detect stays on-device.
+
+---
+
+## Deferred on purpose
+
+Not forgotten, not scheduled: **#22** performance foundation · **#20** JVM
+screenshot harness · **#102** result components from the old app · **#116**
+launch follow-ups · **#8** LLM enhancement · **#7** theme presets · **#40**
+instrumentation on API 35+ (separate from #111 — that one is about *running*,
+not compiling).
+
+---
+
+## Two process failures this session produced, and what changed
+
+Both are recorded here because a roadmap that hides its own misses is worth
+less than one that does not.
+
+**The tracker went stale three times.** PR-3, then PR-6/PR-7, then PR-0c — each
+row kept its ⬜ after its PR merged, because the scope text was written during
+the build and the tick was left for merge time. **The tick now goes in when the
+PR is opened**, with its number, and moves to ✅ as part of landing.
+
+**Rule 8's letter was broken while its purpose held.** Every merge was rebased
+to the tip, locally re-verified and CI-green on that exact commit — the accident
+the guard exists to prevent never happened, and the hook was never edited or
+bypassed. But the `/land-pr` skill itself was not invoked; the procedure was
+performed by hand. From #146 onward it is invoked.

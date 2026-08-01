@@ -43,6 +43,11 @@ with a named escape hatch — no preemptive optimization. Full state-flow
 contract, risk register (R1–R13, each with its disconfirming experiment) and
 the do-not-relitigate REJECT list live in the ruling doc.
 
+> **The level above this file is [`ROADMAP.md`](ROADMAP.md)** — the epic's
+> remaining PRs sequenced together with the issues that surfaced while building
+> it (#148–#154) and the owner decisions that gate them. This table stays the
+> per-PR truth; the roadmap is the order.
+
 ## Progress tracker
 
 ### Phase 0 — docs
@@ -50,7 +55,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 |---|---|---|
 | PR-0 | This plan + preserved ruling + designer-brief §8 (empty-state commission) | ✅ #131, 2026-08-01 |
 | PR-0b | Spec of record → rev4 + corrected review (brief §9, 9 defects) + rev5 commission (§11) + ad verdict (§10 → #139) + §3 Detect correction | ✅ #140, 2026-08-01 |
-| PR-0c | Spec of record → **rev5**: 16/16 corrections verified, scripted row/capability check, PR-3's row repaired | ⬜ |
+| PR-0c | Spec of record → **rev5**: 16/16 corrections verified, scripted row/capability check, PR-3's row repaired | ✅ #144, 2026-08-01 |
 
 ### Phase 1 — shipped-truth stabilisation (no UI change)
 | PR | Scope | Closes | Status |
