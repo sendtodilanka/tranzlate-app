@@ -8,11 +8,13 @@ import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
+import com.codeboxlk.tranzlate.core.testing.FakeOfflineVoiceCatalog
 import com.codeboxlk.tranzlate.core.testing.FakeTranslator
 import com.codeboxlk.tranzlate.core.testing.FakeUsagePolicy
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
+import com.codeboxlk.tranzlate.domain.speech.OfflineVoiceCatalog
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
@@ -59,6 +61,17 @@ object FakeTranslateModule {
     @Provides
     @Singleton
     fun offlineModelManager(): OfflineModelManager = FakeOfflineModelManager()
+
+    /**
+     * Deterministic voice answer for the fake variant: a Maestro run must see
+     * the same speaker marks on every machine, and the real enumeration depends
+     * on which TTS voices the emulator image happens to ship. The three ids are
+     * golden-fixture languages (§1.2 rows en↔fr and en→es), so the marked rows
+     * are rows a fake-variant flow already touches.
+     */
+    @Provides
+    @Singleton
+    fun offlineVoiceCatalog(): OfflineVoiceCatalog = FakeOfflineVoiceCatalog(ids = setOf("en", "es", "fr"))
 
     @Provides
     @Singleton

@@ -7,10 +7,12 @@ import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
+import com.codeboxlk.tranzlate.domain.speech.OfflineVoiceCatalog
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onStart
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,6 +35,12 @@ import javax.inject.Singleton
  * slow, or on a device without Play Services may effectively never answer —
  * an empty list would be a dead end (EDGE_CASES). Rows simply flip to
  * "downloaded" a moment later when the real state arrives.
+ *
+ * Offline-VOICE truth (issue #130 rev.3 U-3) is overlaid the same way and for
+ * a sharper version of the same reason: enumerating TTS voices binds a service
+ * in another process, and on a device with no engine at all that ask ends in a
+ * five-second timeout. A voice mark is decoration on a row; it must never be
+ * the reason the row is not on screen.
  */
 @Singleton
 class LanguageRepositoryImpl
@@ -40,8 +48,27 @@ class LanguageRepositoryImpl
     constructor(
         private val languageDao: LanguageDao,
         private val offlineModelManager: OfflineModelManager,
+        private val offlineVoices: OfflineVoiceCatalog,
         private val preferences: TranzlatePreferencesDataSource,
     ) : LanguageRepository {
+        /**
+         * The device's offline-voice answer as a flow: nothing, then the answer.
+         *
+         * `distinctUntilChanged` sits BELOW `onStart` here, which is the exact
+         * opposite of where the recents source needs it two blocks down — and
+         * the difference is real, not a slip. Recents keep arriving, so
+         * swallowing a real value that happens to equal the prefix would strand
+         * every reader waiting for the one after the paint. The voice catalog
+         * is a ONE-SHOT: there is no later value to wait for, so when the
+         * device's answer is "none" it is identical to the prefix in both value
+         * and meaning, and re-emitting it would rebuild 194 rows to change
+         * nothing.
+         */
+        private val offlineVoiceIds: Flow<Set<String>> =
+            flow { emit(offlineVoices.offlineVoiceLanguageIds()) }
+                .onStart { emit(emptySet()) }
+                .distinctUntilChanged()
+
         override fun languages(): Flow<List<Language>> =
             combine(
                 languageDao.languages(),
@@ -63,7 +90,8 @@ class LanguageRepositoryImpl
                 preferences.recentLanguages
                     .distinctUntilChanged()
                     .onStart { emit(emptyMap()) },
-            ) { entities, modelStates, recents ->
+                offlineVoiceIds,
+            ) { entities, modelStates, recents, voiceIds ->
                 val catalog =
                     if (entities.isEmpty()) {
                         BundledLanguageCatalog.all
@@ -73,6 +101,9 @@ class LanguageRepositoryImpl
                 catalog.map { language ->
                     language.copy(
                         offlineDownloaded = modelStates[language.id] == OfflineModelState.Downloaded,
+                        // Purely additive: the row is built either way, and an
+                        // id the device cannot speak simply carries no mark.
+                        hasOfflineVoice = language.id in voiceIds,
                         lastUsedAt = recents[language.id] ?: language.lastUsedAt,
                     )
                 }
