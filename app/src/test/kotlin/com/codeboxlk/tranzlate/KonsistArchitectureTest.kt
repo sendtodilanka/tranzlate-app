@@ -289,9 +289,14 @@ class KonsistArchitectureTest {
         // before in this repo.
         val holders =
             scope.classes(includeNested = true).filter { klass ->
+                // A WHITELIST, not a blacklist. The first attempt excluded the
+                // test source sets and still failed in CI while passing here —
+                // whatever `scopeFromProject()` walks in one environment and not
+                // the other (#163), an "only /src/main/" rule cannot be widened
+                // by it. The rule is about what the RUNNING app holds, so that
+                // is exactly the right scope anyway.
                 val path = klass.containingFile.path.replace('\\', '/')
-                val production = "/src/test/" !in path && "/src/androidTest" !in path
-                production && klass.properties().any { code(it.text).contains(ENGINE_TYPE) }
+                "/src/main/" in path && klass.properties().any { code(it.text).contains(ENGINE_TYPE) }
             }
         // Vacuous-pass guard: the adapter the rule was written for is in scope.
         assertThat(holders.map { it.name }).contains("AndroidResultSpeaker")
