@@ -39,7 +39,7 @@ class RealOfflineModelManagerSharingTest {
     fun `a burst of subscribers costs ONE ML Kit read`() =
         runTest {
             val store = CountingStore()
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope)
+            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
 
             repeat(SUBSCRIBER_BURST) {
                 backgroundScope.launch { manager.modelStates().collect { } }
@@ -60,7 +60,7 @@ class RealOfflineModelManagerSharingTest {
     fun `two collectors read one flow - same sequence, terminal state included`() =
         runTest {
             val store = CountingStore()
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope)
+            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
 
             turbineScope {
                 val picker = manager.modelStates().testIn(backgroundScope)
@@ -109,7 +109,7 @@ class RealOfflineModelManagerSharingTest {
     fun `a resubscribe after the idle window re-reads the disk`() =
         runTest {
             val store = CountingStore()
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope)
+            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
 
             turbineScope {
                 val screen = manager.modelStates().testIn(backgroundScope)
@@ -126,7 +126,13 @@ class RealOfflineModelManagerSharingTest {
                 store.onDisk += "es" // the disk moved while nobody was watching
 
                 val reopened = manager.modelStates().testIn(backgroundScope)
-                assertThat(reopened.awaitItem()["es"]).isEqualTo(OfflineModelState.NotDownloaded)
+                // The seed, not the map this flow held before. Expiring the
+                // replay cache is what puts it here, and it is the honest
+                // first frame: nothing has been read since the disk moved.
+                assertThat(reopened.awaitItem()).isEmpty()
+                // Straight from the seed to the truth: the re-read lands before
+                // the merge emits, so the stale NotDownloaded frame this test
+                // used to see never reaches a screen at all.
                 assertThat(reopened.awaitItem()["es"]).isEqualTo(OfflineModelState.Downloaded)
                 assertThat(store.downloadedTagsCalls).isEqualTo(2)
                 reopened.cancelAndIgnoreRemainingEvents()
@@ -142,7 +148,7 @@ class RealOfflineModelManagerSharingTest {
     fun `the capable-tag list is read once, not once per emission`() =
         runTest {
             val store = CountingStore()
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope)
+            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
 
             turbineScope {
                 val screen = manager.modelStates().testIn(backgroundScope)
@@ -163,7 +169,14 @@ class RealOfflineModelManagerSharingTest {
     /** Counts what the seam costs: every call here is an ML Kit call in production. */
     private class CountingStore(
         val onDisk: MutableSet<String> = mutableSetOf(),
+        initial: Set<String> = emptySet(),
     ) : ModelStore {
+        /** What the disk says right now — a test can change it behind the app's back. */
+        var downloadedTags: Set<String> = initial
+
+        /** Raised by the NEXT read only, then cleared: a one-off transfer failure. */
+        var failNextWith: Throwable? = null
+
         var downloadedTagsCalls = 0
             private set
 
@@ -178,7 +191,11 @@ class RealOfflineModelManagerSharingTest {
 
         override suspend fun downloadedTags(): Set<String> {
             downloadedTagsCalls++
-            return onDisk.toSet()
+            failNextWith?.let {
+                failNextWith = null
+                throw it
+            }
+            return onDisk.toSet() + downloadedTags
         }
 
         override suspend fun download(tag: String) {
@@ -197,8 +214,93 @@ class RealOfflineModelManagerSharingTest {
             return CAPABLE_TAGS
         }
     }
+
+    /**
+     * The regression a co-verify lens caught, and the reason the subscriber
+     * COUNT had to go. Home holds a subscription all session; ten minutes
+     * later the user deletes a pack from Android's app-storage settings and
+     * opens Manage packs. With a count gate the flow was never unwatched, so
+     * the new screen asked nothing and rendered a pack that is not on the disk.
+     *
+     * A screen may not state something the app has not checked. Every
+     * subscription asks; the freshness window is what keeps a burst at one.
+     */
+    @Test
+    fun `a screen opening later gets a real reading, even while another watches`() =
+        runTest {
+            val store = CountingStore(initial = setOf("fr"))
+            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+            backgroundScope.launch { manager.modelStates().collect { } } // Home, and it stays
+            runCurrent()
+            assertThat(store.downloadedTagsCalls).isEqualTo(1)
+
+            advanceTimeBy(TEN_MINUTES_MILLIS)
+            store.downloadedTags = emptySet() // deleted from Android settings
+
+            val later = backgroundScope.launch { manager.modelStates().collect { } }
+            runCurrent()
+
+            assertThat(store.downloadedTagsCalls).isEqualTo(2)
+            later.cancel()
+        }
+
+    /**
+     * The worker is the only reader of the refresh channel, so anything that
+     * terminates it retires refreshing for the whole process — every later
+     * request lands in a conflated buffer nobody reads. `Task.await()` raises
+     * CancellationException when an ML Kit task is CANCELLED rather than
+     * failed, and refreshDownloaded rethrows it by design, so one cancelled
+     * task was enough to make every screen for the rest of the session show
+     * whatever the last good read said.
+     */
+    @Test
+    fun `a cancelled ML Kit task does not retire refreshing for the process`() =
+        runTest {
+            val store = CountingStore()
+            store.failNextWith = kotlinx.coroutines.CancellationException("task cancelled")
+            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+
+            val first = backgroundScope.launch { manager.modelStates().collect { } }
+            runCurrent()
+            first.cancel()
+            advanceTimeBy(TEN_MINUTES_MILLIS)
+
+            val second = backgroundScope.launch { manager.modelStates().collect { } }
+            runCurrent()
+
+            assertThat(store.downloadedTagsCalls).isEqualTo(2) // the worker lived
+            second.cancel()
+        }
+
+    /**
+     * A StateFlow replays its last value forever unless the replay cache is
+     * told to expire. Without that, a screen returning after the upstream
+     * stopped renders the OLD map — "Downloaded" for a pack since deleted —
+     * and holds it until the disk read returns. The empty seed is the honest
+     * first frame: nothing known yet, which every consumer already handles.
+     */
+    @Test
+    fun `a resubscribe after the idle window never replays the old map`() =
+        runTest {
+            val store = CountingStore(initial = setOf("fr"))
+            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+            val first = backgroundScope.launch { manager.modelStates().collect { } }
+            runCurrent()
+            first.cancel()
+            advanceTimeBy(TEN_MINUTES_MILLIS)
+            store.downloadedTags = emptySet() // deleted while nobody watched
+
+            turbineScope {
+                val states = manager.modelStates().testIn(backgroundScope)
+                assertThat(states.awaitItem()).isEmpty() // the seed, not the stale map
+                runCurrent()
+                assertThat(states.awaitItem()["fr"]).isEqualTo(OfflineModelState.NotDownloaded)
+                states.cancel()
+            }
+        }
 }
 
 private val CAPABLE_TAGS = setOf("en", "es", "fr")
 private val ampleStorage = FakeStorageProbe(free = Long.MAX_VALUE)
+private const val TEN_MINUTES_MILLIS = 10 * 60 * 1_000L
 private const val SUBSCRIBER_BURST = 5
