@@ -12,9 +12,13 @@
 > resume / queue / Undo / version appear only in prose explaining their absence.
 >
 > Rev 4 delivers the empty state commissioned in §8 (**20f**) and adds an
-> unrequested but welcome **ad layer** (§7 of the spec). Full review, including
-> three stale captions and one conflict this brief itself caused, is in **§9**;
-> the ad verdict is in **§10**. §7's older leftovers are now closed.
+> unrequested but welcome **ad layer** (§7 of the spec).
+>
+> **It also carries nine defects, three of them in the new sections** — the
+> worst offers a download on two languages that can never have a pack. The full
+> list, and the retraction of this review's own first pass, is in **§9**; the ad
+> verdict in **§10**; the rev 5 correction list in **§11**. §7's older leftovers
+> are closed.
 
 This brief exists because the spec was first drawn without knowing what the
 Android platform will and will not tell us at runtime. Nothing below is a matter
@@ -268,42 +272,128 @@ pattern from 18a); no invented figures, per the rest of this brief. The rev3
 
 ---
 
-## 9. Rev 4 review (2026-08-01)
+## 9. Rev 4 review (2026-08-01) — rev 4 is the spec of record, with 9 defects to fix
 
-Verified frame by frame, not from the changelog — the method that caught rev 2's
-invented figures. 26 frames scanned; the state table ("5 of 59 packs · Arabic
-downloading · Hindi failed · 110 MB used · 12 MB free") holds across every one.
+**Read this section before drawing rev 5.** The first pass of this review was
+too generous, and an independent adversarial lens took it apart. What follows is
+the corrected version, with the retraction stated plainly.
 
-**Accepted as drawn:** 20f (§8 above) · the entire ad layer's *drawings*
-(§10 rules the build) · all of rev 3 carried through unchanged.
+### What the first pass got wrong — the method, not just the conclusion
 
-**Fixed as asked (§7a):** the "three rules" no longer promises per-row pack
-size, and the sanctioned range now reads 20–45 MB everywhere — the 20–50 MB
-paragraph is gone.
+1. **"26 frames scanned" was not the coverage it sounded like.** There are 26
+   `data-screen-label` attributes, but the labels stop before a 117 KB stretch of
+   the document: **all ten sheets, all five snackbars, 20c, 20e and 21c carry no
+   label at all**. Enumerating labels enumerates about 26 of some 60 drawings.
+   The whole-document greps for banned figures did cover them; the frame-by-frame
+   read did not.
+2. **The scan de-duplicated repeated lines**, which is precisely how a row-level
+   contradiction hides — `download` appearing once in a frame looks identical to
+   `download` appearing on a row that must never carry it. Defect A below was
+   invisible for exactly that reason. **Never dedupe while scanning a design
+   export.**
+3. **"The state table holds across every one" is RETRACTED.** It does not. Three
+   frames contradict it, and the same paragraph then admitted 20f is an exception
+   — a claim arguing with itself two sentences later.
+4. **Two "fixed in rev 4" items were fixes to `README.md`, not to the spec.**
+   That is what §7a asked for and it is what was delivered — but the spec's own
+   "THE THREE RULES" paragraph is byte-identical between rev 3 and rev 4, and
+   `20–50 MB` never appeared in the spec at all. Say which file changed.
 
-**Three stale captions — copy only, no drawing is wrong.** Worth fixing in a
-rev 5, not worth blocking anything:
+### Defects to fix in rev 5 — verified, ordered by severity
 
-1. 15a's caption still reads "pack state **and size** on every row". The frame
-   states no size; the caption outlived rev 3's decision.
-2. 15b's caption still mentions "the **Pro ceiling** stated once at the bottom".
-   The frame actually reads "Packs are free and unlimited" — the caption
-   predates the owner's no-limit ruling.
-3. 18a's caption says the suggestions carry "the size on the button". The
-   buttons say **Get**.
+**A. 21b offers a download on two languages that can never have a pack.**
+The new ad frame draws `AZ / Azerbaijani / download`, `EU / Basque / download`.
+Checked against our own catalog (`BundledLanguageCatalog.offlineCapableIds`):
+`az` and `eu` are **not** in the offline-capable set, and 15a and 16a correctly
+draw both as `ONLINE ONLY`. (`be` Belarusian, drawn `download` in the same
+frame, **is** capable — that row is right.) This is the exact defect class this
+brief exists to prevent, and it arrived in the newest section.
 
-**One conflict, and it is ours.** Rev 4 draws the Detect row's `ONLINE ONLY`
-chip and the 19i "detect needs a connection" sheet. Both are cancelled by owner
-ruling 2 — detection is on-device. The designer followed §3 of this brief, which
-said the sheet had a real trigger. §3 is now corrected above; **PR-27** strips
-the chip from the shipped picker and 19i is never built.
+**B. 21b re-writes the running state four more ways.** `ES / Spanish / On device
+· in use` on **Translate from**, when Spanish is the target everywhere else; the
+recents header reads `On device` instead of `Recent`; Afrikaans — the selected
+source in every other From frame — is missing; and the list header reads
+`59 can be offline`, which is 18a's *zero-pack* header on a screen that has five.
 
-**One inconsistency to note when building 20f:** it draws a healthy device
-("23.4 GB free"), while 20b draws a nearly-full one ("12 MB free"). Both are
-legitimate, but the spec's state paragraph names only section 3 as an exception
-to the running state. Treat 20f as a second, deliberate exception.
+**C. 19m is drawn on a state the document does not have.** `swap_horiz /
+Spanish is already the source`. Spanish is the **target** (16a: "Recently used
+as target"), and 19g says so explicitly: "It is your target language." The
+source in every From frame is Afrikaans.
 
----
+**D. 20f and 18a claim different platform signals for the same suggestion.**
+20f: `FR / French / From your keyboards`. 18a and 18b: `FR / French / Common
+where you are`. One fresh install, one French row, two different sources.
+
+**E. The running state is internally impossible.** Every populated frame draws
+`12 MB free` **and** `AR / Arabic / Downloading…`. Sheet 19b defines that exact
+condition as a hard stop: "There is 12 MB free on this device. A language pack
+usually needs 20–45 MB." → `Not enough space`. Pick a free-space figure that
+permits the download the same frames show in flight.
+
+**F. 19j has no reachable trigger — the same defect as 19i.** The sheet is
+`Amharic has no offline voice`, and its caption says it opens "by tapping the
+speaker mark". Amharic appears 20 times in the document and never carries
+`volume_up`. A mark that is only drawn when offline voice exists cannot be the
+way to report that it does not.
+
+**G. The failed row breaks two of the three rules.** In 15a, 16a and 18a the
+Hindi row is drawn as `cloud_off / Hindi / Did not download · connection lost /
+Retry` — **no ISO-code avatar**, and placed immediately after Azerbaijani, out
+of A–Z order. 21c refuses inline ads for precisely this reason: "position means
+letter". If the placement is a drawing convenience, say so in the caption;
+otherwise the failed row needs its avatar and its alphabetical slot.
+
+**H. The speaker mark is drawn on rows with no pack.** `AR / Arabic /
+volume_up / downloading`, `BN / Bengali / volume_up / download`, `BG / Bulgarian
+/ volume_up / download` (17a, 17b, 17d). The explainer says the mark denotes
+"packs that can also read the translation aloud offline", but `Voice.is
+NetworkConnectionRequired` reports the installed **TTS voice**, which is
+independent of the translate pack. Either the mark means "offline voice exists"
+(then the explainer is wrong) or it means "this pack reads aloud offline" (then
+it cannot appear on an undownloaded row). Needs one answer before 16a is built.
+
+**I. `workspace_premium` — the Pro glyph — still marks the "packs are free and
+unlimited" card** in 15b light/dark and 17b from/to. The caption's stale "Pro
+ceiling" wording was caught; the icon saying the same thing inside the drawing
+was not. Its `Learn more` also has no declared destination.
+
+### Stale captions — copy only, every drawing correct
+
+1. 15a: "pack state **and size** on every row" — the rows say `On device`.
+2. 15b: "the **Pro ceiling** stated once at the bottom" — the frame says
+   "Packs are free and unlimited".
+3. 18a: suggestions carry "the size on the button" — the buttons say `Get`
+   (section 3's intro repeats it: "sizes sit on the buttons").
+
+All three were equally stale in rev 3 and this brief signed rev 3 off as
+reconciled. A caption is part of the spec an engineer reads.
+
+### One conflict that is ours, not the designer's
+
+Rev 4 draws the Detect row's `ONLINE ONLY` chip and sheet **19i**. Both are
+cancelled by owner ruling 2 — detection is on-device
+(`MlKitLanguageIdentifier.kt:3,22`, re-verified). The designer followed §3 of
+this brief, which listed that sheet as having a real trigger. §3 is corrected
+above; **PR-27** strips the chip and 19i is never built.
+
+### Two corrections to this brief's own earlier claims
+
+- The rev 3 status block said "the one remaining Cancel is the tablet dialog's
+  dismiss button". There are **eight** — four tablet dismisses and four in
+  19f/19g. Sheet dismisses reading "Cancel" are fine; §2's prohibition is about
+  the ✕ on a **downloading row**, which correctly reads "Stop download and
+  remove". The count was simply wrong.
+- §1 still points at "the `ONLINE ONLY` chip (the one drawn on the Detect row)"
+  as the exemplar for the 135 online-only languages. That chip is being removed.
+  Point it at any ordinary online-only row instead.
+
+### What is genuinely good, and stands
+
+20f as delivered (§8), every honesty check that did pass — no user-facing
+percentages, no per-row sizes, no invented durations, indeterminate progress,
+"Stop download and remove" — and the whole shape of the ad layer's reasoning.
+**Rev 4 remains the spec of record.** None of A–I requires a re-design; they are
+corrections to frames that already exist.
 
 ## 10. The ad layer (spec §7) — engineering verdict
 
@@ -326,14 +416,99 @@ facts about this repo, not preferences:
    frame in §7 assumes the answer is yes. Building to an assumed answer is
    exactly the failure this brief exists to prevent.
 
+**Three internal contradictions in §7 — fix before anyone builds from it.**
+They matter more than they look, because this section is written as an
+implementation guide and would be followed literally:
+
+1. **The code sample contradicts the rule it sits under.** The guide's states
+   table says a download in flight means "no new requests and no refresh — but a
+   slot already filled **stays**, see 21a, where Arabic is downloading and the
+   banner is still there." The sample then gates the whole slot on one boolean:
+   `showAds = !isPro and canRequestAds and isOnline and !isDownloading` — which
+   tears the filled banner out mid-download, exactly what 21a shows not
+   happening. Two flags are needed: one to *compose* the slot, one to *request*.
+2. **The ad unit ids disagree between the drawings and the table.** Drawings
+   label `picker_banner` / `managepacks_native`; the inventory specifies
+   `translator_picker_banner`, `translator_managepacks_banner`,
+   `translator_managepacks_native`. One naming, please — these become real
+   AdMob unit ids.
+3. **The native card omits a required asset and draws an unreliable one.** The
+   rules list "required assets: headline, icon, CTA"; the drawn card shows
+   `{headline}`, `{advertiser} · {store}`, `{body}`, `{callToAction}` and **no
+   `{icon}`**. `{store}` exists only on app-install ads and is absent on content
+   ads, with no fallback drawn. The section that states "the screen may not
+   state anything the app cannot know" breaks that rule inside its own mock.
+
 **What we adopt now, before any ad code exists:** the picker and Manage packs
-layouts must not have to be re-laid-out to host a slot later. That means the
-list's bottom `contentPadding` and the A–Z rail's bottom stop stay parameterised
-rather than hardcoded to a bare-screen value — a one-line habit in the #130 PRs
-that saves a rework when the slot arrives.
+layouts must not have to be re-laid-out to host a slot later. Today they are
+hardcoded to bare-screen values — `LanguagePickerScreen.kt:370` sets the list's
+`bottom = spacing.sm8`, and the A–Z rail is `padding(vertical = spacing.lg24)`
+(same file, ~line 405). Keeping both **parameterised** is a one-line habit in
+the #130 PRs that saves a rework when the slot arrives.
 
 **Carried to the owner as decisions, not designed here:** whether Pro removes
 ads (changes what existing subscribers were sold); the first-run grace period;
 whether the picker — the app's most task-focused screen — carries a banner at
 all; and app-open/interstitial ads, which the spec itself recommends leaving
 unbuilt for this release. Our recommendations match the spec's on all four.
+
+---
+
+## 11. Commissioned: rev 5 — corrections only, no new screens
+
+Rev 4 stands as the spec of record. Rev 5 is a correction pass over frames that
+already exist. Nothing here needs a new design; everything here is a frame
+disagreeing with another frame, or with what the app can actually do.
+
+**Fix in the drawings** — §9 carries the evidence for each:
+
+1. **21b** — `AZ / Azerbaijani` and `EU / Basque` must read `ONLINE ONLY`, not
+   `download`. Neither language has an offline pack and never will. (`BE /
+   Belarusian / download` in the same frame is correct — leave it.)
+2. **21b** — restore the running state: Spanish is the **target**, so the From
+   screen's selected source is Afrikaans; the pinned section is `Recent`, not
+   `On device`; and the list header is `5 of 59 packs on device`, not 18a's
+   zero-pack `59 can be offline`.
+3. **19m** — Spanish is the target, so "Spanish is already the source" cannot
+   happen. Redraw it on a language the document actually has as the source.
+4. **20f** — French's suggestion reason must match 18a: `Common where you are`.
+5. **The running state's free space** — `12 MB free` makes the in-flight Arabic
+   download impossible by sheet 19b's own rule. Choose a figure that permits it,
+   and keep 19b's tight-space number inside 19b.
+6. **19j** — give it a trigger that can fire, or cut it. A speaker mark drawn
+   only where offline voice exists cannot be the way to report its absence.
+7. **The failed row** (Hindi, in 15a/16a/18a) — give it its ISO avatar and its
+   alphabetical position, or state in the caption that the placement is a
+   drawing convenience.
+8. **The speaker mark** on `AR`, `BN`, `BG` in 17a/17b/17d — decide what the
+   mark means (offline voice exists **vs** this pack reads aloud offline) and
+   make the explainer and the rows agree. See §9-H for why the platform answer
+   is the first one.
+9. **`workspace_premium`** on the "packs are free and unlimited" card (15b,
+   17b) — the Pro glyph contradicts the no-ceiling ruling. Use a neutral
+   information icon, and give its `Learn more` a destination or drop the link.
+10. **Detect** — remove the `ONLINE ONLY` chip from the Detect row everywhere,
+    and cut sheet **19i** entirely. Detection runs on-device; the sheet has no
+    trigger. (This one is our correction, not a designer error — see §3.)
+
+**Fix in the captions** — the drawings are right, the words are stale:
+
+11. 15a: drop "and size" from "pack state and size on every row".
+12. 15b: drop "the Pro ceiling stated once at the bottom" — the frame says
+    packs are free and unlimited.
+13. 18a: the suggestion buttons say `Get`, not a size — in the frame caption and
+    in section 3's intro.
+
+**Fix in §7, the ad guide** — see §10 for the reasoning:
+
+14. Split the one `showAds` boolean into compose-the-slot and request-an-ad, so
+    a download in flight stops new requests without tearing out a filled banner.
+15. One naming for the ad unit ids — the drawings and the inventory table
+    currently disagree.
+16. The native card mock must draw its required `{icon}`, and either drop
+    `{store}` or draw the fallback for content ads, which do not carry it.
+
+**One structural request, not a defect:** please label every drawing with
+`data-screen-label`. Ten sheets, five snackbars, 20c, 20e and 21c currently
+carry none, so any reviewer enumerating frames silently skips them — which is
+exactly what happened in the first pass of the rev 4 review.
