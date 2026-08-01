@@ -123,8 +123,8 @@ change what gets built:
 - **21b** no longer offers a download on Azerbaijani or Basque (no pack exists
   for either), **19j and 19i are cut** (neither has a trigger that can fire) —
   *this paragraph said so from the day rev 5 landed, while the PR-12 scope row
-  above went on ordering 19j built until #180; the row is corrected, and the
-  ruling's three matching lines with it*,
+  above went on ordering 19j built until #180 (**PR #181**); the row is
+  corrected, and the ruling's three matching lines with it*,
   the **Detect `ONLINE ONLY` chip is gone from every frame** — so **PR-27's
   scope shrinks to the shipped app only**, since the spec no longer disagrees
   with ruling 2.
