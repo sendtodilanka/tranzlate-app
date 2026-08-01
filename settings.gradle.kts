@@ -50,6 +50,7 @@ include(":core:translate-fake")
 
 // Ring 4 — features + shell
 include(":feature:text")
+include(":feature:language")
 include(":feature:languagepicker")
 include(":feature:camera")
 include(":feature:history")

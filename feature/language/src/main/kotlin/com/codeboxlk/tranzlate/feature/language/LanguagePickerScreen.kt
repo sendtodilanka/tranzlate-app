@@ -1,4 +1,4 @@
-package com.codeboxlk.tranzlate.feature.text
+package com.codeboxlk.tranzlate.feature.language
 
 import android.text.format.Formatter
 import androidx.annotation.StringRes
@@ -88,7 +88,10 @@ import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
+import com.codeboxlk.tranzlate.core.ui.languageLabel
+import com.codeboxlk.tranzlate.core.ui.searchNormalize
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -202,7 +205,7 @@ fun LanguagePickerContent(
             selectedId = selectedId,
             query = query,
             sizes = sizes,
-            detectLabel = stringResource(R.string.text_lang_detect),
+            detectLabel = languageLabel(DETECT_LANGUAGE_ID),
         )
     MeteredConsentDialog(
         pendingId = pendingConsent,
@@ -428,7 +431,7 @@ private fun PickerTopBar(
             IconButton(onClick = onBack, modifier = Modifier.testTag("tt_lang_back")) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.cd_text_back),
+                    contentDescription = stringResource(R.string.cd_lang_back),
                 )
             }
         },

@@ -1,4 +1,4 @@
-package com.codeboxlk.tranzlate.feature.text
+package com.codeboxlk.tranzlate.core.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalLocale

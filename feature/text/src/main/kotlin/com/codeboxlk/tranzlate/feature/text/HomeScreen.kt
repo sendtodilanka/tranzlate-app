@@ -65,8 +65,10 @@ import com.codeboxlk.tranzlate.core.designsystem.LocalFloatingSurface
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateShapeFull
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 import com.codeboxlk.tranzlate.core.ui.adaptiveScreenMargin
+import com.codeboxlk.tranzlate.core.ui.languageLabel
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 
@@ -100,7 +102,7 @@ private const val PANE_WEIGHT_SECONDARY = 3f
 fun HomeScreen(
     viewModel: TextViewModel,
     onOpenComposer: () -> Unit,
-    onPickLanguage: (LanguagePickerTarget) -> Unit,
+    onPickLanguage: (LanguageRole) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenPaywall: () -> Unit,
     onOpenCamera: () -> Unit,
@@ -149,7 +151,7 @@ fun HomeContent(
     onOpenComposer: () -> Unit,
     onSwapLanguages: () -> Boolean,
     swapAvailable: Boolean,
-    onPickLanguage: (LanguagePickerTarget) -> Unit,
+    onPickLanguage: (LanguageRole) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenPaywall: () -> Unit,
     showProChip: Boolean = true,
@@ -217,8 +219,8 @@ fun HomeContent(
                     LanguageRow(
                         sourceLabel = languageLabel(sourceLangId),
                         targetLabel = languageLabel(targetLangId),
-                        onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
-                        onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
+                        onSourceClick = { onPickLanguage(LanguageRole.SOURCE) },
+                        onTargetClick = { onPickLanguage(LanguageRole.TARGET) },
                         onSwap = swapAction,
                         swapEnabled = swapAvailable,
                         modifier = Modifier.padding(vertical = spacing.sm8),
@@ -306,8 +308,8 @@ fun HomeContent(
                 LanguageRow(
                     sourceLabel = languageLabel(sourceLangId),
                     targetLabel = languageLabel(targetLangId),
-                    onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
-                    onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
+                    onSourceClick = { onPickLanguage(LanguageRole.SOURCE) },
+                    onTargetClick = { onPickLanguage(LanguageRole.TARGET) },
                     onSwap = swapAction,
                     swapEnabled = swapAvailable,
                     modifier =

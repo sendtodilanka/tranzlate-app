@@ -20,13 +20,13 @@ import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
+import com.codeboxlk.tranzlate.feature.language.LanguagePickerScreen
 import com.codeboxlk.tranzlate.feature.languagepicker.OfflineLanguagesScreen
 import com.codeboxlk.tranzlate.feature.paywall.PaywallScreen
 import com.codeboxlk.tranzlate.feature.settings.SettingsScreen
 import com.codeboxlk.tranzlate.feature.text.COMPOSER_CARD_SHARED_KEY
 import com.codeboxlk.tranzlate.feature.text.ComposerScreen
 import com.codeboxlk.tranzlate.feature.text.HomeScreen
-import com.codeboxlk.tranzlate.feature.text.LanguagePickerScreen
 import com.codeboxlk.tranzlate.feature.text.TextViewModel
 
 /**

@@ -1,9 +1,14 @@
-package com.codeboxlk.tranzlate.feature.text
+package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.runtime.Immutable
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
+import com.codeboxlk.tranzlate.core.ui.languageAvatarCode
+import com.codeboxlk.tranzlate.core.ui.languageDisplayName
+import com.codeboxlk.tranzlate.core.ui.languageEndonym
+import com.codeboxlk.tranzlate.core.ui.searchNormalize
 import java.text.Collator
 import java.util.Locale
 

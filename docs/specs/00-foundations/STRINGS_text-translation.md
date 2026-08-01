@@ -201,6 +201,7 @@ Keys shipped by the Home/Composer/Drawer/Result vertical (PR-C). `en` values are
 | `cd_text_mic` | string | `Translate by voice` | composer mic morph (voice vertical later) |
 | `cd_text_mode_chip` | string | `Translation model, %1$s` | contract §2.1 row 6 |
 | `cd_text_menu` / `cd_text_clear` / `cd_text_back` / `cd_text_more` | string | `Open navigation` / `New translation` / `Back` / `More options` | hub top bar + result top bar |
+| `cd_lang_back` | string | `Back` | the picker's own back target. Same words as `cd_text_back`, deliberately a separate key: the picker lives in `:feature:language` since #130 PR-6, and C-3 gives one key one home rather than two modules one name |
 | `cd_text_copy_source` / `cd_text_speak_source` | string | `Copy source text` / `Read source text aloud` | result source block |
 | `cd_text_thumb_up` / `cd_text_thumb_down` | string | `Good translation` / `Bad translation` | result feedback (guided no-op until #8) |
 | `cd_text_retry` | string | `Retry translation` | contract §2.1 row 13 |
