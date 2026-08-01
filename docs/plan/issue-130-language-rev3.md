@@ -53,7 +53,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 1 — shipped-truth stabilisation (no UI change)
 | PR | Scope | Closes | Status |
 |---|---|---|---|
-| PR-1 | #123.3 delete/download ownership race in `RealOfflineModelManager` + #123.4 non-discriminating picker-VM test. HIGH-RISK concurrency; the new race test must be shown to FAIL on pre-fix code | #123.3 #123.4 | ⬜ |
+| PR-1 | #123.3 delete/download ownership race in `RealOfflineModelManager` + #123.4 non-discriminating picker-VM test. HIGH-RISK concurrency; the new race test must be shown to FAIL on pre-fix code | #123.3 #123.4 | ✅ #133, 2026-08-01 |
 | PR-2 | Screen B forever-Loading guard (`onStart emptyMap` on the VM combine) | — | ✅ #132, 2026-08-01 |
 | PR-3 | Manager `states` stateIn + onSubscription conflated refresh + memoized `capableTags` | — | ⬜ |
 | PR-4 | `LanguageTagResolver` lift (core:model) + `LanguageRole` + write-side canonicalisation + picker decoupled from `TextViewModel` | #119 #123.2 | ⬜ |

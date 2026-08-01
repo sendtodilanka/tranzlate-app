@@ -111,6 +111,15 @@ class RealOfflineModelManager internal constructor(
     private val transient = MutableStateFlow<Map<String, OfflineModelState>>(emptyMap())
     private val activeDownloads = ConcurrentHashMap<String, Job>()
 
+    /**
+     * The delete-side ownership register (issue #123 item 3, risk R1): the same
+     * rule download() already obeys — only the job that set a transient may
+     * clear it. Without it, a delete's finally cleared UNCONDITIONALLY, so a
+     * re-download started mid-delete (the picker's ⬇ on a Deleting row) had
+     * its Downloading wiped by the stale delete landing, and the row lied.
+     */
+    private val activeDeletes = ConcurrentHashMap<String, Job>()
+
     override fun modelStates(): Flow<Map<String, OfflineModelState>> =
         combine(downloaded, transient) { down, trans ->
             mergeModelStates(store.capableTags(), down, trans)
@@ -122,10 +131,10 @@ class RealOfflineModelManager internal constructor(
         // Issue #90 pre-flight: refuse BEFORE enqueue when the disk can't hold
         // a model — a partial download + a generic failure is a dead end.
         if (storageProbe.freeBytes() < REQUIRED_FREE_BYTES) {
-            setTransient(languageTag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+            takeTransient(languageTag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
             return
         }
-        setTransient(languageTag, OfflineModelState.Downloading)
+        takeTransient(languageTag, OfflineModelState.Downloading)
         val job =
             downloadScope.launch(start = CoroutineStart.LAZY) {
                 val self = currentCoroutineContext().job
@@ -156,14 +165,14 @@ class RealOfflineModelManager internal constructor(
         // Delete-to-cancel, actually delivered: the in-flight download loses
         // ownership AND its coroutine before we touch the model.
         activeDownloads.remove(languageTag)?.cancel()
-        setTransient(languageTag, OfflineModelState.Deleting)
         // PR-83 lens OPEN-1: the delete itself must ALSO outlive the caller —
         // a nav-away mid-delete cancelled the caller-scoped coroutine before
         // the finally could clear, stranding a dead-end Deleting spinner in
         // the singleton forever. Same medicine as download(): manager scope,
         // and the sync clear runs BEFORE any suspending refresh.
-        downloadScope
-            .launch {
+        val job =
+            downloadScope.launch(start = CoroutineStart.LAZY) {
+                val self = currentCoroutineContext().job
                 try {
                     store.delete(languageTag)
                 } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
@@ -174,10 +183,21 @@ class RealOfflineModelManager internal constructor(
                     // Deleting something absent (or a cancelled download's partial
                     // state) is success by outcome — the refresh below tells truth.
                 } finally {
-                    clearTransient(languageTag)
+                    // Ownership-checked, exactly like download() (issue #123): a
+                    // re-download that started mid-delete revoked this job's claim
+                    // via takeTransient, so a stale delete may not wipe its state.
+                    if (activeDeletes.remove(languageTag, self)) {
+                        clearTransient(languageTag)
+                    }
+                    // The refresh stays unconditional: whatever raced us, the
+                    // platform delete DID run — the downloaded set must tell truth.
                     refreshDownloaded()
                 }
-            }.join()
+            }
+        activeDeletes[languageTag] = job
+        setTransient(languageTag, OfflineModelState.Deleting)
+        job.start() // registered BEFORE it runs — same window rule as download()
+        job.join()
     }
 
     private fun owns(
@@ -203,6 +223,20 @@ class RealOfflineModelManager internal constructor(
         state: OfflineModelState,
     ) {
         transient.update { it + (tag to state) }
+    }
+
+    /**
+     * Overwrites the row's transient AND revokes any in-flight delete's right
+     * to clear it — download()'s side of the issue-#123 ownership rule. The
+     * delete job itself is left running: the platform has no cancel for it,
+     * and its unconditional refresh keeps the downloaded set truthful.
+     */
+    private fun takeTransient(
+        tag: String,
+        state: OfflineModelState,
+    ) {
+        activeDeletes.remove(tag)
+        setTransient(tag, state)
     }
 
     private fun clearTransient(tag: String) {
