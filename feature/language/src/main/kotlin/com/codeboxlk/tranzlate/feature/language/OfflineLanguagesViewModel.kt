@@ -2,25 +2,19 @@ package com.codeboxlk.tranzlate.feature.language
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
-import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
+import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-private const val SUBSCRIBE_TIMEOUT_MS = 5_000L
 
 /** One Screen-B row: a catalog language that MLKit can hold offline. */
 data class OfflineLanguageRow(
@@ -34,10 +28,9 @@ data class OfflineLanguageRow(
  * online-only languages NEVER appear here (they live in the picker with a badge).
  * The screen only ASKS the Translation brain's model manager.
  *
- * Issue #90 (debate ruling): a metered download is a CONSENT question, gated
- * HERE — never via MLKit's untested `requireWifi`. Metered + standing consent
- * absent → [pendingConsent] raises the one-tap dialog; [downloadAnyway] is a
- * one-off yes; the standing answer lives in Settings.
+ * Issue #90 (debate ruling): a metered download is a CONSENT question, and it
+ * is decided by [DownloadGate] — never by MLKit's untested `requireWifi`. This
+ * screen only routes the taps and lends the gate its scope.
  */
 @HiltViewModel
 class OfflineLanguagesViewModel
@@ -45,8 +38,7 @@ class OfflineLanguagesViewModel
     constructor(
         languageRepository: LanguageRepository,
         private val modelManager: OfflineModelManager,
-        private val connectivity: ConnectivityMonitor,
-        private val downloadPrefs: DownloadPrefsRepository,
+        private val downloadGate: DownloadGate,
     ) : ViewModel() {
         val rows: StateFlow<List<OfflineLanguageRow>> =
             combine(
@@ -78,33 +70,22 @@ class OfflineLanguagesViewModel
                     }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyList())
 
-        private val _pendingConsent = MutableStateFlow<String?>(null)
-
         /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
-        val pendingConsent: StateFlow<String?> = _pendingConsent.asStateFlow()
+        val pendingConsent: StateFlow<String?> = downloadGate.pendingConsent
 
+        /** Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts. */
         fun download(id: String) {
-            viewModelScope.launch {
-                val allowed = downloadPrefs.allowMobileData.first()
-                if (connectivity.isMetered() && !allowed) {
-                    _pendingConsent.value = id
-                } else {
-                    modelManager.download(id)
-                }
-            }
+            viewModelScope.launch { downloadGate.requestDownload(id) }
         }
 
         /** Dialog "Download once": THIS download only — the standing pref is untouched. */
         fun downloadAnyway() {
-            val id = _pendingConsent.value ?: return
-            _pendingConsent.value = null
-            viewModelScope.launch { modelManager.download(id) }
+            val id = downloadGate.consentOnce() ?: return
+            viewModelScope.launch { downloadGate.download(id) }
         }
 
         /** Dialog "Wait for Wi-Fi" (or dismiss): the row stays NotDownloaded — no dead end. */
-        fun dismissConsent() {
-            _pendingConsent.value = null
-        }
+        fun dismissConsent() = downloadGate.dismiss()
 
         /** Also delete-to-cancel while Downloading (the verified MLKit limit). */
         fun delete(id: String) {

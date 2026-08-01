@@ -7,11 +7,12 @@ import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
+import com.codeboxlk.tranzlate.core.testing.FakeDownloadPrefsRepository
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
-import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
+import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
@@ -34,8 +35,9 @@ import java.util.Locale
 
 /**
  * The picker's ask-seams: catalog, live model state, the last-used stamp, and
- * the issue-#90 metered-consent gate the redesigned rows inherited along with
- * their download buttons.
+ * the routing of the row download buttons into the issue-#90 consent gate the
+ * redesigned rows inherited along with them. The consent RULE itself is proved
+ * once, in `DownloadGateTest`, where it now lives.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LanguagePickerViewModelTest {
@@ -144,21 +146,11 @@ class LanguagePickerViewModelTest {
         override suspend fun delete(languageTag: String) = Unit
     }
 
-    private class FakeDownloadPrefs : DownloadPrefsRepository {
-        val state = MutableStateFlow(false)
-
-        override val allowMobileData: Flow<Boolean> get() = state
-
-        override suspend fun setAllowMobileData(value: Boolean) {
-            state.value = value
-        }
-    }
-
     private val journal = mutableListOf<String>()
     private val repository = FakeLanguageRepository(journal)
     private val manager = RecordingModelManager()
     private val connectivity = FakeConnectivityMonitor()
-    private val prefs = FakeDownloadPrefs()
+    private val prefs = FakeDownloadPrefsRepository()
     private val translatePrefs = FakeTranslatePrefs(journal)
     private val clock = FakeClock()
 
@@ -181,8 +173,7 @@ class LanguagePickerViewModelTest {
             languageRepository = repository,
             clock = clock,
             modelManager = manager,
-            connectivity = connectivity,
-            downloadPrefs = prefs,
+            downloadGate = DownloadGate(connectivity, prefs, manager),
             translatePrefs = translatePrefs,
             appScope = appScope,
         )
@@ -224,8 +215,7 @@ class LanguagePickerViewModelTest {
                     languageRepository = repository,
                     clock = clock,
                     modelManager = SilentModelManager(),
-                    connectivity = connectivity,
-                    downloadPrefs = prefs,
+                    downloadGate = DownloadGate(connectivity, prefs, manager),
                     translatePrefs = translatePrefs,
                     appScope = appScope,
                 )
@@ -412,68 +402,35 @@ class LanguagePickerViewModelTest {
         dependencyTypes.forEach { assertThat(it).doesNotContain("LanguageUsage") }
     }
 
-    // ---- issue #90 consent gate, re-honoured on picker rows ------------------
+    // ---- issue #90 consent gate, routed from the picker's rows ---------------
 
+    /**
+     * The whole route in one pass: a metered tap reaches the gate (dialog up,
+     * nothing downloaded), and the dialog's yes reaches it too (downloaded,
+     * dialog gone). Wiring the row's ⬇ straight to the manager, or exposing a
+     * `pendingConsent` of the screen's own, is red here. The five-cell rule
+     * behind it is `DownloadGateTest`'s to prove, once.
+     */
     @Test
-    fun `unmetered network downloads immediately - no dialog`() =
-        runTest(dispatcher) {
-            connectivity.metered = false
-            val vm = viewModel()
-
-            vm.download("fr")
-            runCurrent()
-
-            assertThat(manager.downloads).containsExactly("fr")
-            assertThat(vm.pendingConsent.value).isNull()
-        }
-
-    @Test
-    fun `metered without standing consent raises the dialog and does NOT download`() =
+    fun `row taps and the dialog answer are routed through the gate`() =
         runTest(dispatcher) {
             connectivity.metered = true
-            prefs.state.value = false
             val vm = viewModel()
 
             vm.download("fr")
             runCurrent()
-
             assertThat(manager.downloads).isEmpty()
             assertThat(vm.pendingConsent.value).isEqualTo("fr")
-        }
-
-    @Test
-    fun `metered with the standing consent ON downloads without asking`() =
-        runTest(dispatcher) {
-            connectivity.metered = true
-            prefs.state.value = true
-            val vm = viewModel()
-
-            vm.download("fr")
-            runCurrent()
-
-            assertThat(manager.downloads).containsExactly("fr")
-            assertThat(vm.pendingConsent.value).isNull()
-        }
-
-    @Test
-    fun `Download once downloads this one and leaves the standing pref alone`() =
-        runTest(dispatcher) {
-            connectivity.metered = true
-            val vm = viewModel()
-            vm.download("fr")
-            runCurrent()
 
             vm.downloadAnyway()
             runCurrent()
-
             assertThat(manager.downloads).containsExactly("fr")
             assertThat(vm.pendingConsent.value).isNull()
-            assertThat(prefs.state.value).isFalse()
         }
 
-    /** "Wait for Wi-Fi" leaves a re-tappable row, never a stuck spinner. */
+    /** "Wait for Wi-Fi" closes the gate's question from this screen too. */
     @Test
-    fun `dismissing the dialog downloads nothing`() =
+    fun `dismissing the dialog reaches the gate`() =
         runTest(dispatcher) {
             connectivity.metered = true
             val vm = viewModel()

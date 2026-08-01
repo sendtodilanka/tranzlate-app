@@ -4,30 +4,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.ApplicationScope
-import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
-import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
+import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-private const val SUBSCRIBE_TIMEOUT_MS = 5_000L
 
 /** DECISIONS defaults table (pre-first-emission frame only — DataStore owns the real default). */
 private const val FALLBACK_SOURCE_LANG = "en"
@@ -50,7 +44,8 @@ private const val FALLBACK_TARGET_LANG = "fr"
  * Issue #90's consent ruling is re-honoured here rather than bypassed: a metered
  * download is a CONSENT question, and the picker gained download controls in
  * this redesign, so the picker asks it too. Shipping the same button without the
- * gate would have spent the user's data plan behind their back.
+ * gate would have spent the user's data plan behind their back. The rule itself
+ * lives in [DownloadGate]; this screen routes taps into it.
  */
 @HiltViewModel
 class LanguagePickerViewModel
@@ -59,8 +54,7 @@ class LanguagePickerViewModel
         private val languageRepository: LanguageRepository,
         private val clock: AppClock,
         private val modelManager: OfflineModelManager,
-        private val connectivity: ConnectivityMonitor,
-        private val downloadPrefs: DownloadPrefsRepository,
+        private val downloadGate: DownloadGate,
         private val translatePrefs: TranslatePrefsRepository,
         @param:ApplicationScope private val appScope: CoroutineScope,
     ) : ViewModel() {
@@ -110,10 +104,8 @@ class LanguagePickerViewModel
                 LanguageRole.TARGET -> targetSelection
             }
 
-        private val _pendingConsent = MutableStateFlow<String?>(null)
-
         /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
-        val pendingConsent: StateFlow<String?> = _pendingConsent.asStateFlow()
+        val pendingConsent: StateFlow<String?> = downloadGate.pendingConsent
 
         /**
          * A row tap: the WHOLE selection, in one place and in a fixed order —
@@ -186,29 +178,19 @@ class LanguagePickerViewModel
             }
         }
 
-        /** Row ⬇ / ↻. Metered + no standing consent → ask first, download never starts. */
+        /** Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts. */
         fun download(id: String) {
-            viewModelScope.launch {
-                val allowed = downloadPrefs.allowMobileData.first()
-                if (connectivity.isMetered() && !allowed) {
-                    _pendingConsent.value = id
-                } else {
-                    modelManager.download(id)
-                }
-            }
+            viewModelScope.launch { downloadGate.requestDownload(id) }
         }
 
         /** Dialog "Download once": THIS download only — the standing pref is untouched. */
         fun downloadAnyway() {
-            val id = _pendingConsent.value ?: return
-            _pendingConsent.value = null
-            viewModelScope.launch { modelManager.download(id) }
+            val id = downloadGate.consentOnce() ?: return
+            viewModelScope.launch { downloadGate.download(id) }
         }
 
         /** Dialog "Wait for Wi-Fi" (or dismiss): the row stays downloadable — no dead end. */
-        fun dismissConsent() {
-            _pendingConsent.value = null
-        }
+        fun dismissConsent() = downloadGate.dismiss()
 
         /**
          * The row ✕ while downloading. Named for what it DOES: ML Kit exposes no
