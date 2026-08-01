@@ -49,8 +49,8 @@ store has **not** answered yet, plus the two trial shapes the store can report.
 |-----|------|------|------|-------|
 | `paywall_price_pending` | string | `—` (em dash) | — | placeholder while the query is in flight — an empty row would look broken |
 | `paywall_price_loading` | string | `Getting prices from Google Play…` | — | first load |
-| `paywall_price_unavailable` | string | `Couldn't reach Google Play. Tap to try again.` | — | the query failed — retry is on the row itself, no dead end |
-| `paywall_plan_unavailable` | string | `This plan isn't available on Google Play right now. Tap to check again.` | — | the store **answered** and this plan was absent; saying "couldn't reach Play" here would be false |
+| `paywall_price_unavailable` | string | `Couldn\u2019t reach Google Play. Tap to try again.` | — | the query failed — retry is on the row itself, no dead end |
+| `paywall_plan_unavailable` | string | `This plan isn\u2019t available on Google Play right now. Tap to check again.` | — | the store **answered** and this plan was absent; saying "couldn't reach Play" here would be false |
 | `paywall_trial_days` | plurals | `%1$d-day free trial` | day count | store reported a trial expressed in days |
 | `paywall_trial_generic` | string | `Free trial included` | — | store reported a trial in months or years, where a day count would be an invention |
 | `paywall_cta_trial_days` | plurals | `Start my %1$d-day free trial` | day count | primary action, day-count form |
