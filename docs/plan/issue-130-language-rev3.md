@@ -77,7 +77,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 |---|---|---|
 | PR-8 | `TranzlateSheetScaffold` / `TranzlateListSheet` (designsystem, string-free) | ✅ #137, 2026-08-01 |
 | PR-9 | Shared `DownloadGate` — deletes the duplicated consent logic ×2 | ⬜ |
-| PR-10 | Offline-voice seam + `<queries>` TTS_SERVICE + experiment E-V1 | ⬜ |
+| PR-10 | Offline-voice seam + `<queries>` TTS_SERVICE + experiment E-V1 | 👁 #147, 2026-08-01 |
 | PR-11 | Storage walk (aggregate meter source) — seam only; **E-S1 re-ruled to PR-15**, see below | ✅ #138, 2026-08-01 |
 
 ### Phase 4 — 16a Translate-to
