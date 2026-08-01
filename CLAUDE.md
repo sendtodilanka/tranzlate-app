@@ -45,7 +45,7 @@ The requirement is comprehension, not script:
 - **Decide the mutation BEFORE writing the test.** A mutation chosen afterwards gets shaped by the code it just read: a sort test whose example data happens to be in order, a stack test at depth 2 where the root hides the missing guard. Both shipped.
 - **Verify documents against code.** The ruling's file list, the Konsist gate's silence and an issue's own count were each wrong. A plan is a plan — including this project's accepted ones.
 
-`.claude/hooks/guard-pr.sh` denies `gh pr create` without the first two markers, and fails open like the git guard. A promise to be careful is the same shape of non-fix as the checklist that was already written the second time `main` broke.
+`.claude/hooks/guard-pr.sh` denies `gh pr create` without the first two markers; `.claude/hooks/guard-tracker.sh` denies `gh pr merge` when no plan doc mentions the PR (the owner's tracker rule broke three times in one session); and `.claude/agents/co-verify-lens.md` carries all four questions so a lens asks them by default instead of each brief re-inventing them. All fail open like the git guard. A promise to be careful is the same shape of non-fix as the checklist that was already written the second time `main` broke.
 
 > Rules 3-6 are adopted + adapted from the mature `zw-infra-zyntastack` / `zw-voice` projects (Forgejo→GitHub, voice/hardware→Android). Canonical detail: `CONTRIBUTING.md` + `.claude/memory/`.
 
