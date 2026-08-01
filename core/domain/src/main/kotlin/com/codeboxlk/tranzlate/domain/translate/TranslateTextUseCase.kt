@@ -4,6 +4,7 @@ import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.ApplicationScope
 import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.LanguageRole
+import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.model.Translation
@@ -44,10 +45,10 @@ private const val AUTO_DETECT_LANG = "auto"
  *    net charge lands on success only.
  *  - History write on success only (DATA_MODEL `translation`; drawer Recents,
  *    issue #11): C-8 cache-deduped — an identical normalized tuple is never
- *    inserted twice. Skipped while srcLang is the "auto" sentinel because
- *    `Translation.sourceLang` must be a RESOLVED id (DATA_MODEL) and detect
- *    metadata only arrives with the Translation brain. A failed history write
- *    never fails the translation the user is reading.
+ *    inserted twice. `Translation.sourceLang` must be a RESOLVED id, so an auto
+ *    ask writes the id [resolvedSource] derives and an undetected one writes
+ *    nothing at all. A failed history write never fails the translation the
+ *    user is reading.
  *  - The Ads brain is ASKED after every completed translation (D-4 counts
  *    completions); the show/no-show DECISION stays inside [AdsCoordinator].
  *  - Language-usage stamps on SUCCESS only (issue #122, ruling R6): resolved
@@ -137,14 +138,16 @@ class TranslateTextUseCase
                     throw rethrown
                 }
             if (outcome is TranslationOutcome.Success) {
+                // Resolved ONCE for both stores (issue #151). The two seams used
+                // to derive this separately — the stamp canonicalised inside its
+                // repository, the history row did not — so a single detection
+                // could land as `he` in one table and `iw` in the other.
+                val resolvedSrcLang = resolvedSource(srcLang, outcome)
                 // Success-only, resolved-only (ruling R6): auto resolves to the
                 // DETECTED id or — undetected — stamps no source at all. The
                 // literal "auto" sentinel is never a language and never stored.
-                stampLanguageUse(
-                    resolvedSrcLang = if (srcLang == AUTO_DETECT_LANG) outcome.detectedSource else srcLang,
-                    tgtLang = tgtLang,
-                )
-                saveToHistory(text, srcLang, tgtLang, outcome)
+                stampLanguageUse(resolvedSrcLang = resolvedSrcLang, tgtLang = tgtLang)
+                saveToHistory(text, resolvedSrcLang, tgtLang, outcome)
                 adsCoordinator.onTranslationCompleted()
             } else {
                 // Success-only net spend (DECISIONS): failure returns the charge.
@@ -152,6 +155,40 @@ class TranslateTextUseCase
             }
             return outcome
         }
+
+        /**
+         * The ONE derivation of "which language was this actually from" (issue
+         * #151). Two rules meet here:
+         *
+         *  - A concrete ask is already resolved — it arrives through the prefs
+         *    seam, which canonicalises on read AND write (#141), and it is the
+         *    same value the C-8 cache read and the engine call above used. It is
+         *    passed through untouched on purpose: re-spelling it HERE and not
+         *    there would query the store under one id and write it under another.
+         *  - A detected ask is NOT resolved. `MlKitLanguageIdentifier` hands back
+         *    the platform's tag verbatim and `GctEngine` reports whatever the API
+         *    said, so the answer can be a legacy or regional spelling (`iw`, `in`,
+         *    `zh-CN`) that no catalog row carries. That one is canonicalised, at
+         *    this door, before any store sees it.
+         *
+         * [LanguageTagResolver.canonicalOrSelf], not `canonicalId`: a tag the
+         * catalog cannot serve stays itself rather than becoming null and taking
+         * the history row down with it — a translation the user is reading must
+         * not go unrecorded because the detector named a language we have no row
+         * for.
+         *
+         * @return the resolved source, or null when an auto ask came back with no
+         *   detect metadata at all — nothing to stamp, nothing to write.
+         */
+        private fun resolvedSource(
+            srcLang: String,
+            outcome: TranslationOutcome.Success,
+        ): String? =
+            if (srcLang == AUTO_DETECT_LANG) {
+                outcome.detectedSource?.let(LanguageTagResolver::canonicalOrSelf)
+            } else {
+                srcLang
+            }
 
         /**
          * BOTH refund paths go through here (PR-59 lens NOTE-1): a refund must
@@ -200,18 +237,20 @@ class TranslateTextUseCase
             }
         }
 
+        /**
+         * @param resolvedSrcLang from [resolvedSource] — already canonical, never
+         *   the sentinel. Null means an auto ask came back undetected: that stays
+         *   unwritten, because `Translation.sourceLang` must be a resolved id
+         *   (DATA_MODEL; issue #61 closed the older "no history on auto" gap).
+         */
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
         private suspend fun saveToHistory(
             text: String,
-            srcLang: String,
+            resolvedSrcLang: String?,
             tgtLang: String,
             outcome: TranslationOutcome.Success,
         ) {
-            // Auto-detect persists under the RESOLVED source (issue #61 closes the
-            // recorded "no history on auto" gap); undetected stays unwritten —
-            // Translation.sourceLang must be a resolved id (DATA_MODEL).
-            val resolvedSrcLang =
-                if (srcLang == AUTO_DETECT_LANG) outcome.detectedSource ?: return else srcLang
+            if (resolvedSrcLang == null) return
             try {
                 val duplicate =
                     translationRepository.cached(text, resolvedSrcLang, tgtLang, outcome.resolvedEngine)

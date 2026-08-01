@@ -719,4 +719,86 @@ class TextViewModelTest {
 
         assertThat(vm.uiState.value).isInstanceOf(TextUiState.Result::class.java)
     }
+
+    // ---- issue #151: one detection, one spelling ----------------------------
+
+    /**
+     * The read face and the history row are written by two different classes
+     * from the same detected tag, and the star joins them back together by
+     * value. Canonicalise one side only and the star misses the row the use
+     * case just wrote — reads unsaved, then saves a second copy under the
+     * legacy spelling. Reverting EITHER half turns the single row into two.
+     */
+    @Test
+    fun `a detected legacy tag leaves one row that the star can still find`() {
+        val prefs = FakeTranslatePrefsRepository().apply { source.value = "auto" }
+        val repository = FakeTranslationRepository()
+        val vm = viewModel(translator = detecting("iw"), prefs = prefs, repository = repository)
+        settle()
+
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        settle()
+
+        val state = vm.uiState.value as TextUiState.Result
+        assertThat(state.resolvedSourceLang).isEqualTo("he")
+        assertThat(repository.saved.single().sourceLang).isEqualTo("he")
+        assertThat(vm.resultFavourite.value).isFalse()
+
+        vm.onToggleFavourite()
+        settle()
+
+        assertThat(repository.saved).hasSize(1) // the star found its own row
+        assertThat(repository.saved.single().favourite).isTrue()
+        assertThat(vm.resultFavourite.value).isTrue()
+    }
+
+    /**
+     * Rows written before the detect door closed keep their spelling, and that
+     * is the whole of the "tolerate legacy on read" decision: a reopened row
+     * must stay findable by the same lookups it was findable by yesterday.
+     * Canonicalise the id on the way out of the store and the star queries past
+     * the row it is showing — the pre-existing star reads as unsaved and the
+     * next tap writes a canonical duplicate beside it.
+     */
+    @Test
+    fun `reopening a legacy row keeps its stored spelling and stars that row`() =
+        runTest(dispatcher) {
+            val repository = FakeTranslationRepository()
+            repository.save(
+                Translation(
+                    sourceLang = "iw",
+                    sourceText = "Good morning",
+                    targetLang = "en",
+                    targetText = "Boker tov",
+                    engine = Engine.ONLINE_GOOGLE,
+                    createdAt = 1L,
+                ),
+            )
+            val vm = viewModel(repository = repository)
+            settle()
+
+            vm.onHistoryPick(repository.saved.single())
+            settle()
+
+            val state = vm.uiState.value as TextUiState.Result
+            assertThat(state.resolvedSourceLang).isEqualTo("iw")
+            assertThat(state.request.sourceLang).isEqualTo("iw")
+
+            vm.onToggleFavourite()
+            settle()
+
+            assertThat(repository.saved).hasSize(1) // no canonical twin was created
+            assertThat(repository.saved.single().favourite).isTrue()
+        }
+
+    /** G7's shape with the detected tag swapped — the fixture rule's "add a row", not "mutate a tuple". */
+    private fun detecting(tag: String) =
+        FakeTranslator(
+            golden =
+                mapOf(
+                    FakeTranslator.GoldenKey("Good morning", "auto", "fr", ModeId.AUTO) to
+                        TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT, detectedSource = tag),
+                ),
+        )
 }
