@@ -168,6 +168,23 @@ internal fun ComposerPane(
     val resultFavourite by viewModel.resultFavourite.collectAsStateWithLifecycle()
     val swapAvailable by viewModel.swapAvailable.collectAsStateWithLifecycle()
     val speaking by viewModel.speaking.collectAsStateWithLifecycle()
+
+    // Issue #159 co-verify (block 2): the speak button's failure message is
+    // asynchronous now, because the tap WAITS for an engine that is still
+    // binding instead of calling the language unsupported. Only a failure the
+    // user can act on ever arrives here — "still preparing" is not one.
+    val speakNotice by viewModel.speakNotice.collectAsStateWithLifecycle()
+    val noVoice = stringResource(R.string.text_tts_unavailable)
+    val noEngine = stringResource(R.string.text_tts_engine_unavailable)
+    LaunchedEffect(speakNotice) {
+        when (speakNotice) {
+            SpeakOutcome.NO_VOICE -> onNotify(noVoice)
+            SpeakOutcome.ENGINE_UNAVAILABLE -> onNotify(noEngine)
+            else -> return@LaunchedEffect
+        }
+        viewModel.onSpeakNoticeShown()
+    }
+
     ComposerPaneContent(
         resultFavourite = resultFavourite,
         onToggleFavourite = viewModel::onToggleFavourite,
@@ -210,7 +227,9 @@ internal fun ComposerPaneContent(
     resultFavourite: Boolean = false,
     onToggleFavourite: () -> Unit = {},
     speaking: Boolean = false,
-    onSpeakToggle: () -> Boolean = { false },
+    // Fire-and-forget: the outcome arrives through TextViewModel.speakNotice,
+    // because a tap can land while the engine is still binding (issue #159).
+    onSpeakToggle: () -> Unit = {},
     onReverseRequest: () -> Boolean = { false },
     onTranslate: () -> Boolean,
     onRetry: () -> Unit,
@@ -279,10 +298,7 @@ internal fun ComposerPaneContent(
     val swapAction: () -> Unit = {
         if (!onSwapLanguages()) onNotify(swapNeedsDetect)
     }
-    val ttsUnavailable = stringResource(R.string.text_tts_unavailable)
-    val speakAction: () -> Unit = {
-        if (!onSpeakToggle()) onNotify(ttsUnavailable)
-    }
+    val speakAction: () -> Unit = onSpeakToggle
     val reverseAction: () -> Unit = {
         if (!onReverseRequest()) onNotify(swapNeedsDetect) // same truth: needs a detected language
     }

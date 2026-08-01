@@ -45,18 +45,22 @@ is interesting. Two hard constraints:
 
 Small, and each one makes the rest cheaper or safer.
 
-| | Work | Why now |
-|---|---|---|
-| 1 | **#147** land (PR-10 voice seam) | Also fixes **#111** — it restores the `PurchaseFlow` binding that has blocked the instrumentation suite since `fabb214` |
-| 2 | **#148** CI compiles androidTest | The reason #111 survived for weeks: `./gradlew build` never assembles those sources. Must follow #147, which makes them compile again |
-| 3 | **#150** guarded back-stack pop | A crash: `onDone` and three other sites pop without the `size > 1` guard `onBack` already has. Two fast taps can empty the stack |
-| 4 | **#149** `ResultSpeaker` standing TTS | Once #147 lands the app holds two contradictory TTS contracts. Resolve it, or record why speaking is a genuine exception |
+| | Work | PR | Why now |
+|---|---|---|---|
+| 1 | ✅ **#147** land (PR-10 voice seam) | #147 | Also fixes **#111** — it restores the `PurchaseFlow` binding that has blocked the instrumentation suite since `fabb214` |
+| 2 | ✅ **#148** CI compiles androidTest | #160 | The reason #111 survived for weeks: `./gradlew build` never assembles those sources. Must follow #147, which makes them compile again |
+| 3 | ✅ **#150** guarded back-stack pop | #156 | A crash: `onDone` and three other sites pop without the `size > 1` guard `onBack` already has. Two fast taps can empty the stack |
+| 4 | ✅ **#149** `ResultSpeaker` standing TTS | #159 | Once #147 lands the app holds two contradictory TTS contracts. Resolve it, or record why speaking is a genuine exception. Resolved as **consumer-lifetime, not process-lifetime** — the §7.3 ruling was amended, see below |
+
+Wave 1 is closed. Two guards were also built while it ran and are not roadmap
+rows, because neither was planned: **#162** (`guard-pr`) and **#165**
+(`guard-tracker` + the `co-verify-lens` agent).
 
 ## Wave 2 · Finish Phase 3 of the epic
 
-| | Work | Why now |
-|---|---|---|
-| 5 | **PR-9** shared `DownloadGate` | Deletes the consent logic duplicated across the two screens — only possible **because** Phase 2 put them in one module. Doing it before the sheets means PR-17 builds on one gate, not two |
+| | Work | PR | Why now |
+|---|---|---|---|
+| 5 | ⬜ **PR-9** shared `DownloadGate` | #166 | Deletes the consent logic duplicated across the two screens — only possible **because** Phase 2 put them in one module. Doing it before the sheets means PR-17 builds on one gate, not two |
 
 ## Wave 3 · The screens the owner can see
 
@@ -79,9 +83,9 @@ Small, and each one makes the rest cheaper or safer.
 
 ## Any time — independent of the waves
 
-- **#151** history rows store raw detector tags while the prefs seam
+- ⬜ **#151** history rows store raw detector tags while the prefs seam
   canonicalises. Self-contained, `core:domain`.
-- **#152** the STRINGS gate (the dead keys ride with Wave 3; the gate itself can
+- ⬜ **#152** the STRINGS gate (the dead keys ride with Wave 3; the gate itself can
   land whenever).
 
 ---
@@ -103,6 +107,34 @@ block, so the cost of leaving them open is visible.
 **Settled, recorded so it is not re-litigated:** Pro removes ads (it always did —
 `BUSINESS_MODEL.md` says so in four places). No free pack limit. No per-row pack
 sizes. Detect stays on-device.
+
+### One approved ruling was amended — 2026-08-01, #149/#159
+
+The owner approved the eight #130 rulings verbatim. **One of them has since been
+corrected**, and it is recorded here rather than only inside the ruling doc,
+because an approved decision changing quietly is worse than the wrong decision.
+
+The rule read *"TTS = enumerate→cache→shutdown, never a standing engine."* It
+now reads **"never past its consumer."** Both extremes were measured on a
+device, and both lost:
+
+- **Standing forever is real harm.** `com.google.android.tts` stays at
+  `oom adj 100` — above the reclaim tier — even after the app is backgrounded to
+  `adj 900`. AOSP binds it with `BIND_SCHEDULE_LIKE_TOP_APP` and an auto-
+  disconnect timeout of **0**, documented as *"disable automatic unbinding"*.
+  Nothing but `shutdown()` or process death ends it.
+- **Shutting down per utterance is also real harm.** tap → audio is **670 ms
+  fresh against 1–8 ms standing**, on a button with no progress affordance.
+
+So the rule was right about the danger and wrong about the unit. The engine is
+now bound to its consumer — held from `Translating` until the answer is gone or
+the app stops, released on both.
+
+**What did not change:** the enumeration seam (#147) still shuts down on every
+path, including its timeout. That REJECT stands exactly as approved.
+
+Evidence: `docs/research/issue-149-tts-lifetime.md`. Amended in #159; the ruling
+doc carries the same note at §4, §7.3 and its REJECT list.
 
 ---
 

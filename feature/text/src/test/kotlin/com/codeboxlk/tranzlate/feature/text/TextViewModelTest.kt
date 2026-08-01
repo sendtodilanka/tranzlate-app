@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.feature.text
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelStore
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.EngineAttempt
@@ -54,87 +55,6 @@ class TextViewModelTest {
     @get:Rule
     val dispatcherRule = TestDispatcherRule(dispatcher)
 
-    private class RecordingAdsCoordinator : AdsCoordinator {
-        var completedCount = 0
-
-        override suspend fun onTranslationCompleted() {
-            completedCount++
-        }
-    }
-
-    private class FakeResultSpeaker : ResultSpeaker {
-        val state = kotlinx.coroutines.flow.MutableStateFlow(false)
-        override val speaking: kotlinx.coroutines.flow.StateFlow<Boolean> = state
-        var speaks = 0
-            private set
-        var stops = 0
-            private set
-        var available = true
-        var lastLanguage: String? = null
-
-        override fun speak(
-            text: String,
-            languageTag: String,
-        ): Boolean {
-            if (!available) return false
-            speaks++
-            lastLanguage = languageTag
-            state.value = true
-            return true
-        }
-
-        override fun stop() {
-            stops++
-            state.value = false
-        }
-    }
-
-    private class FakeTranslatePrefsRepository : TranslatePrefsRepository {
-        val source = MutableStateFlow("en")
-        val target = MutableStateFlow("fr")
-        val mode = MutableStateFlow(ModeId.AUTO)
-
-        override val sourceLang: Flow<String> = source
-        override val targetLang: Flow<String> = target
-        override val textMode: Flow<ModeId> = mode
-
-        override suspend fun setSourceLang(id: String) {
-            source.value = id
-        }
-
-        override suspend fun setTargetLang(id: String) {
-            target.value = id
-        }
-
-        override suspend fun setLanguagePair(
-            sourceId: String,
-            targetId: String,
-        ) {
-            source.value = sourceId
-            target.value = targetId
-        }
-    }
-
-    private class FakeLanguageRepository(
-        private val catalog: List<Language> = DEFAULT_CATALOG,
-    ) : LanguageRepository {
-        override fun languages(): Flow<List<Language>> = flowOf(catalog)
-
-        override suspend fun setLastUsed(
-            languageId: String,
-            role: LanguageRole,
-            atMillis: Long,
-        ) = Unit
-
-        companion object {
-            val DEFAULT_CATALOG =
-                listOf(
-                    Language("en", "English", offlineAvailable = true, offlineDownloaded = false),
-                    Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
-                )
-        }
-    }
-
     @Suppress("LongParameterList") // the test builder aggregates one fake per seam
     private fun viewModel(
         translator: Translator = FakeTranslator(),
@@ -146,32 +66,19 @@ class TextViewModelTest {
         repository: FakeTranslationRepository = FakeTranslationRepository(),
         speaker: FakeResultSpeaker = FakeResultSpeaker(),
         catalog: List<Language> = FakeLanguageRepository.DEFAULT_CATALOG,
-    ): TextViewModel {
-        val useCase =
-            TranslateTextUseCase(
-                translator,
-                access,
-                usage,
-                RecordingAdsCoordinator(),
-                repository,
-                FakeLanguageUsageRepository(),
-                clock,
-                CoroutineScope(SupervisorJob() + dispatcher),
-            )
-        return TextViewModel(
-            translateText = useCase,
-            prefs = prefs,
-            translationRepository = repository,
-            languageRepository = FakeLanguageRepository(catalog),
-            usagePolicy = usage,
-            featureAccess = access,
-            config = FakeRemoteConfig(),
-            dispatchers = TestDispatcherProvider(dispatcher),
-            clock = clock,
-            speaker = speaker,
-            savedStateHandle = handle,
+    ): TextViewModel =
+        textViewModel(
+            dispatcher,
+            translator,
+            prefs,
+            clock,
+            handle,
+            usage,
+            access,
+            repository,
+            speaker,
+            catalog,
         )
-    }
 
     private fun settle() = dispatcher.scheduler.advanceUntilIdle()
 
@@ -315,53 +222,6 @@ class TextViewModelTest {
 
         assertThat(prefs.source.value).isEqualTo("fr")
         assertThat(prefs.target.value).isEqualTo("en") // the DETECTED id, never "auto"
-    }
-
-    @Test
-    fun `speak toggles play and stop through the seam`() {
-        val speaker = FakeResultSpeaker()
-        val vm = viewModel(speaker = speaker)
-        settle()
-        vm.onInputChange("Good morning")
-        vm.onTranslate()
-        settle()
-
-        assertThat(vm.onSpeak()).isTrue() // play
-        assertThat(speaker.speaks).isEqualTo(1)
-        assertThat(speaker.lastLanguage).isEqualTo("fr") // reads in the TARGET language
-        assertThat(vm.speaking.value).isTrue()
-
-        assertThat(vm.onSpeak()).isTrue() // stop
-        assertThat(speaker.stops).isEqualTo(1)
-        assertThat(vm.speaking.value).isFalse()
-    }
-
-    @Test
-    fun `speak with no engine for the language reports false - the UI guides`() {
-        val speaker = FakeResultSpeaker().apply { available = false }
-        val vm = viewModel(speaker = speaker)
-        settle()
-        vm.onInputChange("Good morning")
-        vm.onTranslate()
-        settle()
-
-        assertThat(vm.onSpeak()).isFalse()
-    }
-
-    @Test
-    fun `leaving the composer stops any reading`() {
-        val speaker = FakeResultSpeaker()
-        val vm = viewModel(speaker = speaker)
-        settle()
-        vm.onInputChange("Good morning")
-        vm.onTranslate()
-        settle()
-        vm.onSpeak()
-
-        vm.onComposerDismissed()
-
-        assertThat(speaker.stops).isEqualTo(1)
-        assertThat(vm.speaking.value).isFalse()
     }
 
     // ---- issue #68: tap-to-reopen + star-to-save -----------------------------

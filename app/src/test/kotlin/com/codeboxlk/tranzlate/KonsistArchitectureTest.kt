@@ -242,6 +242,158 @@ class KonsistArchitectureTest {
         assertThat(prodContributions).isNotEmpty()
     }
 
+    /**
+     * Issue #149 — a `TextToSpeech` is a bound service connection, and the
+     * platform never takes one back on its own: the system binds the engine for
+     * us and then disables its own auto-unbind
+     * (`TextToSpeechManagerPerUserService.getAutoDisconnectTimeoutMs()` returns
+     * `PERMANENT_BOUND_TIMEOUT_MS`, whose contract is "do not unbind"). Measured
+     * on API 37, launching the app was enough to pin the engine process at
+     * oom_adj 100 in the top-app scheduling group, and backgrounding the app did
+     * not release it — only process death did
+     * (`docs/research/issue-149-tts-lifetime.md`).
+     *
+     * What this makes RED — every one of these compiles, and every other test in
+     * the suite stays green through all of them:
+     *
+     *  1. the holder class scoped (`@Singleton` on `AndroidResultSpeaker`);
+     *  2. the **binding** scoped — `@Binds @Singleton` in the Hilt module, which
+     *     is the idiomatic way to scope a `@Binds` and reinstates the exact
+     *     process-lifetime engine the issue opened for. The first version of
+     *     this gate read only classes with a `TextToSpeech` property, and a
+     *     module has none, so it passed (issue #159 co-verify, block 3);
+     *  3. the release deleted (no `shutdown()` call in the holder);
+     *  4. the release faked — comments AND string literals are stripped before
+     *     matching, so neither a KDoc that mentions `shutdown()` nor a
+     *     `Log.d(TAG, "skipping shutdown() for now")` satisfies the rule;
+     *  5. the platform calls left unguarded — constructing or shutting down an
+     *     engine outside `guarded`/`guardedRelease` (mediums 4/5).
+     *
+     * SOURCE-SHAPE assertions, stated honestly. They cannot prove the release
+     * RUNS — `TextViewModelTest` and `ResultSpeakerTest` do that through the
+     * seam and the extracted sequence. What this defends against is the shapes
+     * above, all of which have actually been written by somebody.
+     *
+     * The limit worth naming: a holder that declares its own no-op `shutdown()`
+     * and calls it would pass. Nothing available here resolves a call to its
+     * declaration, so that is a review question, not a gate question.
+     */
+    @Test
+    fun `no class holds a speech engine it cannot give back`() {
+        // PRODUCTION sources only. The rule is about what the running app holds,
+        // and `app/src/androidTest/.../TtsEngineLifetimeProbe.kt` deliberately
+        // constructs engines and shuts them down bare — measuring the rebind
+        // cost IS its job, and wrapping it in the production guards would
+        // measure the guards. CI caught this and my local run did not, which is
+        // its own finding (#163); CI is the truth here, as it has been twice
+        // before in this repo.
+        val holders =
+            scope.classes(includeNested = true).filter { klass ->
+                // A WHITELIST, not a blacklist. The first attempt excluded the
+                // test source sets and still failed in CI while passing here —
+                // whatever `scopeFromProject()` walks in one environment and not
+                // the other (#163), an "only /src/main/" rule cannot be widened
+                // by it. The rule is about what the RUNNING app holds, so that
+                // is exactly the right scope anyway.
+                val path = klass.containingFile.path.replace('\\', '/')
+                "/src/main/" in path && klass.properties().any { code(it.text).contains(ENGINE_TYPE) }
+            }
+        // Vacuous-pass guard: the adapter the rule was written for is in scope.
+        assertThat(holders.map { it.name }).contains("AndroidResultSpeaker")
+
+        val processLifetime =
+            holders.filter { klass -> SCOPES.any(klass::hasAnnotationWithName) }.map { it.name }
+        assertThat(processLifetime).isEmpty()
+
+        val neverReleased =
+            holders
+                .filter { klass -> klass.functions().none { code(it.text).contains(SHUTDOWN) } }
+                .map { it.name }
+        assertThat(neverReleased).isEmpty()
+
+        // Mediums 4/5: the engine's construction and its shutdown both reach the
+        // platform, and both run from paths whose escape would take the screen
+        // down, so each has to sit inside the file's guard helpers.
+        val unguarded =
+            holders
+                .flatMap { it.functions() }
+                .filter { function ->
+                    val body = code(function.text)
+                    (body.contains("$ENGINE_TYPE(") || body.contains(SHUTDOWN)) &&
+                        GUARDS.none(body::contains)
+                }.map { "${it.containingFile.name}: ${it.name}" }
+        assertThat(unguarded).isEmpty()
+    }
+
+    /**
+     * Issue #159 co-verify (block 1) — the shell gives the speech engine back
+     * when the app STOPS.
+     *
+     * `TextViewModel` is hoisted outside the NavDisplay entries, so it resolves
+     * to the Activity's ViewModelStore and `onCleared()` runs only when the
+     * Activity finishes. Backgrounding changes no state, so the state funnel
+     * never fires — and the device re-measurement showed the engine still at
+     * `adj 100` behind an app at `adj 900`, which is the harm #149 opened for.
+     * Only the shell's own lifecycle can close that, and only from HERE: the
+     * composer is not composed while the picker or Settings is on top.
+     *
+     * SOURCE-SHAPE assertion, same honesty as the startup-task gate above: it
+     * cannot prove the effect RUNS (no Android runtime here) — `TextViewModelTest`
+     * pins what the ViewModel does when it is told. What it makes RED is the
+     * DELETION, which compiles and leaves every other test green.
+     */
+    @Test
+    fun `the shell hands the speech engine back when the app stops`() {
+        val shell = scope.functions(includeNested = true).single { it.name == "TranzlateApp" }
+        val body = code(shell.text)
+
+        assertThat(body).contains("LifecycleStartEffect")
+        assertThat(body).contains("onHostStarted()")
+        assertThat(body).contains("onStopOrDispose")
+        assertThat(body).contains("onHostStopped()")
+    }
+
+    /**
+     * The other half of the same rule: the BINDING must not be scoped either.
+     *
+     * Split from the test above because it starts from the opposite end — the
+     * Hilt graph rather than the field — and because that is precisely the gap
+     * the co-verify lens walked through: a class with no `TextToSpeech` property
+     * can still hand out one engine for the whole process.
+     */
+    @Test
+    fun `no Hilt binding gives the speech engine process lifetime`() {
+        val speechTypes =
+            scope
+                .classes(includeNested = true)
+                .filter { klass -> klass.properties().any { code(it.text).contains(ENGINE_TYPE) } }
+                .flatMap { klass -> klass.parents().map { it.name } + klass.name }
+                .toSet()
+        // Vacuous-pass guard: both ends of the binding under test are in scope.
+        assertThat(speechTypes).containsAtLeast("AndroidResultSpeaker", "ResultSpeaker")
+
+        val scopedBindings =
+            scope
+                .functions(includeNested = true)
+                .filter { function ->
+                    function.hasAnnotationWithName("Binds") || function.hasAnnotationWithName("Provides")
+                }.filter { function ->
+                    function.returnType?.name in speechTypes ||
+                        function.parameters.any { it.type.name in speechTypes }
+                }.filter { function -> SCOPES.any(function::hasAnnotationWithName) }
+                .map { "${it.containingFile.name}: ${it.name}" }
+        assertThat(scopedBindings).isEmpty()
+    }
+
+    /**
+     * Comments AND string literals stripped before matching. Both were found by
+     * mutation: deleting the real `tts.shutdown()` left the gate green because
+     * the comment explaining why that call needs a guard says `shutdown()` too,
+     * and after that fix a `Log.d(TAG, "skipping shutdown() for now")` still
+     * passed. A rule that reads prose — or a message — is not reading code.
+     */
+    private fun code(text: String) = text.replace(COMMENT, "").replace(STRING_LITERAL, "")
+
     private companion object {
         /**
          * `Theme` is the theme WRAPPER: it renders only whatever content is passed
@@ -255,5 +407,40 @@ class KonsistArchitectureTest {
 
         /** Worktrees nested inside the checkout being scanned; never the checkout itself. */
         const val NESTED_WORKTREES = ".claude/worktrees/"
+
+        /** KDoc, block and line comments — prose that must not satisfy a code rule. */
+        val COMMENT = Regex("""/\*[\s\S]*?\*/|//[^\n]*""")
+
+        /**
+         * Raw and escaped string literals — a log MESSAGE that names a call must
+         * not satisfy a rule about making the call (issue #159, block 3).
+         */
+        val STRING_LITERAL = Regex(""""{3}[\s\S]*?"{3}|"(?:\\.|[^"\\\n])*"""")
+
+        /** The platform type whose instances are bound service connections. */
+        const val ENGINE_TYPE = "TextToSpeech"
+
+        /** The only call that ends the binding (AOSP: nothing else does). */
+        const val SHUTDOWN = "shutdown()"
+
+        /** `ResultSpeaker.kt`'s escape guards — every platform call goes through one. */
+        val GUARDS = listOf("guarded(", "guardedRelease(")
+
+        /**
+         * Dagger/Hilt scopes that would outlive one consumer. `@Reusable` is in
+         * the list on purpose: it lets Dagger cache and hand back the SAME
+         * engine, which is the property that matters here, not the guarantee.
+         */
+        val SCOPES =
+            listOf(
+                "Singleton",
+                "Reusable",
+                "ActivityRetainedScoped",
+                "ActivityScoped",
+                "ViewModelScoped",
+                "FragmentScoped",
+                "ServiceScoped",
+                "ViewScoped",
+            )
     }
 }
