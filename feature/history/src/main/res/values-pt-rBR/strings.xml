@@ -13,4 +13,8 @@
     <string name="history_deleted">Tradução excluída</string>
     <string name="history_undo">Desfazer</string>
     <string name="history_action_delete">Excluir tradução</string>
+    <string name="history_delete_failed">Não foi possível excluir essa tradução</string>
+    <string name="history_restore_failed">Não foi possível recuperar essa tradução</string>
+    <string name="history_favourite_failed">Não foi possível atualizar as Salvas</string>
+    <string name="history_retry">Tentar novamente</string>
 </resources>

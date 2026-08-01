@@ -573,6 +573,59 @@ class KonsistArchitectureTest {
         assertThat(callsOutsideTranslating).isEmpty()
     }
 
+    /**
+     * Issue #190 — History's write failures reach the user.
+     *
+     * `HistoryViewModelTest` proves the ViewModel stops the throw and records the
+     * failure. Nothing there proves anyone SHOWS it: delete the `LaunchedEffect`
+     * from `HistoryScreen` and every one of those tests stays green while the app
+     * goes back to a write that fails in silence — the #179 shape, one level down
+     * from the crash this issue opened for.
+     *
+     * SOURCE-SHAPE assertions, same honesty as the gates above: this repo has no
+     * Compose unit-test runtime, so nothing here can prove a snackbar appears.
+     * What it makes RED is every regression that compiles and leaves the suite
+     * green — the surface deleted, the Retry action dropped, one of the three
+     * messages left unwired, or the consume moved after the retry (which would
+     * clear the failure the retry is about to produce, and put the user back in
+     * silence on the second failure).
+     *
+     * Comments and string literals are stripped first, so a KDoc that explains
+     * the surface cannot stand in for having one.
+     */
+    @Test
+    fun `the History screen shows a write that failed`() {
+        val screen = filesUnder(HISTORY_MAIN).single { it.name == HISTORY_SCREEN_FILE }
+        val host = code(screen.functions().single { it.name == HISTORY_SCREEN_FILE }.text)
+
+        // Vacuous-pass guard: the surface is read from the ViewModel at all.
+        assertThat(host).contains("viewModel.failure")
+        assertThat(host).contains("showSnackbar")
+
+        // §94's way forward, and the copy for all three writes — a message wired
+        // for `delete` alone is exactly the partial fix issue #190 warns about.
+        assertThat(host).contains("R.string.history_retry")
+        HISTORY_FAILURE_STRINGS.forEach { assertThat(host).contains(it) }
+        assertThat(host).contains("viewModel.retry(")
+
+        // …and each write gets its OWN message. Asserting the three strings are
+        // merely PRESENT is not enough: a branch re-pointed at another write's
+        // copy leaves all three `stringResource` calls in place and reads as a
+        // pass (measured — mutation M10 turned zero tests red before this).
+        val arms =
+            HISTORY_ARM
+                .findAll(host)
+                .associate { it.groupValues[1] to it.groupValues[2].trim() }
+        assertThat(arms.keys).containsExactly("DELETE", "RESTORE", "FAVOURITE")
+        assertThat(arms.values.toSet()).hasSize(HISTORY_FAILURE_STRINGS.size)
+
+        // The order is load-bearing, not stylistic.
+        val consumed = host.indexOf(HISTORY_CONSUME)
+        val retried = host.indexOf("viewModel.retry(")
+        assertThat(consumed).isGreaterThan(-1)
+        assertThat(consumed).isLessThan(retried)
+    }
+
     /** Every start index of [token] — the state-branch walk needs positions, not counts. */
     private fun String.indicesOf(token: String): List<Int> =
         generateSequence(indexOf(token).takeIf { it != -1 }) { previous ->
@@ -662,6 +715,30 @@ class KonsistArchitectureTest {
          * someone say out loud that it announces too.
          */
         const val RENDER_SITES = 2
+
+        // ---- issue #190: History's write failures reach the user ---------------
+
+        /** The screen that owns History's snackbar host; Konsist drops the extension. */
+        const val HISTORY_SCREEN_FILE = "HistoryScreen"
+        const val HISTORY_MAIN = "/feature/history/src/main/"
+
+        /** One per write path — `delete` alone was the partial fix the issue rules out. */
+        val HISTORY_FAILURE_STRINGS =
+            listOf(
+                "R.string.history_delete_failed",
+                "R.string.history_restore_failed",
+                "R.string.history_favourite_failed",
+            )
+
+        /** Must run BEFORE the retry, or the retry's own failure is cleared unread. */
+        const val HISTORY_CONSUME = "viewModel.onFailureShown("
+
+        /**
+         * One `when` arm of the failure-to-copy map. The right-hand side is captured
+         * to the end of the line rather than as an identifier, so inlining the
+         * `stringResource` call into the arm still reads as one distinct message.
+         */
+        val HISTORY_ARM = Regex("""HistoryWrite\.(DELETE|RESTORE|FAVOURITE)\s*->\s*([^\n]+)""")
 
         /** The only call that ends the binding (AOSP: nothing else does). */
         const val SHUTDOWN = "shutdown()"

@@ -13,4 +13,8 @@
     <string name="history_deleted">Nabura ang pagsasalin</string>
     <string name="history_undo">I-undo</string>
     <string name="history_action_delete">Burahin ang pagsasalin</string>
+    <string name="history_delete_failed">Hindi nabura ang pagsasalin</string>
+    <string name="history_restore_failed">Hindi naibalik ang pagsasalin</string>
+    <string name="history_favourite_failed">Hindi na-update ang Naka-save</string>
+    <string name="history_retry">Subukang muli</string>
 </resources>

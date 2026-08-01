@@ -40,7 +40,26 @@ Both empty states name the action that fills the list, so neither is a blank scr
 > action. Removing the undo action turns an unconfirmed delete into data loss; if the snackbar
 > ever goes away, the delete needs a confirmation instead.
 
-## 4. Accessibility (C-4)
+## 4. Write failures (issue #190 · EDGE_CASES §94)
+
+All three writes could take the app down instead of saying anything. Each now names the action
+that failed and carries `history_retry` as the snackbar action, which is the §94 "way forward".
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `history_delete_failed` | string | `Couldn't delete that translation` | — | the row is still in the list, which is the honest state |
+| `history_restore_failed` | string | `Couldn't bring that translation back` | — | Undo failed — the one failure here that loses data, since the delete it was undoing succeeded |
+| `history_favourite_failed` | string | `Couldn't update Saved` | — | names the tab (`history_tab_saved`), not "bookmark" — the user sees "Saved" |
+| `history_retry` | string | `Retry` | — | snackbar action on all three |
+
+> The message never carries the database's own words. "database disk image is malformed (code 11)"
+> is a diagnostic, not a sentence for a user; what the snackbar owes them is which action failed
+> and a way to run it again.
+>
+> No `history_*_failed` message repeats "try again" in its text — the Retry action is right beside
+> it, and Material's snackbar guidance is one message, one action.
+
+## 5. Accessibility (C-4)
 
 | Key | Type | `en` | Args | Notes |
 |-----|------|------|------|-------|
@@ -53,7 +72,7 @@ Both empty states name the action that fills the list, so neither is a blank scr
 > action the tap will perform, which is what TalkBack announces. One shared "Bookmark" string
 > would leave a blind user unable to tell the current state.
 
-## 5. Translation status (C-12)
+## 6. Translation status (C-12)
 
 Every key above has a `fil` and a `pt-rBR` value in the module's locale files today. Those
 wordings were authored in-project, not by a native speaker, and are queued for native-speaker

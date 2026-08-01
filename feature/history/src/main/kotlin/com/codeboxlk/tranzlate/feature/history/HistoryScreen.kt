@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -26,8 +27,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -78,6 +81,42 @@ fun HistoryScreen(
     val scope = rememberCoroutineScope()
     val deletedMessage = stringResource(R.string.history_deleted)
     val undoLabel = stringResource(R.string.history_undo)
+
+    // Issue #190 — a write that fails must say so. All three used to throw out of
+    // a handler-less scope and end the process, which EDGE_CASES §94 names by
+    // hand ("no crash-instead-of-message") and which left the user with no
+    // account of what happened to their data.
+    val failure by viewModel.failure.collectAsStateWithLifecycle()
+    val deleteFailed = stringResource(R.string.history_delete_failed)
+    val restoreFailed = stringResource(R.string.history_restore_failed)
+    val favouriteFailed = stringResource(R.string.history_favourite_failed)
+    val retryLabel = stringResource(R.string.history_retry)
+    LaunchedEffect(failure) {
+        val pending = failure ?: return@LaunchedEffect
+        // "Translation deleted" was shown optimistically, the instant the swipe
+        // landed, because Undo has to be reachable immediately. If the delete then
+        // failed, that message is now untrue — and SnackbarHostState serialises, so
+        // the correction would otherwise wait out the message it contradicts.
+        snackbarHostState.currentSnackbarData?.dismiss()
+        val result =
+            snackbarHostState.showSnackbar(
+                message =
+                    when (pending.write) {
+                        HistoryWrite.DELETE -> deleteFailed
+                        HistoryWrite.RESTORE -> restoreFailed
+                        HistoryWrite.FAVOURITE -> favouriteFailed
+                    },
+                actionLabel = retryLabel,
+                // Long, not Short: an error the user is expected to act on needs
+                // longer than the four seconds a confirmation gets.
+                duration = SnackbarDuration.Long,
+            )
+        // Consume BEFORE retrying, in this order. The retry can fail the same way,
+        // and the screen has to see that as a NEW pending failure — clearing after
+        // it would wipe the second failure and leave the user with no message at all.
+        viewModel.onFailureShown(pending)
+        if (result == SnackbarResult.ActionPerformed) viewModel.retry(pending)
+    }
     HistoryContent(
         history = history,
         favourites = favourites,
@@ -442,6 +481,52 @@ private fun HistoryEmptyPreview() {
             onPick = {},
             onBack = {},
         )
+    }
+}
+
+/**
+ * The write-failure faces (issue #190), one preview per STATE.
+ *
+ * `SnackbarHost` builds its own `Snackbar` from the queued data, and a static
+ * preview runs no effects — so nothing would render if these previewed the screen.
+ * They render the same M3 component the host does, with the same strings and the
+ * same Retry action, which is what the owner has to be able to look at.
+ */
+@Composable
+private fun FailureSnackbar(message: String) {
+    Snackbar(action = { TextButton(onClick = {}) { Text(stringResource(R.string.history_retry)) } }) {
+        Text(message)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun HistoryDeleteFailedPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            FailureSnackbar(stringResource(R.string.history_delete_failed))
+        }
+    }
+}
+
+/** The costly one: the delete already happened, so a failed Undo loses the row. */
+@PreviewLightDark
+@Composable
+private fun HistoryRestoreFailedPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            FailureSnackbar(stringResource(R.string.history_restore_failed))
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun HistoryFavouriteFailedPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            FailureSnackbar(stringResource(R.string.history_favourite_failed))
+        }
     }
 }
 
