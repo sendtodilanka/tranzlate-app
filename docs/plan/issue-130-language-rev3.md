@@ -83,7 +83,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 4 — 16a Translate-to
 | PR | Scope | Status |
 |---|---|---|
-| PR-12 | 16a: voice marks (live day-1 → 19j) + per-role recents + `Selected(inner)` wrapper (ruling 1) | ⬜ |
+| PR-12 | 16a: voice marks **drawn only where the device has an offline voice** (rev 5 — no 19j; see §rev-5 below and #180) + per-role recents + `Selected(inner)` wrapper (ruling 1) | ⬜ |
 
 ### Phase 5 — adaptive
 | PR | Scope | Status |
@@ -121,7 +121,10 @@ item in DESIGNER-BRIEF §11, verified against the drawings. Highlights that
 change what gets built:
 
 - **21b** no longer offers a download on Azerbaijani or Basque (no pack exists
-  for either), **19j and 19i are cut** (neither has a trigger that can fire),
+  for either), **19j and 19i are cut** (neither has a trigger that can fire) —
+  *this paragraph said so from the day rev 5 landed, while the PR-12 scope row
+  above went on ordering 19j built until #180; the row is corrected, and the
+  ruling's three matching lines with it*,
   the **Detect `ONLINE ONLY` chip is gone from every frame** — so **PR-27's
   scope shrinks to the shipped app only**, since the spec no longer disagrees
   with ruling 2.
