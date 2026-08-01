@@ -104,6 +104,34 @@ block, so the cost of leaving them open is visible.
 `BUSINESS_MODEL.md` says so in four places). No free pack limit. No per-row pack
 sizes. Detect stays on-device.
 
+### One approved ruling was amended — 2026-08-01, #149/#159
+
+The owner approved the eight #130 rulings verbatim. **One of them has since been
+corrected**, and it is recorded here rather than only inside the ruling doc,
+because an approved decision changing quietly is worse than the wrong decision.
+
+The rule read *"TTS = enumerate→cache→shutdown, never a standing engine."* It
+now reads **"never past its consumer."** Both extremes were measured on a
+device, and both lost:
+
+- **Standing forever is real harm.** `com.google.android.tts` stays at
+  `oom adj 100` — above the reclaim tier — even after the app is backgrounded to
+  `adj 900`. AOSP binds it with `BIND_SCHEDULE_LIKE_TOP_APP` and an auto-
+  disconnect timeout of **0**, documented as *"disable automatic unbinding"*.
+  Nothing but `shutdown()` or process death ends it.
+- **Shutting down per utterance is also real harm.** tap → audio is **670 ms
+  fresh against 1–8 ms standing**, on a button with no progress affordance.
+
+So the rule was right about the danger and wrong about the unit. The engine is
+now bound to its consumer — held from `Translating` until the answer is gone or
+the app stops, released on both.
+
+**What did not change:** the enumeration seam (#147) still shuts down on every
+path, including its timeout. That REJECT stands exactly as approved.
+
+Evidence: `docs/research/issue-149-tts-lifetime.md`. Amended in #159; the ruling
+doc carries the same note at §4, §7.3 and its REJECT list.
+
 ---
 
 ## Deferred on purpose
