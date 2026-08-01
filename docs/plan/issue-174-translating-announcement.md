@@ -109,9 +109,9 @@ for three reasons found in the shipped code, not in preference.
    see the correct text on screen is worse than the gap it would close.
 2. **The state is already announced, correctly, in all three of its surfaces.**
    `tt_text_limit` carries `LiveRegionMode.Assertive` in the portrait face
-   (`:1039`) and in the pane (`:1267`), announcing the per-kind body
+   (`:1039`) and in the pane (`:1301`), announcing the per-kind body
    (`text_error_limit_reached` / `text_error_not_entitled`); the C-11 sheet
-   announces its per-kind title assertively (`:1143`). Adding a fourth,
+   announces its per-kind title assertively (`:1177`). Adding a fourth,
    kind-blind announcement makes the at-limit moment noisier and less accurate.
 3. **The key never agreed with itself.** C-4 says "Daily Advanced-AI limit
    reached"; the contract's own row for the same key
@@ -193,3 +193,22 @@ M2 needed a second attempt worth recording: the first version *also* reverted th
 double-announcement rule unproven — a mutation that goes red for the wrong reason
 is not evidence. Re-run surgically (branch left intact, face additionally rendered
 under `Result`) so only the intended rule could fire.
+
+## Line citations, corrected 2026-08-02 (#187 co-verify)
+
+The three `LiveRegionMode.Assertive` markers this document cites were written
+from `origin/main` and **not re-checked after this PR's own edit moved them**.
+`TranslatingFace()` and its KDoc add 34 lines above two of the three, so:
+
+| Surface | Cited | Actual |
+|---|---|---|
+| portrait `tt_text_limit` | `:1039` | `:1039` — above the insertion, unmoved |
+| pane `tt_text_limit` | `:1267` | **`:1301`** |
+| C-11 sheet title | `:1143` | **`:1177`** |
+
+Both wrong by exactly 34. The claim they support — all three surfaces already
+announce the limit assertively, per kind — is unchanged and was re-verified.
+
+This is rule 11's fourth cause committed against this document by the change it
+documents: a citation is a claim about the code, and a diff that moves code
+invalidates it.
