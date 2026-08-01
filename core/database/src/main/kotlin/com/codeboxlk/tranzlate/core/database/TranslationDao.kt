@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -50,6 +51,36 @@ interface TranslationDao {
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entity: TranslationEntity): Long
+
+    /**
+     * Undo's whole write, in ONE transaction (issue #189 co-verify).
+     *
+     * [mergeIntoTuple] then [insert] were two separate statements in the
+     * repository. A writer landing between them — an in-flight
+     * `saveToHistory` finishing for the same tuple, or a second undo — takes
+     * the tuple after the merge has already reported 0, so the insert that
+     * follows hits the UNIQUE C-8 index, `IGNORE`s, returns -1, and the star
+     * and the original stamp are dropped in silence. That is issue #179's own
+     * harm, narrowed to a race window instead of firing on every
+     * occupied-tuple undo. The co-verify lens reproduced it rather than
+     * arguing it.
+     *
+     * Room runs a `@Transaction` method's queries in one transaction, so the
+     * tuple cannot change between the two.
+     */
+    @Transaction
+    suspend fun restoreTuple(entity: TranslationEntity) {
+        val merged =
+            mergeIntoTuple(
+                sourceText = entity.sourceText,
+                sourceLang = entity.sourceLang,
+                targetLang = entity.targetLang,
+                engine = entity.engine,
+                favourite = entity.favourite,
+                createdAt = entity.createdAt,
+            )
+        if (merged == 0) insert(entity)
+    }
 
     /**
      * Undo-merge (issue #179) — folds a deleted row's star and original stamp onto

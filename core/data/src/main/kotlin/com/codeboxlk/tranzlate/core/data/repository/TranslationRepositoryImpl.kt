@@ -71,19 +71,8 @@ class TranslationRepositoryImpl
          * the row already carried the star and the stamp the restore was asking
          * for. Both readings of `changes()` end in the same correct state.
          */
-        override suspend fun restore(translation: Translation) {
-            val entity = translation.toEntity().copy(id = 0L)
-            val merged =
-                translationDao.mergeIntoTuple(
-                    sourceText = entity.sourceText,
-                    sourceLang = entity.sourceLang,
-                    targetLang = entity.targetLang,
-                    engine = entity.engine,
-                    favourite = entity.favourite,
-                    createdAt = entity.createdAt,
-                )
-            if (merged == 0) translationDao.insert(entity)
-        }
+        override suspend fun restore(translation: Translation) =
+            translationDao.restoreTuple(translation.toEntity().copy(id = 0L))
 
         override suspend fun delete(id: Long) = translationDao.delete(id)
 
