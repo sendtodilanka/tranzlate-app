@@ -18,6 +18,13 @@
             "if": "Bash(gh *)",
             "timeout": 40,
             "statusMessage": "Checking merge guard rails"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-pr.sh\"",
+            "if": "Bash(gh *)",
+            "timeout": 15,
+            "statusMessage": "Checking PR body carries its enumeration and repro"
           }
         ]
       }
