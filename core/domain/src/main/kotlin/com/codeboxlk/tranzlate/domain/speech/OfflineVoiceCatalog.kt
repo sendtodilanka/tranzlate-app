@@ -2,8 +2,9 @@ package com.codeboxlk.tranzlate.domain.speech
 
 /**
  * Which languages this device can READ ALOUD with no connection (issue #130
- * rev.3 U-3 — the 16a speaker mark and the 19j "no offline voice" sheet both
- * ask this and nothing else).
+ * rev.3 U-3 — the 16a speaker mark asks this and nothing else. The 19j "no
+ * offline voice" sheet asked it too, until rev 5 cut 19j: the mark is drawn
+ * only where a voice exists, so there is no absence left to explain — #180).
  *
  * Three things this contract deliberately fixes about the question:
  *

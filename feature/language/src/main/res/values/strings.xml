@@ -3,7 +3,14 @@
     <string name="text_lang_sheet_source_title">Translate from</string>
     <string name="text_lang_sheet_target_title">Translate to</string>
     <string name="text_lang_recent_header">Recent</string>
+    <!-- 16a names the role, because the target picker's recents are scoped to
+         targets: a header reading plain "Recent" over a target-only list would
+         under-describe it, and one served the merged list would over-claim. -->
+    <string name="text_lang_target_recent_header">Recently used as target</string>
     <string name="text_lang_all_header">All languages</string>
+    <!-- Said once at the top of 16a, never per row. A voice and a translate pack
+         are separate installs, which is why the sentence names the difference. -->
+    <string name="text_lang_voice_legend">Speaker marks languages this device can also speak offline — a voice, installed separately from the translate pack</string>
     <string name="text_lang_loading">Loading languages…</string>
     <string name="text_lang_no_results">No languages match “%1$s”</string>
     <string name="text_lang_no_results_body">Check the spelling, or try the language\'s own name.</string>
@@ -46,6 +53,9 @@
     <string name="cd_text_lang_row_downloadable">%1$s, available for offline use</string>
     <string name="cd_text_lang_row_online_only">%1$s, online only</string>
     <string name="cd_text_lang_row_failed">%1$s, download failed</string>
+    <!-- Wraps whichever row description above applies, so TalkBack hears one
+         sentence. %1$s is that description, already formatted. -->
+    <string name="cd_text_lang_row_voice">%1$s, can be spoken offline</string>
     <string name="cd_text_lang_download">Download %1$s for offline use</string>
     <!-- Never "Cancel": ML Kit has no cancel, so stopping IS removing (plan R2). -->
     <string name="cd_text_lang_stop">Stop download and remove %1$s</string>

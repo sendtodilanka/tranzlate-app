@@ -3,7 +3,9 @@
     <string name="text_lang_sheet_source_title">Isalin mula sa</string>
     <string name="text_lang_sheet_target_title">Isalin sa</string>
     <string name="text_lang_recent_header">Kamakailan</string>
+    <string name="text_lang_target_recent_header">Kamakailang ginamit bilang target</string>
     <string name="text_lang_all_header">Lahat ng wika</string>
+    <string name="text_lang_voice_legend">Minamarkahan ng speaker ang mga wikang kayang bigkasin offline ng device na ito — isang boses, hiwalay na naka-install sa translate pack</string>
     <string name="text_lang_loading">Naglo-load ng mga wika…</string>
     <string name="text_lang_no_results">Walang wikang tumutugma sa “%1$s”</string>
     <string name="text_lang_no_results_body">Suriin ang baybay, o subukan ang sariling pangalan ng wika.</string>
@@ -35,6 +37,7 @@
     <string name="cd_text_lang_row_downloadable">%1$s, puwedeng i-download para offline</string>
     <string name="cd_text_lang_row_online_only">%1$s, online lang</string>
     <string name="cd_text_lang_row_failed">%1$s, hindi natuloy ang pag-download</string>
+    <string name="cd_text_lang_row_voice">%1$s, kayang bigkasin offline</string>
     <string name="cd_text_lang_download">I-download ang %1$s para magamit offline</string>
     <string name="cd_text_lang_stop">Ihinto ang pag-download at alisin ang %1$s</string>
     <string name="cd_text_lang_retry">Subukang i-download muli ang %1$s</string>

@@ -206,6 +206,8 @@ private class MixedTierLanguageRepository : LanguageRepository {
             ),
         )
 
+    override fun recentSelections(role: LanguageRole): Flow<Map<String, Long>> = flowOf(emptyMap())
+
     override suspend fun setLastUsed(
         languageId: String,
         role: LanguageRole,
@@ -221,6 +223,8 @@ private class StaticLanguageRepository : LanguageRepository {
                 Language(id = "fr", name = "French", offlineAvailable = true, offlineDownloaded = false),
             ),
         )
+
+    override fun recentSelections(role: LanguageRole): Flow<Map<String, Long>> = flowOf(emptyMap())
 
     override suspend fun setLastUsed(
         languageId: String,

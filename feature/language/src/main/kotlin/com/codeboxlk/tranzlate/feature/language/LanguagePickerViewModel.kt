@@ -104,6 +104,30 @@ class LanguagePickerViewModel
                 LanguageRole.TARGET -> targetSelection
             }
 
+        private val sourceRecents: StateFlow<Map<String, Long>> =
+            languageRepository
+                .recentSelections(LanguageRole.SOURCE)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyMap())
+
+        private val targetRecents: StateFlow<Map<String, Long>> =
+            languageRepository
+                .recentSelections(LanguageRole.TARGET)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyMap())
+
+        /**
+         * Stamps for the [role] side's own recents section — 16a's "Recently
+         * used as target" may only ever list languages picked as a target.
+         *
+         * A third independent [StateFlow] rather than a fourth `combine` source,
+         * for the same reason as the two above: recents are a shortcut, and a
+         * slow store must never be able to hold 194 rows behind them.
+         */
+        fun recents(role: LanguageRole): StateFlow<Map<String, Long>> =
+            when (role) {
+                LanguageRole.SOURCE -> sourceRecents
+                LanguageRole.TARGET -> targetRecents
+            }
+
         /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
         val pendingConsent: StateFlow<String?> = downloadGate.pendingConsent
 

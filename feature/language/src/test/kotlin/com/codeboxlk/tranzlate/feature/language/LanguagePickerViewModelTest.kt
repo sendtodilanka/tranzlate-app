@@ -70,7 +70,22 @@ class LanguagePickerViewModelTest {
         var choiceAtStampTime: (() -> String)? = null
         var observedChoice: String? = null
 
+        /**
+         * Per-role recents, kept as two independent maps precisely because the
+         * production store keeps them apart: a fake that served one map for
+         * both roles could not tell a target-scoped section from a merged one,
+         * which is the whole claim 16a's header makes.
+         */
+        val sourceRecents = MutableStateFlow<Map<String, Long>>(emptyMap())
+        val targetRecents = MutableStateFlow<Map<String, Long>>(emptyMap())
+
         override fun languages(): Flow<List<Language>> = catalog
+
+        override fun recentSelections(role: LanguageRole): Flow<Map<String, Long>> =
+            when (role) {
+                LanguageRole.SOURCE -> sourceRecents
+                LanguageRole.TARGET -> targetRecents
+            }
 
         override suspend fun setLastUsed(
             languageId: String,
@@ -177,6 +192,41 @@ class LanguagePickerViewModelTest {
             translatePrefs = translatePrefs,
             appScope = appScope,
         )
+
+    /**
+     * The 16a wiring: the target side's recents section reads the TARGET flow
+     * and nothing else. The fake keeps two independent maps for exactly this —
+     * a fake serving one map for both roles could not tell a scoped section
+     * from a merged one, which is the whole claim the header makes.
+     */
+    @Test
+    fun `each side reads its own recents`() =
+        runTest(dispatcher) {
+            repository.sourceRecents.value = mapOf("en" to 10L)
+            repository.targetRecents.value = mapOf("fr" to 20L)
+            val subject = viewModel()
+
+            subject.recents(LanguageRole.TARGET).test {
+                assertThat(awaitItem()).isEmpty() // pre-emission frame
+                assertThat(awaitItem()).containsExactly("fr", 20L)
+            }
+            subject.recents(LanguageRole.SOURCE).test {
+                assertThat(awaitItem()).isEmpty() // pre-emission frame
+                assertThat(awaitItem()).containsExactly("en", 10L)
+            }
+        }
+
+    /** No target picks yet → the empty map that makes the section ABSENT, not a header over nothing. */
+    @Test
+    fun `an untouched target side serves an empty recents map`() =
+        runTest(dispatcher) {
+            repository.sourceRecents.value = mapOf("en" to 10L)
+
+            viewModel().recents(LanguageRole.TARGET).test {
+                assertThat(awaitItem()).isEmpty()
+                expectNoEvents()
+            }
+        }
 
     @Test
     fun `catalog is served from the repository`() =

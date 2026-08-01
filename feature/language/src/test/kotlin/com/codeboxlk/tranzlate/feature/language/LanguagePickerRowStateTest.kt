@@ -24,13 +24,15 @@ class LanguagePickerRowStateTest {
     @Test
     fun `selected and on device`() {
         val state = rowStateOf(language(downloaded = true), null, selected = true)
-        assertThat(state).isEqualTo(LanguageRowState.Selected(onDevice = true))
+        assertThat(state).isEqualTo(LanguageRowState.Selected(LanguageRowState.Downloaded()))
+        assertThat((state as LanguageRowState.Selected).onDevice).isTrue()
     }
 
     @Test
     fun `selected and not on device carries no on-device line`() {
         val state = rowStateOf(language(downloaded = false), null, selected = true)
-        assertThat(state).isEqualTo(LanguageRowState.Selected(onDevice = false))
+        assertThat(state).isEqualTo(LanguageRowState.Selected(LanguageRowState.Downloadable))
+        assertThat((state as LanguageRowState.Selected).onDevice).isFalse()
     }
 
     @Test

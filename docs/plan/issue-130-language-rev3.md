@@ -83,7 +83,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 4 — 16a Translate-to
 | PR | Scope | Status |
 |---|---|---|
-| PR-12 | 16a: voice marks **drawn only where the device has an offline voice** (rev 5 — no 19j; see §rev-5 below and #180) + per-role recents + `Selected(inner)` wrapper (ruling 1) | ⬜ |
+| PR-12 | 16a: voice marks **drawn only where the device has an offline voice** (rev 5 — no 19j; see §rev-5 below and #180) + per-role recents + `Selected(inner)` wrapper (ruling 1) | ✅ #185, 2026-08-02 |
 
 ### Phase 5 — adaptive
 | PR | Scope | Status |
