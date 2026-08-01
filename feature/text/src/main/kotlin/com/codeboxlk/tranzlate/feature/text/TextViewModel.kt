@@ -33,7 +33,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 /** DECISIONS defaults table (pre-first-emission frame only — DataStore owns the real default). */
 private const val FALLBACK_SOURCE_LANG = "en"
@@ -72,6 +74,36 @@ private const val PREFS_SUBSCRIBE_TIMEOUT_MS = 5_000L
  * flow-of-thought limit; successes are never delayed by it.
  */
 private const val BUSY_FLOOR_MS = 500L
+
+/**
+ * What the star tap asked the app to do (issue #195).
+ *
+ * The toggle runs in both directions, so the failure message has to as well:
+ * telling a user who was un-saving that we "couldn't save" is a small lie about
+ * the one thing they just did.
+ */
+enum class StarIntent {
+    SAVE,
+    REMOVE,
+}
+
+/**
+ * A star write that did not land, held until the composer has shown it (#195).
+ *
+ * @property id makes two consecutive identical failures DIFFERENT values.
+ *   Without it, "save failed → Retry → failed the same way" produces an equal
+ *   [StarFailure], `StateFlow` conflates the repeat away, and the second failure
+ *   is never announced — a silent failure introduced by the fix for silence.
+ * @property result the translation the write was asked for. Retry checks it is
+ *   still the one on screen: the snackbar outlives a translation (the user can
+ *   retype and translate again while it is up), and starring a DIFFERENT result
+ *   than the message named is a write nobody asked for.
+ */
+data class StarFailure(
+    val id: Long,
+    val intent: StarIntent,
+    val result: TextUiState.Result,
+)
 
 /**
  * The Text vertical's ONE state holder (APP_STRUCTURE — the screen ASKS the
@@ -168,6 +200,36 @@ class TextViewModel
         /** Whether the CURRENT result's row is favourited — drives the star icon. */
         val resultFavourite: StateFlow<Boolean> = _resultFavourite.asStateFlow()
 
+        // Declared HERE, above the `state` setter, for the same reason
+        // [_resultFavourite] is: `restoreState()` runs from `init{}` and reaches
+        // the setter, and a property initializer below that block would still be
+        // the JVM default when the setter fires.
+        private val starFailureIds = AtomicLong()
+        private val _starFailure = MutableStateFlow<StarFailure?>(null)
+
+        /**
+         * The star write that did not land, or null (issue #195).
+         *
+         * The three calls behind the star used to run in a `viewModelScope`
+         * coroutine with no try and no catch. `viewModelScope` installs no
+         * `CoroutineExceptionHandler`, so a `SQLiteException` — disk full,
+         * database locked, `SQLiteDatabaseCorruptException` — went straight to
+         * the process handler: the user taps the star on the translation they
+         * are reading and the app disappears. EDGE_CASES §94 forbids exactly
+         * that ("no crash-instead-of-message") and EDGE_CASES:114 already ruled
+         * on this control by name — `Save / star … offline write fails →
+         * [Retry]` — in the composer's own result-actions table.
+         *
+         * A retained StateFlow, NOT a one-shot event flow, and here the reason
+         * is stronger than it was for History (#190): this ViewModel is hoisted
+         * OUTSIDE the NavDisplay entries, so it lives in the Activity's
+         * ViewModelStore and outlives the composer's composition every time the
+         * user opens the language picker or goes Home. A failure emitted into
+         * that gap has no subscriber and is dropped forever. Held state is shown
+         * when the composer is next composed; [onStarFailureShown] retires it.
+         */
+        val starFailure: StateFlow<StarFailure?> = _starFailure.asStateFlow()
+
         /** FREE pool cap for the "{left}/{cap}" meter (BUSINESS_MODEL §5 goal-gradient). */
         val aiCap: Int = config.limitFreeAi()
 
@@ -214,6 +276,15 @@ class TextViewModel
                 savedStateHandle[KEY_RESULT_ENGINE] = (value as? TextUiState.Result)?.engine?.name
                 savedStateHandle[KEY_RESULT_SRC] = (value as? TextUiState.Result)?.resolvedSourceLang
                 refreshResultFavourite(value as? TextUiState.Result)
+                // A held star failure names ONE result (issue #195). The composer
+                // can leave that result behind while the failure is still waiting
+                // to be shown — Back to Home clears to Idle, the top-bar action
+                // clears to Idle, a new Translate replaces it — and the message
+                // would then arrive about a translation the user can no longer
+                // see, carrying a Retry with nothing to act on. Retired with the
+                // result it belongs to, for the same reason a cancelled write
+                // says nothing: there is nobody left to tell.
+                if (_starFailure.value?.result != value) _starFailure.value = null
                 savedStateHandle[KEY_ERROR_REASON] = (value as? TextUiState.Error)?.cause?.name
                 savedStateHandle[KEY_LIMIT_NOT_ENTITLED] = (value as? TextUiState.Limit)?.notEntitled
             }
@@ -493,12 +564,38 @@ class TextViewModel
                 return
             }
             viewModelScope.launch {
-                _resultFavourite.value =
-                    translationRepository
-                        .cached(result.request.text, src, result.request.targetLang, result.engine)
-                        ?.favourite ?: false
+                _resultFavourite.value = readFavourite(result, src)
             }
         }
+
+        /**
+         * The star's READ half, guarded for the same reason as its write half
+         * (issue #195). This runs from the `state` setter on EVERY result, so an
+         * unguarded lookup ends the process the moment a translation lands —
+         * before the user can reach the star at all. Fixing only the tap would
+         * have left the issue's own harm alive on the path nobody checked.
+         *
+         * Failure shows the star UNFILLED and says nothing. Nothing was asked
+         * for, so there is nothing to report and nothing to retry; and unfilled
+         * is the same face "no row found" already produces, where leaving the
+         * previous result's value would paint THIS result with the last one's
+         * bookmark. It is not a dead end either: the star stays live, and the
+         * tap that follows goes through [onToggleFavourite], which does speak.
+         */
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
+        private suspend fun readFavourite(
+            result: TextUiState.Result,
+            src: String,
+        ): Boolean =
+            try {
+                translationRepository
+                    .cached(result.request.text, src, result.request.targetLang, result.engine)
+                    ?.favourite ?: false
+            } catch (rethrown: CancellationException) {
+                throw rethrown // never break structured cancellation
+            } catch (unused: Throwable) {
+                false
+            }
 
         // ---- issue #84: result actions — speak + reverse ---------------------
 
@@ -587,7 +684,91 @@ class TextViewModel
         fun onToggleFavourite() {
             val result = state as? TextUiState.Result ?: return
             val src = result.resolvedSourceLang ?: return
-            viewModelScope.launch {
+            // Read from the icon the user actually pressed, so the message names
+            // what THEY were doing rather than which statement the database
+            // happened to be on when it gave up.
+            val asked = if (_resultFavourite.value) StarIntent.REMOVE else StarIntent.SAVE
+            viewModelScope.launch { writeFavourite(result, src, asked) }
+        }
+
+        /**
+         * The snackbar's Retry — the same write, on the result it failed for.
+         *
+         * The staleness guard is not defensive tidying: a snackbar showing an
+         * action the user is expected to take stays up long enough for them to
+         * type something new and translate it, and this ViewModel keeps ONE
+         * `resultFavourite` for whatever is on screen. Without the guard, Retry
+         * would star a translation the message never mentioned. When the result
+         * has moved on there is nothing owed — the failure was about a face that
+         * is gone, and the new result's star is live and tappable.
+         *
+         * The intent is re-derived rather than replayed, which is safe because
+         * the failure handler puts the icon back to the truth it last verified:
+         * the second run therefore asks for exactly what the first one did.
+         */
+        fun retryStar(failure: StarFailure) {
+            if (state != failure.result) return
+            onToggleFavourite()
+        }
+
+        /**
+         * The composer has shown [shown] and does not need it again.
+         *
+         * Compare-and-set, not a plain clear: a Retry can fail while the first
+         * message is still on screen, and clearing blind would throw that newer
+         * failure away unread.
+         */
+        fun onStarFailureShown(shown: StarFailure) {
+            _starFailure.compareAndSet(shown, null)
+        }
+
+        /**
+         * The star's write half, guarded (issue #195).
+         *
+         * `Throwable`, not `Exception`. The point of this guard is that NOTHING
+         * escapes into a scope with no handler, and `Exception` is not that:
+         * Room here is Room-over-framework-SQLite (`Room.databaseBuilder` with no
+         * driver override), and every statement it runs ends in a `native` method
+         * on `android.database.sqlite.SQLiteConnection` — `nativeExecute`,
+         * `nativePrepareStatement`. A JNI link that cannot be satisfied raises
+         * `UnsatisfiedLinkError`: a `LinkageError`, so an `Error`, so NOT an
+         * `Exception`, and a narrow catch hands it straight back to the process
+         * handler this whole guard exists to keep it away from. (Verified here,
+         * not inherited from #190: SDK sources `SQLiteConnection.java:138-167`
+         * declare the natives, `:754` calls one, and the JDK on this machine
+         * reports `UnsatisfiedLinkError → LinkageError → Error → Throwable`.)
+         *
+         * `CancellationException` is re-thrown FIRST and by name, because it is
+         * an `Exception` — widening the catch protects it not at all, and only
+         * the re-throw does. #142 shipped a worker that died permanently because
+         * a `catch (e: Exception)` ate the cancellation meant to stop it
+         * cleanly. Same shape as `TranslateTextUseCase.stampSafely` (#141).
+         *
+         * [verified] is what makes ONE catch honest about THREE failure points.
+         * A star that lies about whether the tap landed is issue #179 again, so
+         * it may only ever show what the database has actually confirmed:
+         *
+         * - the LOOKUP fails → nothing was written and nothing was learned, so
+         *   the icon does not move at all;
+         * - the INSERT fails → nothing was written, and the lookup just proved
+         *   there is no row, so the star is unfilled;
+         * - the UPDATE fails → nothing was written, and the lookup gave us the
+         *   row's stored flag, so the star shows THAT and the flip is undone.
+         *
+         * KNOWN LIMIT, deliberately unchanged here: [TranslationRepository.save]
+         * answers -1 when the C-8 tuple was taken between the lookup and the
+         * insert, and that leaves the star unfilled with nothing said. It is not
+         * a throw and it is not this issue; the honest fix is the merge #189
+         * gave the sibling case, which is a behaviour decision of its own.
+         */
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
+        private suspend fun writeFavourite(
+            result: TextUiState.Result,
+            src: String,
+            asked: StarIntent,
+        ) {
+            var verified = _resultFavourite.value
+            try {
                 val row =
                     translationRepository.cached(
                         result.request.text,
@@ -595,6 +776,8 @@ class TextViewModel
                         result.request.targetLang,
                         result.engine,
                     )
+                // The lookup answered, so the stored truth is known from here on.
+                verified = row?.favourite == true
                 if (row == null) {
                     val id =
                         translationRepository.save(
@@ -613,6 +796,17 @@ class TextViewModel
                     translationRepository.setFavourite(row.id, !row.favourite)
                     _resultFavourite.value = !row.favourite
                 }
+            } catch (rethrown: CancellationException) {
+                // Leaving the composer cancels the write. Nobody is left to tell,
+                // so no message is invented and no snackbar is queued against a
+                // screen that has gone.
+                throw rethrown // never break structured cancellation
+            } catch (unused: Throwable) {
+                // The cause is deliberately not shown: "database disk image is
+                // malformed (code 11)" is not a sentence for a user. What they
+                // get is which action failed, and a way to run it again.
+                _resultFavourite.value = verified
+                _starFailure.value = StarFailure(starFailureIds.incrementAndGet(), asked, result)
             }
         }
 

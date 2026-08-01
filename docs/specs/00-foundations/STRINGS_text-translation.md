@@ -357,3 +357,30 @@ Each of these names the reason, not just the refusal.
 | `limit_sheet_body_pro` | string | `Natural-phrasing AI translations are a Pro feature. Your free translations keep working.` | — | the second sentence is the no-dead-end half |
 | `limit_sheet_cta` | string | `See Pro plans` | — | opens the paywall (`STRINGS_paywall.md`) |
 | `limit_sheet_dismiss` | string | `Not now` | — | C-11 requires the sheet be dismissible; the free engines keep working underneath |
+
+---
+
+## 10. Issue #195 star-write-failure additions (2026-08-02 — C-3 "missing keys get ADDED to STRINGS")
+
+The star on the composer result ran its three database calls in a coroutine with no `try` and no
+`catch`. `viewModelScope` installs no `CoroutineExceptionHandler`, so a `SQLiteException` reached
+the process handler: tap the star, the app disappears. `EDGE_CASES.md:114` had already ruled on
+this exact control, in the composer's own result-actions table — `Save / star … offline write
+fails → [Retry]` — and §94's no-dead-end rule names "no crash-instead-of-message" by hand.
+
+**Two** messages, not one, because the star toggles in both directions. Telling a user who was
+un-saving that we "couldn't save" is a lie about the one thing they just did, and this codebase
+has spent #179, #189 and #190 removing controls that misreport what they did.
+
+| Key | Status | Type | `en` | `fil` | `pt-rBR` | Shown when |
+|-----|--------|------|------|-------|----------|------------|
+| `text_star_save_failed` | **NEW** (`feature/text/values/strings.xml:122`) | string | `Couldn't save this translation.` | `Hindi ma-save ang pagsasaling ito.` | `Não deu para salvar esta tradução.` | `StarIntent.SAVE` — the tap was on an unfilled star and the write did not land |
+| `text_star_remove_failed` | **NEW** (`:123`) | string | `Couldn't remove this from saved.` | `Hindi ito maalis sa naka-save.` | `Não deu para remover isto das salvas.` | `StarIntent.REMOVE` — the tap was on a filled star and the write did not land |
+| `button_retry` | REUSED (`:104`) | string | `Retry` | `Subukang muli` | `Tentar novamente` | the snackbar's action on both messages — §94's required way forward |
+
+No message for a CANCELLED write: leaving the composer cancels it, and there is nobody left to
+tell. No message for the star's READ half either (`TextViewModel.readFavourite`) — nothing was
+asked for, so the icon simply shows unfilled, and the tap that follows is what speaks.
+
+`fil` / `pt-rBR` above are authored in-issue and **queued for native-speaker review** (C-12, DoD
+gate 12) — the same standing caveat the three `feature/text` string files carry in their headers.

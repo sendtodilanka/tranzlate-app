@@ -507,7 +507,7 @@ class KonsistArchitectureTest {
     fun `the translating state announces that it started`() {
         // `single`, not `firstOrNull`: Konsist reports file names WITHOUT the
         // extension, and a name that stops matching must be loud, not vacuous.
-        val composer = filesUnder("/feature/text/src/main/").single { it.name == COMPOSER_FILE }
+        val composer = filesUnder(TEXT_MAIN).single { it.name == COMPOSER_FILE }
         // Comments stripped everywhere below, so a KDoc that explains the live
         // region can never stand in for having one. Previews are excluded from
         // the render rules: a preview legitimately calls the face directly, and
@@ -800,7 +800,76 @@ class KonsistArchitectureTest {
             }
         }
         return null
-    }
+     * Issue #195 — the composer shows a star write that failed.
+     *
+     * `TextViewModelTest` proves the ViewModel stops the throw and records the
+     * failure. Nothing there proves anyone SHOWS it: delete the `LaunchedEffect`
+     * from `ComposerScreen` and every one of those tests stays green while the
+     * app goes back to a star that fails in silence — the #179 shape, one level
+     * down from the crash this issue opened for.
+     *
+     * SOURCE-SHAPE assertions, and the same honesty the gates above owe. This
+     * repo has no Compose unit-test runtime (#186), so nothing here can prove a
+     * snackbar appears. What it makes RED is every regression that compiles and
+     * leaves the suite green: the surface deleted, the Retry action dropped, one
+     * of the two messages left unwired, or the consume moved after the retry
+     * (which would clear the failure the retry is about to produce and put the
+     * user back in silence on the second failure).
+     *
+     * **Its two limits, named rather than implied** (#193 asks for exactly this):
+     *
+     *  1. It reads the FILE minus its previews, not one function, so a legitimate
+     *     extraction into a private helper or a file-level constant still passes —
+     *     the #188 defeat, where the violation was re-spelled rather than removed,
+     *     does not work here. The cost is that moving the surface into a SIBLING
+     *     FILE would fail this gate even though the app is correct. That trade is
+     *     deliberate: a false alarm is answered by a human reading the diff, and a
+     *     silent pass is not answered at all.
+     *  2. The distinctness check reads a `when` over [StarIntent]. Rewriting the
+     *     mapping as an `if` empties the match and this FAILS rather than passing
+     *     silently — fail-closed on a shape change, so the next author has to say
+     *     out loud that both messages are still wired.
+     *
+     * Comments and string literals are stripped first, so a KDoc that explains
+     * the surface cannot stand in for having one.
+     */
+    @Test
+    fun `the composer shows a star write that failed`() {
+        val composer = filesUnder(TEXT_MAIN).single { it.name == COMPOSER_FILE }
+        // Previews removed, not the whole file kept: the two `@PreviewLightDark`
+        // failure faces name the same strings, and every assertion below would
+        // pass on their strength alone with the real surface deleted.
+        val previews =
+            composer.functions().filter { fn -> fn.annotations.any { it.name.startsWith("Preview") } }
+        val surface = code(previews.fold(composer.text) { text, fn -> text.replace(fn.text, "") })
+
+        // Vacuous-pass guard: the failure is read from the ViewModel at all.
+        assertThat(surface).contains("viewModel.$STAR_FAILURE")
+        assertThat(surface).contains("showSnackbar")
+
+        // §94's way forward, and the copy for BOTH directions of the toggle — one
+        // message wired for `save` alone tells the un-saving user the wrong thing.
+        assertThat(surface).contains("R.string.button_retry")
+        assertThat(surface).contains("actionLabel")
+        STAR_FAILURE_STRINGS.forEach { assertThat(surface).contains(it) }
+        assertThat(surface).contains("viewModel.retryStar(")
+        assertThat(surface).contains("SnackbarResult.ActionPerformed")
+
+        // …and each direction gets its OWN message. Asserting the two strings are
+        // merely PRESENT is not enough: a branch re-pointed at the other one leaves
+        // both `stringResource` calls in place and reads as a pass (#190's M10).
+        val arms =
+            STAR_ARM
+                .findAll(surface)
+                .associate { it.groupValues[1] to it.groupValues[2].trim() }
+        assertThat(arms.keys).containsExactly("SAVE", "REMOVE")
+        assertThat(arms.values.toSet()).hasSize(STAR_FAILURE_STRINGS.size)
+
+        // The order is load-bearing, not stylistic.
+        val consumed = surface.indexOf(STAR_CONSUME)
+        val retried = surface.indexOf("viewModel.retryStar(")
+        assertThat(consumed).isGreaterThan(-1)
+        assertThat(consumed).isLessThan(retried)    }
 
     /** Every start index of [token] — the state-branch walk needs positions, not counts. */
     private fun String.indicesOf(token: String): List<Int> =
@@ -952,7 +1021,30 @@ class KonsistArchitectureTest {
         /** The state the row's return-to-rest effect must watch, and what it must do. */
         const val SETTLED_VALUE = "settledValue"
         const val SWIPE_RESET = ".reset()"
+        // ---- issue #195: the composer's star failure reaches the user ---------
 
+        /** The module root the composer lives under; [COMPOSER_FILE] names the file. */
+        const val TEXT_MAIN = "/feature/text/src/main/"
+
+        /** The held failure the screen must read — the gate's vacuous-pass guard. */
+        const val STAR_FAILURE = "starFailure"
+
+        /** One per direction of the toggle — "couldn't save" is untrue for an un-save. */
+        val STAR_FAILURE_STRINGS =
+            listOf(
+                "R.string.text_star_save_failed",
+                "R.string.text_star_remove_failed",
+            )
+
+        /** Must run BEFORE the retry, or the retry's own failure is cleared unread. */
+        const val STAR_CONSUME = "viewModel.onStarFailureShown("
+
+        /**
+         * One `when` arm of the intent-to-copy map. The right-hand side is captured
+         * to the end of the line rather than as an identifier, so inlining the
+         * `stringResource` call into the arm still reads as one distinct message.
+         */
+        val STAR_ARM = Regex("""StarIntent\.(SAVE|REMOVE)\s*->\s*([^\n]+)""")
         /** The only call that ends the binding (AOSP: nothing else does). */
         const val SHUTDOWN = "shutdown()"
 

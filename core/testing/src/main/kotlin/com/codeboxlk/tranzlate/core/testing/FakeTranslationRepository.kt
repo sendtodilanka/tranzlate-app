@@ -22,22 +22,42 @@ class FakeTranslationRepository(
     private var nextId = 1L
 
     /**
-     * Per-write fault injection for History's three write paths (issue #190).
+     * Per-call fault injection for every write path this fake serves —
+     * History's three (issue #190) and the composer star's three (#195).
      *
-     * [failWrites] is a blanket switch over the two INSERT paths, which cannot
-     * express what History needs: one path failing while the other two still
-     * work. Without that, a single test proving `delete` surfaces its failure
-     * would say nothing about `undoDelete` and `toggleFavourite` — which is how
-     * the crash survived in all three at once.
+     * [failWrites] is a blanket switch over the two INSERT paths, and neither
+     * caller can say what it needs with it. History needs one path failing
+     * while the other two still work, or a single test proving `delete`
+     * surfaces its failure says nothing about `undoDelete` and
+     * `toggleFavourite` — which is how the crash survived in all three at once.
+     * The star needs the lookup failing while the insert still works, or the
+     * update failing while the lookup still answers: it runs `cached` and then
+     * EITHER `save` OR `setFavourite`, so a failure lands at three points with
+     * three different amounts already done.
      *
-     * Each hook runs BEFORE its write. A hook that throws makes that write fail;
-     * a hook that suspends holds the write open, which is how a scope cancelled
-     * mid-write (the user navigating away) is reproduced.
+     * The two sets met here by rebase, deliberately: #195 predicted the
+     * collision on [beforeSetFavourite] and said the resolution was to keep one
+     * copy. They are the same hook with the same semantics, so it is declared
+     * once and both suites arm it.
+     *
+     * Each hook runs BEFORE its call. A hook that throws makes that call fail;
+     * a hook that suspends holds it open, which is how a scope cancelled
+     * mid-write — the user navigating away, or leaving the composer — is
+     * reproduced.
+     *
+     * Note [restore] reaches [save] when the C-8 tuple is free, so arming
+     * [beforeSave] arms that path too — deliberate, it is the same insert.
      */
     var beforeDelete: (suspend () -> Unit)? = null
 
     /** @see beforeDelete */
     var beforeRestore: (suspend () -> Unit)? = null
+
+    /** @see beforeDelete */
+    var beforeCached: (suspend () -> Unit)? = null
+
+    /** @see beforeDelete */
+    var beforeSave: (suspend () -> Unit)? = null
 
     /** @see beforeDelete */
     var beforeSetFavourite: (suspend () -> Unit)? = null
@@ -58,6 +78,7 @@ class FakeTranslationRepository(
         targetLang: String,
         engine: Engine,
     ): Translation? {
+        beforeCached?.invoke()
         val normalized = normalize(sourceText)
         return store.value.lastOrNull {
             it.sourceText == normalized &&
@@ -79,6 +100,7 @@ class FakeTranslationRepository(
     }
 
     override suspend fun save(translation: Translation): Long {
+        beforeSave?.invoke()
         check(!failWrites) { "FakeTranslationRepository.failWrites is set" }
         val normalized = translation.copy(sourceText = normalize(translation.sourceText))
         // Mirror Room's IGNORE + unique C-8 index (issue #53 A9): a duplicate
