@@ -55,5 +55,9 @@ gradlePlugin {
             id = "tranzlate.hilt"
             implementationClass = "HiltConventionPlugin"
         }
+        register("stringKeyDocs") {
+            id = "tranzlate.string-key-docs"
+            implementationClass = "StringKeyDocsConventionPlugin"
+        }
     }
 }

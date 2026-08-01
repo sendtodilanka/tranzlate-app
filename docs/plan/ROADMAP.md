@@ -98,8 +98,10 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   is #152's own unimplemented second ask. Follows #172.
 - ⬜ **#151** history rows store raw detector tags while the prefs seam
   canonicalises. Self-contained, `core:domain`.
-- ⬜ **#152** the STRINGS gate (the dead keys ride with Wave 3; the gate itself can
-  land whenever).
+- ⬜ **#152** the STRINGS gate — **PR #172**. Scope grew on contact: the gate's
+  first run found **129 of 205** keys documented nowhere, so the PR also carries
+  four new `STRINGS_*.md` and refreshes two. The `feature/text` dead keys still
+  ride with Wave 3 — 22 remain there by decision, several marked *keep* in §7.
 
 ---
 

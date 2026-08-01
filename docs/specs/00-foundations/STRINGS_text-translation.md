@@ -205,16 +205,16 @@ Keys shipped by the Home/Composer/Drawer/Result vertical (PR-C). `en` values are
 | `cd_text_copy_source` / `cd_text_speak_source` | string | `Copy source text` / `Read source text aloud` | result source block |
 | `cd_text_thumb_up` / `cd_text_thumb_down` | string | `Good translation` / `Bad translation` | result feedback (guided no-op until #8) |
 | `cd_text_retry` | string | `Retry translation` | contract §2.1 row 13 |
-| `home_greeting_morning` / `_afternoon` / `_evening` | string | `Morning` / `Afternoon` / `Evening` | UI_SPEC §2.1 time-aware greeting |
+| `home_greeting_morning` / `home_greeting_afternoon` / `home_greeting_evening` | string | `Morning` / `Afternoon` / `Evening` | UI_SPEC §2.1 time-aware greeting |
 | `home_greeting_named` | string | `%1$s, %2$s` | greeting + account name (name slot — no account system yet) |
 | `home_subtitle` | string | `What would you like to translate?` | UI_SPEC §2.1 |
 | ~~`home_tile_conversation` (+`_sub`) · `home_tile_camera` (+`_sub`)~~ | string | ~~`Conversation`/`Two-way talk` · `Camera`/`Point and translate`~~ | **REMOVED (issue #26, D-5 rev.2)** — canvas quick-action tiles gone; Conversation→Chat tab, Camera→Camera tab (bottom nav) |
-| `text_guided_mode` / `_voice` / `_tts` / `_conversation` / `_bookmark` / `_more` / `_feedback` | string | "… arrives with the … update" family | EDGE_CASES no-dead-end guided messages for not-yet-built asks |
+| `text_guided_mode` / `text_guided_voice` / `text_guided_more` / `text_guided_feedback` | string | "… arrives with the … update" family | EDGE_CASES no-dead-end guided messages for not-yet-built asks. *(2026-08-01, #152: the row used to read `/ _tts / _conversation / _bookmark` as well; those three keys were never created, and the suffix shorthand hid both that and the fact that `text_guided_more` / `text_guided_feedback` were undocumented under a literal search. Keys are spelled out in full from here on.)* |
 | `text_copied` | string | `Copied` | EDGE_CASES §7 copy success feedback |
-| `text_engine_badge_offline` / `_online` / `_advanced` | string | `Offline · instant` / `Online` / `Advanced AI` | UI_SPEC §2.4 engine badge per resolved Engine (C-9) |
+| `text_engine_badge_offline` / `text_engine_badge_online` / `text_engine_badge_advanced` | string | `Offline · instant` / `Online` / `Advanced AI` | UI_SPEC §2.4 engine badge per resolved Engine (C-9) |
 | `text_error_generic_body` | string | `Something went wrong while translating. Please check your connection and try again.` | §2.9 (already proposed NEW there) |
 | `text_error_unsupported_pair` | string | `This language pair isn't supported yet. Try a different language pair.` | UNSUPPORTED_PAIR outcome (G8) |
-| `text_lang_sheet_source_title` / `_target_title` | string | `Translate from` / `Translate to` | interim minimal picker sheet |
+| `text_lang_sheet_source_title` / `text_lang_sheet_target_title` | string | `Translate from` / `Translate to` | interim minimal picker sheet. Both keys now ship from `:feature:language` — `STRINGS_language.md` §2 is their home |
 | ~~`drawer_search`~~ / `drawer_history` / `drawer_saved` / `drawer_offline_languages` / `drawer_settings` / `drawer_help` / `drawer_about` | string (`:app`) | ~~`Search`~~ / `History` / `Saved` / `Offline languages` / `Settings` / `Help` / `About` | UI_SPEC §2.3 drawer sections (Search retired — never built, issue #26; +Help/About) |
 | `drawer_recents_header` / `drawer_recents_empty` | string (`:app`) | `Recents` / `Your recent translations will appear here` | drawer Recents |
 | `drawer_account_guest` / `drawer_tier_free` | string (`:app`) | `Guest` / `Free` | account row (static until the Access brain) |
@@ -235,13 +235,13 @@ Keys shipped by the D-5 rev.3 Home rebuild. All live in `feature/text/src/main/r
 | `cd_home_settings` | string | `Settings` | top-bar settings icon CD |
 | `home_tools` | string | `Tools` | section label above the 2×2 grid |
 | `home_translate` | string | `Translate` | the morphed action button's label (distinct from `cd_translate`, which is the CD) |
-| `home_tool_offline` / `_sub` | string | `Offline mode` / `6 languages ready` | ⚠ the subtitle is a **hardcoded count** — must become a real value (or a plural) when the offline manager lands |
-| `home_tool_voice` / `_sub` | string | `Voice` / `Speak and hear it` | |
-| `home_tool_camera` / `_sub` | string | `Camera` / `Signs and menus` | |
-| `home_tool_conversation` / `_sub` | string | `Conversation` / `Two-way talk` | |
-| `home_row_download` / `_sub` | string | `Download languages` / `133 available · 2 updates ready` | ⚠ **hardcoded counts**, same caveat; `·` is `·` in the resource |
+| `home_tool_offline` / `home_tool_offline_sub` | string | `Offline mode` / `Translate without a connection` | ✅ the hardcoded `6 languages ready` this row used to document is gone — the subtitle no longer states a count it cannot know |
+| `home_tool_voice` / `home_tool_voice_sub` | string | `Voice` / `Speak and hear it` | |
+| `home_tool_camera` / `home_tool_camera_sub` | string | `Camera` / `Signs and menus` | |
+| `home_tool_conversation` / `home_tool_conversation_sub` | string | `Conversation` / `Two-way talk` | |
+| `home_row_download` / `home_row_download_sub` | string / **plurals** | `Download languages` / `%1$d language available offline` · `%1$d languages available offline` | ✅ the hardcoded `133 available · 2 updates ready` this row used to document is gone; the subtitle became a real plural with a real count |
 | `home_mini_phrasebook` / `home_mini_quotes` | string | `Phrasebook` / `Quotes` | half-width shortcut cards |
-| `home_phrasing_title` / `_sub` | string | `Natural phrasing` / `Rewrites idioms so they land right` | AI banner |
+| `home_phrasing_title` / `home_phrasing_sub` | string | `Natural phrasing` / `Rewrites idioms so they land right` | AI banner |
 | `home_badge_new` | string | `NEW` | banner badge |
 | `home_guided_pro` | string | `Subscriptions arrive with the access update` | EDGE_CASES no-dead-end |
 | `home_guided_phrasebook` | string | `Phrasebook arrives in a later update` | " |
@@ -254,15 +254,36 @@ Keys shipped by the D-5 rev.3 Home rebuild. All live in `feature/text/src/main/r
 
 | Key(s) | Why it is orphaned | Disposition |
 |---|---|---|
-| `home_greeting_morning` / `_afternoon` / `_evening` / `_named` · `home_subtitle` | the greeting canvas is gone — the card stack replaced it | **retire** unless a greeting returns to the design |
+| `home_greeting_morning` / `home_greeting_afternoon` / `home_greeting_evening` / `home_greeting_named` · `home_subtitle` | the greeting canvas is gone — the card stack replaced it | **retire** unless a greeting returns to the design |
 | `text_mode_automatic` · `cd_text_mode_chip` | the mode chip has no home in the rev.3 top bar | **keep** — needed the moment the engine picker is re-sited (UI_SPEC §4) |
 | `cd_text_menu` | drawer removed (D-5 rev.3) | **retire** with the dead drawer files |
 | `cd_text_clear` | the ✕ / new-translation action went with the old top bar | **keep** — the action itself is still owed |
-| `cd_text_input` · `cd_text_counter` · `cd_text_source_lang` · `cd_text_target_lang` | ✅ **attached** — PR [#44](https://github.com/sendtodilanka/tranzlate-app/pull/44) re-attached all four (the field via `semantics`, the counter via `semantics`, both pills via `semantics(mergeDescendants = true)`); verified in a live accessibility-tree dump. *(Briefly unattached in #43 — a real regression, now closed.)* |
+| `cd_text_input` · `cd_text_counter` · `cd_text_source_lang` · `cd_text_target_lang` | ✅ **attached** — PR [#44](https://github.com/sendtodilanka/tranzlate-app/pull/44) re-attached all four (the field via `semantics`, the counter via `semantics`, both pills via `semantics(mergeDescendants = true)`); verified in a live accessibility-tree dump. *(Briefly unattached in #43 — a real regression, now closed.)* | **no longer orphaned** |
 | `cd_translate` | the Translate button now carries a visible `home_translate` label, so it has an accessible name without the CD | **keep** (no regression) — reuse if the button ever becomes icon-only |
 | `cd_text_retry` | Result-screen retry not re-wired to this key | check when FIX_QUEUE C2 lands |
 
 **Shell strings (`app/src/main/res/values/strings.xml`) — orphaned by the same PR, none deleted:** `nav_home` / `nav_chat` / `nav_camera` (no bottom bar) and the whole `drawer_*` + `app_guided_search` family (no drawer). They come out with the dead `DrawerContent.kt` / `TopLevelDestination.kt` files. `chat_coming_soon_title` / `coming_soon` **stay** — Chat is still a destination, now reached from the Conversation tool card.
+
+**Orphan sweep refreshed 2026-08-01 (#152).** The table above was last verified 2026-07-26 and has
+drifted in both directions, so here is the current count rather than a re-assertion of the old one.
+A fresh `R.string.*` / `@string/*` sweep across **every module and every source set** finds **22**
+`:feature:text` keys with zero references. Fourteen of them are not in the table above:
+`text_guided_mode`, `text_guided_more`, `text_guided_feedback`, `cd_text_more`,
+`cd_text_copy_source`, `cd_text_speak_source`, `cd_text_thumb_up`, `cd_text_thumb_down`,
+`text_engine_badge_offline`, `text_engine_badge_online`, `text_engine_badge_advanced`,
+`a11y_translating`, `home_edit_no_text_to_translate_warning`, `cd_text_retry`. Going the other way,
+`cd_text_menu` no longer exists as a resource at all, and `cd_text_clear` is referenced again.
+
+Nothing here is deleted by #152 — that issue's mandate was the five `offline_state_*` keys, and
+these belong to work in flight. But the "why" column now owes fourteen more rows, and an
+unreferenced `a11y_translating` is worth a second look: C-4 makes it a canonical live-region
+string, so zero references is more likely a missing announcement than a dead key.
+
+> **2026-08-01 (#152):** the `:app` shell strings now have their own catalogue,
+> `STRINGS_shell.md`, and that file is their home. The paragraph above is kept as the record of
+> *why* they were orphaned. Of the keys it names, only `nav_home` / `nav_chat` / `nav_camera` and
+> `chat_coming_soon_title` still exist as resources; the `drawer_*` family, `app_guided_search`
+> and `coming_soon` are gone.
 
 ---
 
@@ -280,3 +301,55 @@ The window is now **waited out** instead of reported (`ResultSpeaker.speak` susp
 **No message at all** for `SpeakOutcome.STARTED` (audio is playing) and for `SpeakOutcome.CANCELLED` (the engine was released while the tap waited — backgrounding, or the face leaving the result). A request the user already walked away from must not greet them with a failure when they come back.
 
 `fil` / `pt-rBR` above are authored in-issue and **queued for native-speaker review** (C-12, DoD gate 12) — the same standing caveat the three `feature/text` string files carry in their headers.
+
+---
+
+## 9. Issue #152 additions (2026-08-01 — C-3 "missing keys get ADDED to STRINGS")
+
+Twenty keys were shipping from `feature/text/src/main/res/values/` with no row anywhere in this
+catalogue. Nothing caught that, because until #152 nothing checked C-3 at all — a rule that holds
+only while a reviewer remembers it. The `verifyStringKeyDocs` Gradle task now fails the build on
+the next one. `en` values below are transcribed **verbatim from the shipped resource**, not
+re-authored.
+
+### 9.1 Composer and result controls
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `composer_paste` | string | `Paste` | — | paste affordance on the empty composer |
+| `text_paste_empty` | string | `Clipboard is empty.` | — | paste with nothing to paste — the tap gets an answer instead of nothing (EDGE_CASES) |
+| `cd_text_reverse` | string | `Reverse translation direction` | — | contentDescription for the C-7 reverse action |
+| `cd_text_counter_limit` | string | `%1$d-character limit reached` | limit | the counter's at-limit description; the under-limit form is `cd_text_counter` |
+| `cd_speak_stop` | string | `Stop reading` | — | the read-aloud control while speech is playing — a toggle-aware pair with `cd_speak` |
+
+### 9.2 Actions that cannot run right now (EDGE_CASES availability)
+
+Each of these names the reason, not just the refusal.
+
+| Key | Type | `en` | Args |
+|-----|------|------|------|
+| `text_swap_needs_detect` | string | `Translate once to detect the language before swapping.` | — |
+| `text_tts_unavailable` | string | `Speech isn't available for this language on this device.` | — |
+| `text_star_unavailable` | string | `Couldn't save this one — its language wasn't detected.` | — |
+
+### 9.3 Translation failure block
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `text_error_title` | string | `Couldn't translate` | — | error block heading |
+| `text_error_offline` | string | `You're offline. Connect to the internet and try again.` | — | |
+| `text_error_limit_reached` | string | `You've used today's free AI translations. They reset at midnight.` | — | states when it comes back, so the wait is knowable |
+| `text_error_not_entitled` | string | `This translation quality needs a Pro subscription.` | — | |
+| `text_error_edit` | string | `Edit text` | — | the way out of the error block — the block is never a dead end |
+
+### 9.4 Daily-AI meter and the at-limit sheet (C-11, paywall trigger #1)
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `text_ai_meter` | string | `AI translations: %1$d/%2$d left today` | left, total | ⚠ this reads **left / total**. C-6 fixes the canonical metered counter as `text_metered_counter` = `%1$d/%2$d today` reading **used / limit** — the opposite direction. `text_metered_counter` has no resource today, so nothing conflicts on screen yet; whichever survives, C-6 has to be amended or this key renamed, because two counters counting opposite ways is how a user is told two different things about the same quota |
+| `limit_sheet_title_quota` | string | `Daily free AI limit reached` | — | the free pool emptied (D-2 rev.2) |
+| `limit_sheet_body_quota` | string | `Your 5 free AI-quality translations are used for today. They reset at midnight — or go Pro for unlimited.` | — | ⚠ hardcodes **5**; if the FREE pool size ever moves, this string lies |
+| `limit_sheet_title_pro` | string | `This quality needs Pro` | — | the feature is PRO-only, a different fact from an emptied pool |
+| `limit_sheet_body_pro` | string | `Natural-phrasing AI translations are a Pro feature. Your free translations keep working.` | — | the second sentence is the no-dead-end half |
+| `limit_sheet_cta` | string | `See Pro plans` | — | opens the paywall (`STRINGS_paywall.md`) |
+| `limit_sheet_dismiss` | string | `Not now` | — | C-11 requires the sheet be dismissible; the free engines keep working underneath |
