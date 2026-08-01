@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -132,6 +131,10 @@ private fun railSlot(
  * [LanguagePickerViewModel.query]. In one line: `rememberSaveable` is addressed
  * through whichever `SaveableStateHolder` is drawing this screen, and the same
  * picker is about to be drawn from three different ones.
+ *
+ * The file does not IMPORT either saveable helper either — not even in a preview
+ * — because that import list is what `PickerHostAgnosticTest` reads, and the
+ * import is the one spelling an alias cannot disguise (#192 co-verify).
  */
 @Composable
 fun LanguagePickerScreen(
@@ -1803,7 +1806,12 @@ private fun AlphabetRailPreview() {
             Box(modifier = Modifier.size(width = Dimensions.touchTargetMin, height = previewRailHeight)) {
                 AlphabetRail(
                     letters = ('A'..'J').mapIndexed { index, letter -> letter to index },
-                    listState = rememberLazyListState(),
+                    // `remember`, not `rememberLazyListState()`: this file may not
+                    // IMPORT the saveable versions at all, because an import is the
+                    // one place an alias cannot hide what was imported and that is
+                    // what `PickerHostAgnosticTest` reads. A preview has no state to
+                    // restore anyway.
+                    listState = remember { LazyListState() },
                 )
             }
         }

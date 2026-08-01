@@ -4,7 +4,6 @@ import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import javax.inject.Inject
 
 /**
  * Issue #90's owner ruling, in ONE home: a model download over a METERED
@@ -48,58 +47,63 @@ import javax.inject.Inject
  * instance, so the question raised on one screen is that screen's question —
  * a `@Singleton` would leak a half-answered dialog across the picker and the
  * offline manager. Both halves of that — no scope of its own, no scope
- * annotation — are held by `DownloadGateTest`, against this file's source.
+ * annotation — are held by `DownloadGateTest`, against this file's source, and
+ * the composition root's `@Provides` is held to the same rule from the other
+ * end by `KonsistArchitectureTest`.
  *
  * The question itself is kept in a [ConsentQuestionStore] rather than in a field
  * here, so that a process death in the middle of it does not silently withdraw a
- * question the user was looking at (#130 PR-13, loss class PP-5.f). The gate does
- * not know or care whether that storage is durable; read the store's own KDoc
- * for why moving it there cannot become a second way to reach a download.
+ * question the user was looking at (#130 PR-13, loss class PP-5.f).
+ *
+ * **No `@Inject` on the constructor, on purpose.** The gate is assembled by the
+ * composition root instead, which is what keeps [ConsentQuestionStore] out of
+ * the Hilt graph entirely — see that interface's KDoc for the bypass this
+ * closes. An `@Inject` constructor here would force a binding for every
+ * parameter, and a binding for the store is exactly the thing that must not
+ * exist.
  */
-class DownloadGate
-    @Inject
-    constructor(
-        private val connectivity: ConnectivityMonitor,
-        private val downloadPrefs: DownloadPrefsRepository,
-        private val modelManager: OfflineModelManager,
-        private val consentQuestion: ConsentQuestionStore,
-    ) {
-        /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
-        val pendingConsent: StateFlow<String?> = consentQuestion.question
+class DownloadGate(
+    private val connectivity: ConnectivityMonitor,
+    private val downloadPrefs: DownloadPrefsRepository,
+    private val modelManager: OfflineModelManager,
+    private val consentQuestion: ConsentQuestionStore,
+) {
+    /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
+    val pendingConsent: StateFlow<String?> = consentQuestion.question
 
-        /**
-         * A row's ⬇ / ↻ tap. Starts the download, unless the connection is
-         * metered and no standing permission exists — in which case it raises
-         * the question instead and starts NOTHING.
-         */
-        suspend fun requestDownload(id: String) {
-            val allowed = downloadPrefs.allowMobileData.first()
-            if (connectivity.isMetered() && !allowed) {
-                consentQuestion.raise(id)
-            } else {
-                modelManager.download(id)
-            }
-        }
-
-        /**
-         * The dialog's "Download once". Closes the question and returns the
-         * answer as a [ConsentedDownload], for the caller to hand to
-         * [downloadConsented] on its own scope; null when nothing was pending
-         * (a second tap on an answered dialog).
-         *
-         * Synchronous on purpose — the dialog must be gone the instant the tap
-         * lands, not one dispatch later.
-         */
-        fun consentOnce(): ConsentedDownload? = consentQuestion.take()?.let(::ConsentedDownload)
-
-        /** The consented download itself — [consentOnce]'s follow-through. */
-        suspend fun downloadConsented(consented: ConsentedDownload) = modelManager.download(consented.id)
-
-        /** "Wait for Wi-Fi", or a dismiss: the row is left untouched and re-tappable. */
-        fun dismiss() {
-            consentQuestion.take()
+    /**
+     * A row's ⬇ / ↻ tap. Starts the download, unless the connection is
+     * metered and no standing permission exists — in which case it raises
+     * the question instead and starts NOTHING.
+     */
+    suspend fun requestDownload(id: String) {
+        val allowed = downloadPrefs.allowMobileData.first()
+        if (connectivity.isMetered() && !allowed) {
+            consentQuestion.raise(id)
+        } else {
+            modelManager.download(id)
         }
     }
+
+    /**
+     * The dialog's "Download once". Closes the question and returns the
+     * answer as a [ConsentedDownload], for the caller to hand to
+     * [downloadConsented] on its own scope; null when nothing was pending
+     * (a second tap on an answered dialog).
+     *
+     * Synchronous on purpose — the dialog must be gone the instant the tap
+     * lands, not one dispatch later.
+     */
+    fun consentOnce(): ConsentedDownload? = consentQuestion.take()?.let(::ConsentedDownload)
+
+    /** The consented download itself — [consentOnce]'s follow-through. */
+    suspend fun downloadConsented(consented: ConsentedDownload) = modelManager.download(consented.id)
+
+    /** "Wait for Wi-Fi", or a dismiss: the row is left untouched and re-tappable. */
+    fun dismiss() {
+        consentQuestion.take()
+    }
+}
 
 /**
  * Evidence that the user answered "Download once" for [id] — nothing else.

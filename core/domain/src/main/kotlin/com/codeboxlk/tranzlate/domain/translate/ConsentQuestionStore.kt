@@ -27,6 +27,36 @@ import kotlinx.coroutines.flow.getAndUpdate
  * `DownloadGateTest` now holds both halves of it against this file's source
  * instead of only saying so in prose.
  *
+ * ## Never bound in the Hilt graph — the reason this type is safe to be public
+ *
+ * Before PR-13 the pending id was a `private val` inside [DownloadGate] and
+ * nothing in the app could read it. Moving it out here made it reachable, and a
+ * co-verify lens compiled the consequence: a `@HiltViewModel` that injects this
+ * interface alongside [OfflineModelManager] can [take] the id the user is
+ * currently being asked about and pass it straight to
+ * [OfflineModelManager.download] — no gate, no [ConsentedDownload], no metered
+ * check. Issue #90's ruling, walked around one layer above where #166's lens
+ * caught it. The app assembled clean with that ViewModel in it.
+ *
+ * `internal` on the Hilt module does not close it: that restricts who can NAME
+ * the module in Kotlin, not who Dagger will hand the bound type to — Dagger
+ * resolves by type within a component, and both language ViewModels already hold
+ * an [OfflineModelManager] directly.
+ *
+ * So there is **no binding for this type in any component**, and the gate has no
+ * `@Inject` constructor to force one. The composition root builds the durable
+ * store and the gate around it in one `@Provides`, and a class that asks Dagger
+ * for a [ConsentQuestionStore] fails to compile — *"cannot be provided without
+ * an @Provides-annotated method"*. A type nobody can obtain needs no rule about
+ * what may be done with it.
+ *
+ * Constructing one directly is still allowed and still harmless: a store you
+ * built yourself is YOUR empty store, not the one the user's open question lives
+ * in. That is what keeps the tests below able to drive this interface without a
+ * Hilt graph. `KonsistArchitectureTest` holds the binding's absence, so the fix
+ * cannot be undone by adding back the one line that Dagger's own error message
+ * invites.
+ *
  * @see DownloadGate
  */
 interface ConsentQuestionStore {
