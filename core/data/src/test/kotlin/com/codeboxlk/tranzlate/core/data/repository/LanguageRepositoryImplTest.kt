@@ -3,6 +3,8 @@ package com.codeboxlk.tranzlate.core.data.repository
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
+import app.cash.turbine.test
 import com.codeboxlk.tranzlate.core.database.LanguageDao
 import com.codeboxlk.tranzlate.core.database.LanguageEntity
 import com.codeboxlk.tranzlate.core.datastore.TranzlatePreferencesDataSource
@@ -10,15 +12,19 @@ import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LanguageRepositoryImplTest {
     @Test
     fun `an empty table serves the whole bundled catalog`() =
@@ -246,6 +252,65 @@ class LanguageRepositoryImplTest {
         dependencyTypes.forEach { assertThat(it).doesNotContain("LanguageUsage") }
     }
 
+    /**
+     * Risk R10, first half — the operator may not move UP or out. `dataStore
+     * .data` re-emits the WHOLE preferences object on every write, so a theme
+     * toggle, a mode switch or a consent answer each arrive here as a recents
+     * map identical to the last one. Without `distinctUntilChanged` on this
+     * source, every one of them rebuilds 194 catalog rows and re-emits a list
+     * nothing about the languages has changed.
+     */
+    @Test
+    fun `R10 - an unrelated preference write never rebuilds the language list`() =
+        runTest {
+            val store = FakeLanguagePreferencesStore()
+            val repository = repository(store = store)
+
+            repository.languages().test {
+                runCurrent()
+                expectMostRecentItem() // drain the opening paint, whatever its shape
+
+                store.updateData { prefs ->
+                    prefs.toMutablePreferences().apply { this[UNRELATED_PREFERENCE] = 1 }
+                }
+                runCurrent()
+
+                expectNoEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /**
+     * Risk R10, second half — and it may not move DOWN either. Below the
+     * `onStart` prefix it would compare the first REAL recents value against
+     * that prefix, and on a fresh install both are empty: the real one is
+     * swallowed, this source collapses to a single emission, and every reader
+     * that waits for the value after the paint — `drop(1)` in the tests above,
+     * a screen waiting for device truth in production — waits forever.
+     *
+     * The silent model manager keeps the arithmetic honest: it contributes
+     * exactly one emission (the repository's own prefix), so the second
+     * emission this asserts can only have come from recents.
+     *
+     * Collected through a DISPATCHED collector, which is how a ViewModel's
+     * `stateIn` collects. `combine` folds every update already queued when its
+     * loop next runs into a single emission, so an undispatched collector —
+     * turbine's default start — legitimately sees the paint and the recents
+     * answer as one item and would make this count say nothing. Verified both
+     * ways before this test was written.
+     */
+    @Test
+    fun `R10 - a fresh install still delivers the recents emission after the paint`() =
+        runTest {
+            val repository = repository(models = SilentOfflineModelManager())
+            val emissions = mutableListOf<Int>()
+
+            backgroundScope.launch { repository.languages().collect { emissions += it.size } }
+            runCurrent()
+
+            assertThat(emissions.size).isAtLeast(2)
+        }
+
     /** Unbounded growth would put every language the user ever touched in one preference. */
     @Test
     fun `the recents store keeps only the newest entries`() =
@@ -275,6 +340,12 @@ class LanguageRepositoryImplTest {
         store: FakeLanguagePreferencesStore = FakeLanguagePreferencesStore(),
     ) = LanguageRepositoryImpl(dao, models, TranzlatePreferencesDataSource(store))
 }
+
+/**
+ * A key this repository never reads — the stand-in for theme, mode and consent,
+ * every one of which writes to the same preferences object the recents live in.
+ */
+private val UNRELATED_PREFERENCE = intPreferencesKey("prefs.theme")
 
 /** In-memory `DataStore`, so the real preference codec is what these tests exercise. */
 private class FakeLanguagePreferencesStore : DataStore<Preferences> {

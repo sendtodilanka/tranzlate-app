@@ -13,17 +13,24 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -92,6 +99,15 @@ class RealOfflineModelManager internal constructor(
     private val store: ModelStore,
     private val storageProbe: StorageProbe,
     scope: CoroutineScope?,
+    /**
+     * Monotonic milliseconds, for the freshness window below only. Monotonic
+     * and not wall-clock on purpose: a user changing the device time must not
+     * be able to make a stale disk reading look current. `System.nanoTime`
+     * rather than `SystemClock.elapsedRealtime` because this class is covered
+     * by JVM unit tests, where the Android class is not mocked and every call
+     * throws. Tests pass the test scheduler's virtual clock instead.
+     */
+    private val elapsedMillis: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
 ) : OfflineModelManager {
     @Inject
     internal constructor(
@@ -120,10 +136,110 @@ class RealOfflineModelManager internal constructor(
      */
     private val activeDeletes = ConcurrentHashMap<String, Job>()
 
-    override fun modelStates(): Flow<Map<String, OfflineModelState>> =
+    /**
+     * ML Kit's translatable-tag list is an SDK constant — `TranslateLanguage
+     * .getAllLanguages()` answers from a static array, never the device — so
+     * reading it ONCE is the whole of its truth. It used to be read inside the
+     * merge, which is once per emission per collector: three screens watching a
+     * single download rebuilt the same ~59-tag set on every row transition, for
+     * a value that cannot change while the process lives.
+     */
+    private val capableTags: Set<String> by lazy { store.capableTags() }
+
+    /** Refresh asks for the worker below; conflated on purpose — see [modelStates]. */
+    private val refreshRequests = Channel<Unit>(Channel.CONFLATED)
+
+    /**
+     * The ONE upstream every screen shares (issue #130 rev.3, U-13). Cold, this
+     * flow multiplied by its collectors: the picker alone opens two chains — its
+     * own transient watch and the catalog repository's overlay — so ONE screen
+     * ran the merge twice and paid the ML Kit round-trip twice, and the packs
+     * screen and the text screen each added another.
+     *
+     * `WhileSubscribed(5s)` rather than `Eagerly`: with no screen watching there
+     * is nothing worth merging, and the grace window is long enough that a
+     * rotation or a nav hop does not tear the upstream down and build it again.
+     * The scope is [downloadScope], the process-lifetime scope issues #82/#83
+     * already sanctioned — this adds no second lifetime, which the rev3 ruling
+     * caps at two for the whole app.
+     */
+    private val states: StateFlow<Map<String, OfflineModelState>> =
         combine(downloaded, transient) { down, trans ->
-            mergeModelStates(store.capableTags(), down, trans)
-        }.onStart { refreshDownloaded() }
+            mergeModelStates(capableTags, down, trans)
+        }.stateIn(
+            downloadScope,
+            // replayExpiration = 0 is load-bearing, not tidiness. The default
+            // is Long.MAX_VALUE: the StateFlow would keep replaying its last
+            // map long after WhileSubscribed stopped the upstream, so a screen
+            // opening later would render "Downloaded" for a model the user had
+            // since deleted from Android's app-storage settings, and hold that
+            // lie until the disk read came back. Expiring the cache means the
+            // first frame is the empty seed — "nothing known yet", which every
+            // consumer already handles — instead of a confident wrong answer.
+            SharingStarted.WhileSubscribed(SHARED_STATE_IDLE_MILLIS, replayExpirationMillis = 0),
+            emptyMap(),
+        )
+
+    /** Monotonic stamp of the last COMPLETED read; Long.MIN_VALUE = never read. */
+    private val lastReadAtMillis = AtomicLong(Long.MIN_VALUE)
+
+    // One worker owns the disk read. Two refreshes can then never be in flight
+    // together, which matters because refreshDownloaded() publishes by
+    // assignment: overlapping reads could land out of order and let an older
+    // answer overwrite a newer one. The channel is conflated, so a request that
+    // arrives while the worker is busy replaces a waiting one instead of
+    // queueing behind it. It runs in downloadScope, so a collector leaving
+    // mid-read cannot cancel the read it asked for.
+    //
+    // The catch is deliberately Throwable and deliberately here rather than
+    // inside refreshDownloaded(). This worker is the ONLY reader of the
+    // request channel, so anything that terminates it retires refreshing for
+    // the rest of the process — every later trySend would land in a conflated
+    // buffer nobody reads, and every screen from then on would show whatever
+    // the last successful read said. refreshDownloaded() rethrows
+    // CancellationException by design, and `Task.await()` raises exactly that
+    // when an ML Kit task is CANCELLED rather than failed, so one cancelled
+    // task would otherwise be enough. Only this worker's own cancellation —
+    // the process scope going down — is allowed to stop it.
+    init {
+        downloadScope.launch {
+            refreshRequests.receiveAsFlow().collect {
+                if (!readIsStale()) return@collect
+                try {
+                    refreshDownloaded()
+                } catch (
+                    @Suppress("TooGenericExceptionCaught", "SwallowedException") failed: Throwable,
+                ) {
+                    currentCoroutineContext().ensureActive()
+                    // Someone else's failure. The map keeps its last truth and
+                    // the next subscription asks again.
+                }
+                lastReadAtMillis.set(elapsedMillis())
+            }
+        }
+    }
+
+    /**
+     * The cold face of the hot [states]: subscribing is what asks the disk, so
+     * the answer is fresh when a screen opens, without any screen having to ask.
+     *
+     * EVERY subscription asks; the worker decides. It skips a request that
+     * arrives within [SHARED_STATE_IDLE_MILLIS] of the last completed read, so
+     * the picker's two chains — its own transient watch and the catalog
+     * repository's overlay — subscribe together and share one round-trip, while
+     * a screen opened ten minutes later gets a genuine reading.
+     *
+     * That freshness window replaced a subscriber COUNT, which looked
+     * equivalent and was not: with the count, a refresh happened only when the
+     * flow went from unwatched to watched, so a second screen opening while the
+     * first was still watching inherited whatever the shared map already held.
+     * Models can be deleted from Android's app-storage settings while this app
+     * is backgrounded, so the second screen would state "Downloaded" for a pack
+     * that is gone. The old cold flow refreshed once per collector and could
+     * not have that bug; a shared flow has to earn it back.
+     */
+    override fun modelStates(): Flow<Map<String, OfflineModelState>> =
+        states.onSubscription { refreshRequests.trySend(Unit) }
 
     override suspend fun download(languageTag: String) {
         if (!store.isCapable(languageTag)) return
@@ -205,6 +321,15 @@ class RealOfflineModelManager internal constructor(
         job: Job,
     ): Boolean = activeDownloads[tag] === job
 
+    /**
+     * True when the last completed read is old enough that a new subscriber
+     * deserves a real one. Never-read always qualifies.
+     */
+    private fun readIsStale(): Boolean {
+        val last = lastReadAtMillis.get()
+        return last == Long.MIN_VALUE || elapsedMillis() - last >= SHARED_STATE_IDLE_MILLIS
+    }
+
     private suspend fun refreshDownloaded() {
         downloaded.value =
             try {
@@ -249,6 +374,17 @@ class RealOfflineModelManager internal constructor(
  * 45.7MB on disk (research E3) — x3 headroom for the store + unzip staging.
  */
 private const val REQUIRED_FREE_BYTES = 150L * 1024 * 1024
+
+/**
+ * How long the shared merge survives its last collector. The same window every
+ * `stateIn` in the app uses, and for the same reason: it has to outlive a
+ * configuration change, which is the only pause a watching screen takes that
+ * is not the user leaving. `internal` so the sharing tests advance virtual time
+ * against the production number instead of a copy of it.
+ */
+private const val NANOS_PER_MILLI = 1_000_000L
+
+internal const val SHARED_STATE_IDLE_MILLIS = 5_000L
 
 private fun Exception.toFailure(): OfflineModelFailure =
     when (this) {
