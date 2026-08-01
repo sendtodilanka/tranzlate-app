@@ -185,8 +185,8 @@ class LanguagePickerViewModel
 
         /** Dialog "Download once": THIS download only — the standing pref is untouched. */
         fun downloadAnyway() {
-            val id = downloadGate.consentOnce() ?: return
-            viewModelScope.launch { downloadGate.download(id) }
+            val consented = downloadGate.consentOnce() ?: return
+            viewModelScope.launch { downloadGate.downloadConsented(consented) }
         }
 
         /** Dialog "Wait for Wi-Fi" (or dismiss): the row stays downloadable — no dead end. */

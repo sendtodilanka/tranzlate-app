@@ -4,12 +4,13 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.CoroutineScope
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import java.io.File
 
 /**
  * THE issue-#90 consent matrix — one suite, where the rule now lives. The
@@ -86,8 +87,8 @@ class DownloadGateTest {
             gate.requestDownload("de")
 
             val consented = gate.consentOnce()
-            assertThat(consented).isEqualTo("de")
-            gate.download(consented!!)
+            assertThat(consented?.id).isEqualTo("de")
+            gate.downloadConsented(consented!!)
 
             assertThat(manager.downloads).containsExactly("de")
             assertThat(gate.pendingConsent.value).isNull()
@@ -108,8 +109,8 @@ class DownloadGateTest {
             connectivity.metered = true
             gate.requestDownload("de")
 
-            gate.consentOnce()?.let { gate.download(it) }
-            gate.consentOnce()?.let { gate.download(it) }
+            gate.consentOnce()?.let { gate.downloadConsented(it) }
+            gate.consentOnce()?.let { gate.downloadConsented(it) }
 
             assertThat(manager.downloads).containsExactly("de")
         }
@@ -139,27 +140,68 @@ class DownloadGateTest {
             assertThat(gate.pendingConsent.value).isEqualTo("de")
         }
 
-    // ---- the structural rule -------------------------------------------------
+    // ---- the structural rules ------------------------------------------------
 
     /**
-     * The gate owns no scope, by construction. Both callers run it inside their
-     * own `viewModelScope.launch`, and that is the whole reason the extraction
-     * is safe: a shared gate that launched on a scope of its own would decide
-     * the lifetime of every screen's downloads at once — the defect class that
-     * blocked #130 PR-4, where a write moved onto a scope that dies. Injecting
-     * a [CoroutineScope] here fails this test instead of shipping.
+     * The two invariants the extraction's safety argument rests on, checked
+     * where they are actually written — in the gate's SOURCE.
+     *
+     *  1. **No scope of its own.** A shared gate that launched on a scope it
+     *     owned would decide the lifetime of every screen's downloads at once —
+     *     the defect class that blocked #130 PR-4, where a write moved onto a
+     *     scope that dies.
+     *  2. **No Hilt scope annotation.** One instance per state holder is the
+     *     reason a question raised on the picker stays on the picker; a
+     *     `@Singleton` (or any `@…Scoped`, or `@Reusable`) would carry a
+     *     half-answered dialog into Settings → Offline languages, where
+     *     "Download once" would spend mobile data on a language nobody asked
+     *     for there.
+     *
+     * This replaces a reflection check over `DownloadGate::class.java
+     * .constructors`, which read constructor PARAMETERS and so was green on
+     * both of the mutations a co-verify lens actually wrote: a
+     * `CoroutineScope` held as a private FIELD, and `@Singleton` on the class.
+     * The mutations were picked first this time and the check written to fail
+     * them (mandatory rule 11, third cause) — see the PR body for the four runs.
+     *
+     * Reading the file instead of Konsist's project scope is deliberate: #163
+     * has a Konsist gate passing locally and failing in CI on the same commit,
+     * cause still undiagnosed, so a Konsist result from a worktree is not
+     * evidence. One named file, read directly, gives the same answer everywhere.
+     * The rule is scoped to this ONE file rather than all of `:core:domain`,
+     * because `TranslateTextUseCase` legitimately takes an injected
+     * `@ApplicationScope CoroutineScope` and launches on it (:71, :180) — a
+     * module-wide ban would be red on correct code.
      */
     @Test
-    fun `the gate launches nothing of its own`() {
-        val dependencies =
-            DownloadGate::class.java.constructors
-                .flatMap { it.parameterTypes.toList() }
-                .map { it.name }
+    fun `the gate owns no scope - neither a coroutine one nor a Hilt one`() {
+        val checkoutRoot =
+            generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
+                .first { File(it, "settings.gradle.kts").isFile }
+        // Comments come out first: this is a rule about CODE, so the gate's
+        // KDoc stays free to explain why it has no scope and to name the
+        // `downloadScope` the transfer really runs on.
+        val code =
+            checkoutRoot
+                .resolve(GATE_SOURCE)
+                .readText()
+                .replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), "")
+                .replace(Regex("//.*"), "")
 
-        assertThat(dependencies).isNotEmpty()
-        assertThat(dependencies).doesNotContain(CoroutineScope::class.java.name)
+        // Never vacuous: a moved, renamed or unreadable gate fails here instead
+        // of satisfying every "does not contain" below by being empty.
+        assertThat(code).contains("class DownloadGate")
+
+        listOf("Scope", "launch", "async", "Job", "@Singleton", "@Reusable").forEach { banned ->
+            assertWithMessage("DownloadGate.kt names `$banned` in code — see this test's KDoc")
+                .that(code)
+                .doesNotContain(banned)
+        }
     }
 }
+
+private const val GATE_SOURCE =
+    "core/domain/src/main/kotlin/com/codeboxlk/tranzlate/domain/translate/DownloadGate.kt"
 
 /** Records what the Translation brain was actually asked to download. */
 private class RecordingModelManager : OfflineModelManager {
