@@ -4,6 +4,7 @@ import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.LanguageRole
+import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.model.Translation
@@ -173,6 +174,105 @@ class TranslateTextUseCaseTest {
             val row = repository.saved.single() // issue #61: detectedSource drives the write
             assertThat(row.sourceLang).isEqualTo("en") // resolved, never the "auto" sentinel
         }
+
+    // ---- issue #151: the detect door writes ids the catalog can serve --------
+
+    /**
+     * `MlKitLanguageIdentifier` returns the platform's tag verbatim, and the
+     * platform still says `iw` for Hebrew. Written raw, the row named a language
+     * the catalog has no row for while the usage stamp — canonicalising inside
+     * its own repository — recorded `he` for the very same translation.
+     */
+    @Test
+    fun `a legacy detect tag reaches the history row canonicalised`() =
+        runTest {
+            val hebrew = detecting("iw")
+            val repository = FakeTranslationRepository()
+            val languageUsage = FakeLanguageUsageRepository()
+
+            useCase(translator = hebrew, repository = repository, languageUsage = languageUsage)
+                .invoke("Good morning", "auto", "fr", ModeId.AUTO)
+            advanceUntilIdle()
+
+            val row = repository.saved.single()
+            assertThat(row.sourceLang).isEqualTo("he")
+            // The point of the id: the catalog can serve it, so the row can be
+            // named rather than printed as a code nobody recognises.
+            assertThat(LanguageTagResolver.canonicalIds).contains(row.sourceLang)
+            // ONE translation, ONE spelling: history and the usage store agree.
+            assertThat(languageUsage.stamps.map { it.languageId }).contains(row.sourceLang)
+            assertThat(languageUsage.stamps.map { it.languageId }).doesNotContain("iw")
+        }
+
+    /**
+     * `canonicalOrSelf`, not `canonicalId`: a detector naming something the
+     * catalog cannot serve must cost the row its NAME, never its existence. A
+     * translation the user is reading has to still be in Recents afterwards.
+     */
+    @Test
+    fun `a detect tag the catalog cannot serve is written as itself, not dropped`() =
+        runTest {
+            val repository = FakeTranslationRepository()
+
+            useCase(translator = detecting("zzz"), repository = repository)
+                .invoke("Good morning", "auto", "fr", ModeId.AUTO)
+
+            assertThat(repository.saved.single().sourceLang).isEqualTo("zzz")
+        }
+
+    /**
+     * The sentinel is a picker affordance, not a language, and the resolver
+     * hands it straight back. So the ONE thing that must keep the row out is
+     * the missing detect metadata itself — not a spelling test that "auto"
+     * would pass.
+     */
+    @Test
+    fun `the auto sentinel is never written as a source language`() =
+        runTest {
+            val repository = FakeTranslationRepository()
+            val undetected =
+                FakeTranslator(
+                    golden =
+                        mapOf(
+                            FakeTranslator.GoldenKey("Good morning", "auto", "fr", ModeId.AUTO) to
+                                TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
+                        ),
+                )
+
+            useCase(translator = undetected, repository = repository)
+                .invoke("Good morning", "auto", "fr", ModeId.AUTO)
+
+            assertThat(repository.saved).isEmpty()
+        }
+
+    /**
+     * The other side of the same door, and the reason the caller's own ids are
+     * passed through untouched: `srcLang` is what the C-8 cache read above and
+     * the engine call already used. Re-spelling it for the write alone would
+     * query the store under one id and record it under another — the exact
+     * split this issue is about, moved one column over.
+     */
+    @Test
+    fun `a concrete source is recorded exactly as the caller asked`() =
+        runTest {
+            val repository = FakeTranslationRepository()
+
+            useCase(repository = repository).invoke("Good morning", "en", "fr", ModeId.ML2_MINI)
+
+            val row = repository.saved.single()
+            assertThat(row.sourceLang).isEqualTo("en")
+            assertThat(row.targetLang).isEqualTo("fr")
+        }
+
+    /** G7's shape with the detected tag swapped — the fixture rule's "add a row", not "mutate a tuple". */
+    private fun detecting(tag: String) =
+        FakeTranslator(
+            golden =
+                mapOf(
+                    FakeTranslator.GoldenKey("Good morning", "auto", "fr", ModeId.AUTO) to
+                        TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT, detectedSource = tag),
+                ),
+        )
 
     @Test
     fun `history write failure never fails the translation`() =

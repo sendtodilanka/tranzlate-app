@@ -116,4 +116,28 @@ class LanguageTagResolverTest {
     fun `the auto sentinel is not a language and resolves to null`() {
         assertThat(LanguageTagResolver.canonicalId("auto")).isNull()
     }
+
+    /**
+     * The pass-through half, unpinned until issue #151 gave it a fourth caller.
+     * Every seam that canonicalises a tag it did not choose — prefs, the usage
+     * stamp, the history row — reaches for [LanguageTagResolver.canonicalOrSelf]
+     * precisely because a null here would be worse than an odd spelling: the
+     * `"auto"` sentinel would become a NullPointerException at a language
+     * boundary, and a language the catalog has no row for would take the record
+     * that mentions it down instead of being written as itself.
+     */
+    @Test
+    fun `canonicalOrSelf passes through what the catalog cannot serve, sentinel included`() {
+        assertThat(LanguageTagResolver.canonicalOrSelf("auto")).isEqualTo("auto")
+        assertThat(LanguageTagResolver.canonicalOrSelf("und")).isEqualTo("und")
+        assertThat(LanguageTagResolver.canonicalOrSelf("zzz")).isEqualTo("zzz")
+    }
+
+    @Test
+    fun `canonicalOrSelf still resolves what the catalog can serve`() {
+        assertThat(LanguageTagResolver.canonicalOrSelf("iw")).isEqualTo("he")
+        assertThat(LanguageTagResolver.canonicalOrSelf("in")).isEqualTo("id")
+        assertThat(LanguageTagResolver.canonicalOrSelf("zh-CN")).isEqualTo("zh")
+        assertThat(LanguageTagResolver.canonicalOrSelf("he")).isEqualTo("he")
+    }
 }

@@ -10,6 +10,7 @@ import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
@@ -441,9 +442,17 @@ class TextViewModel
                                     translatedText = outcome.text,
                                     transliteration = null,
                                     engine = outcome.resolvedEngine,
+                                    // Canonicalised for the SAME reason the use
+                                    // case does it (issue #151), and it has to
+                                    // happen on both sides or neither: the star
+                                    // below looks the history row up by exactly
+                                    // the tuple the use case wrote. Detect `iw`,
+                                    // canonicalise only the write, and the lookup
+                                    // misses its own row — the star reads
+                                    // unsaved and then saves a second copy.
                                     resolvedSourceLang =
                                         if (request.sourceLang == AUTO_LANG) {
-                                            outcome.detectedSource
+                                            outcome.detectedSource?.let(LanguageTagResolver::canonicalOrSelf)
                                         } else {
                                             request.sourceLang
                                         },
@@ -610,6 +619,16 @@ class TextViewModel
         /**
          * A History row reopens IN the composer (issue #68): input + pair +
          * the stored answer — Retry replays through the C-8 cache instantly.
+         *
+         * The row's ids are used EXACTLY as stored, deliberately (issue #151).
+         * A row written before the detect door was closed can carry a legacy
+         * spelling, and re-spelling it here is the one thing that would break
+         * it: every lookup it takes part in — the star's `cached`, the use
+         * case's `cachedAny` — is keyed on the id the row actually holds, so a
+         * canonicalised copy would query past its own row and start a duplicate.
+         * Legacy rows are tolerated on read, which means their ids travel
+         * unchanged; the prefs seam canonicalises what it stores (#141), so the
+         * chips still read the language the user expects.
          */
         fun onHistoryPick(translation: Translation) {
             translateJob?.cancel()
