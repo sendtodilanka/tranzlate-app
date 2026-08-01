@@ -246,6 +246,7 @@ private class MixedTierLanguageRepository : LanguageRepository {
 
     override suspend fun setLastUsed(
         languageId: String,
+        role: LanguageRole,
         atMillis: Long,
     ) = Unit
 }
