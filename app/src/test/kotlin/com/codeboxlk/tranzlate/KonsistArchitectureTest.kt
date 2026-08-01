@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate
 
 import com.codeboxlk.tranzlate.core.ui.languageLabel
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import com.lemonappdev.konsist.api.Konsist
 import org.junit.Test
 import java.io.File
@@ -386,6 +387,94 @@ class KonsistArchitectureTest {
     }
 
     /**
+     * Issue #192 co-verify (F1) — nobody but the gate holds an unanswered
+     * consent question, and nothing gives the gate a lifetime.
+     *
+     * The harm, concretely. Before #130 PR-13 the pending language id was a
+     * `private val` inside `DownloadGate` and nothing in the app could reach it.
+     * PR-13 moved it behind `ConsentQuestionStore` so it could survive process
+     * death — a public interface, bound in `ViewModelComponent`, therefore
+     * injectable into any `@HiltViewModel`. A co-verify lens compiled the
+     * consequence and this session re-ran it: a ViewModel taking
+     * `ConsentQuestionStore` + `OfflineModelManager` can drain the question the
+     * user is being asked and start that download itself — no gate, no metered
+     * check, no `ConsentedDownload`. `:app:assembleTranzlateProdDebug`
+     * **succeeded** with that ViewModel in the tree. Issue #90's ruling walked
+     * around, one layer above where #166's lens caught it.
+     *
+     * The fix is structural, not a rule: the store has NO Hilt binding, and the
+     * gate has no `@Inject` constructor to force one. The offending ViewModel now
+     * fails to compile. This gate exists because Dagger's own error message —
+     * *"cannot be provided without an @Provides-annotated method"* — reads as an
+     * instruction to add the binding back, and because moving the gate's
+     * construction into a `@Provides` moved it out of sight of
+     * `DownloadGateTest`'s "the gate owns no scope" rule, which reads one file.
+     *
+     * Three assertions, in the order they would fail:
+     *
+     *  1. **Who may even name the type.** Two-sided on purpose: an exact set, so
+     *     a scope that silently loses files goes RED instead of passing
+     *     vacuously (#110), and a new consumer goes red with its own name in the
+     *     message. Comments are stripped, so a KDoc discussing the store never
+     *     counts as holding one. It is a NAME rule, so it fires on an aliased
+     *     import too — an alias cannot hide the symbol on the left of `as`,
+     *     which is precisely the hole the same lens found in the picker's gate.
+     *  2. **No binding hands the store out**, in case a future consumer lives in
+     *     one of the three files that are allowed to name it.
+     *  3. **No binding scopes the gate.** One gate per state holder is what keeps
+     *     a half-answered dialog on the screen that raised it; `@ViewModelScoped`
+     *     on the `@Provides` would carry the picker's question into Settings →
+     *     Offline languages, where "Download once" would spend mobile data on a
+     *     language nobody asked for there.
+     *
+     * Known over-trigger, stated rather than hidden: assertion 1 matches the
+     * substring, so `InMemoryConsentQuestionStore` — harmless, it is an empty
+     * store of your own — would also land here. Loud is the right side to err on
+     * for a consent rule, and the message says which file to look at.
+     */
+    @Test
+    fun `no Hilt binding hands out an unanswered consent question`() {
+        val mainSources = filesUnder(MAIN_SOURCES)
+        assertThat(mainSources).isNotEmpty()
+
+        // (1) The exact set of production files that may name the store.
+        val namers =
+            mainSources
+                .filter { code(it.text).contains(CONSENT_STORE) }
+                .map { it.name }
+                .toSet()
+        assertWithMessage(
+            "Only the store's own file, the gate that holds one and the composition root " +
+                "may name $CONSENT_STORE — see this test's KDoc for the bypass that opens",
+        ).that(namers)
+            .isEqualTo(CONSENT_STORE_NAMERS)
+
+        val bindings =
+            scope
+                .functions(includeNested = true)
+                .filter { it.hasAnnotationWithName("Binds") || it.hasAnnotationWithName("Provides") }
+        // Vacuous-pass guard: the binding this rule is about is in scope.
+        assertThat(bindings.map { it.name }).contains(GATE_PROVIDER)
+
+        // (2) …and none of them puts the store in the graph.
+        val handedOut =
+            bindings
+                .filter { it.returnType?.name?.contains(CONSENT_STORE) == true }
+                .map { "${it.containingFile.name}: ${it.name}" }
+        assertThat(handedOut).isEmpty()
+
+        // (3) …and none of them gives the gate a lifetime beyond one state holder.
+        val scopedGate =
+            bindings
+                .filter { function ->
+                    function.returnType?.name == GATE_TYPE ||
+                        function.parameters.any { it.type.name.contains(CONSENT_STORE) }
+                }.filter { function -> SCOPES.any(function::hasAnnotationWithName) }
+                .map { "${it.containingFile.name}: ${it.name}" }
+        assertThat(scopedGate).isEmpty()
+    }
+
+    /**
      * Issue #174 — the translating state announces that it started.
      *
      * `a11y_translating` shipped in three locales with ZERO call sites, so a
@@ -524,6 +613,28 @@ class KonsistArchitectureTest {
 
         /** The platform type whose instances are bound service connections. */
         const val ENGINE_TYPE = "TextToSpeech"
+
+        // ---- issue #192 F1: the consent question's reachability ---------------
+
+        /** Production sources — the rule is about what the running app can obtain. */
+        const val MAIN_SOURCES = "/src/main/"
+
+        /** The storage seam PR-13 introduced; holding one means holding the open question. */
+        const val CONSENT_STORE = "ConsentQuestionStore"
+
+        /**
+         * Everything allowed to name it: the file that declares it, the gate whose
+         * question it is, and the composition root that builds both. A fourth name
+         * here is a fourth thing that can drain a question the user is still
+         * looking at.
+         */
+        val CONSENT_STORE_NAMERS = setOf("ConsentQuestionStore", "DownloadGate", "DownloadGateModule")
+
+        /** The gate itself — no binding of it may carry a scope. */
+        const val GATE_TYPE = "DownloadGate"
+
+        /** The one `@Provides` that builds it; named so an emptied scope is loud. */
+        const val GATE_PROVIDER = "downloadGate"
 
         // ---- issue #174: the translating announcement -------------------------
 

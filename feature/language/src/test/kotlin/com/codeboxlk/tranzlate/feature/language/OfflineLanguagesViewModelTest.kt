@@ -8,6 +8,7 @@ import com.codeboxlk.tranzlate.core.testing.FakeDownloadPrefsRepository
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
+import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.awaitCancellation
@@ -43,7 +44,7 @@ class OfflineLanguagesViewModelTest {
             OfflineLanguagesViewModel(
                 languageRepository = StaticLanguageRepository(),
                 modelManager = manager,
-                downloadGate = DownloadGate(connectivity, prefs, manager),
+                downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
             )
     }
 
@@ -96,7 +97,7 @@ class OfflineLanguagesViewModelTest {
                 OfflineLanguagesViewModel(
                     languageRepository = StaticLanguageRepository(),
                     modelManager = SilentModelManager(),
-                    downloadGate = DownloadGate(connectivity, prefs, manager),
+                    downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
                 )
             viewModel.rows.launchIn(backgroundScope)
             runCurrent()
@@ -116,7 +117,7 @@ class OfflineLanguagesViewModelTest {
                 OfflineLanguagesViewModel(
                     languageRepository = StaticLanguageRepository(),
                     modelManager = scripted,
-                    downloadGate = DownloadGate(connectivity, prefs, manager),
+                    downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
                 )
             viewModel.rows.launchIn(backgroundScope)
             runCurrent()
@@ -147,7 +148,7 @@ class OfflineLanguagesViewModelTest {
                 OfflineLanguagesViewModel(
                     languageRepository = MixedTierLanguageRepository(),
                     modelManager = SilentModelManager(),
-                    downloadGate = DownloadGate(connectivity, prefs, manager),
+                    downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
                 )
             viewModel.rows.launchIn(backgroundScope)
             runCurrent()

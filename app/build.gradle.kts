@@ -175,6 +175,15 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.kotlinx.serialization.core)
 
+    // Leak watcher, DEBUG BUILDS ONLY. `debugImplementation` is scoped to the
+    // build TYPE, so it reaches tranzlateProdDebug and tranzlateFakeDebug and no
+    // release variant of either — which is the whole point: LeakCanary installs
+    // itself from a ContentProvider and dumps the heap on the device, and neither
+    // belongs in anything a user installs. The classpath is asserted, not
+    // assumed: see the CI guard "release runtime classpath carries no leak
+    // watcher" (#130 PR-13; the ruling's P2 rider).
+    debugImplementation(libs.leakcanary.android)
+
     testImplementation(libs.junit)
     testImplementation(libs.truth)
     testImplementation(libs.konsist)
