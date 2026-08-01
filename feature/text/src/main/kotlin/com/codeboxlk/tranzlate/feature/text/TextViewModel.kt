@@ -313,13 +313,11 @@ class TextViewModel
             return true
         }
 
-        fun onSelectSourceLanguage(id: String) {
-            viewModelScope.launch { prefs.setSourceLang(id) }
-        }
-
-        fun onSelectTargetLanguage(id: String) {
-            viewModelScope.launch { prefs.setTargetLang(id) }
-        }
+        // onSelectSourceLanguage/onSelectTargetLanguage lived here until the
+        // #130 rev.3 decouple (#123.2): the picker now writes its own choice
+        // through LanguagePickerViewModel → TranslatePrefsRepository — the same
+        // DataStore keys [sourceLang]/[targetLang] read — so the chips stay
+        // coherent without this class lending the picker a write path.
 
         /**
          * Leaving 5a for Home discards the draft — text cleared, any in-flight

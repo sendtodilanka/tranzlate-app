@@ -7,9 +7,11 @@ import com.codeboxlk.tranzlate.core.model.EngineAttempt
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.core.testing.FakeClock
+import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
 import com.codeboxlk.tranzlate.core.testing.FakeLanguageUsageRepository
 import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
@@ -19,8 +21,10 @@ import com.codeboxlk.tranzlate.core.testing.FakeUsagePolicy
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherProvider
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
+import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
+import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
 import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.google.common.truth.Truth.assertThat
@@ -133,6 +137,22 @@ class TextViewModelTest {
                     Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
                 )
         }
+    }
+
+    // Minimal picker-VM seams for the coherence test — no behaviour, just wiring.
+
+    private class SilentModelManager : OfflineModelManager {
+        override fun modelStates(): Flow<Map<String, OfflineModelState>> = flowOf(emptyMap())
+
+        override suspend fun download(languageTag: String) = Unit
+
+        override suspend fun delete(languageTag: String) = Unit
+    }
+
+    private class SilentDownloadPrefs : DownloadPrefsRepository {
+        override val allowMobileData: Flow<Boolean> = flowOf(false)
+
+        override suspend fun setAllowMobileData(value: Boolean) = Unit
     }
 
     @Suppress("LongParameterList") // the test builder aggregates one fake per seam
@@ -858,5 +878,44 @@ class TextViewModelTest {
         dispatcher.scheduler.runCurrent()
 
         assertThat(vm.uiState.value).isInstanceOf(TextUiState.Result::class.java)
+    }
+
+    // ---- #130 rev.3 decouple (#123.2): coherence across the two ViewModels ---
+
+    /**
+     * The decouple's whole claim: the picker writes its selection through the
+     * SAME `TranslatePrefsRepository` this class reads its chips from, so a
+     * pick round-trips into the composer with no shared ViewModel handle and
+     * no callback. One repository instance here = one DataStore in production
+     * (`@Singleton` binding); the keys cannot diverge because there is only
+     * one seam.
+     */
+    @Test
+    fun `a picker-ViewModel selection round-trips into the composer's chip flows`() {
+        val prefs = FakeTranslatePrefsRepository()
+        val textVm = viewModel(prefs = prefs)
+        val pickerVm =
+            LanguagePickerViewModel(
+                languageRepository = FakeLanguageRepository(),
+                clock = FakeClock(),
+                modelManager = SilentModelManager(),
+                connectivity = FakeConnectivityMonitor(),
+                downloadPrefs = SilentDownloadPrefs(),
+                translatePrefs = prefs,
+                // Application-lifetime by contract: the choice write must
+                // survive the picker's own scope dying on pop.
+                appScope = CoroutineScope(dispatcher + SupervisorJob()),
+            )
+        settle()
+        assertThat(textVm.sourceLang.value).isEqualTo("en")
+        assertThat(textVm.targetLang.value).isEqualTo("fr")
+
+        pickerVm.select("de", LanguageRole.TARGET)
+        settle()
+        assertThat(textVm.targetLang.value).isEqualTo("de")
+
+        pickerVm.select("ja", LanguageRole.SOURCE)
+        settle()
+        assertThat(textVm.sourceLang.value).isEqualTo("ja")
     }
 }

@@ -114,55 +114,45 @@ private fun railSlot(
  * Full-screen language picker — the production redesign of issue #117
  * (Claude Design "Language Picker 15a", 412×892, light + dark).
  *
- * DI shell over [LanguagePickerContent]. Two state holders on purpose:
- * [TextViewModel] owns the CHOICE this screen was opened to change, while
- * [LanguagePickerViewModel] owns what the picker needs to present that choice
- * honestly — catalog, live offline-model state, the last-used stamp and the
- * row-level download controls. Search state is held here so the content stays
- * stateless and previewable.
+ * DI shell over [LanguagePickerContent]. ONE state holder since the #130
+ * rev.3 decouple (#123.2): [LanguagePickerViewModel] owns the selection
+ * read/write through `TranslatePrefsRepository` — the same DataStore keys the
+ * composer's chips read, so no `TextViewModel` handle is borrowed to keep the
+ * two screens coherent — plus everything the picker needs to present that
+ * choice honestly: catalog, live offline-model state, the per-role last-used
+ * stamp and the row-level download controls. Search state is held here so the
+ * content stays stateless and previewable.
  */
 @Composable
 fun LanguagePickerScreen(
-    viewModel: TextViewModel,
-    target: LanguagePickerTarget,
+    target: LanguageRole,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    pickerViewModel: LanguagePickerViewModel = hiltViewModel(),
+    viewModel: LanguagePickerViewModel = hiltViewModel(),
 ) {
-    val languages by pickerViewModel.languages.collectAsStateWithLifecycle()
-    val offlineStates by pickerViewModel.offlineStates.collectAsStateWithLifecycle()
-    val pendingConsent by pickerViewModel.pendingConsent.collectAsStateWithLifecycle()
-    val sourceLang by viewModel.sourceLang.collectAsStateWithLifecycle()
-    val targetLang by viewModel.targetLang.collectAsStateWithLifecycle()
+    val languages by viewModel.languages.collectAsStateWithLifecycle()
+    val offlineStates by viewModel.offlineStates.collectAsStateWithLifecycle()
+    val pendingConsent by viewModel.pendingConsent.collectAsStateWithLifecycle()
+    val selectedId by viewModel.selection(target).collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     LanguagePickerContent(
         target = target,
         languages = languages,
-        selectedId = if (target == LanguagePickerTarget.SOURCE) sourceLang else targetLang,
+        selectedId = selectedId,
         query = query,
         onQueryChange = { query = it },
         onSelect = { id ->
-            when (target) {
-                LanguagePickerTarget.SOURCE -> {
-                    pickerViewModel.onLanguagePicked(id, LanguageRole.SOURCE)
-                    viewModel.onSelectSourceLanguage(id)
-                }
-
-                LanguagePickerTarget.TARGET -> {
-                    pickerViewModel.onLanguagePicked(id, LanguageRole.TARGET)
-                    viewModel.onSelectTargetLanguage(id)
-                }
-            }
+            viewModel.select(id, target)
             onDone()
         },
         onBack = onDone,
         modifier = modifier,
         offlineStates = offlineStates,
-        onDownload = pickerViewModel::download,
-        onStop = pickerViewModel::stopAndRemove,
+        onDownload = viewModel::download,
+        onStop = viewModel::stopAndRemove,
         pendingConsent = pendingConsent,
-        onDownloadAnyway = pickerViewModel::downloadAnyway,
-        onDismissConsent = pickerViewModel::dismissConsent,
+        onDownloadAnyway = viewModel::downloadAnyway,
+        onDismissConsent = viewModel::dismissConsent,
     )
 }
 
@@ -182,7 +172,7 @@ fun LanguagePickerScreen(
  */
 @Composable
 fun LanguagePickerContent(
-    target: LanguagePickerTarget,
+    target: LanguageRole,
     languages: List<Language>,
     selectedId: String,
     query: String,
@@ -201,8 +191,8 @@ fun LanguagePickerContent(
     val spacing = LocalSpacing.current
     val title =
         when (target) {
-            LanguagePickerTarget.SOURCE -> stringResource(R.string.text_lang_sheet_source_title)
-            LanguagePickerTarget.TARGET -> stringResource(R.string.text_lang_sheet_target_title)
+            LanguageRole.SOURCE -> stringResource(R.string.text_lang_sheet_source_title)
+            LanguageRole.TARGET -> stringResource(R.string.text_lang_sheet_target_title)
         }
     val sections =
         rememberPickerSections(
@@ -281,7 +271,7 @@ private class PickerSections(
  */
 @Composable
 private fun rememberPickerSections(
-    target: LanguagePickerTarget,
+    target: LanguageRole,
     languages: List<Language>,
     offlineStates: Map<String, OfflineModelState>,
     selectedId: String,
@@ -305,7 +295,7 @@ private fun rememberPickerSections(
     val detect =
         remember(target, detectLabel, selectedId, normalizedQuery) {
             detectRow(detectLabel, selected = selectedId == DETECT_LANGUAGE_ID)
-                .takeIf { target == LanguagePickerTarget.SOURCE }
+                .takeIf { target == LanguageRole.SOURCE }
                 ?.takeIf { normalizedQuery.isEmpty() || it.searchKey.contains(normalizedQuery) }
         }
     val counts = remember(languages) { onDeviceCount(languages) }
@@ -1192,7 +1182,7 @@ private val previewStates =
 private fun LanguagePickerSourcePreview() {
     TranzlateTheme {
         LanguagePickerContent(
-            target = LanguagePickerTarget.SOURCE,
+            target = LanguageRole.SOURCE,
             languages = previewLanguages,
             selectedId = "af",
             query = "",
@@ -1209,7 +1199,7 @@ private fun LanguagePickerSourcePreview() {
 private fun LanguagePickerTargetPreview() {
     TranzlateTheme {
         LanguagePickerContent(
-            target = LanguagePickerTarget.TARGET,
+            target = LanguageRole.TARGET,
             languages = previewLanguages,
             selectedId = "es",
             query = "",
@@ -1226,7 +1216,7 @@ private fun LanguagePickerTargetPreview() {
 private fun LanguagePickerSearchingPreview() {
     TranzlateTheme {
         LanguagePickerContent(
-            target = LanguagePickerTarget.TARGET,
+            target = LanguageRole.TARGET,
             languages = previewLanguages,
             selectedId = "es",
             query = "a",
@@ -1243,7 +1233,7 @@ private fun LanguagePickerSearchingPreview() {
 private fun LanguagePickerNoResultsPreview() {
     TranzlateTheme {
         LanguagePickerContent(
-            target = LanguagePickerTarget.TARGET,
+            target = LanguageRole.TARGET,
             languages = previewLanguages,
             selectedId = "es",
             query = "klingon",
@@ -1259,7 +1249,7 @@ private fun LanguagePickerNoResultsPreview() {
 private fun LanguagePickerLoadingPreview() {
     TranzlateTheme {
         LanguagePickerContent(
-            target = LanguagePickerTarget.TARGET,
+            target = LanguageRole.TARGET,
             languages = emptyList(),
             selectedId = "es",
             query = "",
@@ -1275,7 +1265,7 @@ private fun LanguagePickerLoadingPreview() {
 private fun LanguagePickerConsentDialogPreview() {
     TranzlateTheme {
         LanguagePickerContent(
-            target = LanguagePickerTarget.TARGET,
+            target = LanguageRole.TARGET,
             languages = previewLanguages,
             selectedId = "es",
             query = "",

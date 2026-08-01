@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.core.data.repository
 
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 
 /**
  * The bundled static language catalog (spec 02 §4.1) — re-derived FRESH on
@@ -92,24 +93,6 @@ internal object BundledLanguageCatalog {
             "ur",
             "vi",
             "cy",
-        )
-
-    /**
-     * Alternate and legacy spellings that must resolve to a catalog id rather
-     * than silently miss — ML Kit's Language-ID API, restored preferences and
-     * Cloud's own documented "X or Y" cells all emit these forms. Keys are
-     * lowercase because RFC 4647 requires case-insensitive matching.
-     */
-    private val legacyAliases: Map<String, String> =
-        mapOf(
-            "iw" to "he",
-            "in" to "id",
-            "ji" to "yi",
-            "jw" to "jv",
-            "fil" to "tl",
-            "zh-cn" to "zh",
-            "zh-hk" to "zh-TW",
-            "zh-hant" to "zh-TW",
         )
 
     /** The full catalog, ordered by English name (picker order). */
@@ -311,35 +294,17 @@ internal object BundledLanguageCatalog {
             language("zu", "Zulu"),
         )
 
-    private val byLowercaseId: Map<String, String> = all.associate { it.id.lowercase() to it.id }
-
     /**
      * Resolves any incoming BCP-47 tag to a catalog id, or `null` when nothing
      * in the catalog can serve it.
      *
-     * Implements RFC 4647 §3.4 "Lookup": the tag is progressively truncated from
-     * the end until a match is found, and matching is case-insensitive (RFC 4647:
-     * "Matching of language tags to language ranges MUST be done in a
-     * case-insensitive manner"). `lowercase()` is the no-arg, locale-invariant
-     * overload — the Turkish dotless-i would corrupt a `Locale`-sensitive one.
-     *
-     * Deliberately does NOT go through `java.util.Locale`: its legacy-code
-     * canonicalisation differs between the desktop JVM and Android, which would
-     * make unit-test results a lie about device behaviour. The mapping here is
-     * an explicit table, so both platforms agree.
+     * A pure DELEGATION to [LanguageTagResolver] since issue #119: the alias
+     * table and the RFC 4647 §3.4 lookup live in `:core:model` so layers that
+     * cannot see this internal catalog resolve through the same single table.
+     * `BundledLanguageCatalogTest` pins this catalog's ids to the resolver's
+     * [LanguageTagResolver.canonicalIds], so the two cannot drift apart.
      */
-    fun canonicalId(tag: String): String? {
-        var candidate = tag.trim().replace('_', '-')
-        while (candidate.isNotEmpty()) {
-            val key = candidate.lowercase()
-            byLowercaseId[key]?.let { return it }
-            legacyAliases[key]?.let { return it }
-            val lastSeparator = candidate.lastIndexOf('-')
-            if (lastSeparator < 0) return null
-            candidate = candidate.substring(0, lastSeparator)
-        }
-        return null
-    }
+    fun canonicalId(tag: String): String? = LanguageTagResolver.canonicalId(tag)
 
     private fun language(
         id: String,

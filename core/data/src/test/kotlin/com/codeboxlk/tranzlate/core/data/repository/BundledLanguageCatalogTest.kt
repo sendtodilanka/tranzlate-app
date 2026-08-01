@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.core.data.repository
 
+import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import java.util.Locale
@@ -110,6 +111,21 @@ class BundledLanguageCatalogTest {
             .containsExactly("alz", "btx", "bts", "dov", "cnh", "hrx", "ktu", "yua")
     }
 
+    // ---- issue #119: the resolver LIFTED to :core:model; the catalog delegates.
+    // The full alias/lookup matrix moved with the table (LanguageTagResolverTest);
+    // what stays here is what only this side can pin — that the two agree.
+
+    /**
+     * The drift pin the delegation depends on: the resolver's id universe IS
+     * this catalog's id list, element for element. A row added to one and not
+     * the other fails here by name instead of silently un-resolving a language.
+     */
+    @Test
+    fun `the catalog and the resolver carry the same ids in the same order`() {
+        assertThat(BundledLanguageCatalog.all.map { it.id })
+            .isEqualTo(LanguageTagResolver.canonicalIds)
+    }
+
     @Test
     fun `an exact id resolves to itself`() {
         for (language in BundledLanguageCatalog.all) {
@@ -117,75 +133,12 @@ class BundledLanguageCatalogTest {
         }
     }
 
-    /**
-     * The legacy and alternate spellings, pinned by name with the source that
-     * justifies each one (plan-doc §4). Getting any of these wrong does not
-     * crash — it silently drops the language, which is the worst failure mode
-     * there is.
-     */
+    /** One alias + one miss through the CATALOG entry point — proves the delegation is wired. */
     @Test
-    fun `legacy and alternate spellings resolve to the catalog id`() {
-        // Cloud Translation prints these cells as "X or Y"; we keep the modern form,
-        // except Filipino where ML Kit's own constant is "tl".
+    fun `canonicalId delegates to the lifted resolver`() {
         assertThat(BundledLanguageCatalog.canonicalId("iw")).isEqualTo("he")
-        assertThat(BundledLanguageCatalog.canonicalId("jw")).isEqualTo("jv")
-        assertThat(BundledLanguageCatalog.canonicalId("fil")).isEqualTo("tl")
-        assertThat(BundledLanguageCatalog.canonicalId("zh-CN")).isEqualTo("zh")
-        // ISO 639 legacy codes still emitted by older platform APIs.
-        assertThat(BundledLanguageCatalog.canonicalId("in")).isEqualTo("id")
-        assertThat(BundledLanguageCatalog.canonicalId("ji")).isEqualTo("yi")
-        // Cloud's language-variants table: zh-HK is served by the zh-TW model.
-        assertThat(BundledLanguageCatalog.canonicalId("zh-HK")).isEqualTo("zh-TW")
-        // Traditional script must not truncate to zh, which is Simplified.
-        assertThat(BundledLanguageCatalog.canonicalId("zh-Hant")).isEqualTo("zh-TW")
-    }
-
-    /**
-     * The trap this guards: RFC 4647 truncation alone would send every `zh-*`
-     * to `zh`, and `zh` is Simplified. Traditional text would then be translated
-     * by the wrong model with no error anywhere.
-     */
-    @Test
-    fun `Chinese variants keep their script`() {
-        assertThat(BundledLanguageCatalog.canonicalId("zh-Hans")).isEqualTo("zh")
-        assertThat(BundledLanguageCatalog.canonicalId("zh-Hans-CN")).isEqualTo("zh")
-        assertThat(BundledLanguageCatalog.canonicalId("zh-Hant-TW")).isEqualTo("zh-TW")
-        assertThat(BundledLanguageCatalog.canonicalId("zh-TW")).isEqualTo("zh-TW")
-    }
-
-    /** RFC 4647: "Matching ... MUST be done in a case-insensitive manner". */
-    @Test
-    fun `matching is case-insensitive`() {
-        assertThat(BundledLanguageCatalog.canonicalId("EN")).isEqualTo("en")
-        assertThat(BundledLanguageCatalog.canonicalId("IW")).isEqualTo("he")
-        assertThat(BundledLanguageCatalog.canonicalId("pt-br")).isEqualTo("pt-BR")
-        assertThat(BundledLanguageCatalog.canonicalId("ZH-tw")).isEqualTo("zh-TW")
-    }
-
-    /**
-     * RFC 4647 §3.4 Lookup: "the language range is progressively truncated from
-     * the end until a matching language tag is located". A regional tag we do not
-     * carry must fall back to its base language rather than disappear.
-     */
-    @Test
-    fun `an unknown region falls back to the base language`() {
-        assertThat(BundledLanguageCatalog.canonicalId("en-GB")).isEqualTo("en")
-        assertThat(BundledLanguageCatalog.canonicalId("es-419")).isEqualTo("es")
-        assertThat(BundledLanguageCatalog.canonicalId("de-AT-1901")).isEqualTo("de")
-    }
-
-    /** Underscore is the `java.util.Locale#toString` separator, not BCP-47's. */
-    @Test
-    fun `an underscore-separated tag is accepted`() {
-        assertThat(BundledLanguageCatalog.canonicalId("pt_BR")).isEqualTo("pt-BR")
-    }
-
-    @Test
-    fun `a tag no catalog row can serve resolves to null`() {
-        assertThat(BundledLanguageCatalog.canonicalId("und")).isNull()
+        assertThat(BundledLanguageCatalog.canonicalId("nb")).isEqualTo("no")
         assertThat(BundledLanguageCatalog.canonicalId("zzz")).isNull()
-        assertThat(BundledLanguageCatalog.canonicalId("")).isNull()
-        assertThat(BundledLanguageCatalog.canonicalId("   ")).isNull()
     }
 }
 
