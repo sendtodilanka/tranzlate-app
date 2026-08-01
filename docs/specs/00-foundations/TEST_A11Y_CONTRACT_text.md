@@ -223,7 +223,7 @@ Namespace convention: `tt_text_*`. සෑම control එකකටම `Modifier.t
 | 14 | Error view (container) | `tt_text_error_view` | `ErrorView` | container (`liveRegion`) | title + retry |
 | — | Limit face (quota / access) | `tt_text_limit` | `ComposerScreen` | text (`liveRegion` assertive) | additive rev.2 (issue #53 PR-5): LimitReached / NotEntitled guidance — NOT an error view |
 | 15 | Result text | `tt_text_result` | `ResultCard` | text (selectable) | golden output rendered here |
-| — | Loading indicator | `tt_text_loading` | `LoadingView` | progress (`liveRegion`) | translating spinner |
+| — | Loading indicator | `tt_text_loading` | `ComposerScreen` → `TranslatingFace` | shimmer + text (`liveRegion` polite) | **wired 2026-08-02 (issue #174)** — the tag and its live region existed only in this table until then; there is no `LoadingView`, the host is the shimmer itself |
 | — | Usage warning banner | `tt_text_usage_warning` | `HomeScreen` | text (`liveRegion` polite) | UI-derived from the `remaining` flow (rev.2 — `warningMessage()` retired) |
 
 > **Contract:** මේ tag string 17 වෙනස් නොවිය යුතුයි (Maestro + Compose test දෙකම මේවා reference කරයි). tag rename එකක් = breaking change = doc update + PR.
@@ -412,13 +412,20 @@ appId: com.codeboxlk.tranzlate.offlinetranslator
 
 | Event | Live-region host (`testTag`) | `liveRegion` | Announced text (en, string key) |
 |-------|------------------------------|--------------|----------------------------------|
-| Translate started | `tt_text_loading` | `Polite` | `Translating…` (`a11y_translating`) |
+| Translate started | `tt_text_loading` | `Polite` | `Translating…` (`a11y_translating`) — **wired 2026-08-02, issue #174**; both render sites (portrait read face + split pane) |
 | Result ready | `tt_text_result` | `Polite` | `Translation ready: %1$s` (`a11y_result_ready`) — result text |
 | Error | `tt_text_error_view` | `Assertive` | `Translation failed. %1$s` (`a11y_error`) — reason (`Network unavailable` / `Translation error`) |
 | Usage warning | `tt_text_usage_warning` | `Polite` | `%1$s` (UI-derived from `remaining` — e.g. `1 free NLP3.5 translation left today`) |
-| At limit | (paywall) | `Assertive` | `Daily free limit reached` (`a11y_limit_reached`) |
+| At limit — quota | `tt_text_limit`, and the C-11 sheet title | `Assertive` | `text_error_limit_reached` inline; `limit_sheet_title_quota` on the sheet |
+| At limit — not entitled | `tt_text_limit`, and the C-11 sheet title | `Assertive` | `text_error_not_entitled` inline; `limit_sheet_title_pro` on the sheet |
 
 Implement via `Modifier.semantics { liveRegion = LiveRegionMode.Polite/Assertive }`. Assertive **only** for error/limit (interrupts); everything else Polite.
+
+**`a11y_limit_reached` is retired (issue #174).** The two at-limit rows above replace the single `(paywall)` row that named it. The old row asserted one fixed string for a state that has two different truths, and "come back tomorrow" is false for the entitlement-denied kind — the one user who cannot read the correct text on screen would be the only one told the wrong thing. Both kinds are announced assertively with their own copy, which is strictly more informative. See C-4 rev.2.
+
+**Why `Translate started` is Polite and not Assertive.** It fires at the instant the user activates Translate, while TalkBack is still speaking that control's own label. Assertive would cut the label off — spending the confirmation of *which control was hit* to say that something started, which is backwards. Polite queues behind it: "Translate, button" → "Translating…".
+
+**Fast cache hit (C-8) — two queued messages, accepted.** `TextViewModel` sets `Translating` synchronously and cancels the 500 ms busy floor on success, so a cache hit can flip to `Result` almost at once and TalkBack may say "Translating…" then "Translation ready: …". Both are Polite, so neither interrupts the other. Delaying the start announcement would buy that second back by risking silence on the slow path — the exact harm #174 was opened for. The region cannot *repeat*, because it carries no format argument and Compose emits a live-region event only when a surviving node's property value changes; and it cannot *linger*, because it renders only inside the `Translating` branch.
 
 ## 2.4 Focus / traversal order (top → bottom, LTR)
 

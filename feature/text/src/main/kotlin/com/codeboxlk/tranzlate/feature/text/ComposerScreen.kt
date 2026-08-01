@@ -960,7 +960,7 @@ private fun ColumnScope.ComposerReadBody(
     when (uiState) {
         is TextUiState.Translating -> {
             ResultCard(targetLabel = targetLabel) {
-                ShimmerResult()
+                TranslatingFace()
             }
         }
 
@@ -1085,6 +1085,40 @@ private fun resultTypeFor(text: String) =
         text.length <= RESULT_HEADLINE_MAX_CHARS -> MaterialTheme.typography.headlineMedium
         else -> MaterialTheme.typography.titleLarge
     }
+
+/**
+ * The translating face (TEST_A11Y_CONTRACT §2.3 row 1 · C-4 `a11y_translating`).
+ *
+ * The shimmer is decorative and draws no semantics, so before issue #174 a
+ * TalkBack user who activated Translate heard NOTHING until the outcome landed —
+ * they could not tell a slow engine from a tap that never registered. This is the
+ * live region that says the work started, on `tt_text_loading`, the host tag the
+ * contract has named for it all along.
+ *
+ * `Polite` deliberately: this fires while TalkBack is still speaking the Translate
+ * control's own label, and `Assertive` would cut that off — spending the
+ * confirmation of WHICH control was hit to say that something began. Assertive is
+ * kept for outcomes that END the task (`a11y_error`), per contract §2.3.
+ *
+ * The region sits INSIDE the `Translating` branch on purpose, so it leaves with
+ * the state and can never read "Translating…" over a finished result. It also
+ * cannot repeat: the announcement takes no format argument, and Compose emits a
+ * live-region event only when a node present in BOTH semantics trees has a
+ * property whose value changed (`AndroidComposeViewAccessibilityDelegateCompat`,
+ * `sendSemanticsPropertyChangeEvents`).
+ */
+@Composable
+private fun TranslatingFace(modifier: Modifier = Modifier) {
+    val announcement = stringResource(R.string.a11y_translating)
+    ShimmerResult(
+        modifier =
+            modifier.semantics {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = announcement
+            },
+        testTag = "tt_text_loading",
+    )
+}
 
 /**
  * BUSINESS_MODEL §5 goal-gradient: the AI-quality meter shows WHILE an
@@ -1291,7 +1325,7 @@ private fun ResultPane(
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when (uiState) {
                     is TextUiState.Translating -> {
-                        ShimmerResult()
+                        TranslatingFace()
                     }
 
                     is TextUiState.Result -> {
@@ -1625,6 +1659,24 @@ private fun ComposerTranslatingPreview() {
                 onNotify = {},
                 onClearAll = {},
                 modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/**
+ * The translating face on its own (issue #174). One meaningful state — it is
+ * either running or it is not on screen — so one preview. Nothing of the live
+ * region is visible here by design: the owner reviews the shimmer, TalkBack
+ * reviews the announcement.
+ */
+@PreviewLightDark
+@Composable
+private fun TranslatingFacePreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            TranslatingFace(
+                modifier = Modifier.fillMaxWidth().padding(LocalSpacing.current.md16),
             )
         }
     }
