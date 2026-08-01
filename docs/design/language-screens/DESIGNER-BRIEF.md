@@ -412,9 +412,13 @@ facts about this repo, not preferences:
    scheduled with the four brains, not the language screens.
 2. The spec's own step 1 is the **UMP consent flow**, which is a privacy-gate
    change to app startup, not a language-screens change.
-3. Its **owner decision 1 — "does Pro remove ads?" — is unsettled**, and every
-   frame in §7 assumes the answer is yes. Building to an assumed answer is
-   exactly the failure this brief exists to prevent.
+3. ~~Its owner decision 1 — "does Pro remove ads?" — is unsettled.~~
+   **SETTLED, and it always was** (owner, 2026-08-01). `BUSINESS_MODEL.md` says
+   it in four places: `:29` interstitials FREE-shown / PRO-none, `:32` camera
+   with-ads / no-ads, `:58` the paywall's first selling point **`✓ No ads`**,
+   and `:95` "suppressed entirely when the entitlement resolves to `Paid(PRO)`".
+   Every §7 frame assuming an ad-free Pro is therefore correct. Reasons 1 and 2
+   still stand on their own.
 
 **Three internal contradictions in §7 — fix before anyone builds from it.**
 They matter more than they look, because this section is written as an
@@ -446,8 +450,12 @@ hardcoded to bare-screen values — `LanguagePickerScreen.kt:370` sets the list'
 (same file, ~line 405). Keeping both **parameterised** is a one-line habit in
 the #130 PRs that saves a rework when the slot arrives.
 
-**Carried to the owner as decisions, not designed here:** whether Pro removes
-ads (changes what existing subscribers were sold); the first-run grace period;
+**Carried to the owner as decisions, not designed here** — now three, not four.
+~~Whether Pro removes ads~~ is settled above, and my framing of it was wrong:
+I wrote that adding "no ads" would change what existing subscribers were sold.
+The opposite is true — **"No ads" is already what was sold**, in the paywall's
+own first line. Shipping ads to a subscriber would be the breach. What is left:
+the first-run grace period;
 whether the picker — the app's most task-focused screen — carries a banner at
 all; and app-open/interstitial ads, which the spec itself recommends leaving
 unbuilt for this release. Our recommendations match the spec's on all four.
