@@ -1,6 +1,8 @@
 package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.unit.Dp
+import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
@@ -302,10 +304,13 @@ enum class RecentHeader {
  * reach — and "recents empty → the section is ABSENT" is precisely a claim about
  * something that is not on screen.
  *
- * @property showVoiceLegend the `volume_up` explainer above the list.
+ * @property showVoiceLegend the `volume_up` explainer, drawn ABOVE the
+ *   `LazyColumn` and never inside it — see [pickerListPlan] for why that
+ *   placement is load-bearing rather than cosmetic.
  * @property recentHeader null when the recents section is not emitted at all.
  * @property railOffset index of the first alphabetical row inside the same
- *   `LazyColumn`, which is what a rail letter scrolls to.
+ *   `LazyColumn`, which is what a rail letter scrolls to. The legend is not one
+ *   of those items, so it is not counted here.
  */
 @Immutable
 data class PickerListPlan(
@@ -330,10 +335,28 @@ data class PickerListPlan(
  *   screen would carry one, and the explainer would describe an absence. That
  *   is the same dead-affordance rule (§7.6) rev 5 applied to the mark itself,
  *   one level up.
- * - **The rail counts everything above the alphabet.** The legend is a real
- *   item in the same list, so leaving it out of [PickerListPlan.railOffset]
- *   makes every letter land one row short — deterministic, silent, and
- *   invisible to any test that only looks at rows.
+ * - **The rail counts everything above the alphabet.** Every header and
+ *   pseudo-row emitted before the alphabet is a real item in the same list, so
+ *   leaving one out of [PickerListPlan.railOffset] makes every letter land a row
+ *   short — deterministic, silent, and invisible to any test that only looks at
+ *   rows.
+ * - **The legend is NOT one of those items, and that is a fix, not a detail.**
+ *   The device's voice answer arrives after the list has been laid out — binding
+ *   `TextToSpeech` is documented at up to 5000ms
+ *   (`AndroidOfflineVoiceCatalog.INIT_TIMEOUT_MS`), and the picker paints long
+ *   before that. While the legend lived inside the `LazyColumn`, its arrival
+ *   INSERTED an item at index 0 of a list whose scroll position was already
+ *   anchored to a key: `LazyListState` re-points the anchor at whatever item
+ *   still carries the key it was showing, so the new item was laid out just
+ *   ABOVE the viewport and was never seen. Measured on `Tranzlate_Resizable`:
+ *   `totalItemsCount` 197 → 198 while `firstVisibleItemIndex` went 0 → 1 with
+ *   the same first visible key, and `VoiceLegend` first composed 64.8s later,
+ *   when the list was scrolled back to the top by hand. That is documented
+ *   `LazyListState` behaviour — it is what stops a list jumping when content
+ *   loads above it — so the answer is not to fight it but to keep the legend out
+ *   of the anchored item set entirely. Drawn above the `LazyColumn` it occupies
+ *   the same place in the 16a frame, appears the moment the device answers, and
+ *   [railOffset] never has to know it exists.
  *
  * @param detectRowPresent the source-only "Detect language" pseudo-row.
  * @param anyVoiceMark at least one row would draw the speaker ([showsVoiceMark]).
@@ -353,11 +376,11 @@ fun pickerListPlan(
             role == LanguageRole.TARGET -> RecentHeader.TARGET
             else -> RecentHeader.GENERIC
         }
-    // Emission order, and therefore counting order: detect row · legend ·
-    // recents (header + rows) · "All languages" header · the alphabet.
+    // Emission order, and therefore counting order: detect row · recents
+    // (header + rows) · "All languages" header · the alphabet. The legend is
+    // deliberately absent from both — it is not an item of this list.
     val railOffset =
         (if (detectRowPresent) 1 else 0) +
-            (if (showVoiceLegend) 1 else 0) +
             (if (recentHeader == null) 0 else recentCount + 1) +
             (if (railed) 1 else 0)
     return PickerListPlan(
@@ -367,6 +390,37 @@ fun pickerListPlan(
         railOffset = railOffset,
     )
 }
+
+/**
+ * How short a picker row is allowed to be.
+ *
+ * Pulled out of the row composable for the same reason [pickerListPlan] was
+ * pulled out of the list composable: this module has no Robolectric and no
+ * Compose test rule, so a decision left inside a `@Composable` is a decision no
+ * test can reach. A co-verify lens proved that literally — it deleted the
+ * `!voiceMark` half of this condition, the whole module's unit tests stayed
+ * BUILD SUCCESSFUL with zero failures, and the row it broke is the one the
+ * comment says must not break.
+ *
+ * The rule: the mark is drawn on the SUPPORTING line, so any row that carries a
+ * mark needs the two-line box even when it has no supporting words. The
+ * voice-but-no-pack row — 17a's Arabic, and every `Downloadable`/`OnlineOnly`
+ * language this device happens to have a voice for — is exactly that case, and
+ * a 56dp single-line box would clip the mark away.
+ *
+ * @param hasSupportingText the row has state words to show ("On device",
+ *   "Downloading…", a failure reason). `Downloadable` and `OnlineOnly` have none.
+ * @param voiceMark the row draws the offline-voice speaker ([showsVoiceMark]).
+ */
+fun pickerRowMinHeight(
+    hasSupportingText: Boolean,
+    voiceMark: Boolean,
+): Dp =
+    if (!hasSupportingText && !voiceMark) {
+        Dimensions.pickerRowHeight
+    } else {
+        Dimensions.pickerRowHeightTall
+    }
 
 /** First index per rail letter, so a rail tap can scroll straight to it. */
 fun List<LanguagePickerRow>.letterIndex(offset: Int): Map<Char, Int> =

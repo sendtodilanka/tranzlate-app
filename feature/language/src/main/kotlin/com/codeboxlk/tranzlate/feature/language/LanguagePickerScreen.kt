@@ -379,61 +379,77 @@ private fun PickerList(
                 emptyList()
             }
         }
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            contentPadding =
-                PaddingValues(
-                    start = spacing.sm8,
-                    // The rail is an OVERLAY with a 48dp touch strip on this
-                    // edge, and it wins the hit test. At an 8dp inset the rows
-                    // ran under it and it swallowed the right half of every
-                    // trailing control: tapping the outer edge of a row's ⬇
-                    // scrolled the list instead of starting the download —
-                    // deterministic, not a race. While the rail is up, the list
-                    // ends where the rail begins.
-                    end = if (railed) Dimensions.touchTargetMin else spacing.sm8,
-                    bottom = spacing.sm8,
-                ),
-            modifier = Modifier.fillMaxSize().testTag("tt_lang_list"),
-        ) {
-            // Emission order IS the order pickerListPlan counts in.
-            sections.detect?.let { detect ->
-                item(key = "detect_${detect.id}", contentType = CONTENT_TYPE_ROW) {
-                    LanguageRow(detect, target, onSelect, onDownload, onStop)
-                }
-            }
-            if (plan.showVoiceLegend) {
-                item(key = "voice_legend") { VoiceLegend() }
-            }
-            if (sections.catalogEmpty) {
-                item(key = "catalog_loading") { CatalogLoading() }
-            }
-            if (sections.nothingFound) {
-                item(key = "empty_result") { NoSearchResults(query = query, onShowAll = onClearQuery) }
-            }
-            plan.recentHeader?.let { header ->
-                item(key = "header_recent", contentType = CONTENT_TYPE_HEADER) {
-                    SectionHeader(recentHeaderRes(header))
-                }
-                pickerRows(sections.recent, "rec", target, onSelect, onDownload, onStop)
-            }
-            // No "All languages" banner over a filtered list: the results ARE
-            // the list, and a counter beside them would count the catalog, not
-            // them.
-            if (plan.showAllHeader) {
-                item(key = "header_all", contentType = CONTENT_TYPE_HEADER) {
-                    SectionHeader(R.string.text_lang_all_header, sections.counts)
-                }
-            }
-            pickerRows(visibleRows, "all", target, onSelect, onDownload, onStop)
-        }
-        if (letters.isNotEmpty()) {
-            AlphabetRail(
-                letters = letters,
-                listState = listState,
-                modifier = Modifier.align(Alignment.CenterEnd).padding(vertical = spacing.lg24),
+    Column(modifier = Modifier.fillMaxSize()) {
+        // ABOVE the LazyColumn, not inside it. The device's voice answer lands
+        // after the list has been laid out, and an item that appears at index 0
+        // of an already-anchored LazyColumn is placed above the viewport and
+        // never seen — see `pickerListPlan` for the measurement. Here it simply
+        // appears, in the same place the 16a frame draws it, and the list below
+        // keeps its own scroll position.
+        if (plan.showVoiceLegend) {
+            VoiceLegend(
+                modifier =
+                    Modifier.padding(
+                        start = spacing.sm8,
+                        // Matches the list's own end inset so the legend pill and
+                        // the row pills line up while the rail is up.
+                        end = if (railed) Dimensions.touchTargetMin else spacing.sm8,
+                    ),
             )
+        }
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            LazyColumn(
+                state = listState,
+                contentPadding =
+                    PaddingValues(
+                        start = spacing.sm8,
+                        // The rail is an OVERLAY with a 48dp touch strip on this
+                        // edge, and it wins the hit test. At an 8dp inset the rows
+                        // ran under it and it swallowed the right half of every
+                        // trailing control: tapping the outer edge of a row's ⬇
+                        // scrolled the list instead of starting the download —
+                        // deterministic, not a race. While the rail is up, the list
+                        // ends where the rail begins.
+                        end = if (railed) Dimensions.touchTargetMin else spacing.sm8,
+                        bottom = spacing.sm8,
+                    ),
+                modifier = Modifier.fillMaxSize().testTag("tt_lang_list"),
+            ) {
+                // Emission order IS the order pickerListPlan counts in.
+                sections.detect?.let { detect ->
+                    item(key = "detect_${detect.id}", contentType = CONTENT_TYPE_ROW) {
+                        LanguageRow(detect, target, onSelect, onDownload, onStop)
+                    }
+                }
+                if (sections.catalogEmpty) {
+                    item(key = "catalog_loading") { CatalogLoading() }
+                }
+                if (sections.nothingFound) {
+                    item(key = "empty_result") { NoSearchResults(query = query, onShowAll = onClearQuery) }
+                }
+                plan.recentHeader?.let { header ->
+                    item(key = "header_recent", contentType = CONTENT_TYPE_HEADER) {
+                        SectionHeader(recentHeaderRes(header))
+                    }
+                    pickerRows(sections.recent, "rec", target, onSelect, onDownload, onStop)
+                }
+                // No "All languages" banner over a filtered list: the results ARE
+                // the list, and a counter beside them would count the catalog, not
+                // them.
+                if (plan.showAllHeader) {
+                    item(key = "header_all", contentType = CONTENT_TYPE_HEADER) {
+                        SectionHeader(R.string.text_lang_all_header, sections.counts)
+                    }
+                }
+                pickerRows(visibleRows, "all", target, onSelect, onDownload, onStop)
+            }
+            if (letters.isNotEmpty()) {
+                AlphabetRail(
+                    letters = letters,
+                    listState = listState,
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(vertical = spacing.lg24),
+                )
+            }
         }
     }
 }
@@ -658,18 +674,12 @@ private fun LanguageRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(
-                    // The mark lives on the supporting line, so a row that has
-                    // only the mark is still the TALL row: the "voice, no pack"
-                    // case (17a's downloading Arabic) has no supporting words
-                    // and must not lose its mark to a 56dp single-line box.
-                    min =
-                        if (supporting == null && !voiceMark) {
-                            Dimensions.pickerRowHeight
-                        } else {
-                            Dimensions.pickerRowHeightTall
-                        },
-                ).clip(TranzlateShapeFull)
+                // Decided in `pickerRowMinHeight`, not here: the "voice, no pack"
+                // row must keep the two-line box, and a lens proved that living
+                // inside this composable meant no test in the module could reach
+                // the rule at all.
+                .heightIn(min = pickerRowMinHeight(hasSupportingText = supporting != null, voiceMark = voiceMark))
+                .clip(TranzlateShapeFull)
                 .background(rowContainerColor(row.state))
                 .selectable(
                     selected = selected,
@@ -987,14 +997,19 @@ private fun RowTrailing(
  * Not a control, and not focusable as one: it explains a mark that has nothing
  * to tap (rev 5 cut 19j — see [showsVoiceMark]). TalkBack reads it as the
  * sentence it is.
+ *
+ * It is drawn ABOVE the list rather than as an item of it. The reason is not
+ * layout taste — it is that the device's voice answer arrives after the list has
+ * been laid out, and an item added to an anchored `LazyColumn` at index 0 lands
+ * above the viewport. `pickerListPlan` carries the measurement.
  */
 @Composable
-private fun VoiceLegend() {
+private fun VoiceLegend(modifier: Modifier = Modifier) {
     val spacing = LocalSpacing.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .heightIn(min = Dimensions.pickerRowHeight)
                 .clip(TranzlateShapeFull)

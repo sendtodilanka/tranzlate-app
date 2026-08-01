@@ -44,8 +44,9 @@ class PickerListPlanTest {
 
         assertThat(empty.recentHeader).isNull()
         // …and the list closes over the gap: nothing above the alphabet except
-        // the legend and the "All languages" header.
-        assertThat(empty.railOffset).isEqualTo(2)
+        // the "All languages" header. The legend is not an item of this list —
+        // see `theVoiceAnswerAddsNoItemToTheAnchoredList`.
+        assertThat(empty.railOffset).isEqualTo(1)
     }
 
     @Test
@@ -88,20 +89,37 @@ class PickerListPlanTest {
     // ---- the rail's offset --------------------------------------------------
 
     /**
-     * The legend is a real item in the same `LazyColumn` the rail indexes into.
-     * Leave it out of the count and every letter lands one row short of the row
-     * it names — deterministic, silent, and invisible to any test that only
-     * looks at rows.
+     * THE regression test for the co-verify blocking defect.
+     *
+     * The device's offline-voice answer arrives LATE — binding `TextToSpeech` is
+     * documented at up to 5000ms, and the picker paints well before that — so
+     * `anyVoiceMark` flips false → true while the list is already on screen. If
+     * the legend is an item of that list, the flip inserts an item at index 0 of
+     * a `LazyColumn` whose scroll position is anchored to the key it was already
+     * showing: the anchor follows its key to index 1 and the new item is laid out
+     * ABOVE the viewport, where it is never seen. Measured on the emulator —
+     * `totalItemsCount` 197 → 198, `firstVisibleItemIndex` 0 → 1, same first
+     * visible key, and `VoiceLegend` first composed 64.8 seconds later when the
+     * list was dragged back to the top by hand.
+     *
+     * So the invariant is not "count the legend correctly". It is that the
+     * answer arriving must not change the anchored item set AT ALL, in either
+     * direction, which is only true while the legend is drawn outside the list.
+     * Both answers must produce the same offset — asserting one of them alone
+     * would pass with the legend put straight back.
      */
     @Test
-    fun `railOffsetCountsTheVoiceLegend`() {
-        val withLegend = plan(anyVoiceMark = true, recentCount = 3)
-        val withoutLegend = plan(anyVoiceMark = false, recentCount = 3)
+    fun `theVoiceAnswerAddsNoItemToTheAnchoredList`() {
+        val beforeTheDeviceAnswers = plan(anyVoiceMark = false, recentCount = 3)
+        val afterTheDeviceAnswers = plan(anyVoiceMark = true, recentCount = 3)
 
-        // legend + (header + 3 rows) + "All languages"
-        assertThat(withLegend.railOffset).isEqualTo(6)
-        assertThat(withoutLegend.railOffset).isEqualTo(5)
-        assertThat(withLegend.railOffset - withoutLegend.railOffset).isEqualTo(1)
+        // (header + 3 rows) + "All languages" — on both sides of the answer.
+        assertThat(beforeTheDeviceAnswers.railOffset).isEqualTo(5)
+        assertThat(afterTheDeviceAnswers.railOffset).isEqualTo(beforeTheDeviceAnswers.railOffset)
+        // …and the legend itself is still the thing that changed, so this is not
+        // passing because nothing happened.
+        assertThat(beforeTheDeviceAnswers.showVoiceLegend).isFalse()
+        assertThat(afterTheDeviceAnswers.showVoiceLegend).isTrue()
     }
 
     @Test
@@ -119,13 +137,16 @@ class PickerListPlanTest {
         val searching = plan(railed = false, recentCount = 0)
 
         assertThat(searching.showAllHeader).isFalse()
-        assertThat(searching.railOffset).isEqualTo(1) // the legend still stands
+        // Nothing above the results at all. The legend still STANDS while a
+        // search runs — it just stands above the list rather than in it.
+        assertThat(searching.railOffset).isEqualTo(0)
+        assertThat(searching.showVoiceLegend).isTrue()
     }
 
     /**
-     * End-to-end against the drawn frame: the export's 16a has the legend, three
-     * recents and the "All languages" header above Albanian, so the first
-     * alphabetical row sits at index 6.
+     * End-to-end against the drawn frame: the export's 16a has three recents and
+     * the "All languages" header above Albanian inside the list, and the legend
+     * above the list, so the first alphabetical row sits at index 5.
      */
     @Test
     fun `the export's own 16a arithmetic`() {
@@ -167,7 +188,7 @@ class PickerListPlanTest {
 
         assertThat(built.showVoiceLegend).isTrue()
         assertThat(built.recentHeader).isEqualTo(RecentHeader.TARGET)
-        assertThat(built.railOffset).isEqualTo(6)
+        assertThat(built.railOffset).isEqualTo(5)
         // Afrikaans is on device and has NO voice — the row that proves the two
         // are independent, and it is the first row the rail's 'A' points at.
         assertThat(rows.first().displayName).isEqualTo("Afrikaans")
