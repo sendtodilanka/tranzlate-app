@@ -100,7 +100,8 @@ class TranzlatePreferencesDataSource
 
         /**
          * When each language was last chosen — what the picker's "Recent" section
-         * is built from (issue #117).
+         * is built from (issue #117), split per picking side since issue #130
+         * rev.3 (16a shows source-recents and target-recents separately).
          *
          * This lives in preferences and NOT in the `language` Room table, which
          * is where it looks like it should live. That table is never seeded —
@@ -110,27 +111,71 @@ class TranzlatePreferencesDataSource
          * data; keeping it here means it does not depend on a seeding decision
          * that has not been made, and it survives the catalog changing under it.
          *
+         * Three keys, one codec: the pre-split single key is read-only legacy —
+         * new picks land under the side-specific key. Continuity for upgraders
+         * is a read-time union in [recentLanguages] (chosen over a one-shot
+         * seed: no write ever happens on the read path, there is no "has the
+         * seed run" flag to corrupt, and the old data stays byte-identical on
+         * disk for a rollback). The legacy entries carry no side information,
+         * so the per-side flows honestly EXCLUDE them rather than guessing a
+         * side that was never recorded.
+         *
          * Stored as `id:millis` entries joined by U+001F — a unit separator can
          * appear in neither a BCP-47 tag nor a decimal, so the codec has no
          * escaping to get wrong. Malformed entries are dropped rather than
          * throwing: a corrupt preference must cost the user their recents list,
-         * never the screen.
+         * never the screen. Each key decodes independently, so one corrupt map
+         * never takes the other two down with it.
          */
-        val recentLanguages: Flow<Map<String, Long>> =
-            preferences.map { prefs -> decodeRecents(prefs[KEY_RECENT_LANGS].orEmpty()) }
+        val recentSourceLanguages: Flow<Map<String, Long>> =
+            preferences.map { prefs -> decodeRecents(prefs[KEY_RECENT_LANGS_SOURCE].orEmpty()) }
+
+        /** See [recentSourceLanguages]. */
+        val recentTargetLanguages: Flow<Map<String, Long>> =
+            preferences.map { prefs -> decodeRecents(prefs[KEY_RECENT_LANGS_TARGET].orEmpty()) }
 
         /**
-         * Records a use and keeps only the [RECENT_STORE_LIMIT] most recent, so the
-         * preference cannot grow with every language the user ever touches.
+         * The MERGED view the shipped 15a picker renders: union of the legacy
+         * pre-split key and both side keys, newest stamp per id. Exactly the
+         * single-map shape it always served, so the split is invisible there.
          */
-        suspend fun recordLanguageUse(
+        val recentLanguages: Flow<Map<String, Long>> =
+            preferences.map { prefs ->
+                val union =
+                    decodeRecents(prefs[KEY_RECENT_LANGS].orEmpty()).asSequence() +
+                        decodeRecents(prefs[KEY_RECENT_LANGS_SOURCE].orEmpty()).asSequence() +
+                        decodeRecents(prefs[KEY_RECENT_LANGS_TARGET].orEmpty()).asSequence()
+                union
+                    .groupingBy { it.key }
+                    .fold(Long.MIN_VALUE) { newest, entry -> maxOf(newest, entry.value) }
+            }
+
+        /**
+         * Records a source-side pick and keeps only the [RECENT_STORE_LIMIT] most
+         * recent, so the preference cannot grow with every language the user ever
+         * touches. The cap is PER MAP — splitting must never remember less than
+         * the single key did.
+         */
+        suspend fun recordSourceLanguageUse(
+            languageId: String,
+            atMillis: Long,
+        ) = recordUse(KEY_RECENT_LANGS_SOURCE, languageId, atMillis)
+
+        /** See [recordSourceLanguageUse]. */
+        suspend fun recordTargetLanguageUse(
+            languageId: String,
+            atMillis: Long,
+        ) = recordUse(KEY_RECENT_LANGS_TARGET, languageId, atMillis)
+
+        private suspend fun recordUse(
+            key: Preferences.Key<String>,
             languageId: String,
             atMillis: Long,
         ) {
             if (languageId.isBlank()) return
             dataStore.edit { prefs ->
-                val merged = decodeRecents(prefs[KEY_RECENT_LANGS].orEmpty()) + (languageId to atMillis)
-                prefs[KEY_RECENT_LANGS] =
+                val merged = decodeRecents(prefs[key].orEmpty()) + (languageId to atMillis)
+                prefs[key] =
                     merged.entries
                         .sortedByDescending { it.value }
                         .take(RECENT_STORE_LIMIT)
@@ -145,7 +190,11 @@ class TranzlatePreferencesDataSource
             private val KEY_THEME = intPreferencesKey("prefs.theme")
             private val KEY_DYNAMIC_COLOR = booleanPreferencesKey("prefs.dynamic_color")
             private val KEY_ALLOW_MOBILE_DATA = booleanPreferencesKey("prefs.allow_mobile_data")
+
+            /** Pre-split recents (issue #117 shape). READ-ONLY legacy since #130 rev.3 — never written again. */
             private val KEY_RECENT_LANGS = stringPreferencesKey("prefs.recent_languages")
+            private val KEY_RECENT_LANGS_SOURCE = stringPreferencesKey("prefs.recent_languages.source")
+            private val KEY_RECENT_LANGS_TARGET = stringPreferencesKey("prefs.recent_languages.target")
 
             const val DEFAULT_SOURCE_LANG = "en"
             const val DEFAULT_TARGET_LANG = "fr"

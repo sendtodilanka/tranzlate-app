@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.feature.languagepicker
 
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
@@ -144,6 +145,7 @@ private class StaticLanguageRepository : LanguageRepository {
 
     override suspend fun setLastUsed(
         languageId: String,
+        role: LanguageRole,
         atMillis: Long,
     ) = Unit
 }

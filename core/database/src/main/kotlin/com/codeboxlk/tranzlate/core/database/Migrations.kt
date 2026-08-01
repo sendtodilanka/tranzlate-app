@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * `MigrationCoverageTest` fails the build if this chain has a gap, so the mistake
  * that destructive fallback used to paper over cannot reach a release instead.
  */
-val TRANZLATE_MIGRATIONS: List<Migration> = listOf(MigrationOneToTwo)
+val TRANZLATE_MIGRATIONS: List<Migration> = listOf(MigrationOneToTwo, MigrationTwoToThree)
 
 /**
  * v1 → v2 — the C-8 cache key becomes UNIQUE.
@@ -77,6 +77,46 @@ internal object MigrationOneToTwo : Migration(1, 2) {
             "CREATE UNIQUE INDEX IF NOT EXISTS " +
                 "`index_translation_source_text_source_lang_target_lang_engine` " +
                 "ON `translation` (`source_text`, `source_lang`, `target_lang`, `engine`)",
+        )
+    }
+}
+
+/**
+ * v2 → v3 — the `language_usage` table lands (issue #122).
+ *
+ * Purely additive: the ONLY delta between `schemas/…/2.json` and `3.json` is the
+ * new table — translation-success stamps per (id, role), what Manage packs'
+ * deletion honesty reads from. No existing table, index or row is touched, so
+ * there is nothing to collapse or carry across.
+ *
+ * The statement matches Room's own `createSql` for [LanguageUsageEntity]
+ * byte-for-byte (checked against the exported `3.json`) — a drifted hand-written
+ * CREATE is exactly what Room's schema validation would reject on next open.
+ * Full statement, not a constant shared with the entity: a migration has to keep
+ * describing the schema as it was at THIS version even after the entity moves on
+ * (Room migration guidance).
+ *
+ * Verification stance, honestly: `MigrationCoverageTest` gates this step
+ * structurally (chain completeness + the exported schema per version), but the
+ * SQL is NOT executed in CI — Room's `MigrationTestHelper` needs the
+ * instrumentation suite, which is red on API 35+ (issue #40, follow-up #111).
+ * Same pre-existing gap as v1→v2, recorded rather than papered over.
+ *
+ * MagicNumber is suppressed, not obeyed: a migration step IS its two version
+ * numbers, frozen at the moment it shipped — naming them constants would invite
+ * sharing with [TRANZLATE_DB_VERSION], which is exactly the drift this file's
+ * header forbids. (1 and 2 sit in the rule's default ignore list, which is the
+ * only reason v1→v2 needed no suppression.)
+ */
+@Suppress("MagicNumber")
+internal object MigrationTwoToThree : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `language_usage` (" +
+                "`lang_id` TEXT NOT NULL, " +
+                "`role` TEXT NOT NULL, " +
+                "`last_used_at` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`lang_id`, `role`))",
         )
     }
 }

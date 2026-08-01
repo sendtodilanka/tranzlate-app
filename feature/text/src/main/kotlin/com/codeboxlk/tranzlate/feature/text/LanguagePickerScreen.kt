@@ -85,6 +85,7 @@ import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateShapeFull
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
@@ -141,10 +142,16 @@ fun LanguagePickerScreen(
         query = query,
         onQueryChange = { query = it },
         onSelect = { id ->
-            pickerViewModel.onLanguagePicked(id)
             when (target) {
-                LanguagePickerTarget.SOURCE -> viewModel.onSelectSourceLanguage(id)
-                LanguagePickerTarget.TARGET -> viewModel.onSelectTargetLanguage(id)
+                LanguagePickerTarget.SOURCE -> {
+                    pickerViewModel.onLanguagePicked(id, LanguageRole.SOURCE)
+                    viewModel.onSelectSourceLanguage(id)
+                }
+
+                LanguagePickerTarget.TARGET -> {
+                    pickerViewModel.onLanguagePicked(id, LanguageRole.TARGET)
+                    viewModel.onSelectTargetLanguage(id)
+                }
             }
             onDone()
         },

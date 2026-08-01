@@ -1,17 +1,22 @@
 package com.codeboxlk.tranzlate.domain.translate
 
 import com.codeboxlk.tranzlate.core.common.AppClock
+import com.codeboxlk.tranzlate.core.common.ApplicationScope
 import com.codeboxlk.tranzlate.core.model.Entitlement
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
+import com.codeboxlk.tranzlate.domain.repository.LanguageUsageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslationRepository
 import com.codeboxlk.tranzlate.domain.usage.SpendResult
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -45,6 +50,13 @@ private const val AUTO_DETECT_LANG = "auto"
  *    never fails the translation the user is reading.
  *  - The Ads brain is ASKED after every completed translation (D-4 counts
  *    completions); the show/no-show DECISION stays inside [AdsCoordinator].
+ *  - Language-usage stamps on SUCCESS only (issue #122, ruling R6): resolved
+ *    source as SOURCE, target as TARGET — never on selection, never the "auto"
+ *    sentinel. Engine-agnostic AND cache-agnostic on purpose: an online-served
+ *    or cache-served answer still proves the user uses that language, and not
+ *    stamping it would nudge deleting an actively-used pack. Fire-and-forget
+ *    on [externalScope]: the stamp never delays the outcome and its failure is
+ *    its own, never the translation's.
  */
 class TranslateTextUseCase
     @Inject
@@ -54,7 +66,9 @@ class TranslateTextUseCase
         private val usagePolicy: UsagePolicy,
         private val adsCoordinator: AdsCoordinator,
         private val translationRepository: TranslationRepository,
+        private val languageUsageRepository: LanguageUsageRepository,
         private val clock: AppClock,
+        @param:ApplicationScope private val externalScope: CoroutineScope,
     ) {
         suspend operator fun invoke(
             text: String,
@@ -82,6 +96,11 @@ class TranslateTextUseCase
                         null // best-effort: a broken cache must never block a translation
                     }
                 if (hit != null) {
+                    // A cache-served answer is still a USE of both languages
+                    // (the pair is resolved by construction on this path) — not
+                    // stamping it would let a pack the user exercises daily
+                    // look months stale in Manage packs (ruling R6 rationale).
+                    stampLanguageUse(resolvedSrcLang = srcLang, tgtLang = tgtLang)
                     return TranslationOutcome.Success(
                         text = hit.targetText,
                         resolvedEngine = hit.engine,
@@ -118,6 +137,13 @@ class TranslateTextUseCase
                     throw rethrown
                 }
             if (outcome is TranslationOutcome.Success) {
+                // Success-only, resolved-only (ruling R6): auto resolves to the
+                // DETECTED id or — undetected — stamps no source at all. The
+                // literal "auto" sentinel is never a language and never stored.
+                stampLanguageUse(
+                    resolvedSrcLang = if (srcLang == AUTO_DETECT_LANG) outcome.detectedSource else srcLang,
+                    tgtLang = tgtLang,
+                )
                 saveToHistory(text, srcLang, tgtLang, outcome)
                 adsCoordinator.onTranslationCompleted()
             } else {
@@ -133,6 +159,46 @@ class TranslateTextUseCase
          * inside a cancelled coroutine would otherwise throw and leak the spend.
          */
         private suspend fun refundSafely(tier: Tier) = withContext(NonCancellable) { usagePolicy.refund(tier) }
+
+        /**
+         * BOTH success paths (engine and cache) stamp through here. Launched on
+         * the application scope, NOT awaited: the user is already reading the
+         * translation, so a slow or dying disk must cost the stamp, never add
+         * latency or fail the outcome — and a screen scope cancelling mid-write
+         * must not lose it. Each role is isolated so a failed source stamp
+         * still lets the target stamp land.
+         *
+         * @param resolvedSrcLang RESOLVED source id, or null when an auto ask
+         *   came back without detect metadata — then only the target is stamped
+         *   (the sentinel must never be stored, ruling R6).
+         */
+        private fun stampLanguageUse(
+            resolvedSrcLang: String?,
+            tgtLang: String,
+        ) {
+            val atMillis = clock.nowMillis()
+            externalScope.launch {
+                if (resolvedSrcLang != null) {
+                    stampSafely(resolvedSrcLang, LanguageRole.SOURCE, atMillis)
+                }
+                stampSafely(tgtLang, LanguageRole.TARGET, atMillis)
+            }
+        }
+
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
+        private suspend fun stampSafely(
+            languageId: String,
+            role: LanguageRole,
+            atMillis: Long,
+        ) {
+            try {
+                languageUsageRepository.stampUse(languageId, role, atMillis)
+            } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                throw rethrown // never break structured cancellation
+            } catch (ignored: Exception) {
+                // Best-effort: Manage packs misses one stamp; nothing else may notice.
+            }
+        }
 
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
         private suspend fun saveToHistory(

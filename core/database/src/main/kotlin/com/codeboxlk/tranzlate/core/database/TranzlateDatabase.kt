@@ -9,8 +9,10 @@ import androidx.room.RoomDatabase
  * made in one and forgotten in the other.
  *
  * v2 (issue #53 A9): the C-8 cache index became UNIQUE — see [TRANZLATE_MIGRATIONS].
+ * v3 (issue #122): the `language_usage` table lands — translation-success stamps
+ * per (id, role), what Manage packs' deletion honesty reads from.
  */
-const val TRANZLATE_DB_VERSION = 2
+const val TRANZLATE_DB_VERSION = 3
 
 /**
  * DATA_MODEL — Room db `tranzlate.db`. Collections tables land with their feature spec.
@@ -23,6 +25,7 @@ const val TRANZLATE_DB_VERSION = 2
     entities = [
         TranslationEntity::class,
         LanguageEntity::class,
+        LanguageUsageEntity::class,
     ],
     version = TRANZLATE_DB_VERSION,
     exportSchema = true,
@@ -31,4 +34,6 @@ abstract class TranzlateDatabase : RoomDatabase() {
     abstract fun translationDao(): TranslationDao
 
     abstract fun languageDao(): LanguageDao
+
+    abstract fun languageUsageDao(): LanguageUsageDao
 }

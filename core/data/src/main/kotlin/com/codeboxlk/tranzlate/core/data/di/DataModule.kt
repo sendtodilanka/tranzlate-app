@@ -1,19 +1,27 @@
 package com.codeboxlk.tranzlate.core.data.di
 
+import com.codeboxlk.tranzlate.core.common.ApplicationScope
+import com.codeboxlk.tranzlate.core.common.DispatcherProvider
 import com.codeboxlk.tranzlate.core.data.repository.DownloadPrefsRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.LanguageRepositoryImpl
+import com.codeboxlk.tranzlate.core.data.repository.LanguageUsageRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.ThemePrefsRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.TranslatePrefsRepositoryImpl
 import com.codeboxlk.tranzlate.core.data.repository.TranslationRepositoryImpl
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
+import com.codeboxlk.tranzlate.domain.repository.LanguageUsageRepository
 import com.codeboxlk.tranzlate.domain.repository.ThemePrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslationRepository
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import javax.inject.Singleton
 
 /**
  * Engine-agnostic data bindings — present in BOTH prod and fake variants.
@@ -35,6 +43,9 @@ internal abstract class DataModule {
     abstract fun languageRepository(impl: LanguageRepositoryImpl): LanguageRepository
 
     @Binds
+    abstract fun languageUsageRepository(impl: LanguageUsageRepositoryImpl): LanguageUsageRepository
+
+    @Binds
     abstract fun translatePrefsRepository(impl: TranslatePrefsRepositoryImpl): TranslatePrefsRepository
 
     @Binds
@@ -42,4 +53,21 @@ internal abstract class DataModule {
 
     @Binds
     abstract fun downloadPrefsRepository(impl: DownloadPrefsRepositoryImpl): DownloadPrefsRepository
+
+    companion object {
+        /**
+         * Application-lifetime scope for fire-and-forget data writes (first
+         * user: the translate flow's usage stamper, issue #122). Provided HERE
+         * — not in the per-flavor TranslateModules — because it is
+         * engine-agnostic plumbing both flavors need, and a single provider
+         * cannot drift. SupervisorJob so one failed write never cancels the
+         * scope for every later one; IO because everything launched on it is
+         * disk work.
+         */
+        @Provides
+        @Singleton
+        @ApplicationScope
+        fun applicationScope(dispatchers: DispatcherProvider): CoroutineScope =
+            CoroutineScope(SupervisorJob() + dispatchers.io)
+    }
 }

@@ -4,6 +4,7 @@ import com.codeboxlk.tranzlate.core.database.LanguageDao
 import com.codeboxlk.tranzlate.core.database.LanguageEntity
 import com.codeboxlk.tranzlate.core.datastore.TranzlatePreferencesDataSource
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
@@ -91,13 +92,23 @@ class LanguageRepositoryImpl
          * every user, forever, while looking implemented. The DAO write is kept
          * ALONGSIDE for the day the table is seeded; preferences are what the
          * overlay above actually reads.
+         *
+         * Per-role since issue #130 rev.3: the pick lands under its side's key
+         * (16a material) while the merged overlay above keeps serving the same
+         * union view the shipped 15a picker renders. Selection ONLY — the
+         * translate-use store (`LanguageUsageRepository`) is deliberately not a
+         * dependency here, so a pick can never masquerade as a use (ruling R6).
          */
         override suspend fun setLastUsed(
             languageId: String,
+            role: LanguageRole,
             atMillis: Long,
         ) {
             val canonical = BundledLanguageCatalog.canonicalId(languageId) ?: languageId
-            preferences.recordLanguageUse(canonical, atMillis)
+            when (role) {
+                LanguageRole.SOURCE -> preferences.recordSourceLanguageUse(canonical, atMillis)
+                LanguageRole.TARGET -> preferences.recordTargetLanguageUse(canonical, atMillis)
+            }
             languageDao.setLastUsed(canonical, atMillis)
         }
     }
