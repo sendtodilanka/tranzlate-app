@@ -68,7 +68,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 3 — seams + primitives
 | PR | Scope | Status |
 |---|---|---|
-| PR-8 | `TranzlateSheetScaffold` / `TranzlateListSheet` (designsystem, string-free) | ⬜ |
+| PR-8 | `TranzlateSheetScaffold` / `TranzlateListSheet` (designsystem, string-free) | ✅ #137, 2026-08-01 |
 | PR-9 | Shared `DownloadGate` — deletes the duplicated consent logic ×2 | ⬜ |
 | PR-10 | Offline-voice seam + `<queries>` TTS_SERVICE + experiment E-V1 | ⬜ |
 | PR-11 | Storage walk (aggregate meter source) + experiment E-S1 | ⬜ |
