@@ -79,11 +79,13 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateShapeFull
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.ui.ErrorCard
 import com.codeboxlk.tranzlate.core.ui.ShimmerResult
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 import com.codeboxlk.tranzlate.core.ui.adaptiveScreenMargin
+import com.codeboxlk.tranzlate.core.ui.languageLabel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
@@ -118,7 +120,7 @@ const val COMPOSER_CARD_SHARED_KEY = "composer_card"
 fun ComposerScreen(
     viewModel: TextViewModel,
     onBack: () -> Unit,
-    onPickLanguage: (LanguagePickerTarget) -> Unit,
+    onPickLanguage: (LanguageRole) -> Unit,
     onOpenPaywall: () -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
@@ -151,7 +153,7 @@ fun ComposerScreen(
 internal fun ComposerPane(
     viewModel: TextViewModel,
     onBack: () -> Unit,
-    onPickLanguage: (LanguagePickerTarget) -> Unit,
+    onPickLanguage: (LanguageRole) -> Unit,
     onNotify: (String) -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
@@ -214,7 +216,7 @@ internal fun ComposerPaneContent(
     onRetry: () -> Unit,
     onSwapLanguages: () -> Boolean,
     swapAvailable: Boolean = true,
-    onPickLanguage: (LanguagePickerTarget) -> Unit,
+    onPickLanguage: (LanguageRole) -> Unit,
     onBack: () -> Unit,
     onNotify: (String) -> Unit,
     onClearAll: () -> Unit,
@@ -360,8 +362,8 @@ internal fun ComposerPaneContent(
                 sourceLabel = languageLabel(sourceLangId),
                 targetLabel = languageLabel(targetLangId),
                 onBack = onBack,
-                onSourceClick = { onPickLanguage(LanguagePickerTarget.SOURCE) },
-                onTargetClick = { onPickLanguage(LanguagePickerTarget.TARGET) },
+                onSourceClick = { onPickLanguage(LanguageRole.SOURCE) },
+                onTargetClick = { onPickLanguage(LanguageRole.TARGET) },
                 onSwap = swapAction,
                 swapEnabled = swapAvailable,
                 constrainPills = layout.expandedWidth,

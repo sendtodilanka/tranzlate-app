@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate
 
+import com.codeboxlk.tranzlate.core.ui.languageLabel
 import com.google.common.truth.Truth.assertThat
 import com.lemonappdev.konsist.api.Konsist
 import org.junit.Test

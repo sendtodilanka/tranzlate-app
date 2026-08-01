@@ -1,7 +1,10 @@
-package com.codeboxlk.tranzlate.feature.text
+package com.codeboxlk.tranzlate.feature.language
 
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
+import com.codeboxlk.tranzlate.core.ui.languageEndonym
+import com.codeboxlk.tranzlate.core.ui.searchNormalize
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import java.util.Locale

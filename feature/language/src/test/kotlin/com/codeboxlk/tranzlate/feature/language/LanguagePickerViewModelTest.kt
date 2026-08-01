@@ -1,4 +1,4 @@
-package com.codeboxlk.tranzlate.feature.text
+package com.codeboxlk.tranzlate.feature.language
 
 import app.cash.turbine.test
 import com.codeboxlk.tranzlate.core.model.Language
@@ -8,6 +8,7 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
+import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository

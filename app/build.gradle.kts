@@ -135,6 +135,7 @@ tasks.configureEach {
 dependencies {
     // Features (Ring 4)
     implementation(projects.feature.text)
+    implementation(projects.feature.language)
     implementation(projects.feature.languagepicker)
     implementation(projects.feature.camera)
     implementation(projects.feature.history)

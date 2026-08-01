@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="text_lang_sheet_source_title">Traduzir de</string>
+    <string name="text_lang_sheet_target_title">Traduzir para</string>
+    <string name="text_lang_recent_header">Recentes</string>
+    <string name="text_lang_all_header">Todos os idiomas</string>
+    <string name="text_lang_loading">Carregando idiomas…</string>
+    <string name="text_lang_no_results">Nenhum idioma corresponde a “%1$s”</string>
+    <string name="text_lang_no_results_body">Verifique a ortografia ou tente o nome do idioma no próprio idioma.</string>
+    <string name="text_lang_show_all">Mostrar todos os idiomas</string>
+    <string name="text_lang_online_only">Somente on-line</string>
+    <string name="text_lang_on_device">No dispositivo</string>
+    <string name="text_lang_on_device_size">No dispositivo · %1$s</string>
+    <string name="text_lang_downloading">Baixando…</string>
+    <string name="text_lang_error_network">Sem conexão. Reconecte e tente novamente.</string>
+    <string name="text_lang_error_storage">Espaço insuficiente. Libere espaço e tente novamente.</string>
+    <string name="text_lang_error_generic">O download não foi concluído. Tente novamente.</string>
+    <string name="text_lang_data_dialog_title">Baixar %1$s usando dados móveis?</string>
+    <string name="text_lang_data_dialog_body">Os pacotes de idioma são grandes. Você pode esperar o Wi-Fi.</string>
+    <string name="text_lang_data_dialog_once">Baixar uma vez</string>
+    <string name="text_lang_data_dialog_wait">Esperar o Wi-Fi</string>
+    <plurals name="text_lang_search_hint">
+        <item quantity="one">Pesquisar %1$d idioma</item>
+        <item quantity="other">Pesquisar %1$d idiomas</item>
+    </plurals>
+    <plurals name="text_lang_on_device_count">
+        <item quantity="one">%1$d de %2$d no dispositivo</item>
+        <item quantity="other">%1$d de %2$d no dispositivo</item>
+    </plurals>
+    <!-- Language picker (issue #117 redesign) -->
+    <string name="cd_text_lang_search">Pesquisar idiomas</string>
+    <string name="cd_text_lang_clear">Limpar pesquisa</string>
+    <string name="cd_text_lang_row_on_device">%1$s, no dispositivo</string>
+    <string name="cd_text_lang_row_downloading">%1$s, baixando</string>
+    <string name="cd_text_lang_row_downloadable">%1$s, disponível para uso off-line</string>
+    <string name="cd_text_lang_row_online_only">%1$s, somente on-line</string>
+    <string name="cd_text_lang_row_failed">%1$s, falha no download</string>
+    <string name="cd_text_lang_download">Baixar %1$s para uso off-line</string>
+    <string name="cd_text_lang_stop">Parar o download e remover %1$s</string>
+    <string name="cd_text_lang_retry">Tentar baixar %1$s novamente</string>
+    <!-- The picker owns its own back description: `cd_text_back` stays with the
+         composer, and C-3 gives one key one home rather than two modules one name. -->
+    <string name="cd_lang_back">Voltar</string>
+</resources>

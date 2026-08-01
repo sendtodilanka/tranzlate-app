@@ -1,4 +1,4 @@
-package com.codeboxlk.tranzlate.feature.text
+package com.codeboxlk.tranzlate.core.ui
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -174,26 +174,5 @@ class LanguageNamesTest {
         assertThat(languageDisplayName("fr-CA", Locale.ENGLISH, fallback = "French (Canada)"))
             .isEqualTo("French (Canada)")
         assertThat(languageDisplayName("de", Locale.FRENCH, fallback = "German")).isEqualTo("allemand")
-    }
-
-    @Test
-    fun `the rail keeps its ends and never exceeds what fits`() {
-        val alphabet = ('A'..'Z').mapIndexed { index, letter -> letter to index }
-
-        val sampled = alphabet.sampledTo(10)
-
-        assertThat(sampled).hasSize(10)
-        assertThat(sampled.first()).isEqualTo('A' to 0)
-        // Dropping the tail instead would make the rail lie by omission: an
-        // index that stops at M in a list that runs to Z.
-        assertThat(sampled.last()).isEqualTo('Z' to 25)
-        assertThat(sampled.map { it.second }).isInOrder()
-    }
-
-    @Test
-    fun `a rail that already fits is untouched`() {
-        val five = ('A'..'E').mapIndexed { index, letter -> letter to index }
-
-        assertThat(five.sampledTo(10)).isEqualTo(five)
     }
 }
