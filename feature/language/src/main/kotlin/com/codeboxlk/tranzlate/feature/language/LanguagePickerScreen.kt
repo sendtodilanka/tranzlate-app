@@ -28,6 +28,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
@@ -137,11 +138,13 @@ fun LanguagePickerScreen(
     val offlineStates by viewModel.offlineStates.collectAsStateWithLifecycle()
     val pendingConsent by viewModel.pendingConsent.collectAsStateWithLifecycle()
     val selectedId by viewModel.selection(target).collectAsStateWithLifecycle()
+    val recents by viewModel.recents(target).collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     LanguagePickerContent(
         target = target,
         languages = languages,
         selectedId = selectedId,
+        recents = recents,
         query = query,
         onQueryChange = { query = it },
         onSelect = { id ->
@@ -161,8 +164,19 @@ fun LanguagePickerScreen(
 
 /**
  * Stateless picker layout: back + title · permanent search field · "Detect
- * language" (source side only) · Recent · All languages + on-device counter,
- * with an A–Z rail down the right edge.
+ * language" (source side only) · the offline-voice legend and speaker marks
+ * (target side only, 16a) · Recent · All languages + on-device counter, with an
+ * A–Z rail down the right edge.
+ *
+ * ONE screen serves both sides rather than two. 15a and 16a share their chrome,
+ * their search, their six row states, their counter and their rail; the spec
+ * calls the differences "three deliberate differences", which is a description
+ * of one screen with a parameter, not of a second screen. A parallel
+ * `TargetPickerScreen` would also put the language surface in a second home,
+ * which the rev.3 ruling rejected P1's module stance for (§7.1) and CLAUDE.md
+ * states as "every big job has ONE home". Every difference is therefore a
+ * branch on [target], and each of those branches is decided in [pickerListPlan]
+ * or [showsVoiceMark] so it can be unit-tested without a Compose test rule.
  *
  * The row pill deliberately sits 8dp from the screen edge rather than on the
  * 16dp screen-margin line (#88/#92): the margin rule governs CONTENT, and the
@@ -183,6 +197,7 @@ fun LanguagePickerContent(
     onSelect: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    recents: Map<String, Long> = emptyMap(),
     offlineStates: Map<String, OfflineModelState> = emptyMap(),
     sizes: Map<String, Long> = emptyMap(),
     onDownload: (String) -> Unit = {},
@@ -205,6 +220,7 @@ fun LanguagePickerContent(
             selectedId = selectedId,
             query = query,
             sizes = sizes,
+            recents = recents,
             detectLabel = languageLabel(DETECT_LANGUAGE_ID),
         )
     MeteredConsentDialog(
@@ -237,6 +253,7 @@ fun LanguagePickerContent(
                     ),
             )
             PickerList(
+                target = target,
                 sections = sections,
                 query = query,
                 onSelect = onSelect,
@@ -257,6 +274,8 @@ private class PickerSections(
     val counts: OnDeviceCount,
     val searching: Boolean,
     val catalogEmpty: Boolean,
+    /** At least one row in the CATALOG would draw the speaker (never just the filtered view). */
+    val anyVoiceMark: Boolean,
 ) {
     /** A fruitless SEARCH — distinct from a catalog that has not arrived yet. */
     val nothingFound: Boolean get() = searching && !catalogEmpty && results.isEmpty() && detect == null
@@ -280,12 +299,13 @@ private fun rememberPickerSections(
     selectedId: String,
     query: String,
     sizes: Map<String, Long>,
+    recents: Map<String, Long>,
     detectLabel: String,
 ): PickerSections {
     val locale = LocalLocale.current.platformLocale
     val rows =
-        remember(languages, offlineStates, selectedId, sizes, locale) {
-            buildPickerRows(languages, offlineStates, selectedId, locale, sizes)
+        remember(languages, offlineStates, selectedId, sizes, recents, locale) {
+            buildPickerRows(languages, offlineStates, selectedId, locale, sizes, recents)
         }
     val normalizedQuery = remember(query) { searchNormalize(query) }
     val results = remember(rows, normalizedQuery) { rows.matching(normalizedQuery) }
@@ -302,6 +322,10 @@ private fun rememberPickerSections(
                 ?.takeIf { normalizedQuery.isEmpty() || it.searchKey.contains(normalizedQuery) }
         }
     val counts = remember(languages) { onDeviceCount(languages) }
+    // Over the whole catalog, not the filtered results: the legend explains a
+    // mark the user meets while scrolling, and it must not blink out because a
+    // three-letter query happens to match only unvoiced languages.
+    val anyVoiceMark = remember(rows, target) { rows.any { it.showsVoiceMark(target) } }
     return PickerSections(
         all = rows,
         results = results,
@@ -310,6 +334,7 @@ private fun rememberPickerSections(
         counts = counts,
         searching = normalizedQuery.isNotEmpty(),
         catalogEmpty = languages.isEmpty(),
+        anyVoiceMark = anyVoiceMark,
     )
 }
 
@@ -320,6 +345,7 @@ private fun rememberPickerSections(
  */
 @Composable
 private fun PickerList(
+    target: LanguageRole,
     sections: PickerSections,
     query: String,
     onSelect: (String) -> Unit,
@@ -330,18 +356,25 @@ private fun PickerList(
     val spacing = LocalSpacing.current
     val listState = rememberLazyListState()
     val visibleRows = if (sections.searching) sections.results else sections.all
-    // Where the alphabetical block starts, so a rail letter scrolls to the row
-    // and not to whatever happens to sit that far down. Counted from the items
-    // actually emitted below — detect row, Recent header + its rows, and the
-    // "All languages" header.
     val railed = !sections.searching && !sections.catalogEmpty
-    val detectCount = if (sections.detect != null) 1 else 0
-    val recentCount = if (sections.recent.isEmpty()) 0 else sections.recent.size + 1
-    val allOffset = detectCount + recentCount + if (railed) 1 else 0
+    // Every "is this section here?" answer, and with them the index the A–Z
+    // rail scrolls into, comes from ONE pure function — so the arithmetic that
+    // has to agree with the emission order below is readable by a unit test
+    // rather than only by a screenshot.
+    val plan =
+        remember(target, sections.detect, sections.recent, sections.anyVoiceMark, railed) {
+            pickerListPlan(
+                role = target,
+                detectRowPresent = sections.detect != null,
+                recentCount = sections.recent.size,
+                anyVoiceMark = sections.anyVoiceMark,
+                railed = railed,
+            )
+        }
     val letters =
-        remember(visibleRows, allOffset, railed) {
+        remember(visibleRows, plan.railOffset, railed) {
             if (railed) {
-                visibleRows.letterIndex(allOffset).toList().sortedBy { it.second }
+                visibleRows.letterIndex(plan.railOffset).toList().sortedBy { it.second }
             } else {
                 emptyList()
             }
@@ -364,10 +397,14 @@ private fun PickerList(
                 ),
             modifier = Modifier.fillMaxSize().testTag("tt_lang_list"),
         ) {
+            // Emission order IS the order pickerListPlan counts in.
             sections.detect?.let { detect ->
                 item(key = "detect_${detect.id}", contentType = CONTENT_TYPE_ROW) {
-                    LanguageRow(detect, onSelect, onDownload, onStop)
+                    LanguageRow(detect, target, onSelect, onDownload, onStop)
                 }
+            }
+            if (plan.showVoiceLegend) {
+                item(key = "voice_legend") { VoiceLegend() }
             }
             if (sections.catalogEmpty) {
                 item(key = "catalog_loading") { CatalogLoading() }
@@ -375,21 +412,21 @@ private fun PickerList(
             if (sections.nothingFound) {
                 item(key = "empty_result") { NoSearchResults(query = query, onShowAll = onClearQuery) }
             }
-            if (sections.recent.isNotEmpty()) {
+            plan.recentHeader?.let { header ->
                 item(key = "header_recent", contentType = CONTENT_TYPE_HEADER) {
-                    SectionHeader(R.string.text_lang_recent_header)
+                    SectionHeader(recentHeaderRes(header))
                 }
-                pickerRows(sections.recent, "rec", onSelect, onDownload, onStop)
+                pickerRows(sections.recent, "rec", target, onSelect, onDownload, onStop)
             }
             // No "All languages" banner over a filtered list: the results ARE
             // the list, and a counter beside them would count the catalog, not
             // them.
-            if (railed) {
+            if (plan.showAllHeader) {
                 item(key = "header_all", contentType = CONTENT_TYPE_HEADER) {
                     SectionHeader(R.string.text_lang_all_header, sections.counts)
                 }
             }
-            pickerRows(visibleRows, "all", onSelect, onDownload, onStop)
+            pickerRows(visibleRows, "all", target, onSelect, onDownload, onStop)
         }
         if (letters.isNotEmpty()) {
             AlphabetRail(
@@ -409,12 +446,21 @@ private fun PickerList(
 private fun LazyListScope.pickerRows(
     rows: List<LanguagePickerRow>,
     prefix: String,
+    target: LanguageRole,
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
 ) = items(rows, key = { "${prefix}_${it.id}" }, contentType = { CONTENT_TYPE_ROW }) { row ->
-    LanguageRow(row, onSelect, onDownload, onStop)
+    LanguageRow(row, target, onSelect, onDownload, onStop)
 }
+
+/** 15a says "Recent"; 16a names the role, so its header can be checked against its rows. */
+@StringRes
+private fun recentHeaderRes(header: RecentHeader): Int =
+    when (header) {
+        RecentHeader.GENERIC -> R.string.text_lang_recent_header
+        RecentHeader.TARGET -> R.string.text_lang_target_recent_header
+    }
 
 // ---- pieces ----------------------------------------------------------------
 
@@ -597,6 +643,7 @@ private fun SectionHeader(
 @Composable
 private fun LanguageRow(
     row: LanguagePickerRow,
+    target: LanguageRole,
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
@@ -604,14 +651,24 @@ private fun LanguageRow(
     val spacing = LocalSpacing.current
     val selected = row.state is LanguageRowState.Selected
     val supporting = rowSupportingText(row.state)
-    val description = rowContentDescription(row)
+    val voiceMark = row.showsVoiceMark(target)
+    val description = rowContentDescription(row, voiceMark)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
             Modifier
                 .fillMaxWidth()
                 .heightIn(
-                    min = if (supporting == null) Dimensions.pickerRowHeight else Dimensions.pickerRowHeightTall,
+                    // The mark lives on the supporting line, so a row that has
+                    // only the mark is still the TALL row: the "voice, no pack"
+                    // case (17a's downloading Arabic) has no supporting words
+                    // and must not lose its mark to a 56dp single-line box.
+                    min =
+                        if (supporting == null && !voiceMark) {
+                            Dimensions.pickerRowHeight
+                        } else {
+                            Dimensions.pickerRowHeightTall
+                        },
                 ).clip(TranzlateShapeFull)
                 .background(rowContainerColor(row.state))
                 .selectable(
@@ -642,7 +699,7 @@ private fun LanguageRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            RowSupportingLine(state = row.state, text = supporting)
+            RowSupportingLine(state = row.state, text = supporting, voiceMark = voiceMark)
         }
         Spacer(Modifier.width(spacing.sm8))
         RowTrailing(row = row, onDownload = onDownload, onStop = onStop)
@@ -717,12 +774,18 @@ private fun LanguageAvatarCircle(
     }
 }
 
-/** The supporting line's WORDS, or null when the state has nothing to add. */
+/**
+ * The supporting line's WORDS, or null when the state has nothing to add.
+ *
+ * `Selected` delegates to what it wraps rather than answering for itself: that
+ * is the whole point of the wrapper, and it is what puts "On device" under the
+ * selected Spanish row in 16a.
+ */
 @Composable
 private fun rowSupportingText(state: LanguageRowState): String? {
     val context = LocalContext.current
     return when (state) {
-        is LanguageRowState.Selected -> if (state.onDevice) onDeviceLine(context, state.sizeBytes) else null
+        is LanguageRowState.Selected -> rowSupportingText(state.inner)
         is LanguageRowState.Downloaded -> onDeviceLine(context, state.sizeBytes)
         LanguageRowState.Downloading -> stringResource(R.string.text_lang_downloading)
         is LanguageRowState.Failed -> stringResource(failureCauseRes(state.cause))
@@ -764,16 +827,20 @@ private fun failureCauseRes(cause: OfflineModelFailure): Int =
 private fun RowSupportingLine(
     state: LanguageRowState,
     text: String?,
+    voiceMark: Boolean,
 ) {
-    if (text == null) return
+    if (text == null && !voiceMark) return
     val spacing = LocalSpacing.current
     val color =
-        when (state) {
-            is LanguageRowState.Selected -> MaterialTheme.colorScheme.onPrimaryContainer
-            is LanguageRowState.Failed -> MaterialTheme.colorScheme.error
+        when {
+            state is LanguageRowState.Selected -> MaterialTheme.colorScheme.onPrimaryContainer
+            state is LanguageRowState.Failed -> MaterialTheme.colorScheme.error
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
-    if (state == LanguageRowState.Downloading) {
+    val downloading =
+        state == LanguageRowState.Downloading ||
+            (state is LanguageRowState.Selected && state.inner == LanguageRowState.Downloading)
+    if (downloading && text != null) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
@@ -783,16 +850,50 @@ private fun RowSupportingLine(
                 modifier = Modifier.weight(1f).testTag("tt_lang_progress"),
             )
             Text(text = text, style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
+            VoiceMark(visible = voiceMark, tint = color)
         }
     } else {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.xs4),
+        ) {
+            if (text != null) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = color,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
+            VoiceMark(visible = voiceMark, tint = color)
+        }
     }
+}
+
+/**
+ * The offline-voice speaker, drawn where the export draws it: on the supporting
+ * line, just after the state words, in the same ink as them — not in the
+ * trailing cluster, which belongs to the row's one state control.
+ *
+ * Silent to TalkBack on purpose. It is decoration over a fact already spoken by
+ * the row's own description ([rowContentDescription]); announced separately it
+ * would read as a second, tappable thing, and since rev 5 cut 19j there is
+ * nothing to tap — the mark is only ever drawn where the voice already exists.
+ */
+@Composable
+private fun VoiceMark(
+    visible: Boolean,
+    tint: Color,
+) {
+    if (!visible) return
+    Icon(
+        Icons.AutoMirrored.Filled.VolumeUp,
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier.size(Dimensions.iconXs).testTag("tt_lang_voice_mark"),
+    )
 }
 
 /** The single trailing control — one per state, decided in one place. */
@@ -873,6 +974,63 @@ private fun RowTrailing(
 }
 
 /**
+ * The 16a voice legend: what the speaker on a row means, said ONCE at the top
+ * instead of on every row that carries one.
+ *
+ * It is drawn as a row-shaped block — same 40dp circle, same leading inset,
+ * same full-pill shape as a language row — because it sits in the list and
+ * anything else there would read as a card that had wandered in. The circle
+ * takes the tertiary pair, which is the same treatment the "Detect language"
+ * avatar already gets for the same reason: this is not a language, and the
+ * palette should say so before the words do.
+ *
+ * Not a control, and not focusable as one: it explains a mark that has nothing
+ * to tap (rev 5 cut 19j — see [showsVoiceMark]). TalkBack reads it as the
+ * sentence it is.
+ */
+@Composable
+private fun VoiceLegend() {
+    val spacing = LocalSpacing.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Dimensions.pickerRowHeight)
+                .clip(TranzlateShapeFull)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .padding(
+                    start = Dimensions.pickerLeadingInset,
+                    end = spacing.md16,
+                    top = spacing.sm8,
+                    bottom = spacing.sm8,
+                ).testTag("tt_lang_voice_legend"),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier =
+                Modifier
+                    .size(Dimensions.iconChip)
+                    .clip(TranzlateShapeFull)
+                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.VolumeUp,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(Dimensions.iconSm),
+            )
+        }
+        Spacer(Modifier.width(spacing.md16))
+        Text(
+            text = stringResource(R.string.text_lang_voice_legend),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
  * The design's own chip, reused for the 135 catalog languages that ML Kit
  * cannot hold offline at all (plan R4) — same visual language, nothing invented.
  */
@@ -895,14 +1053,31 @@ private fun OnlineOnlyChip() {
     )
 }
 
-/** The name AND its state — the old app announced `content-desc=""` on every node. */
+/**
+ * The name AND its state — the old app announced `content-desc=""` on every node.
+ *
+ * The speaker mark is folded in HERE rather than labelled on the icon: a
+ * screen reader should hear one sentence about the row ("Spanish, on device,
+ * can be spoken offline"), not a row followed by a loose decorative node.
+ */
 @Composable
-private fun rowContentDescription(row: LanguagePickerRow): String {
-    val name = row.displayName
-    return when (row.state) {
+private fun rowContentDescription(
+    row: LanguagePickerRow,
+    voiceMark: Boolean,
+): String {
+    val base = stateContentDescription(row.state, row.displayName)
+    return if (voiceMark) stringResource(R.string.cd_text_lang_row_voice, base) else base
+}
+
+@Composable
+private fun stateContentDescription(
+    state: LanguageRowState,
+    name: String,
+): String =
+    when (state) {
         // `selected` semantics already announce the choice; the line adds the fact.
         is LanguageRowState.Selected -> {
-            if (row.state.onDevice) stringResource(R.string.cd_text_lang_row_on_device, name) else name
+            stateContentDescription(state.inner, name)
         }
 
         is LanguageRowState.Downloaded -> {
@@ -925,7 +1100,6 @@ private fun rowContentDescription(row: LanguagePickerRow): String {
             stringResource(R.string.cd_text_lang_row_failed, name)
         }
     }
-}
 
 private fun rowContainerColorFor(
     state: LanguageRowState,
@@ -1162,17 +1336,45 @@ private fun MeteredConsentDialog(
 
 // ---- previews (CLAUDE.md rule 7 — one per meaningful STATE) ------------------
 
+/**
+ * The 16a cast, as the export draws it: Spanish selected, on device, with a
+ * voice; English on device with a voice; Afrikaans on device with NO voice —
+ * the row that proves a pack does not imply a voice. Arabic carries a voice
+ * while its pack is still downloading, which is the other half of that
+ * independence and the case 17a's landscape "to" frame draws.
+ */
 private val previewLanguages =
     listOf(
-        Language("af", "Afrikaans", offlineAvailable = true, offlineDownloaded = true, lastUsedAt = 3L),
+        Language("af", "Afrikaans", offlineAvailable = true, offlineDownloaded = true),
         Language("sq", "Albanian", offlineAvailable = true, offlineDownloaded = false),
         Language("am", "Amharic", offlineAvailable = true, offlineDownloaded = false),
-        Language("ar", "Arabic", offlineAvailable = true, offlineDownloaded = false),
+        Language(
+            "ar",
+            "Arabic",
+            offlineAvailable = true,
+            offlineDownloaded = false,
+            hasOfflineVoice = true,
+        ),
         Language("hy", "Armenian", offlineAvailable = false, offlineDownloaded = false),
-        Language("en", "English", offlineAvailable = true, offlineDownloaded = true, lastUsedAt = 2L),
-        Language("es", "Spanish", offlineAvailable = true, offlineDownloaded = true, lastUsedAt = 1L),
+        Language(
+            "en",
+            "English",
+            offlineAvailable = true,
+            offlineDownloaded = true,
+            hasOfflineVoice = true,
+        ),
+        Language(
+            "es",
+            "Spanish",
+            offlineAvailable = true,
+            offlineDownloaded = true,
+            hasOfflineVoice = true,
+        ),
         Language("ja", "Japanese", offlineAvailable = false, offlineDownloaded = false),
     )
+
+/** Newest first: Spanish, English, Afrikaans — the export's recents order. */
+private val previewRecents = mapOf("es" to 3L, "en" to 2L, "af" to 1L)
 
 private val previewStates =
     mapOf(
@@ -1192,6 +1394,7 @@ private fun LanguagePickerSourcePreview() {
             onQueryChange = {},
             onSelect = {},
             onBack = {},
+            recents = previewRecents,
             offlineStates = previewStates,
         )
     }
@@ -1209,6 +1412,7 @@ private fun LanguagePickerTargetPreview() {
             onQueryChange = {},
             onSelect = {},
             onBack = {},
+            recents = previewRecents,
             offlineStates = previewStates,
         )
     }
@@ -1226,6 +1430,7 @@ private fun LanguagePickerSearchingPreview() {
             onQueryChange = {},
             onSelect = {},
             onBack = {},
+            recents = previewRecents,
             offlineStates = previewStates,
         )
     }
@@ -1281,7 +1486,11 @@ private fun LanguagePickerConsentDialogPreview() {
 }
 
 @Composable
-private fun RowPreviewSurface(state: LanguageRowState) {
+private fun RowPreviewSurface(
+    state: LanguageRowState,
+    hasOfflineVoice: Boolean = false,
+    target: LanguageRole = LanguageRole.SOURCE,
+) {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             LanguageRow(
@@ -1291,7 +1500,9 @@ private fun RowPreviewSurface(state: LanguageRowState) {
                         displayName = "Spanish",
                         avatar = LanguageAvatar.Code("ES"),
                         state = state,
+                        hasOfflineVoice = hasOfflineVoice,
                     ),
+                target = target,
                 onSelect = {},
                 onDownload = {},
                 onStop = {},
@@ -1305,7 +1516,7 @@ private fun RowPreviewSurface(state: LanguageRowState) {
 @PreviewLightDark
 @Composable
 private fun LanguageRowSelectedPreview() {
-    RowPreviewSurface(LanguageRowState.Selected(onDevice = true))
+    RowPreviewSurface(LanguageRowState.Selected(LanguageRowState.Downloaded()))
 }
 
 @PreviewLightDark
@@ -1349,6 +1560,131 @@ private fun LanguageRowDownloadedWithSizePreview() {
     RowPreviewSurface(LanguageRowState.Downloaded(sizeBytes = 45_700_000L))
 }
 
+/**
+ * The wrapper's point, drawn: selection no longer erases what the row was, so a
+ * chosen language that is still downloading keeps its progress line and a
+ * chosen language that failed still says why.
+ */
+@PreviewLightDark
+@Composable
+private fun LanguageRowSelectedDownloadingPreview() {
+    RowPreviewSurface(LanguageRowState.Selected(LanguageRowState.Downloading))
+}
+
+@PreviewLightDark
+@Composable
+private fun LanguageRowSelectedFailedPreview() {
+    RowPreviewSurface(LanguageRowState.Selected(LanguageRowState.Failed(OfflineModelFailure.NETWORK)))
+}
+
+// ---- 16a: the target row's one extra property (issue #130 PR-12) ------------
+// The mark is TARGET-only, so every preview below passes LanguageRole.TARGET;
+// the matching source-side rows are the six previews above, which pass SOURCE
+// and must show no speaker at all.
+
+/** The export's English row: on device, and this device can say it out loud. */
+@PreviewLightDark
+@Composable
+private fun TargetPickerRowVoicePreview() {
+    RowPreviewSurface(
+        state = LanguageRowState.Downloaded(),
+        hasOfflineVoice = true,
+        target = LanguageRole.TARGET,
+    )
+}
+
+/** The export's Afrikaans row: same pack, no voice, therefore no mark. */
+@PreviewLightDark
+@Composable
+private fun TargetPickerRowNoVoicePreview() {
+    RowPreviewSurface(
+        state = LanguageRowState.Downloaded(),
+        hasOfflineVoice = false,
+        target = LanguageRole.TARGET,
+    )
+}
+
+/** 16a's selected Spanish row: "On device" AND the speaker AND the tick, together. */
+@PreviewLightDark
+@Composable
+private fun TargetPickerRowSelectedPreview() {
+    RowPreviewSurface(
+        state = LanguageRowState.Selected(LanguageRowState.Downloaded()),
+        hasOfflineVoice = true,
+        target = LanguageRole.TARGET,
+    )
+}
+
+/**
+ * Voice present, pack absent — the combination 16a does not draw and 17a's
+ * landscape "to" frame does (Arabic, mid-download, marked). A pack and a voice
+ * are separate installs; this preview is where a reviewer can see that the row
+ * still finds room for the mark when there are no supporting words to sit
+ * beside, and where the coupling would show up if it ever crept back in.
+ */
+@PreviewLightDark
+@Composable
+private fun TargetPickerRowVoiceNoPackPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column {
+                LanguageRow(
+                    row =
+                        LanguagePickerRow(
+                            id = "ar",
+                            displayName = "Arabic",
+                            avatar = LanguageAvatar.Code("AR"),
+                            state = LanguageRowState.Downloading,
+                            hasOfflineVoice = true,
+                        ),
+                    target = LanguageRole.TARGET,
+                    onSelect = {},
+                    onDownload = {},
+                    onStop = {},
+                )
+                LanguageRow(
+                    row =
+                        LanguagePickerRow(
+                            id = "sq",
+                            displayName = "Albanian",
+                            avatar = LanguageAvatar.Code("SQ"),
+                            state = LanguageRowState.Downloadable,
+                            hasOfflineVoice = true,
+                        ),
+                    target = LanguageRole.TARGET,
+                    onSelect = {},
+                    onDownload = {},
+                    onStop = {},
+                )
+                LanguageRow(
+                    row =
+                        LanguagePickerRow(
+                            id = "hy",
+                            displayName = "Armenian",
+                            avatar = LanguageAvatar.Code("HY"),
+                            state = LanguageRowState.OnlineOnly,
+                            hasOfflineVoice = true,
+                        ),
+                    target = LanguageRole.TARGET,
+                    onSelect = {},
+                    onDownload = {},
+                    onStop = {},
+                )
+            }
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun VoiceLegendPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            VoiceLegend()
+        }
+    }
+}
+
 @PreviewLightDark
 @Composable
 private fun LanguageRowDetectPreview() {
@@ -1357,12 +1693,14 @@ private fun LanguageRowDetectPreview() {
             Column {
                 LanguageRow(
                     row = detectRow("Detect language", selected = false),
+                    target = LanguageRole.SOURCE,
                     onSelect = {},
                     onDownload = {},
                     onStop = {},
                 )
                 LanguageRow(
                     row = detectRow("Detect language", selected = true),
+                    target = LanguageRole.SOURCE,
                     onSelect = {},
                     onDownload = {},
                     onStop = {},
@@ -1393,6 +1731,7 @@ private fun SectionHeaderPreview() {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Column {
                 SectionHeader(R.string.text_lang_recent_header)
+                SectionHeader(R.string.text_lang_target_recent_header)
                 SectionHeader(R.string.text_lang_all_header, OnDeviceCount(downloaded = 3, capable = 59))
             }
         }

@@ -3,7 +3,9 @@
     <string name="text_lang_sheet_source_title">Traduzir de</string>
     <string name="text_lang_sheet_target_title">Traduzir para</string>
     <string name="text_lang_recent_header">Recentes</string>
+    <string name="text_lang_target_recent_header">Usados recentemente como destino</string>
     <string name="text_lang_all_header">Todos os idiomas</string>
+    <string name="text_lang_voice_legend">O alto-falante marca os idiomas que este dispositivo também fala off-line — uma voz, instalada separadamente do pacote de tradução</string>
     <string name="text_lang_loading">Carregando idiomas…</string>
     <string name="text_lang_no_results">Nenhum idioma corresponde a “%1$s”</string>
     <string name="text_lang_no_results_body">Verifique a ortografia ou tente o nome do idioma no próprio idioma.</string>
@@ -35,6 +37,7 @@
     <string name="cd_text_lang_row_downloadable">%1$s, disponível para uso off-line</string>
     <string name="cd_text_lang_row_online_only">%1$s, somente on-line</string>
     <string name="cd_text_lang_row_failed">%1$s, falha no download</string>
+    <string name="cd_text_lang_row_voice">%1$s, pode ser falado off-line</string>
     <string name="cd_text_lang_download">Baixar %1$s para uso off-line</string>
     <string name="cd_text_lang_stop">Parar o download e remover %1$s</string>
     <string name="cd_text_lang_retry">Tentar baixar %1$s novamente</string>

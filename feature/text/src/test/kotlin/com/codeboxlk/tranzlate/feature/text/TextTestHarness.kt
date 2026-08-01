@@ -145,6 +145,8 @@ internal class FakeLanguageRepository(
 ) : LanguageRepository {
     override fun languages(): Flow<List<Language>> = flowOf(catalog)
 
+    override fun recentSelections(role: LanguageRole): Flow<Map<String, Long>> = flowOf(emptyMap())
+
     override suspend fun setLastUsed(
         languageId: String,
         role: LanguageRole,

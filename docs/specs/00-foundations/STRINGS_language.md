@@ -30,8 +30,10 @@ The `verifyStringKeyDocs` Gradle task now fails the build if a key ships without
 |-----|------|------|------|-------|
 | `text_lang_sheet_source_title` | string | `Translate from` | — | picker opened for the source side |
 | `text_lang_sheet_target_title` | string | `Translate to` | — | picker opened for the target side |
-| `text_lang_recent_header` | string | `Recent` | — | list section header |
+| `text_lang_recent_header` | string | `Recent` | — | list section header — 15a, role-neutral because that section is served the merged source∪target view |
+| `text_lang_target_recent_header` | string | `Recently used as target` | — | 16a's header. Its section is served TARGET recents only, so the header can be checked against its rows; empty → the whole section is **absent**, never a header over nothing |
 | `text_lang_all_header` | string | `All languages` | — | list section header |
+| `text_lang_voice_legend` | string | `Speaker marks languages this device can also speak offline — a voice, installed separately from the translate pack` | — | 16a, said **once** above the list, never per row. Drawn only when at least one visible row carries the mark — on a device with no installed voices it would explain an absence (ruling §7.6, no dead affordances) |
 | `text_lang_show_all` | string | `Show all languages` | — | expands past the recents block |
 | `text_lang_search_hint` | plurals | `Search %1$d language` / `Search %1$d languages` | count | ⚠ the count is the **real catalogue size**, never the design export's hardcoded 65 |
 
@@ -79,6 +81,7 @@ nothing to a screen reader.
 | `cd_text_lang_row_downloadable` | string | `%1$s, available for offline use` | language name |
 | `cd_text_lang_row_online_only` | string | `%1$s, online only` | language name |
 | `cd_text_lang_row_failed` | string | `%1$s, download failed` | language name |
+| `cd_text_lang_row_voice` | string | `%1$s, can be spoken offline` | the already-formatted row description above |
 | `cd_text_lang_download` | string | `Download %1$s for offline use` | language name |
 | `cd_text_lang_stop` | string | `Stop download and remove %1$s` | language name |
 | `cd_text_lang_retry` | string | `Try downloading %1$s again` | language name |
@@ -86,6 +89,13 @@ nothing to a screen reader.
 
 > **Never "Cancel".** ML Kit's `RemoteModelManager.download()` has no cancel, so stopping a
 > download *is* removing the partial model — `cd_text_lang_stop` says what actually happens.
+
+> **`cd_text_lang_row_voice` wraps, it does not replace.** The speaker glyph itself is silent to
+> TalkBack (`contentDescription = null`); the fact is folded into the row's one description so a
+> screen reader hears a sentence, not a row followed by a loose decorative node. There is no
+> "no offline voice" string: rev 5 cut sheet 19j because the mark is only ever drawn where the
+> voice exists, so the absence has nothing to announce here — it is reported by the Speak action
+> on the result screen (`text_tts_unavailable`, issue #159).
 
 > `cd_lang_back` is the picker's own back target and deliberately a separate key from the
 > composer's `cd_text_back`: C-3 gives one key one home rather than two modules one name. The row

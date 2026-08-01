@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.runtime.Immutable
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
@@ -28,19 +29,37 @@ const val RECENT_LIMIT = 5
 @Immutable
 sealed interface LanguageRowState {
     /**
-     * The choice this screen was opened to change. Wins over every other state:
-     * "which one is mine" is the screen's primary question, and a language whose
-     * model is mid-flight or failed is still perfectly usable online, so hiding
-     * that detail here is not a dead end (model repair lives in the offline
-     * manager — D-E2).
+     * The choice this screen was opened to change — a WRAPPER, not a seventh
+     * state (issue #130 rev.3 ruling 1, P1's graft).
      *
-     * @property onDevice the model is downloaded, so the row keeps its on-device line.
-     * @property sizeBytes measured on-disk size, or null when we cannot measure it (R3).
+     * It used to replace whatever the row was, carrying a lone `onDevice`
+     * boolean, and that could only ever say one of the six things the row might
+     * have said. 16a settles it with a drawing: the selected Spanish row shows
+     * "On device" AND the offline-voice speaker AND the tick, all at once. So
+     * selection COMPOSES with the resting state instead of erasing it, and
+     * every fact the row would have shown survives being chosen.
+     *
+     * What selection still decides alone is the trailing control: a selected row
+     * shows the tick and nothing else. Pack repair lives in the offline manager
+     * (D-E2), so the picker never puts a second control on the row it is about
+     * to close over.
+     *
+     * @property inner what this row would be if it were not the current choice.
      */
     data class Selected(
-        val onDevice: Boolean,
-        val sizeBytes: Long? = null,
-    ) : LanguageRowState
+        val inner: LanguageRowState,
+    ) : LanguageRowState {
+        init {
+            // The one shape this type must not take. Nothing constructs it —
+            // [rowStateOf] wraps a freshly computed resting state — and a
+            // doubly-wrapped value would render as an ordinary selected row
+            // while quietly hiding a whole state, so it fails loudly instead.
+            require(inner !is Selected) { "Selected must wrap a resting state, not another Selected" }
+        }
+
+        /** The model is on disk, so the row keeps its on-device line. */
+        val onDevice: Boolean get() = inner is Downloaded
+    }
 
     /** Usable with the radio off. @property sizeBytes real bytes on disk, never an estimate (R3). */
     data class Downloaded(
@@ -85,6 +104,17 @@ data class LanguagePickerRow(
     val avatar: LanguageAvatar,
     val state: LanguageRowState,
     val lastUsedAt: Long? = null,
+    /**
+     * This DEVICE can read the language aloud with no connection — an installed
+     * TTS voice, which is a separate install from a separate source than the
+     * translate pack. Device truth, copied straight from [Language.hasOfflineVoice]
+     * and deliberately NOT crossed with any [state]: 17a's landscape "to" frame
+     * draws the speaker on Arabic while its pack is still downloading.
+     *
+     * Whether the mark is DRAWN is a second question, answered by
+     * [showsVoiceMark] — only a target picker shows it.
+     */
+    val hasOfflineVoice: Boolean = false,
     /** Folded `displayName + endonym + id`, ready for a plain `contains` scan. */
     val searchKey: String = "",
 ) {
@@ -94,38 +124,66 @@ data class LanguagePickerRow(
 }
 
 /**
+ * Does this row draw the offline-voice speaker?
+ *
+ * Target rows only. The spec states it as the third of 16a's "three deliberate
+ * differences" — "a target row carries one property a source never needs" — and
+ * draws the consequence: the `from · landscape` frame carries no speaker mark
+ * anywhere, the `to · landscape` frame carries three. Speaking is what you do
+ * with a RESULT, and the result is in the target language.
+ *
+ * Rev 5 also makes this the whole of the story. An earlier revision drew the
+ * mark on every row and explained the empty ones in a "no offline voice" sheet
+ * (19j); that sheet is cut, because a mark drawn where there is no voice is a
+ * dead affordance (ruling §7.6) and rev 5 removes the dead case instead of
+ * captioning it. A language with no voice simply carries no mark, and the
+ * absence is reported where it costs something — the Speak action on the result
+ * screen (`text_tts_unavailable`, issue #159).
+ */
+fun LanguagePickerRow.showsVoiceMark(role: LanguageRole): Boolean = role == LanguageRole.TARGET && hasOfflineVoice
+
+/**
  * The one place a [Language] plus its live model state becomes a row state.
  *
- * Precedence, and why:
- * 1. **Selected** — see [LanguageRowState.Selected].
- * 2. **Failed** / **Downloading** — transient, actionable, and rarer than
+ * The RESTING state is decided first, from five mutually exclusive facts, and
+ * selection is then wrapped around whatever that turned out to be. Precedence
+ * inside the resting set, and why:
+ * 1. **Failed** / **Downloading** — transient, actionable, and rarer than
  *    everything below them; they must not be masked by the resting state.
- * 3. **Downloaded** — [Language.offlineDownloaded] is already the live overlay
+ * 2. **Downloaded** — [Language.offlineDownloaded] is already the live overlay
  *    `LanguageRepositoryImpl` applies, so it is trusted even before the raw
  *    state map arrives.
- * 4. **OnlineOnly** — a COMPILE-TIME fact ([Language.offlineAvailable]), never
+ * 3. **OnlineOnly** — a COMPILE-TIME fact ([Language.offlineAvailable]), never
  *    inferred from an absent map entry. That distinction is what stops the first
  *    frame from labelling 194 rows "Online only" and contradicting itself a
  *    moment later.
- * 5. **Downloadable** — capable, nothing on disk. Also where `Deleting` lands:
+ * 4. **Downloadable** — capable, nothing on disk. Also where `Deleting` lands:
  *    the picker has no delete control of its own, the model is on its way out,
  *    and "not on device" is the true statement about it. Calling it
  *    "Downloading" would be a false one.
+ *
+ * Selection is deliberately NOT a sixth branch of that `when` any more. As one
+ * it consumed the row — a selected language that was mid-download rendered
+ * exactly like a selected language that was online only. 16a draws the opposite:
+ * the selected row states its pack, its voice and its tick together. See
+ * [LanguageRowState.Selected].
  */
 fun rowStateOf(
     language: Language,
     modelState: OfflineModelState?,
     selected: Boolean,
     sizeBytes: Long? = null,
-): LanguageRowState =
-    when {
-        selected -> LanguageRowState.Selected(onDevice = language.offlineDownloaded, sizeBytes = sizeBytes)
-        modelState is OfflineModelState.Failed -> LanguageRowState.Failed(modelState.cause)
-        modelState == OfflineModelState.Downloading -> LanguageRowState.Downloading
-        language.offlineDownloaded -> LanguageRowState.Downloaded(sizeBytes = sizeBytes)
-        !language.offlineAvailable -> LanguageRowState.OnlineOnly
-        else -> LanguageRowState.Downloadable
-    }
+): LanguageRowState {
+    val resting =
+        when {
+            modelState is OfflineModelState.Failed -> LanguageRowState.Failed(modelState.cause)
+            modelState == OfflineModelState.Downloading -> LanguageRowState.Downloading
+            language.offlineDownloaded -> LanguageRowState.Downloaded(sizeBytes = sizeBytes)
+            !language.offlineAvailable -> LanguageRowState.OnlineOnly
+            else -> LanguageRowState.Downloadable
+        }
+    return if (selected) LanguageRowState.Selected(resting) else resting
+}
 
 /**
  * Builds the picker's rows: localized name, avatar code, row state, search
@@ -135,6 +193,11 @@ fun rowStateOf(
  *
  * @param sizes measured on-disk bytes per tag. Empty today (see [LanguageRowState.Downloaded]);
  *   a row simply omits the number rather than guessing one.
+ * @param recents when each id was last chosen FOR THE SIDE THIS PICKER IS
+ *   CHOOSING (`LanguageRepository.recentSelections`). It is the whole source of
+ *   [LanguagePickerRow.lastUsedAt] — there is deliberately no fallback to
+ *   [Language.lastUsedAt], which carries the merged source-and-target overlay
+ *   and would file a source-only pick under 16a's "Recently used as target".
  */
 fun buildPickerRows(
     languages: List<Language>,
@@ -142,6 +205,7 @@ fun buildPickerRows(
     selectedId: String,
     locale: Locale,
     sizes: Map<String, Long> = emptyMap(),
+    recents: Map<String, Long> = emptyMap(),
 ): List<LanguagePickerRow> {
     val collator = Collator.getInstance(locale)
     return languages
@@ -159,7 +223,10 @@ fun buildPickerRows(
                         selected = language.id == selectedId,
                         sizeBytes = sizes[language.id],
                     ),
-                lastUsedAt = language.lastUsedAt,
+                lastUsedAt = recents[language.id],
+                // Copied, never crossed with the pack state: a voice and a pack
+                // are separate installs and either can be present alone.
+                hasOfflineVoice = language.hasOfflineVoice,
                 searchKey = searchNormalize("$displayName ${endonym.orEmpty()} ${language.id}"),
             )
         }.sortedWith { left, right -> collator.compare(left.displayName, right.displayName) }
@@ -181,7 +248,7 @@ fun detectRow(
         avatar = LanguageAvatar.Detect,
         state =
             if (selected) {
-                LanguageRowState.Selected(onDevice = false)
+                LanguageRowState.Selected(LanguageRowState.OnlineOnly)
             } else {
                 LanguageRowState.OnlineOnly
             },
@@ -218,6 +285,88 @@ fun onDeviceCount(languages: List<Language>): OnDeviceCount =
         downloaded = languages.count { it.offlineAvailable && it.offlineDownloaded },
         capable = languages.count { it.offlineAvailable },
     )
+
+/** Which words head the recents section — or that it is not emitted at all. */
+enum class RecentHeader {
+    /** 15a: "Recent", role-neutral because the section is served the merged view. */
+    GENERIC,
+
+    /** 16a: "Recently used as target" — true of every row under it, or absent. */
+    TARGET,
+}
+
+/**
+ * What the picker's list emits above the alphabet, decided in one pure place so
+ * a plain unit test can read it. This module has no Robolectric and no Compose
+ * test rule, so a decision left inside the composable is a decision no test can
+ * reach — and "recents empty → the section is ABSENT" is precisely a claim about
+ * something that is not on screen.
+ *
+ * @property showVoiceLegend the `volume_up` explainer above the list.
+ * @property recentHeader null when the recents section is not emitted at all.
+ * @property railOffset index of the first alphabetical row inside the same
+ *   `LazyColumn`, which is what a rail letter scrolls to.
+ */
+@Immutable
+data class PickerListPlan(
+    val showVoiceLegend: Boolean,
+    val recentHeader: RecentHeader?,
+    val showAllHeader: Boolean,
+    val railOffset: Int,
+)
+
+/**
+ * The 16a/15a list plan.
+ *
+ * Three rules worth stating, because each is a thing the screen must NOT do:
+ *
+ * - **An empty recents section is absent, not empty.** No header over nothing,
+ *   no "you have no recents yet" — the 18a first-run pattern, where Recent is
+ *   simply not there. A header with no rows is furniture that reports a
+ *   failure the user did not have.
+ * - **The legend is drawn only where something carries the mark.** It explains
+ *   the speaker; on a device with no installed offline voices at all — E-V1's
+ *   AOSP-with-no-Google-TTS case, which resolves to the empty set — nothing on
+ *   screen would carry one, and the explainer would describe an absence. That
+ *   is the same dead-affordance rule (§7.6) rev 5 applied to the mark itself,
+ *   one level up.
+ * - **The rail counts everything above the alphabet.** The legend is a real
+ *   item in the same list, so leaving it out of [PickerListPlan.railOffset]
+ *   makes every letter land one row short — deterministic, silent, and
+ *   invisible to any test that only looks at rows.
+ *
+ * @param detectRowPresent the source-only "Detect language" pseudo-row.
+ * @param anyVoiceMark at least one row would draw the speaker ([showsVoiceMark]).
+ * @param railed the A–Z rail is up: a full, unfiltered, non-empty catalog.
+ */
+fun pickerListPlan(
+    role: LanguageRole,
+    detectRowPresent: Boolean,
+    recentCount: Int,
+    anyVoiceMark: Boolean,
+    railed: Boolean,
+): PickerListPlan {
+    val showVoiceLegend = role == LanguageRole.TARGET && anyVoiceMark
+    val recentHeader =
+        when {
+            recentCount == 0 -> null
+            role == LanguageRole.TARGET -> RecentHeader.TARGET
+            else -> RecentHeader.GENERIC
+        }
+    // Emission order, and therefore counting order: detect row · legend ·
+    // recents (header + rows) · "All languages" header · the alphabet.
+    val railOffset =
+        (if (detectRowPresent) 1 else 0) +
+            (if (showVoiceLegend) 1 else 0) +
+            (if (recentHeader == null) 0 else recentCount + 1) +
+            (if (railed) 1 else 0)
+    return PickerListPlan(
+        showVoiceLegend = showVoiceLegend,
+        recentHeader = recentHeader,
+        showAllHeader = railed,
+        railOffset = railOffset,
+    )
+}
 
 /** First index per rail letter, so a rail tap can scroll straight to it. */
 fun List<LanguagePickerRow>.letterIndex(offset: Int): Map<Char, Int> =

@@ -176,12 +176,19 @@ class LanguagePickerSearchTest {
     fun `recents are most-recent-first, capped, and include the current choice`() {
         val used =
             listOf(
-                Language("en", "English", offlineAvailable = true, offlineDownloaded = false, lastUsedAt = 30L),
-                Language("es", "Spanish", offlineAvailable = true, offlineDownloaded = false, lastUsedAt = 10L),
-                Language("fr", "French", offlineAvailable = true, offlineDownloaded = false, lastUsedAt = 20L),
+                Language("en", "English", offlineAvailable = true, offlineDownloaded = false),
+                Language("es", "Spanish", offlineAvailable = true, offlineDownloaded = false),
+                Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
                 Language("ja", "Japanese", offlineAvailable = false, offlineDownloaded = false),
             )
-        val built = buildPickerRows(used, emptyMap(), selectedId = "en", locale = Locale.ENGLISH)
+        val built =
+            buildPickerRows(
+                used,
+                emptyMap(),
+                selectedId = "en",
+                locale = Locale.ENGLISH,
+                recents = mapOf("en" to 30L, "es" to 10L, "fr" to 20L),
+            )
         assertThat(built.recentRows().map { it.id }).containsExactly("en", "fr", "es").inOrder()
         assertThat(built.recentRows(limit = 2).map { it.id }).containsExactly("en", "fr").inOrder()
     }

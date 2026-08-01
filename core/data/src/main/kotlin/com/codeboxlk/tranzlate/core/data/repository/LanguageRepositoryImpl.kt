@@ -110,6 +110,31 @@ class LanguageRepositoryImpl
             }
 
         /**
+         * Per-role recents for a picker's own section (16a).
+         *
+         * The two sides deliberately read DIFFERENT keys, and the asymmetry is
+         * the #122 split's, not an oversight here:
+         * - **TARGET** reads the target key alone, because 16a's header names
+         *   the role ("Recently used as target") and must be true of every row
+         *   under it.
+         * - **SOURCE** reads the merged union, which is what the shipped 15a
+         *   picker already renders under its role-neutral "Recent" header. The
+         *   pre-split legacy key carries no side, so a source-only read would
+         *   silently drop an upgrader's whole recents list to make a header
+         *   that never claimed a role slightly more precise.
+         *
+         * `distinctUntilChanged` because `dataStore.data` re-emits on every
+         * unrelated preference write and an identical map would rebuild 194
+         * rows to change nothing. It sits at the end here, not upstream of an
+         * `onStart` as in [languages]: this flow has no prefix to be swallowed.
+         */
+        override fun recentSelections(role: LanguageRole): Flow<Map<String, Long>> =
+            when (role) {
+                LanguageRole.SOURCE -> preferences.recentLanguages
+                LanguageRole.TARGET -> preferences.recentTargetLanguages
+            }.distinctUntilChanged()
+
+        /**
          * The id is normalised first: a tag that arrived from ML Kit's
          * Language-ID API or from a restored preference can carry an alternate
          * spelling (`iw`, `fil`, `zh-CN`), and an un-normalised write would

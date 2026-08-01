@@ -237,6 +237,53 @@ class LanguageRepositoryImplTest {
         }
 
     /**
+     * 16a's section header names the role, so its rows have to be true of that
+     * role. `recentSelections(TARGET)` therefore reads the target key ALONE —
+     * a source-only pick must not surface under "Recently used as target", even
+     * though the merged overlay one test above deliberately still shows both.
+     */
+    @Test
+    fun `target recents exclude a pick made on the source side`() =
+        runTest {
+            val repository = repository()
+
+            repository.setLastUsed("en", LanguageRole.SOURCE, atMillis = 10L)
+            repository.setLastUsed("fr", LanguageRole.TARGET, atMillis = 20L)
+
+            assertThat(repository.recentSelections(LanguageRole.TARGET).first())
+                .containsExactly("fr", 20L)
+        }
+
+    /**
+     * The source side keeps the merged view the shipped 15a picker renders. Its
+     * header is role-neutral ("Recent"), and the pre-split legacy key carries no
+     * side at all — a source-only read would silently drop an upgrader's whole
+     * recents list to make a header that never claimed a role more precise.
+     */
+    @Test
+    fun `source recents stay the merged view 15a already renders`() =
+        runTest {
+            val repository = repository()
+
+            repository.setLastUsed("en", LanguageRole.SOURCE, atMillis = 10L)
+            repository.setLastUsed("fr", LanguageRole.TARGET, atMillis = 20L)
+
+            assertThat(repository.recentSelections(LanguageRole.SOURCE).first())
+                .containsExactly("en", 10L, "fr", 20L)
+        }
+
+    /** Nothing picked for a side yet is an empty map, never the other side's. */
+    @Test
+    fun `an untouched side serves an empty recents map`() =
+        runTest {
+            val repository = repository()
+
+            repository.setLastUsed("en", LanguageRole.SOURCE, atMillis = 10L)
+
+            assertThat(repository.recentSelections(LanguageRole.TARGET).first()).isEmpty()
+        }
+
+    /**
      * Ruling R6's disconfirming gate at the selection end: a pick writes
      * RECENTS, never translation-usage. The proof is structural — this class
      * cannot reach the usage store it does not depend on — and this pins that
