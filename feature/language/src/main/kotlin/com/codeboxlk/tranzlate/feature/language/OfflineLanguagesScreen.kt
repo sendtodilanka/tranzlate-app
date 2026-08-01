@@ -1,4 +1,4 @@
-package com.codeboxlk.tranzlate.feature.languagepicker
+package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -40,6 +41,7 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
+import com.codeboxlk.tranzlate.core.ui.languageDisplayName
 
 /**
  * Screen B — "Offline translation" manager (spec 02 D-E2): only MLKit-capable
@@ -81,7 +83,9 @@ internal fun OfflineLanguagesContent(
     // Issue #90: metered-download consent — ONE dialog at peak intent, wifi
     // waiting keeps the row NotDownloaded (no spinner, no dead end).
     pendingConsent?.let { id ->
-        val name = rows.firstOrNull { it.id == id }?.name ?: id
+        val row = rows.firstOrNull { it.id == id }
+        val name =
+            row?.let { languageDisplayName(it.id, LocalLocale.current.platformLocale, it.name) } ?: id
         AlertDialog(
             onDismissRequest = onDismissConsent,
             title = { Text(stringResource(R.string.offline_data_dialog_title, name)) },
@@ -172,7 +176,12 @@ private fun OfflineRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = row.name,
+                // The SAME name the picker's rows carry. Until PR-6 this screen
+                // lived in a module with no access to `languageDisplayName`, so
+                // it rendered the catalog's own English string: the picker said
+                // "Bangla" and this list said "Bengali", for one language, in
+                // one app, on a plain English device.
+                text = languageDisplayName(row.id, LocalLocale.current.platformLocale, row.name),
                 style = MaterialTheme.typography.bodyLarge,
             )
             // Issue #90 (EDGE_CASES no-dead-end): a Failed row explains WHY —

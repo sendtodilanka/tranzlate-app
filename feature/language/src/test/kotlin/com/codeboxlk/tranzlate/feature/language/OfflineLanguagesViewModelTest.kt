@@ -1,4 +1,4 @@
-package com.codeboxlk.tranzlate.feature.languagepicker
+package com.codeboxlk.tranzlate.feature.language
 
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
