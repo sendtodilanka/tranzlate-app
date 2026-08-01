@@ -18,8 +18,10 @@ individual signal was green:
 
 **The rule both incidents produce: a branch that predates the tip proves nothing
 about the merge result.** The `PreToolUse` guard in `.claude/hooks/guard-git.sh`
-enforces this mechanically — it denies `gh pr merge <N>` when the PR's branch is
-behind `origin/main`. This skill is the procedure the guard protects.
+enforces this mechanically — it denies a merge when the PR's branch is behind
+`origin/main`, in every form the command takes: the number after a flag, a URL,
+a branch name, or no argument at all. This skill is the procedure the guard
+protects.
 
 ## Procedure — one PR at a time, never a batch in one loop
 
@@ -47,10 +49,20 @@ behind `origin/main`. This skill is the procedure the guard protects.
    `gh pr checks` fails on this repo's token scope — watch the run instead.
    Green on the branch's *old* history does not count.
 
-4. **Merge**, then immediately **update the epic tracker row** in the plan doc.
+4. **Merge** — with the epic tracker row *already carrying this PR's number*.
    The owner's strict rule: a merge that leaves the tracker stale is an
-   incomplete merge. If the tracker lives on the branch you just merged, the
-   row goes in that same PR; otherwise it rides the next one.
+   incomplete merge. Write the row into `docs/plan/issue-NN-*.md` on the branch
+   and push it before you merge; `.claude/hooks/guard-tracker.sh` denies the
+   merge when nothing under `docs/plan/*.md` mentions `#N`, on the branch or on
+   `main`.
+
+   This step used to end "otherwise it rides the next one". That ride-along is
+   the failure mode rather than a workaround for it — the rule broke three times
+   in one session (PR-3, PR-6/PR-7, PR-0c) and every time by deferring the tick
+   to merge time, when the merge is already done and the branch can no longer
+   carry it. A row written on the branch will conflict with its siblings on the
+   next rebase; step 1 already tells you how, and that conflict is the cheap
+   half of this.
 
 5. **Then, and only then**, start the next PR at step 1 — with the tip that now
    includes what you just merged.
@@ -64,19 +76,12 @@ BUILD phase, not the merge phase.
 
 ## What a co-verify lens must ask, every time (rule 10)
 
-These four are standing questions, not per-PR inventions. Each one is on the
-list because a lens found it AFTER I had shipped the PR:
-
-1. **Enumerate.** How many call sites/paths does this thing have, and how many
-   did the PR change? Run the grep yourself — #146 converted 2 of 6, #150 fixed
-   5 of 9, and both PRs read as complete.
-2. **Reproduce.** Does the fix close the harm the ISSUE describes, not the
-   symptom its title names? Re-run the reproduction. #149 released the engine on
-   one path and left the reported one open.
-3. **Mutate.** Revert the fix and run the suite. If it stays green, the PR has
-   no red bar and the tests are decoration — that has been true three times.
-4. **Verify the documents.** Any claim taken from a plan, ruling or issue must
-   be re-derived from source. Three such claims were wrong this session.
+The four standing questions — **enumerate · reproduce · mutate ·
+verify-the-documents** — live in `CLAUDE.md` rule 10, each with the shipped
+defect that put it on the list. They are deliberately not restated here: this
+file, `CLAUDE.md` and `.claude/agents/co-verify-lens.md` each carried a copy and
+the three had already begun to drift. Run the lens as the `co-verify-lens`
+agent, which reads rule 10 itself and pins a cross-model default.
 
 ## What the guard will not catch
 

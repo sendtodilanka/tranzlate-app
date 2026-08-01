@@ -13,6 +13,11 @@
 #  - Fast: no fetch on the paths that do not need one.
 set -uo pipefail
 
+# Which PR a `gh pr merge` acts on is shared with guard-tracker.sh — see that
+# file for why one line in two copies was two bugs.
+# shellcheck source=./gh-merge-target.sh
+. "$(dirname "${BASH_SOURCE[0]}")/gh-merge-target.sh" 2>/dev/null || exit 0
+
 payload=$(cat)
 cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
 [ -z "$cmd" ] && exit 0
@@ -48,18 +53,19 @@ if printf '%s' "$scan" | grep -qE '(^|[;&|][[:space:]]*)git[[:space:]]+([^;&|]*[
 fi
 
 # ── 3. gh pr merge while the branch is behind the tip — THE recurring accident ─
-if printf '%s' "$scan" | grep -qE '(^|[;&|][[:space:]]*)gh[[:space:]]+pr[[:space:]]+merge'; then
-  num=$(printf '%s' "$scan" | grep -oE 'gh[[:space:]]+pr[[:space:]]+merge[[:space:]]+[0-9]+' | grep -oE '[0-9]+$' || true)
-  [ -z "$num" ] && exit 0                       # no explicit number — cannot check, allow
-  command -v gh >/dev/null 2>&1 || exit 0       # no gh — allow
-  head=$(timeout 15 gh pr view "$num" --json headRefName --jq .headRefName 2>/dev/null) || exit 0
-  [ -z "$head" ] && exit 0
-  timeout 20 git fetch -q origin main "$head" 2>/dev/null || exit 0   # offline — allow
-  behind=$(git rev-list --count "origin/${head}..origin/main" 2>/dev/null) || exit 0
+# The target used to be read as "the number written right after `merge`", which
+# saw one of the ten ways this command is written. gh_pr_merge_numbers resolves
+# the way gh does — flags anywhere, a URL, a branch, or no argument at all.
+command -v gh >/dev/null 2>&1 || exit 0         # no gh — allow
+for num in $(gh_pr_merge_numbers "$scan"); do
+  head=$(gh_run 15 gh pr view "$num" --json headRefName --jq .headRefName 2>/dev/null) || continue
+  [ -z "$head" ] && continue
+  gh_run 20 git fetch -q origin main "$head" 2>/dev/null || continue   # offline — allow
+  behind=$(git rev-list --count "origin/${head}..origin/main" 2>/dev/null) || continue
   if [ "${behind:-0}" -gt 0 ]; then
     deny "PR #${num} (${head}) is ${behind} commit(s) BEHIND origin/main, so its green CI never saw the merge result. This exact situation broke main twice (#108, #132/#134). Rebase, push, wait for CI green on THAT commit, then merge:
   cd <the branch's worktree> && git fetch origin && git rebase origin/main && git push --force-with-lease
   gh run watch \$(gh run list --branch ${head} --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status && gh pr merge ${num} --merge"
   fi
-fi
+done
 exit 0

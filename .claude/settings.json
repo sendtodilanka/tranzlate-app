@@ -25,6 +25,13 @@
             "if": "Bash(gh *)",
             "timeout": 15,
             "statusMessage": "Checking PR body carries its enumeration and repro"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-tracker.sh\"",
+            "if": "Bash(gh *)",
+            "timeout": 40,
+            "statusMessage": "Checking the epic tracker carries this PR"
           }
         ]
       }
