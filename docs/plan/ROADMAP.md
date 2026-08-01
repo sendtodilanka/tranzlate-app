@@ -97,6 +97,10 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   retaken: the star and the original date were dropped in silence after the
   snackbar had promised the delete was reversible. Merges now, in one
   transaction. **#191** carries the one trade-off it leaves for the owner.
+- 👁 **#190** — **PR #194** — History's three write paths (`delete`, `undoDelete`,
+  `toggleFavourite`) had no error handling at all: a `SQLiteException` took the
+  app down instead of showing a message. Policy was already settled by
+  `EDGE_CASES.md:114` (**[Retry]**), not an open choice.
 - ⬜ **#178** `guard-pr.sh` failed CLOSED on any body it could not read from the
   command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.
