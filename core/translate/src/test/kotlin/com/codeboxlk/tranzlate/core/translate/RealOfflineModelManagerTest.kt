@@ -1,8 +1,8 @@
 package com.codeboxlk.tranzlate.core.translate
 
-import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.testing.FakeStorageProbe
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
@@ -235,12 +235,6 @@ class RealOfflineModelManagerTest {
             val state = manager.modelStates().first()["fr"]
             assertThat(state).isInstanceOf(OfflineModelState.Failed::class.java)
         }
-}
-
-private class FakeStorageProbe(
-    var free: Long,
-) : StorageProbe {
-    override fun freeBytes(): Long = free
 }
 
 private val plentyFree = FakeStorageProbe(free = Long.MAX_VALUE)
