@@ -93,6 +93,10 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   three failure messages, **both live**, one call site each. Six keys × three
   locales for three messages. Best done in Wave 5 with PR-23, or earlier — the
   two screens already share one `DownloadGate` after PR-9.
+- 👁 **#179** — **PR #189** — Undo restored nothing when the row's tuple was
+  retaken: the star and the original date were dropped in silence after the
+  snackbar had promised the delete was reversible. Merges now, in one
+  transaction. **#191** carries the one trade-off it leaves for the owner.
 - ⬜ **#178** `guard-pr.sh` failed CLOSED on any body it could not read from the
   command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.
