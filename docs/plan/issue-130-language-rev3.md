@@ -25,7 +25,7 @@ date) · ⛔ blocked (by what).
 | 4 | 19n privacy copy | Flavor-scoped strings — each brand states only what is true for it |
 | 5 | Home row label | **"Language packs"** (en/fil/pt-BR) |
 | 6 | Folded cover screen | No separate design now — phone portrait covers it; revisit v2 |
-| 7 | Manage packs empty state | Commissioned from Claude Design (brief §8; prompt given to owner) |
+| 7 | Manage packs empty state | ✅ **delivered** — rev4 frame **20f**, light+dark, accepted as drawn (brief §8 outcome). Builds in PR-23 |
 | 8 | 19a interim actions | Pre-approved: if experiment E-W1 fails, ship "Not now"/"Download now" |
 
 ## Architecture (the ruling, in one block)
@@ -49,6 +49,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR | Scope | Status |
 |---|---|---|
 | PR-0 | This plan + preserved ruling + designer-brief §8 (empty-state commission) | ✅ #131, 2026-08-01 |
+| PR-0b | Spec of record → rev4 + corrected review (brief §9, 9 defects) + rev5 commission (§11) + ad verdict (§10 → #139) + §3 Detect correction | ✅ #140, 2026-08-01 |
 
 ### Phase 1 — shipped-truth stabilisation (no UI change)
 | PR | Scope | Closes | Status |
@@ -99,12 +100,48 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 7 — Manage packs
 | PR | Scope | Status |
 |---|---|---|
-| PR-23 | 20b rewrite behind the SAME Home row + relabel "Language packs" (ruling 5) + empty state (ruling 7 drawing) | ⬜ |
+| PR-23 | 20b rewrite behind the SAME Home row + relabel "Language packs" (ruling 5) + **20f** empty state (ruling 7 — drawn in rev4) | ⬜ |
 | PR-24 | 20c pack-actions sheet | ⬜ |
 | PR-25 | 20e Free up space | ⬜ |
 | PR-26 | 20d list-detail (camera card + pair-share line omitted) | ⬜ |
 | PR-27 | Ruling 2 execution: remove the Detect "ONLINE ONLY" chip; 19i never built | ⬜ |
 | PR-28 | 19n flavor-scoped copy (ruling 4) | ⬜ |
+
+## Spec of record — rev 4 (2026-08-01)
+
+`docs/design/language-screens/language-screens-spec.html` is **rev 4**, and it
+stands — but the first review of it was too generous and an independent lens
+took it apart. Corrected verdict, full evidence in DESIGNER-BRIEF §9:
+
+- **20f delivered** (ruling 7) and accepted as drawn.
+- **Nine defects to fix in rev 5**, three of them in the new sections. The worst:
+  **21b offers a download on Azerbaijani and Basque**, neither of which is in
+  `BundledLanguageCatalog.offlineCapableIds` — 15a and 16a correctly draw both
+  `ONLINE ONLY`. Also: 21b re-writes the running state four ways, 19m is drawn on
+  a source the document does not have, 20f and 18a disagree on French's
+  suggestion signal, the `12 MB free` state makes the in-flight download
+  impossible by sheet 19b's own rule, 19j's trigger cannot fire, the failed row
+  drops its ISO avatar and its A–Z slot, the speaker mark appears on rows with no
+  pack, and the Pro glyph still sits on the "packs are free" card.
+- **Method lesson, recorded so it is not repeated:** `data-screen-label`
+  enumerates 26 of some 60 drawings (every sheet and snackbar is unlabelled), and
+  de-duplicating lines while scanning hides exactly the row-level contradiction
+  being hunted. **DESIGNER-BRIEF §11 is the rev 5 commission** — 10 drawing
+  fixes, 3 caption fixes, 3 ad-guide fixes, and a request to label every drawing.
+- **Ruling 2 is unaffected:** rev 4 still draws the Detect chip and 19i because
+  brief §3 told the designer that sheet had a real trigger. §3 is corrected;
+  PR-27 is unchanged.
+
+**Rev 4 also adds an ad layer (spec §7) — deliberately OUT of this epic.** Two
+slots, a refusal list and a UMP-first build order, all good, but `:ads` and
+`:consent` do not exist yet, step 1 is a startup privacy gate, and its own owner
+decision 1 ("does Pro remove ads?") is unsettled while every frame assumes the
+answer. Tracked as **#139**, which also carries the guide's three internal
+contradictions (brief §10). **The one thing this epic adopts now:**
+picker/Manage-packs list `contentPadding.bottom` and the A–Z rail's bottom stop
+stay **parameterised** — today they are hardcoded (`LanguagePickerScreen.kt:370`
+and the rail's `padding(vertical = spacing.lg24)`), so hosting a slot later would
+be a re-layout.
 
 ## Per-PR gate (unchanged standing rules)
 
