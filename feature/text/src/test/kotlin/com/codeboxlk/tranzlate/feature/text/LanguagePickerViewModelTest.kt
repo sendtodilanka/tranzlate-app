@@ -56,6 +56,17 @@ class LanguagePickerViewModelTest {
             )
         val lastUsed = mutableListOf<Triple<String, LanguageRole, Long>>()
 
+        /** Set to make the stamp fail the way a full disk or a locked DB does. */
+        var failWith: Throwable? = null
+
+        /**
+         * Read at stamp time. Lets a test assert what the CHOICE store held at
+         * the moment the stamp ran — the only way to tell "choice first, in one
+         * coroutine" apart from "two launches that happened to land in order".
+         */
+        var choiceAtStampTime: (() -> String)? = null
+        var observedChoice: String? = null
+
         override fun languages(): Flow<List<Language>> = catalog
 
         override suspend fun setLastUsed(
@@ -63,6 +74,8 @@ class LanguagePickerViewModelTest {
             role: LanguageRole,
             atMillis: Long,
         ) {
+            observedChoice = choiceAtStampTime?.invoke()
+            failWith?.let { throw it }
             lastUsed += Triple(languageId, role, atMillis)
             journal?.add("stamp:$languageId")
         }
@@ -269,17 +282,49 @@ class LanguagePickerViewModelTest {
         }
 
     /**
-     * One tap, one coroutine, fixed order: the Recent stamp lands BEFORE the
-     * choice write that closes the screen, so the stamp cannot race behind it
-     * (two independent launches gave no such guarantee).
+     * One tap, one coroutine, fixed order — and the order is the CHOICE first.
+     * Neither write is atomic with the other, so whichever runs second is the
+     * one a throw or a process death can take. Losing the stamp costs Manage
+     * packs a date; losing the choice puts the language under Recent while the
+     * composer still shows the old one. The cheap half goes last.
+     *
+     * The second assertion is the one a "two independent launches" regression
+     * cannot pass: it reads the choice store from INSIDE the stamp, so the
+     * choice must already be durable by the time the stamp runs — not merely
+     * enqueued ahead of it.
      */
     @Test
-    fun `the recents stamp lands before the choice write`() =
+    fun `the choice is already committed when the recents stamp runs`() =
         runTest(dispatcher) {
+            repository.choiceAtStampTime = { translatePrefs.target.value }
+
             viewModel().select("fr", LanguageRole.TARGET)
             runCurrent()
 
-            assertThat(journal).containsExactly("stamp:fr", "target:fr").inOrder()
+            assertThat(journal).containsExactly("target:fr", "stamp:fr").inOrder()
+            assertThat(repository.observedChoice).isEqualTo("fr")
+        }
+
+    /**
+     * The stamp writes to a DIFFERENT store than the choice, and it can fail on
+     * its own — a full disk, a locked database. When it does, the user must
+     * still get the language they tapped.
+     *
+     * Both lenses on this change found the same defect and this is its red bar:
+     * with the stamp running first and unguarded, the throw skipped the choice
+     * write entirely AND escaped to an application scope that carries no
+     * `CoroutineExceptionHandler` — a missed date taking the process with it.
+     */
+    @Test
+    fun `a failing recents stamp costs the date, never the choice`() =
+        runTest(dispatcher) {
+            repository.failWith = IllegalStateException("disk full")
+
+            viewModel().select("de", LanguageRole.TARGET)
+            advanceUntilIdle()
+
+            assertThat(translatePrefs.targetLang.first()).isEqualTo("de")
+            assertThat(repository.lastUsed).isEmpty() // the stamp really did fail
         }
 
     @Test

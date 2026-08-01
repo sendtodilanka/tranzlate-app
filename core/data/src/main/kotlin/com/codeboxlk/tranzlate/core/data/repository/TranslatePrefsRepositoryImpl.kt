@@ -20,8 +20,14 @@ import javax.inject.Singleton
  * legacy spellings (`iw`, `zh-CN`). Stored raw, such an id makes the picker's
  * radio compare (`language.id == selectedId`) tick nothing while the composer
  * chip reads "Hebrew" — the screen contradicting itself. Canonicalising every
- * write means no store downstream of this seam can hold a tag the catalog
- * cannot serve.
+ * write means nothing NEW enters the store in a spelling the catalog cannot
+ * serve — and canonicalising every READ means an install that upgraded with
+ * `iw` already on disk is served `he` from this seam, so the picker's tick and
+ * the composer's request agree on day one instead of after the next write.
+ * Both co-verify lenses found the read half missing: the picker canonicalised
+ * for itself, so its row ticked correctly while `TextViewModel` still handed
+ * the raw tag to the engine and to the history row — two readers, two answers,
+ * one store.
  *
  * Behaviour-preserving for already-canonical ids (the resolver maps them to
  * themselves) AND for the `"auto"` detect sentinel, which is not a language:
@@ -34,9 +40,11 @@ class TranslatePrefsRepositoryImpl
     constructor(
         private val dataSource: TranzlatePreferencesDataSource,
     ) : TranslatePrefsRepository {
-        override val sourceLang: Flow<String> = dataSource.sourceLang
+        override val sourceLang: Flow<String> =
+            dataSource.sourceLang.map(LanguageTagResolver::canonicalOrSelf)
 
-        override val targetLang: Flow<String> = dataSource.targetLang
+        override val targetLang: Flow<String> =
+            dataSource.targetLang.map(LanguageTagResolver::canonicalOrSelf)
 
         override val textMode: Flow<ModeId> =
             dataSource.textMode.map { stored ->
@@ -46,11 +54,11 @@ class TranslatePrefsRepositoryImpl
             }
 
         override suspend fun setSourceLang(id: String) {
-            dataSource.setSourceLang(canonicalOrSelf(id))
+            dataSource.setSourceLang(LanguageTagResolver.canonicalOrSelf(id))
         }
 
         override suspend fun setTargetLang(id: String) {
-            dataSource.setTargetLang(canonicalOrSelf(id))
+            dataSource.setTargetLang(LanguageTagResolver.canonicalOrSelf(id))
         }
 
         override suspend fun setLanguagePair(
@@ -59,8 +67,9 @@ class TranslatePrefsRepositoryImpl
         ) {
             // Both ids resolved BEFORE the one atomic edit — canonicalisation
             // must never split the pair write the swap depends on.
-            dataSource.setLanguagePair(canonicalOrSelf(sourceId), canonicalOrSelf(targetId))
+            dataSource.setLanguagePair(
+                LanguageTagResolver.canonicalOrSelf(sourceId),
+                LanguageTagResolver.canonicalOrSelf(targetId),
+            )
         }
-
-        private fun canonicalOrSelf(id: String): String = LanguageTagResolver.canonicalId(id) ?: id
     }

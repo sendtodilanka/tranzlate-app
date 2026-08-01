@@ -27,6 +27,54 @@ class TranslatePrefsRepositoryImplTest {
         return TranslatePrefsRepositoryImpl(TranzlatePreferencesDataSource(store)) to store
     }
 
+    // ---- the OTHER half: an install that upgraded with a legacy id on disk --
+
+    /**
+     * The write door only governs what is written from now on. An install that
+     * upgraded with `iw` already in `prefs.target_lang` has no write to fix it
+     * — and every reader downstream of this seam would have been served the raw
+     * tag: the picker canonicalised for itself and ticked Hebrew, while
+     * `TextViewModel` handed `iw` to the engine and wrote `iw` into the history
+     * row. Two readers, two answers, one store. Canonicalising the READ is what
+     * makes the seam's promise true for the installs that already exist.
+     */
+    @Test
+    fun `a legacy id already on disk is served canonical`() =
+        runTest {
+            val store = CountingPreferencesDataStore()
+            store.seed(stringPreferencesKey("prefs.source_lang"), "iw")
+            store.seed(stringPreferencesKey("prefs.target_lang"), "in")
+            val repository = TranslatePrefsRepositoryImpl(TranzlatePreferencesDataSource(store))
+
+            assertThat(repository.sourceLang.first()).isEqualTo("he")
+            assertThat(repository.targetLang.first()).isEqualTo("id")
+        }
+
+    /** Reading must not rewrite: the seam serves `he`, the disk still holds `iw`. */
+    @Test
+    fun `canonicalising a read does not write anything back`() =
+        runTest {
+            val store = CountingPreferencesDataStore()
+            store.seed(stringPreferencesKey("prefs.source_lang"), "iw")
+            val repository = TranslatePrefsRepositoryImpl(TranzlatePreferencesDataSource(store))
+
+            repository.sourceLang.first()
+
+            assertThat(store.edits).isEqualTo(0)
+            assertThat(store.data.first()[stringPreferencesKey("prefs.source_lang")]).isEqualTo("iw")
+        }
+
+    /** The detect sentinel is not a language: it survives the read untouched. */
+    @Test
+    fun `the auto sentinel survives a read`() =
+        runTest {
+            val store = CountingPreferencesDataStore()
+            store.seed(stringPreferencesKey("prefs.source_lang"), "auto")
+            val repository = TranslatePrefsRepositoryImpl(TranzlatePreferencesDataSource(store))
+
+            assertThat(repository.sourceLang.first()).isEqualTo("auto")
+        }
+
     // ---- the #123.2 trigger, killed at the write ----------------------------
 
     /**
@@ -164,6 +212,18 @@ private class CountingPreferencesDataStore : DataStore<Preferences> {
         private set
 
     override val data: Flow<Preferences> = state
+
+    /** Puts a value on "disk" without counting as an edit — an upgraded install. */
+    fun seed(
+        key: Preferences.Key<String>,
+        value: String,
+    ) {
+        state.value =
+            state.value
+                .toMutablePreferences()
+                .apply { this[key] = value }
+                .toPreferences()
+    }
 
     override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
         edits += 1

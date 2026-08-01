@@ -14,6 +14,7 @@ import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -93,12 +94,12 @@ class LanguagePickerViewModel
          */
         private val sourceSelection: StateFlow<String> =
             translatePrefs.sourceLang
-                .map { id -> LanguageTagResolver.canonicalId(id) ?: id }
+                .map(LanguageTagResolver::canonicalOrSelf)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), FALLBACK_SOURCE_LANG)
 
         private val targetSelection: StateFlow<String> =
             translatePrefs.targetLang
-                .map { id -> LanguageTagResolver.canonicalId(id) ?: id }
+                .map(LanguageTagResolver::canonicalOrSelf)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), FALLBACK_TARGET_LANG)
 
         /** The id the [role] side's radio should tick right now. */
@@ -115,11 +116,21 @@ class LanguagePickerViewModel
 
         /**
          * A row tap: the WHOLE selection, in one place and in a fixed order —
-         * first the Recent stamp (per role since #130 rev.3 split recents; the
-         * "auto" sentinel is not a catalog row, so it is never stamped), then
-         * the choice write through the same [TranslatePrefsRepository] methods
-         * the composer's swap/history writes use. One coroutine, so the stamp
-         * can never race behind the write that closes the screen.
+         * the CHOICE first, then the Recent stamp (per role since #130 rev.3
+         * split recents; the "auto" sentinel is not a catalog row, so it is
+         * never stamped), both through the same repositories the composer's
+         * swap/history writes use. One coroutine, so the stamp can never race
+         * behind the write that closes the screen.
+         *
+         * The order is load-bearing, and it used to be the other way round.
+         * These are two separate DataStore commits plus a Room write; nothing
+         * makes them atomic. Whatever runs second is the half that can be lost
+         * — to a throw, or to the process dying in the gap while the user is
+         * already walking away from the screen. Losing the stamp costs Manage
+         * packs one date. Losing the choice means the language appears under
+         * Recent while the composer still shows the old one: the screen
+         * contradicting itself, which is the exact defect this epic exists to
+         * remove. So the half that may be lost is the cheap one.
          */
         fun select(
             id: String,
@@ -141,13 +152,36 @@ class LanguagePickerViewModel
             // false of the durability. Found by the co-verify lens, not the tests
             // — every one of them drives the coroutine to completion.
             appScope.launch {
-                if (id != DETECT_LANGUAGE_ID) {
-                    languageRepository.setLastUsed(id, role, clock.nowMillis())
-                }
                 when (role) {
                     LanguageRole.SOURCE -> translatePrefs.setSourceLang(id)
                     LanguageRole.TARGET -> translatePrefs.setTargetLang(id)
                 }
+                if (id != DETECT_LANGUAGE_ID) {
+                    stampSafely(id, role)
+                }
+            }
+        }
+
+        /**
+         * Best-effort Recent stamp. It writes to a different store than the
+         * choice above, and a disk error there must not take the choice with
+         * it — nor reach [appScope], which has no `CoroutineExceptionHandler`,
+         * so an escaping throw would take the process down for a missed date.
+         * Same shape as `TranslateTextUseCase.stampSafely`, and for the same
+         * reason: cancellation is rethrown so structured concurrency still
+         * works.
+         */
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
+        private suspend fun stampSafely(
+            id: String,
+            role: LanguageRole,
+        ) {
+            try {
+                languageRepository.setLastUsed(id, role, clock.nowMillis())
+            } catch (rethrown: CancellationException) {
+                throw rethrown
+            } catch (ignored: Exception) {
+                // Manage packs misses one date; the selection itself is safe.
             }
         }
 

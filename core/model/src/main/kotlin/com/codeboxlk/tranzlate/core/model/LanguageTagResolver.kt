@@ -254,10 +254,22 @@ object LanguageTagResolver {
     private val byLowercaseId: Map<String, String> = canonicalIds.associateBy { it.lowercase() }
 
     /**
+     * [canonicalId] with the pass-through the callers all wanted: an id the
+     * catalog cannot serve — including the `"auto"` detect sentinel, which is
+     * not a language — comes back unchanged rather than as null.
+     *
+     * Five call sites had each written `canonicalId(x) ?: x` by hand. One of
+     * them dropping the fallback would silently turn the sentinel into a
+     * NullPointerException at a language boundary, so the idiom belongs here
+     * beside the resolver it guards.
+     */
+    fun canonicalOrSelf(tag: String): String = canonicalId(tag) ?: tag
+
+    /**
      * Resolves any incoming BCP-47 tag to a catalog id, or `null` when nothing
      * in the catalog can serve it. The `"auto"` detect sentinel is not a
-     * language and resolves to `null` — callers that must pass it through keep
-     * it via their own `?: id` fallback.
+     * language and resolves to `null` — callers that must pass it through use
+     * [canonicalOrSelf].
      */
     fun canonicalId(tag: String): String? {
         var candidate = tag.trim().replace('_', '-')
