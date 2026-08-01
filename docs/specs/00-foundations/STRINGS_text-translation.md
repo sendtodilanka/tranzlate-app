@@ -263,3 +263,20 @@ Keys shipped by the D-5 rev.3 Home rebuild. All live in `feature/text/src/main/r
 | `cd_text_retry` | Result-screen retry not re-wired to this key | check when FIX_QUEUE C2 lands |
 
 **Shell strings (`app/src/main/res/values/strings.xml`) — orphaned by the same PR, none deleted:** `nav_home` / `nav_chat` / `nav_camera` (no bottom bar) and the whole `drawer_*` + `app_guided_search` family (no drawer). They come out with the dead `DrawerContent.kt` / `TopLevelDestination.kt` files. `chat_coming_soon_title` / `coming_soon` **stay** — Chat is still a destination, now reached from the Conversation tool card.
+
+---
+
+## 8. Issue #159 speak-outcome additions (2026-08-01 · PR #159 co-verify — C-3 "missing keys get ADDED to STRINGS")
+
+The speak button used to have ONE failure message for every way speech could fail, and on device it told a **lie**: after a cache-hit translation the result renders before the ~500 ms engine bind finishes, so a tap in that window got *"Speech isn't available for this language on this device"* — about a language and a device that were both fine — and the same button worked seconds later.
+
+The window is now **waited out** instead of reported (`ResultSpeaker.speak` suspends until the bind reports), so "still binding" is no longer sayable at all. What is left are two different truths, which need two different messages — and the second one has to guide, or it is a dead end (EDGE_CASES).
+
+| Key | Status | Type | `en` | `fil` | `pt-rBR` | Shown when |
+|-----|--------|------|------|-------|----------|------------|
+| `text_tts_unavailable` | REUSED (`feature/text/values/strings.xml:127`) — meaning NARROWED | string | `Speech isn't available for this language on this device.` | `Hindi available ang speech para sa wikang ito sa device na ito.` | `A fala não está disponível para este idioma neste aparelho.` | `SpeakOutcome.NO_VOICE` — the engine bound and reported no voice for the target language (`setLanguage` → `LANG_MISSING_DATA` / `LANG_NOT_SUPPORTED`) |
+| `text_tts_engine_unavailable` | **NEW** (`:128`) | string | `No speech engine on this device. Add one in system settings to hear translations.` | `Walang speech engine sa device na ito. Magdagdag ng isa sa system settings para marinig ang mga pagsasalin.` | `Nenhum mecanismo de fala neste aparelho. Adicione um nas configurações do sistema para ouvir as traduções.` | `SpeakOutcome.ENGINE_UNAVAILABLE` — no usable engine at all, or it refused to start |
+
+**No message at all** for `SpeakOutcome.STARTED` (audio is playing) and for `SpeakOutcome.CANCELLED` (the engine was released while the tap waited — backgrounding, or the face leaving the result). A request the user already walked away from must not greet them with a failure when they come back.
+
+`fil` / `pt-rBR` above are authored in-issue and **queued for native-speaker review** (C-12, DoD gate 12) — the same standing caveat the three `feature/text` string files carry in their headers.

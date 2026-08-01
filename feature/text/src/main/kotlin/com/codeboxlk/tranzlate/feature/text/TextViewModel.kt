@@ -141,6 +141,24 @@ class TextViewModel
         private val _uiState = MutableStateFlow<TextUiState>(TextUiState.Idle)
         val uiState: StateFlow<TextUiState> = _uiState.asStateFlow()
 
+        /**
+         * Whether the shell that hoists this ViewModel is between `ON_START` and
+         * `ON_STOP` (issue #159 co-verify, block 1).
+         *
+         * `onCleared()` alone was not the release the issue asked for: this VM is
+         * hoisted OUTSIDE the NavDisplay entries, so it lives in the Activity's
+         * ViewModelStore and `onCleared()` runs only when the Activity finishes.
+         * Backgrounding a result left the state at `Result`, so the engine was
+         * still held — re-measuring HOME with a result on screen reproduced the
+         * issue's own "before" row. Only the BACK path was ever fixed.
+         *
+         * False until the shell says otherwise, and declared ABOVE the `state`
+         * setter that reads it: `restoreState()` runs from `init{}`, and a
+         * property initializer below that block would still be the JVM default
+         * when the setter fires (the same order trap [translateJob] carries).
+         */
+        private var hostStarted = false
+
         // Declared BEFORE the `state` setter's first use (restoreState runs in
         // init): a process-death restore crashed on the later declaration
         // (caught by the resume/unreadable-record tests before it shipped).
@@ -182,16 +200,7 @@ class TextViewModel
             get() = _uiState.value
             set(value) {
                 _uiState.value = value
-                // Issue #149: the speech engine is a bound service connection,
-                // so it is held for exactly as long as a spoken answer can be on
-                // screen — from the moment one is asked for until the face stops
-                // being a result. Preparing at Translating rather than at Result
-                // is what keeps the first tap warm: the ~500ms engine bind runs
-                // alongside the translation instead of in front of the audio.
-                when (value) {
-                    is TextUiState.Translating, is TextUiState.Result -> speaker.prepare()
-                    else -> speaker.release()
-                }
+                syncSpeaker()
                 savedStateHandle[KEY_STATE] =
                     when (value) {
                         is TextUiState.Translating -> STATE_TRANSLATING
@@ -254,13 +263,47 @@ class TextViewModel
         }
 
         /**
-         * The other end of [ResultSpeaker.prepare] (issue #149). The state
-         * machine gives the engine back on every face that cannot speak, but a
-         * result left on screen when the host goes away would never reach one of
-         * those faces — and a text-to-speech engine held past its consumer keeps
-         * another process pinned at visible-app importance until this process
-         * dies. This is where Google's own guidance puts the release ("call this
-         * method in the onDestroy() method of an Activity").
+         * The ONE place that decides whether an engine is worth holding
+         * (issue #149 / #159). Two inputs, both necessary:
+         *
+         * - a face that can speak — `Translating` prepares rather than `Result`,
+         *   so the ~500ms bind runs alongside the translation instead of in
+         *   front of the audio;
+         * - a host that is on screen — a bound engine keeps another process at
+         *   visible-app importance whether or not ours is visible, so holding
+         *   one for a backgrounded app is the leak this issue opened for.
+         */
+        private fun syncSpeaker() {
+            val canSpeak = state is TextUiState.Translating || state is TextUiState.Result
+            if (hostStarted && canSpeak) speaker.prepare() else speaker.release()
+        }
+
+        /** Shell `ON_START`: re-bind for a result the user has come back to. */
+        fun onHostStarted() {
+            hostStarted = true
+            syncSpeaker()
+        }
+
+        /**
+         * Shell `ON_STOP`: nothing on this screen can be listened to any more, so
+         * the engine goes back — the app is not a background audio player, and a
+         * held engine outlives our visibility by design.
+         */
+        fun onHostStopped() {
+            hostStarted = false
+            // Kills any tap still waiting on a bind, so returning to the app
+            // cannot be greeted by a message about a request already abandoned.
+            speakJob?.cancel()
+            syncSpeaker()
+        }
+
+        /**
+         * The last resort (issue #149). [onHostStopped] covers backgrounding, but
+         * a host cleared without a stop — and any wiring mistake in the shell —
+         * still must not leak: a text-to-speech engine held past its consumer
+         * keeps another process pinned at visible-app importance until this
+         * process dies. This is also where Google's own guidance puts the release
+         * ("call this method in the onDestroy() method of an Activity").
          */
         override fun onCleared() {
             super.onCleared()
@@ -453,17 +496,51 @@ class TextViewModel
         /** True while TTS reads the result — the speak button's play ⇄ stop state. */
         val speaking: StateFlow<Boolean> get() = speaker.speaking
 
+        private var speakJob: Job? = null
+
+        private val _speakNotice = MutableStateFlow<SpeakOutcome?>(null)
+
         /**
-         * Toggle: reading → stop; idle → read the RESULT in the target language.
-         * False = engine/language unavailable (UI guides — no dead end).
+         * What the speak button owes the user, or null (issue #159 co-verify,
+         * block 2). Only ever a FAILURE the user can act on: a request still
+         * waiting for its engine is not one, because it is going to play.
+         *
+         * A one-shot the UI acknowledges with [onSpeakNoticeShown], so the same
+         * failure twice in a row still speaks twice.
          */
-        fun onSpeak(): Boolean {
-            val result = state as? TextUiState.Result ?: return false
-            if (speaker.speaking.value) {
+        val speakNotice: StateFlow<SpeakOutcome?> = _speakNotice.asStateFlow()
+
+        /** The UI has shown [speakNotice]; clear it. */
+        fun onSpeakNoticeShown() {
+            _speakNotice.value = null
+        }
+
+        /**
+         * Toggle: reading (or waiting to read) → stop; idle → read the RESULT in
+         * the target language.
+         *
+         * Asynchronous because [ResultSpeaker.speak] waits out a bind that has
+         * not finished — the tap that lands on a cache-hit result before the
+         * ~500ms engine bind completes used to be told the LANGUAGE was
+         * unsupported, which was false, and the same button worked seconds later
+         * (issue #159 co-verify, block 2). A request in flight counts as
+         * "reading" for the toggle: without that, the second tap would start a
+         * second utterance instead of stopping the first.
+         */
+        fun onSpeak() {
+            if (speakJob?.isActive == true || speaker.speaking.value) {
+                speakJob?.cancel()
                 speaker.stop()
-                return true
+                return
             }
-            return speaker.speak(result.translatedText, result.request.targetLang)
+            val result = state as? TextUiState.Result ?: return
+            speakJob =
+                viewModelScope.launch {
+                    when (val outcome = speaker.speak(result.translatedText, result.request.targetLang)) {
+                        SpeakOutcome.STARTED, SpeakOutcome.CANCELLED -> Unit
+                        else -> _speakNotice.value = outcome
+                    }
+                }
         }
 
         /**

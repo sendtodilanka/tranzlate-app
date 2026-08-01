@@ -168,11 +168,21 @@ DELETE :feature:languagepicker             (move ×2 පසු)
 > | surface | consumer | contract |
 > |---|---|---|
 > | `AndroidOfflineVoiceCatalog` (PR-10) | එක ප්‍රශ්නයක් — ඇසුවාට පස්සේ ඉවරයි | construct → ask → **`finally { shutdown() }`** (rev.3 හි ලියූ පරිදිම) |
-> | `AndroidResultSpeaker` (#84 · #149) | result face එක — play/stop toggle + replay | `prepare()` @ Translating → **`release()`** face එක result නොවන හැම මොහොතක ම + `onCleared()` |
+> | `AndroidResultSpeaker` (#84 · #149) | result face එක — play/stop toggle + replay | `prepare()` @ Translating → **`release()`** face එක result නොවන හැම මොහොතක ම + shell එකේ **`ON_STOP`** + `onCleared()` |
 >
-> මනින ලද කරුණු (API 37, `Resizable_Experimental`): engine එකක් bound ව තිබෙන තාක් TTS process එක `oom adj 100` + top-app sched group එකේ රැඳේ — **app එක background එකේ තිබියදීත්** — platform එක කිසිදා එය නොහරියි (`getAutoDisconnectTimeoutMs()` → `PERMANENT_BOUND_TIMEOUT_MS` = 0 = "do not unbind"). ඒ නිසා §7.3 REJECT එක **standing**: process-lifetime hold එකක් තහනම්මයි. එහෙත් rebind එකට ~500ms යයි, fresh engine එකක tap→audio **670ms** vs standing engine එකක **2-8ms** — ඒ නිසා utterance-per-shutdown එකද speaker එකට **REJECT**. දෙකට ම පොදු invariant: **engine එකක් තමන්ගේ consumer ට වඩා වැඩි කල් ජීවත් නොවේ.**
+> මනින ලද කරුණු (API 37, `Resizable_Experimental`): engine එකක් bound ව තිබෙන තාක් TTS process එක `oom adj 100` + top-app sched group එකේ රැඳේ — **app එක background එකේ තිබියදීත්** — platform එක කිසිදා එය නොහරියි (`getAutoDisconnectTimeoutMs()` → `PERMANENT_BOUND_TIMEOUT_MS` = 0 = "do not unbind"). ඒ නිසා §7.3 REJECT එක **standing**: process-lifetime hold එකක් තහනම්මයි. එහෙත් rebind එකට ~500ms යයි, fresh engine එකක tap→audio **670ms** vs standing engine එකක **1-8ms** (raw: 8/2/4/7/1 — කලින් මෙහි ලියා තිබූ "2-8ms" එක raw data එකට නොගැලපුණි, PR #159 lens එකෙන් හසුවිය) — ඒ නිසා utterance-per-shutdown එකද speaker එකට **REJECT**. දෙකට ම පොදු invariant: **engine එකක් තමන්ගේ consumer ට වඩා වැඩි කල් ජීවත් නොවේ.**
 >
-> Konsist gate: `no class holds a speech engine it cannot give back` (`app/src/test/.../KonsistArchitectureTest.kt`) — `@Singleton` engine holder එකක් හෝ `shutdown()` නැති holder එකක් RED කරයි.
+> **Consumer එකට "screen" විතරක් නොවේ, "app එක on screen ද" කියන එකත් අයිතියි** (#159 co-verify). `TextViewModel` එක NavDisplay entries වලින් පිටත hoist කර ඇති නිසා එය Activity ගේ ViewModelStore එකේ ජීවත් වේ — background යාමෙන් state එකක් වෙනස් නොවන අතර `onCleared()` ද නොදුවයි. Result එකක් තියාගෙන HOME ඔබූ විට engine එක `adj 100` හිම රැඳුණි (app එක `adj 900`, cached) — එනම් fix එකට කලින් තිබූ තත්ත්වයම. ඒ නිසා shell එකේ `LifecycleStartEffect` එකෙන් `ON_START`/`ON_STOP` ද lifetime එකට එකතු වේ; return එකේදී නැවත bind වන නිසා warm-first-tap එක නැති නොවේ.
+>
+> **Konsist gates** (`app/src/test/.../KonsistArchitectureTest.kt`) — දැන් හරියටම මේවා RED කරයි (එකින් එක mutation එකකින් තහවුරු කර ඇත):
+>
+> | gate | RED කරන දේ |
+> |---|---|
+> | `no class holds a speech engine it cannot give back` | holder class එකට scope annotation එකක් · holder එකේ `shutdown()` call එකක් නැති වීම · engine construct/shutdown එක `guarded`/`guardedRelease` වලින් පිටත |
+> | `no Hilt binding gives the speech engine process lifetime` | `@Binds`/`@Provides` එකකට scope annotation එකක් (`@Binds @Singleton` = idiomatic Hilt scoping — **පරණ gate එක මෙය අල්ලා ගත්තේ නෑ**, class එකේ `TextToSpeech` property එකක් නැති නිසා) |
+> | `the shell hands the speech engine back when the app stops` | `TranzlateApp` එකෙන් `LifecycleStartEffect` + `onHostStarted()`/`onHostStopped()` ඉවත් කිරීම |
+>
+> Matching එකට කලින් **comments සහ string literals දෙකම strip** වේ: `"skipping shutdown() for now"` වගේ log message එකකින් gate එක තෘප්තිමත් වුණි (#159 lens). **Gate එකේ සීමාව නම් කරමු:** holder එකක් තමන්ගේම no-op `shutdown()` එකක් declare කර call කළොත් එය පසුවෙයි — call එකක් declaration එකට resolve කරන tool එකක් මෙහි නෑ, ඒ නිසා එය review ප්‍රශ්නයක් මිස gate ප්‍රශ්නයක් නොවේ. Gates මේවා source-SHAPE assertions — release එක **දුවනවා** කියා ඔප්පු කරන්නේ `TextViewModelTest` + `ResultSpeakerTest`.
 
 ---
 

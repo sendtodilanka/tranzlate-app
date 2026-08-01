@@ -120,7 +120,12 @@
     <string name="text_swap_needs_detect">Translate once to detect the language before swapping.</string>
     <string name="cd_text_counter_limit">%1$d-character limit reached</string>
     <string name="cd_speak_stop">Stop reading</string>
+    <!-- Speak outcomes (issue #159). Two DIFFERENT truths: the engine bound but has
+         no voice for this language, vs. there is no usable speech engine at all.
+         Neither is ever shown for an engine that is merely still binding — that tap
+         waits and then plays. -->
     <string name="text_tts_unavailable">Speech isn\'t available for this language on this device.</string>
+    <string name="text_tts_engine_unavailable">No speech engine on this device. Add one in system settings to hear translations.</string>
     <string name="text_error_title">Couldn\'t translate</string>
     <string name="text_error_edit">Edit text</string>
 </resources>

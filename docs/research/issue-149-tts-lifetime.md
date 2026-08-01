@@ -155,9 +155,25 @@ the result left on screen when the host goes away.
 
 `prepare()` fires at `Translating`, not at `Result`, deliberately: the ~500ms bind
 then runs alongside the translation instead of in front of the audio, so the first
-tap is warm. A tap that beats the bind is still answered honestly — `speak()`
-returns false and the UI shows "unavailable", exactly as for a missing engine —
-and that window is the same one the pre-fix code had on a cold start.
+tap is warm.
+
+> **CORRECTED after co-verify (2026-08-01, PR #159 lens).** This section first
+> claimed that a tap beating the bind "is still answered honestly — `speak()`
+> returns false and the UI shows 'unavailable' … the same window the pre-fix code
+> had on a cold start". **Both halves were wrong**, and the lens reproduced it on
+> the device: after a **cache hit** the busy floor is cancelled and `Result`
+> renders immediately, so the tap lands mid-bind and got *"Speech isn't available
+> for this language on this device"* — a statement about the language and the
+> device that was false, on a button that worked seconds later. And the window was
+> **new**, not inherited: pre-fix the singleton bound at Home and was long ready by
+> the time any result existed. A window this fix creates cannot be excused by the
+> code it replaced.
+>
+> Fixed by making the wait a wait: `ResultSpeaker.speak` suspends until the bind
+> reports, so the tap plays. Only outcomes that are true are ever said out loud —
+> `NO_VOICE` (the engine bound, this language has no voice) and
+> `ENGINE_UNAVAILABLE` (no usable engine at all, with the system-settings
+> guidance EDGE_CASES requires). "Still binding" is not one of them.
 
 ## Verification on the device (post-fix, real UI)
 
@@ -170,6 +186,32 @@ and that window is the same one the pre-fix code had on a cold start.
 
 The last row is the one the singleton could never produce.
 
+## The first fix did not close the harm — co-verify re-measurement (PR #159)
+
+Everything above survived the lens. The **fix** did not: it released on `onCleared`
+and on the state funnel, and `TextViewModel` is hoisted OUTSIDE the NavDisplay
+entries (`TranzlateApp.kt`), so it resolves to the Activity's ViewModelStore and
+`onCleared()` runs only when the Activity finishes. Backgrounding changes no state
+at all, so with a result on screen the funnel never fired either. Re-measured,
+result held, `KEYCODE_HOME`:
+
+```
++25s : com.google.android.tts → adj 100  schedGroup 3  cached=false
+       our app                → adj 700
++65s : com.google.android.tts → adj 100  schedGroup 3  cached=false
+       our app                → adj 900  cached=true
+```
+
+That is this record's own **"before the fix"** row, reproduced against the fix.
+Only the BACK path — the one the acceptance table happened to test — was ever
+closed.
+
+The lifetime now has a second input: the shell's own `ON_START`/`ON_STOP`
+(`LifecycleStartEffect` beside the hoist, since the composer is not composed while
+the picker or Settings is on top). An engine is held only when a face that can
+speak is showing **and** the app is on screen; coming back re-binds, so the first
+tap after a return is still warm. Re-verification of that is in the PR body.
+
 ## Limits of this record
 
 - One device, one engine (`com.google.android.tts`, API 37 emulator). A
@@ -179,6 +221,15 @@ The last row is the one the singleton could never produce.
   than through `TextToSpeechManagerService`) was not measured. It uses plain
   `BIND_AUTO_CREATE` without `BIND_SCHEDULE_LIKE_TOP_APP`, so the scheduling-group
   half of the finding may not hold there; the "nothing unbinds it but you" half is
-  structural and does.
+  structural and does. **Which path the `release()` guard is for** was corrected by
+  the co-verify lens: it cited `DirectConnection.disconnect` (`TextToSpeech.java`
+  :2430) as the unguarded `unbindService` — a path AOSP marks legacy — while API
+  31+ ends the session through `SystemConnection.disconnect` (:2488-2500), which
+  unbinds nothing itself. Independently confirmed here only as far as
+  `connectToEngine()` choosing `SystemConnection` or `DirectConnection` from
+  `mIsSystem`; the two `disconnect()` bodies at those line numbers are the lens's
+  reading, not re-verified in this session (the file truncates in the fetch tool)
+  — **verified data නෑ** for the exact bodies. The guard stays either way: it costs
+  nothing, and the legacy path is still reachable.
 - Nothing here measures battery. The claim is about process importance, scheduling
   group and reclaim eligibility — all directly observed — not about mAh.

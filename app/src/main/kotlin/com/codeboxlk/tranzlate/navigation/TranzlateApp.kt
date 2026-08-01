@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -41,6 +42,23 @@ fun TranzlateApp(
 ) {
     val backStack = rememberNavBackStack(TextNavKey)
     val textViewModel: TextViewModel = hiltViewModel()
+
+    // Issue #149 / #159 co-verify: this ViewModel is hoisted OUTSIDE the
+    // NavDisplay entries, so it resolves to the Activity's ViewModelStore and
+    // onCleared() runs only when the Activity finishes. Backgrounding with a
+    // result on screen therefore released nothing, and the speech engine — a
+    // bound service connection the platform never takes back on its own — stayed
+    // pinned at visible-app importance behind a backgrounded app, which is the
+    // harm #149 reported.
+    //
+    // The lifetime belongs HERE and not in a screen: the engine has to go back
+    // when the APP stops, whichever destination is on top, and the composer is
+    // not composed while the picker or Settings is. This effect is scoped to the
+    // same host the ViewModel is, so the two cannot drift.
+    LifecycleStartEffect(textViewModel) {
+        textViewModel.onHostStarted()
+        onStopOrDispose { textViewModel.onHostStopped() }
+    }
 
     fun navigateTo(key: NavKey) {
         if (backStack.lastOrNull() != key) backStack.add(key)
