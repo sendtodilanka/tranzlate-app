@@ -1,4 +1,4 @@
-package com.codeboxlk.tranzlate.feature.languagepicker
+package com.codeboxlk.tranzlate.feature.language
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

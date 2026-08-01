@@ -1,4 +1,4 @@
-package com.codeboxlk.tranzlate.feature.languagepicker
+package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,8 +28,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -40,6 +42,8 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
+import com.codeboxlk.tranzlate.core.ui.languageDisplayName
+import java.util.Locale
 
 /**
  * Screen B — "Offline translation" manager (spec 02 D-E2): only MLKit-capable
@@ -78,10 +82,15 @@ internal fun OfflineLanguagesContent(
     onDismissConsent: () -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
+    val locale = LocalLocale.current.platformLocale
+    // Once per data or locale change — not once per recomposition per row. The
+    // picker's own KDoc makes this a rule; a CLDR lookup in a list item runs on
+    // every frame a fling produces.
+    val shown = remember(rows, locale) { buildOfflineRows(rows, locale) }
     // Issue #90: metered-download consent — ONE dialog at peak intent, wifi
     // waiting keeps the row NotDownloaded (no spinner, no dead end).
     pendingConsent?.let { id ->
-        val name = rows.firstOrNull { it.id == id }?.name ?: id
+        val name = shown.firstOrNull { it.id == id }?.displayName ?: id
         AlertDialog(
             onDismissRequest = onDismissConsent,
             title = { Text(stringResource(R.string.offline_data_dialog_title, name)) },
@@ -134,7 +143,7 @@ internal fun OfflineLanguagesContent(
                         )
                     }
                 }
-                if (rows.isEmpty()) {
+                if (shown.isEmpty()) {
                     Text(
                         text = stringResource(R.string.offline_loading),
                         style = MaterialTheme.typography.bodyLarge,
@@ -143,7 +152,7 @@ internal fun OfflineLanguagesContent(
                     )
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize().testTag("tt_offline_list")) {
-                        items(rows, key = OfflineLanguageRow::id) { row ->
+                        items(shown, key = OfflinePackRow::id) { row ->
                             OfflineRow(row = row, onDownload = onDownload, onDelete = onDelete)
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         }
@@ -156,7 +165,7 @@ internal fun OfflineLanguagesContent(
 
 @Composable
 private fun OfflineRow(
-    row: OfflineLanguageRow,
+    row: OfflinePackRow,
     onDownload: (String) -> Unit,
     onDelete: (String) -> Unit,
 ) {
@@ -172,7 +181,12 @@ private fun OfflineRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = row.name,
+                // The SAME name the picker's rows carry. Until PR-6 this screen
+                // lived in a module with no access to `languageDisplayName`, so
+                // it rendered the catalog's own English string: the picker said
+                // "Bangla" and this list said "Bengali", for one language, in
+                // one app, on a plain English device.
+                text = row.displayName,
                 style = MaterialTheme.typography.bodyLarge,
             )
             // Issue #90 (EDGE_CASES no-dead-end): a Failed row explains WHY —
@@ -208,7 +222,7 @@ private fun OfflineRow(
                 ) {
                     Icon(
                         Icons.Outlined.DownloadForOffline,
-                        contentDescription = stringResource(R.string.offline_cd_download, row.name),
+                        contentDescription = stringResource(R.string.offline_cd_download, row.displayName),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
@@ -226,7 +240,7 @@ private fun OfflineRow(
                         )
                         Icon(
                             Icons.Filled.Stop,
-                            contentDescription = stringResource(R.string.offline_cd_stop, row.name),
+                            contentDescription = stringResource(R.string.offline_cd_stop, row.displayName),
                             modifier = Modifier.size(14.dp),
                         )
                     }
@@ -240,7 +254,7 @@ private fun OfflineRow(
                 ) {
                     Icon(
                         Icons.Outlined.Delete,
-                        contentDescription = stringResource(R.string.offline_cd_delete, row.name),
+                        contentDescription = stringResource(R.string.offline_cd_delete, row.displayName),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -260,7 +274,7 @@ private fun OfflineRow(
                 ) {
                     Icon(
                         Icons.Filled.Refresh,
-                        contentDescription = stringResource(R.string.offline_cd_retry, row.name),
+                        contentDescription = stringResource(R.string.offline_cd_retry, row.displayName),
                         tint = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -278,12 +292,20 @@ private fun OfflineRow(
 
 private val previewRows =
     listOf(
+        // `bn` earns its place. The catalog calls it "Bengali" and CLDR calls it
+        // "Bangla", so it is the one row here that reads differently after this
+        // change — a preview set where every name happened to match the catalog
+        // would have shown the owner nothing, which is what a lens found.
+        OfflineLanguageRow("bn", "Bengali", OfflineModelState.Downloaded),
         OfflineLanguageRow("fr", "French", OfflineModelState.Downloaded),
         OfflineLanguageRow("de", "German", OfflineModelState.Downloading),
         OfflineLanguageRow("es", "Spanish", OfflineModelState.NotDownloaded),
         OfflineLanguageRow("it", "Italian", OfflineModelState.Deleting),
         OfflineLanguageRow("pt", "Portuguese", OfflineModelState.Failed(OfflineModelFailure.STORAGE)),
     )
+
+/** What the screen actually renders — same mapping, so a preview cannot drift from it. */
+private val previewShown = buildOfflineRows(previewRows, Locale.ENGLISH)
 
 @PreviewLightDark
 @Composable
@@ -333,12 +355,17 @@ private fun OfflineRowStatesPreview() {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Column {
-                previewRows.forEach { row ->
+                previewShown.forEach { row ->
                     OfflineRow(row = row, onDownload = {}, onDelete = {})
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
                 OfflineRow(
-                    row = OfflineLanguageRow("nl", "Dutch", OfflineModelState.Failed(OfflineModelFailure.NETWORK)),
+                    row =
+                        OfflinePackRow(
+                            "nl",
+                            "Dutch",
+                            OfflineModelState.Failed(OfflineModelFailure.NETWORK),
+                        ),
                     onDownload = {},
                     onDelete = {},
                 )

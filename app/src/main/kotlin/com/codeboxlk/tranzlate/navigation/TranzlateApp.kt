@@ -21,7 +21,7 @@ import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
 import com.codeboxlk.tranzlate.feature.language.LanguagePickerScreen
-import com.codeboxlk.tranzlate.feature.languagepicker.OfflineLanguagesScreen
+import com.codeboxlk.tranzlate.feature.language.OfflineLanguagesScreen
 import com.codeboxlk.tranzlate.feature.paywall.PaywallScreen
 import com.codeboxlk.tranzlate.feature.settings.SettingsScreen
 import com.codeboxlk.tranzlate.feature.text.COMPOSER_CARD_SHARED_KEY
@@ -182,7 +182,7 @@ private fun AppNavDisplay(
                         },
                     )
                 }
-                // "Offline languages" (Home entries) = the :feature:languagepicker
+                // "Offline languages" (Home entries) = the :feature:language
                 // placeholder (download/delete packs) — a different job from the
                 // text vertical's source/target picker above, hence the alias.
                 entry<LanguagesNavKey> {

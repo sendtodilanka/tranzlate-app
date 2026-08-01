@@ -49,7 +49,7 @@ data object ChatNavKey : NavKey
 @Serializable
 data object HistoryNavKey : NavKey
 
-/** Drawer "Offline languages" placeholder destination (languagepicker feature). */
+/** Drawer "Offline languages" placeholder destination (:feature:language). */
 @Serializable
 data object LanguagesNavKey : NavKey
 

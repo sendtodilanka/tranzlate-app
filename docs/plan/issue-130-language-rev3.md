@@ -64,8 +64,8 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 2 — the move (logic-edit zero)
 | PR | Scope | Status |
 |---|---|---|
-| PR-6 | Create `:feature:language`; git-mv picker (4 prod + 4 test suites + strings ×3) verbatim; `LanguagePickerTarget` alias retired — the composer speaks `LanguageRole`. **Two corrections to the ruling's file list, both verified:** `LanguageNames.kt` is NOT picker-only (`languageLabel` is the composer's chip label), so `:feature:text` now depends on `:feature:language` — language presentation keeps ONE home; and the cross-VM coherence test cannot live in either feature after the split, so it moved to `:app` | ⬜ |
-| PR-7 | git-mv packs screen; delete `:feature:languagepicker`; Screen B localized-names one-liner | ⬜ |
+| PR-6 | Create `:feature:language`; git-mv picker (4 prod + 4 test suites + strings ×3) verbatim; `LanguagePickerTarget` alias retired — the composer speaks `LanguageRole`. **Two corrections to the ruling's file list, both verified:** `LanguageNames.kt` is NOT picker-only (`languageLabel` is the composer's chip label), so `:feature:text` now depends on `:feature:language` — language presentation keeps ONE home; and the cross-VM coherence test cannot live in either feature after the split, so it moved to `:app` | ✅ #145, 2026-08-01 |
+| PR-7 | git-mv packs screen; delete `:feature:languagepicker`; Screen B localized-names one-liner | ✅ #146, 2026-08-01 |
 
 ### Phase 3 — seams + primitives
 | PR | Scope | Status |
