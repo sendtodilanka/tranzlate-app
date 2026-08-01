@@ -26,17 +26,43 @@ cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
 
 printf '%s' "$cmd" | grep -qE '(^|[;&|][[:space:]]*)gh[[:space:]]+pr[[:space:]]+create' || exit 0
 
-# The body is usually a heredoc or a $(cat <<EOF …). Scan the WHOLE command:
-# unlike guard-git.sh, here the payload IS what we need to inspect.
+# No body at all → the author is opening a PR some other way; not our business.
+# This runs FIRST now (#178). It used to sit after the marker scan, so an
+# invocation the hook could not read reached the deny instead of the fail-open.
+printf '%s' "$cmd" | grep -qE '\-\-body|\-\-body-file' || exit 0
+
+# WHERE THE BODY TEXT IS. The hook sees the command BEFORE the shell expands
+# it, so only some forms are readable at all:
+#
+#   --body "$(cat <<'EOF' … EOF)"   readable — the heredoc text is in $cmd
+#   --body 'literal text'          readable — likewise
+#   --body-file body.md            readable — if we open the file
+#   --body "$(cat body.md)"        NOT readable — resolved at run time
+#   --body "$BODY"                 NOT readable — a variable we do not have
+#
+# #178: the last two used to be DENIED. That contradicted this hook's own
+# fail-open contract and rejected PR bodies that were in fact compliant.
+body=$cmd
+
+bf=$(printf '%s' "$cmd" | sed -n "s/.*--body-file[= ]\{1,\}['\"]\{0,1\}\([^ '\"]\{1,\}\).*/\1/p" | head -1)
+if [ -n "$bf" ]; then
+  # Unreadable or missing → allow. The hook cannot know what it says.
+  [ -r "$bf" ] || exit 0
+  body=$(cat -- "$bf" 2>/dev/null) || exit 0
+elif ! printf '%s' "$cmd" | grep -q '<<'; then
+  # No heredoc. If --body's argument STARTS with a substitution or a variable,
+  # the text is not in $cmd and we must not judge it. Deliberately narrow: a
+  # literal body containing $( inside a fenced code block is still scanned,
+  # which is most of this repo's PR bodies.
+  printf '%s' "$cmd" | grep -qE "\-\-body[= ]+[\"']?[\$\`]" && exit 0
+fi
+
 missing=""
-printf '%s' "$cmd" | grep -q 'Call sites:' || missing="Call sites:"
-if ! printf '%s' "$cmd" | grep -q 'Reproduced:'; then
+printf '%s' "$body" | grep -q 'Call sites:' || missing="Call sites:"
+if ! printf '%s' "$body" | grep -q 'Reproduced:'; then
   missing="${missing:+$missing and }Reproduced:"
 fi
 [ -z "$missing" ] && exit 0
-
-# No body at all → the author is opening a PR some other way; not our business.
-printf '%s' "$cmd" | grep -qE '\-\-body|\-\-body-file' || exit 0
 
 jq -nc --arg r "PR body is missing: ${missing}
 
