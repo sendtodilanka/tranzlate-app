@@ -45,18 +45,22 @@ is interesting. Two hard constraints:
 
 Small, and each one makes the rest cheaper or safer.
 
-| | Work | Why now |
-|---|---|---|
-| 1 | **#147** land (PR-10 voice seam) | Also fixes **#111** — it restores the `PurchaseFlow` binding that has blocked the instrumentation suite since `fabb214` |
-| 2 | **#148** CI compiles androidTest | The reason #111 survived for weeks: `./gradlew build` never assembles those sources. Must follow #147, which makes them compile again |
-| 3 | **#150** guarded back-stack pop | A crash: `onDone` and three other sites pop without the `size > 1` guard `onBack` already has. Two fast taps can empty the stack |
-| 4 | **#149** `ResultSpeaker` standing TTS | Once #147 lands the app holds two contradictory TTS contracts. Resolve it, or record why speaking is a genuine exception |
+| | Work | PR | Why now |
+|---|---|---|---|
+| 1 | ✅ **#147** land (PR-10 voice seam) | #147 | Also fixes **#111** — it restores the `PurchaseFlow` binding that has blocked the instrumentation suite since `fabb214` |
+| 2 | ✅ **#148** CI compiles androidTest | #160 | The reason #111 survived for weeks: `./gradlew build` never assembles those sources. Must follow #147, which makes them compile again |
+| 3 | ✅ **#150** guarded back-stack pop | #156 | A crash: `onDone` and three other sites pop without the `size > 1` guard `onBack` already has. Two fast taps can empty the stack |
+| 4 | ✅ **#149** `ResultSpeaker` standing TTS | #159 | Once #147 lands the app holds two contradictory TTS contracts. Resolve it, or record why speaking is a genuine exception. Resolved as **consumer-lifetime, not process-lifetime** — the §7.3 ruling was amended, see below |
+
+Wave 1 is closed. Two guards were also built while it ran and are not roadmap
+rows, because neither was planned: **#162** (`guard-pr`) and **#165**
+(`guard-tracker` + the `co-verify-lens` agent).
 
 ## Wave 2 · Finish Phase 3 of the epic
 
-| | Work | Why now |
-|---|---|---|
-| 5 | **PR-9** shared `DownloadGate` | Deletes the consent logic duplicated across the two screens — only possible **because** Phase 2 put them in one module. Doing it before the sheets means PR-17 builds on one gate, not two |
+| | Work | PR | Why now |
+|---|---|---|---|
+| 5 | ⬜ **PR-9** shared `DownloadGate` | #166 | Deletes the consent logic duplicated across the two screens — only possible **because** Phase 2 put them in one module. Doing it before the sheets means PR-17 builds on one gate, not two |
 
 ## Wave 3 · The screens the owner can see
 
@@ -79,9 +83,9 @@ Small, and each one makes the rest cheaper or safer.
 
 ## Any time — independent of the waves
 
-- **#151** history rows store raw detector tags while the prefs seam
+- ⬜ **#151** history rows store raw detector tags while the prefs seam
   canonicalises. Self-contained, `core:domain`.
-- **#152** the STRINGS gate (the dead keys ride with Wave 3; the gate itself can
+- ⬜ **#152** the STRINGS gate (the dead keys ride with Wave 3; the gate itself can
   land whenever).
 
 ---
