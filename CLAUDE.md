@@ -96,7 +96,7 @@ The whole app's behaviour must equal the **Google Translate** Android app. Tranz
 Feature branch → PR to `main`. A Claude push-guard blocks direct pushes to `main` (feature-branch pushes are fine). Commit/push only when asked.
 
 ## Project rules (`.claude/memory/`)
-- **Replies ≥70% Sinhala script** (English only for code / paths / commands / symbol names / acronyms).
+- **Write so the owner can understand it** — rule 9 above is the statement of it. This line used to restate it as "replies ≥70% Sinhala script"; that percentage is the retired proxy, and a rule restated in two places is a rule that drifts (see rule 11).
 - **No speculation** — every claim needs a source or a disconfirmation experiment, else say "verified data නෑ".
 - **Terminal `./gradlew`** needs `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"` (Java 21; no standalone JDK on this machine).
 
