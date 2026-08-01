@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.core.translate
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.testing.FakeStorageProbe
+import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
@@ -53,7 +54,7 @@ class RealOfflineModelManagerTest {
             manager.download("fr")
             runCurrent()
 
-            assertThat(manager.modelStates().first()["fr"])
+            assertThat(manager.stateOf("fr"))
                 .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.STORAGE))
             assertThat(store.committed).isEmpty() // no partial download ever started
         }
@@ -67,13 +68,13 @@ class RealOfflineModelManagerTest {
 
             manager.download("fr")
             runCurrent()
-            assertThat(manager.modelStates().first()["fr"])
+            assertThat(manager.stateOf("fr"))
                 .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.STORAGE))
 
             probe.free = Long.MAX_VALUE // user freed space; retry must not be a dead end
             manager.download("fr")
             runCurrent()
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
         }
 
     @Test
@@ -84,13 +85,13 @@ class RealOfflineModelManagerTest {
 
             manager.download("fr") // launches internally, returns at once
             runCurrent()
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
 
             manager.delete("fr") // the user's Stop
             runCurrent()
 
             assertThat(store.downloadCancelled).isTrue() // the internal job died at the gate
-            assertThat(manager.modelStates().first()["fr"])
+            assertThat(manager.stateOf("fr"))
                 .isEqualTo(OfflineModelState.NotDownloaded) // never Downloaded, never Failed
         }
 
@@ -107,11 +108,11 @@ class RealOfflineModelManagerTest {
             runCurrent()
 
             // Still truthfully Downloading — the owner's leave-and-return scenario.
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
 
             store.downloadGate.complete(Unit)
             runCurrent()
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloaded)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloaded)
         }
 
     @Test
@@ -138,7 +139,7 @@ class RealOfflineModelManagerTest {
             runCurrent()
 
             // Never a dead-end spinner: the manager-scoped finally cleared it.
-            assertThat(manager.modelStates().first()["fr"])
+            assertThat(manager.stateOf("fr"))
                 .isNotEqualTo(OfflineModelState.Deleting)
         }
 
@@ -167,23 +168,23 @@ class RealOfflineModelManagerTest {
             // The user deletes the model; the platform delete is slow.
             val screen = launch { manager.delete("fr") }
             runCurrent()
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Deleting)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Deleting)
 
             // Mid-delete, the user re-downloads from the picker row.
             manager.download("fr")
             runCurrent()
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
 
             // The stale delete lands — it no longer owns the row's transient,
             // so it must NOT clear the new download's Downloading.
             deleteGate.complete(Unit)
             runCurrent()
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
 
             // And the download it raced still completes truthfully.
             base.downloadGate.complete(Unit)
             runCurrent()
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloaded)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloaded)
             screen.join()
         }
 
@@ -201,7 +202,7 @@ class RealOfflineModelManagerTest {
             runCurrent()
 
             assertThat(store.committed).containsExactly("fr") // one store call chain
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloaded)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloaded)
         }
 
     @Test
@@ -215,7 +216,7 @@ class RealOfflineModelManagerTest {
             store.downloadGate.complete(Unit)
             runCurrent()
 
-            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloaded)
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloaded)
         }
 
     @Test
@@ -232,9 +233,23 @@ class RealOfflineModelManagerTest {
             manager.download("fr")
             runCurrent()
 
-            val state = manager.modelStates().first()["fr"]
+            val state = manager.stateOf("fr")
             assertThat(state).isInstanceOf(OfflineModelState.Failed::class.java)
         }
 }
 
 private val plentyFree = FakeStorageProbe(free = Long.MAX_VALUE)
+
+/**
+ * The manager's states are HOT since issue #130 rev.3 (U-13): a subscriber is
+ * handed the shared flow's current value, and that is the `emptyMap()` seed
+ * until the first merge lands — so a bare `first()` now reads the seed rather
+ * than the state under test.
+ *
+ * Waiting for a populated map waits for the merge without pinning HOW MANY
+ * emissions precede it, which is the only part of the sequence these ownership
+ * tests were ever about. Every assertion below is the one it made before the
+ * flow changed temperature; only the read is new.
+ */
+private suspend fun OfflineModelManager.stateOf(tag: String): OfflineModelState? =
+    modelStates().first { it.isNotEmpty() }[tag]

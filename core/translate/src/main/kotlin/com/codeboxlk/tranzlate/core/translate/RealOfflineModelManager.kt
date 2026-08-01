@@ -13,17 +13,24 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -120,10 +127,79 @@ class RealOfflineModelManager internal constructor(
      */
     private val activeDeletes = ConcurrentHashMap<String, Job>()
 
-    override fun modelStates(): Flow<Map<String, OfflineModelState>> =
+    /**
+     * ML Kit's translatable-tag list is an SDK constant — `TranslateLanguage
+     * .getAllLanguages()` answers from a static array, never the device — so
+     * reading it ONCE is the whole of its truth. It used to be read inside the
+     * merge, which is once per emission per collector: three screens watching a
+     * single download rebuilt the same ~59-tag set on every row transition, for
+     * a value that cannot change while the process lives.
+     */
+    private val capableTags: Set<String> by lazy { store.capableTags() }
+
+    /** Refresh asks for the worker below; conflated on purpose — see [modelStates]. */
+    private val refreshRequests = Channel<Unit>(Channel.CONFLATED)
+
+    /** How many collectors [modelStates] currently has; 0 means nobody is watching. */
+    private val collectors = AtomicInteger(0)
+
+    /**
+     * The ONE upstream every screen shares (issue #130 rev.3, U-13). Cold, this
+     * flow multiplied by its collectors: the picker alone opens two chains — its
+     * own transient watch and the catalog repository's overlay — so ONE screen
+     * ran the merge twice and paid the ML Kit round-trip twice, and the packs
+     * screen and the text screen each added another.
+     *
+     * `WhileSubscribed(5s)` rather than `Eagerly`: with no screen watching there
+     * is nothing worth merging, and the grace window is long enough that a
+     * rotation or a nav hop does not tear the upstream down and build it again.
+     * The scope is [downloadScope], the process-lifetime scope issues #82/#83
+     * already sanctioned — this adds no second lifetime, which the rev3 ruling
+     * caps at two for the whole app.
+     */
+    private val states: StateFlow<Map<String, OfflineModelState>> =
         combine(downloaded, transient) { down, trans ->
-            mergeModelStates(store.capableTags(), down, trans)
-        }.onStart { refreshDownloaded() }
+            mergeModelStates(capableTags, down, trans)
+        }.stateIn(downloadScope, SharingStarted.WhileSubscribed(SHARED_STATE_IDLE_MILLIS), emptyMap())
+
+    // One worker owns the disk read. Two refreshes can then never be in flight
+    // together, which matters because refreshDownloaded() publishes by
+    // assignment: overlapping reads could land out of order and let an older
+    // answer overwrite a newer one. The channel is conflated, so a request that
+    // arrives while the worker is busy replaces a waiting one instead of
+    // queueing behind it. It runs in downloadScope, so a collector leaving
+    // mid-read cannot cancel the read it asked for.
+    init {
+        downloadScope.launch { refreshRequests.receiveAsFlow().collect { refreshDownloaded() } }
+    }
+
+    /**
+     * The cold face of the hot [states]: subscribing is what asks the disk, so
+     * the answer is fresh when a screen opens without any screen having to ask
+     * for it.
+     *
+     * Only the collector that finds the flow unwatched asks. That count is what
+     * makes a burst cost exactly one read — a bare conflated send would not,
+     * because the worker starts on the first request and everything that
+     * arrives after it starts is a second refresh. The picker's two chains
+     * subscribe together and now share one round-trip between them.
+     *
+     * And when the last collector leaves, the next arrival asks again. That is
+     * the staleness guard the hot flow needs: a `StateFlow` keeps replaying its
+     * final value long after `WhileSubscribed` stopped the upstream, and models
+     * can be deleted from Android's app-storage settings while this app is
+     * backgrounded — so a replayed map is a claim about the disk, not a
+     * reading of it.
+     */
+    override fun modelStates(): Flow<Map<String, OfflineModelState>> =
+        states
+            .onSubscription { if (collectors.getAndIncrement() == 0) refreshRequests.trySend(Unit) }
+            .onCompletion {
+                // Clamped rather than trusted: a counter stuck below zero would
+                // silently retire the staleness guard for the rest of the
+                // process, and an extra read costs one round-trip.
+                if (collectors.decrementAndGet() < 0) collectors.set(0)
+            }
 
     override suspend fun download(languageTag: String) {
         if (!store.isCapable(languageTag)) return
@@ -249,6 +325,15 @@ class RealOfflineModelManager internal constructor(
  * 45.7MB on disk (research E3) — x3 headroom for the store + unzip staging.
  */
 private const val REQUIRED_FREE_BYTES = 150L * 1024 * 1024
+
+/**
+ * How long the shared merge survives its last collector. The same window every
+ * `stateIn` in the app uses, and for the same reason: it has to outlive a
+ * configuration change, which is the only pause a watching screen takes that
+ * is not the user leaving. `internal` so the sharing tests advance virtual time
+ * against the production number instead of a copy of it.
+ */
+internal const val SHARED_STATE_IDLE_MILLIS = 5_000L
 
 private fun Exception.toFailure(): OfflineModelFailure =
     when (this) {
