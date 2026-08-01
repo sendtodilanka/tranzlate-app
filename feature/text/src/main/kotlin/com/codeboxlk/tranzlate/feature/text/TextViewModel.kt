@@ -182,6 +182,16 @@ class TextViewModel
             get() = _uiState.value
             set(value) {
                 _uiState.value = value
+                // Issue #149: the speech engine is a bound service connection,
+                // so it is held for exactly as long as a spoken answer can be on
+                // screen — from the moment one is asked for until the face stops
+                // being a result. Preparing at Translating rather than at Result
+                // is what keeps the first tap warm: the ~500ms engine bind runs
+                // alongside the translation instead of in front of the audio.
+                when (value) {
+                    is TextUiState.Translating, is TextUiState.Result -> speaker.prepare()
+                    else -> speaker.release()
+                }
                 savedStateHandle[KEY_STATE] =
                     when (value) {
                         is TextUiState.Translating -> STATE_TRANSLATING
@@ -241,6 +251,20 @@ class TextViewModel
         // the assignment, leaving a live coroutine nothing could cancel.
         init {
             restoreState()
+        }
+
+        /**
+         * The other end of [ResultSpeaker.prepare] (issue #149). The state
+         * machine gives the engine back on every face that cannot speak, but a
+         * result left on screen when the host goes away would never reach one of
+         * those faces — and a text-to-speech engine held past its consumer keeps
+         * another process pinned at visible-app importance until this process
+         * dies. This is where Google's own guidance puts the release ("call this
+         * method in the onDestroy() method of an Activity").
+         */
+        override fun onCleared() {
+            super.onCleared()
+            speaker.release()
         }
 
         fun onInputChange(value: String) {

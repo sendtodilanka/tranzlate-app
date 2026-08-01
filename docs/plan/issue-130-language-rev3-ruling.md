@@ -159,6 +159,21 @@ DELETE :feature:languagepicker             (move ×2 පසු)
 | Usage store selection-never-stamps test + date-less exclusion | invented-dates dishonesty (brief §7b → R6) |
 | Move PRs logic-frozen + unmodified-tests-green + single-revert isolation | shipped-15a regression during migration (R2) |
 
+> ⚠️ **AMENDED after this ruling was accepted** (2026-08-01, issue #149 · evidence `docs/research/issue-149-tts-lifetime.md`).
+>
+> ඉහත row එකේ **"standing connection ශුන්‍යයි"** rule එක **enumeration** ගැන — එය එසේම standing යි. එහෙත් ඒ wording එක literal ව මුළු app එකටම කියවූ විට **speaker** එකට වැරදි contract එකක් දෙයි, මන්ද utterance එකකට පසු shutdown කිරීම මනින ලද මිලක් ගෙවයි.
+>
+> නිවැරදි unit එක **"process-lifetime"** මිස "standing" නොවේ. එකම rule එක, unit දෙකකට:
+>
+> | surface | consumer | contract |
+> |---|---|---|
+> | `AndroidOfflineVoiceCatalog` (PR-10) | එක ප්‍රශ්නයක් — ඇසුවාට පස්සේ ඉවරයි | construct → ask → **`finally { shutdown() }`** (rev.3 හි ලියූ පරිදිම) |
+> | `AndroidResultSpeaker` (#84 · #149) | result face එක — play/stop toggle + replay | `prepare()` @ Translating → **`release()`** face එක result නොවන හැම මොහොතක ම + `onCleared()` |
+>
+> මනින ලද කරුණු (API 37, `Resizable_Experimental`): engine එකක් bound ව තිබෙන තාක් TTS process එක `oom adj 100` + top-app sched group එකේ රැඳේ — **app එක background එකේ තිබියදීත්** — platform එක කිසිදා එය නොහරියි (`getAutoDisconnectTimeoutMs()` → `PERMANENT_BOUND_TIMEOUT_MS` = 0 = "do not unbind"). ඒ නිසා §7.3 REJECT එක **standing**: process-lifetime hold එකක් තහනම්මයි. එහෙත් rebind එකට ~500ms යයි, fresh engine එකක tap→audio **670ms** vs standing engine එකක **2-8ms** — ඒ නිසා utterance-per-shutdown එකද speaker එකට **REJECT**. දෙකට ම පොදු invariant: **engine එකක් තමන්ගේ consumer ට වඩා වැඩි කල් ජීවත් නොවේ.**
+>
+> Konsist gate: `no class holds a speech engine it cannot give back` (`app/src/test/.../KonsistArchitectureTest.kt`) — `@Singleton` engine holder එකක් හෝ `shutdown()` නැති holder එකක් RED කරයි.
+
 ---
 
 ## 5 · Owner rulings needed (taste / product ONLY — engineering questions මෙහි නෑ)
@@ -200,7 +215,7 @@ DELETE :feature:languagepicker             (move ×2 පසු)
 
 1. **P1 module stance** (picker `feature:text` + `:core:languageui` + rename-only) — surface ගෙවල් 3කට split; string/row-primitive accretion ඒ design එකම P3 shape එකට converge කරයි picker stranded ව; move cost measured-minimal (coupling = `LanguagePickerTarget` + constructor param — §0). 
 2. **P3 `:core:language-ui` ring module** — necessity claim falsified (app-shell hosting covers 19h); module count ↓; product strings core ring එකක නොතබයි.
-3. **P2 process-lifetime TTS engine hold** — enumerate→cache→shutdown adopted; rarely-changing data එකකට standing binder connection = owner leak-weight එකට එරෙහි, audit §1 cache-recompute ප්‍රමාණවත් කියයි.
+3. **P2 process-lifetime TTS engine hold** — enumerate→cache→shutdown adopted; rarely-changing data එකකට standing binder connection = owner leak-weight එකට එරෙහි, audit §1 cache-recompute ප්‍රමාණවත් කියයි. **(2026-08-01 · #149 amendment — §4 බලන්න:** මේ REJECT එක **process-lifetime** hold එකට පමණයි, "engine එකක් කිසිසේත් standing නොවිය යුතුය" කියා නොවේ. Speaker එකට utterance-per-shutdown = මනින ලද 670ms tap→audio — ඒ නිසා එය consumer-lifetime, `docs/research/issue-149-tts-lifetime.md`.**)**
 4. **P3 PR-C names-fix placement** — cross-feature import violation (build.gradle verified §0); fix = PR-7 (same-module).
 5. **P1 DataStore-only usage store** — Room adopted: queryable stale-list (20e), structured migration, දෙවැනි bespoke codec එකක් නෑ; 2-of-3 proposals convergent.
 6. **P1 16a-with-dead-marks sequencing** — 19j = mark tap target drawn (spec 16a/19j); PR-12 එකේම දෙකම.

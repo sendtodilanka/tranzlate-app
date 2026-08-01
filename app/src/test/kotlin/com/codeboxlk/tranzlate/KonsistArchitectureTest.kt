@@ -242,6 +242,53 @@ class KonsistArchitectureTest {
         assertThat(prodContributions).isNotEmpty()
     }
 
+    /**
+     * Issue #149 — a `TextToSpeech` is a bound service connection, and the
+     * platform never takes one back on its own: the system binds the engine for
+     * us and then disables its own auto-unbind
+     * (`TextToSpeechManagerPerUserService.getAutoDisconnectTimeoutMs()` returns
+     * `PERMANENT_BOUND_TIMEOUT_MS`, whose contract is "do not unbind"). Measured
+     * on API 37, launching the app was enough to pin the engine process at
+     * oom_adj 100 in the top-app scheduling group, and backgrounding the app did
+     * not release it — only process death did
+     * (`docs/research/issue-149-tts-lifetime.md`).
+     *
+     * The regressions this makes RED are the two that produced the original bug
+     * and both of which compile with every other test green: a class that keeps
+     * the engine in a property and is scoped `@Singleton` (pinned for the
+     * process), or one with no `shutdown()` anywhere (pinned whatever the scope).
+     *
+     * SOURCE-SHAPE assertion, stated honestly: it cannot prove the release RUNS
+     * — `TextViewModelTest` does that through the seam's fake. What this defends
+     * against is the deletion.
+     */
+    @Test
+    fun `no class holds a speech engine it cannot give back`() {
+        val holders =
+            scope.classes(includeNested = true).filter { klass ->
+                klass.properties().any { code(it.text).contains("TextToSpeech") }
+            }
+        // Vacuous-pass guard: the adapter the rule was written for is in scope.
+        assertThat(holders.map { it.name }).contains("AndroidResultSpeaker")
+
+        val processLifetime =
+            holders.filter { it.hasAnnotationWithName("Singleton") }.map { it.name }
+        assertThat(processLifetime).isEmpty()
+
+        val neverReleased =
+            holders
+                .filter { klass -> klass.functions().none { code(it.text).contains("shutdown()") } }
+                .map { it.name }
+        assertThat(neverReleased).isEmpty()
+    }
+
+    /**
+     * Comments stripped before matching. Found by mutation: deleting the real
+     * `tts.shutdown()` left the gate GREEN, because the comment explaining why
+     * that call needs a guard says `shutdown()` too — the rule was reading prose.
+     */
+    private fun code(text: String) = text.replace(COMMENT, "")
+
     private companion object {
         /**
          * `Theme` is the theme WRAPPER: it renders only whatever content is passed
@@ -255,5 +302,8 @@ class KonsistArchitectureTest {
 
         /** Worktrees nested inside the checkout being scanned; never the checkout itself. */
         const val NESTED_WORKTREES = ".claude/worktrees/"
+
+        /** KDoc, block and line comments — prose that must not satisfy a code rule. */
+        val COMMENT = Regex("""/\*[\s\S]*?\*/|//[^\n]*""")
     }
 }

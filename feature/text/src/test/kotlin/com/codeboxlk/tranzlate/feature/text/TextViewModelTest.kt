@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.feature.text
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelStore
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.EngineAttempt
@@ -72,11 +73,38 @@ class TextViewModelTest {
         var available = true
         var lastLanguage: String? = null
 
+        /**
+         * Issue #149 — the real adapter's [ResultSpeaker.prepare] binds a system
+         * speech service and [ResultSpeaker.release] gives it back, so a fake
+         * that only counted `speak` could not tell a released engine from a
+         * held one. [held] is what the platform actually pays for.
+         */
+        var prepares = 0
+            private set
+        var releases = 0
+            private set
+        var held = false
+            private set
+
+        override fun prepare() {
+            if (held) return // idempotent, like the adapter
+            prepares++
+            held = true
+        }
+
+        override fun release() {
+            if (!held) return
+            releases++
+            held = false
+            state.value = false
+        }
+
         override fun speak(
             text: String,
             languageTag: String,
         ): Boolean {
             if (!available) return false
+            prepare()
             speaks++
             lastLanguage = languageTag
             state.value = true
@@ -362,6 +390,86 @@ class TextViewModelTest {
 
         assertThat(speaker.stops).isEqualTo(1)
         assertThat(vm.speaking.value).isFalse()
+    }
+
+    // ---- issue #149: the speech engine's lifetime ----------------------------
+    // A TextToSpeech is a bound service connection. Measured on API 37
+    // (docs/research/issue-149-tts-lifetime.md): while one is held, the engine
+    // process sits at oom_adj 100 in the top-app scheduling group and the
+    // platform never takes it back on its own. These four pin WHEN we hold one.
+
+    @Test
+    fun `no speech engine is held until an answer is on its way`() {
+        val speaker = FakeResultSpeaker()
+        val vm = viewModel(speaker = speaker)
+        settle()
+
+        // The regression this defends: the adapter used to build its engine in a
+        // field initializer of a @Singleton, so reaching Home — typing nothing,
+        // translating nothing — was already enough to pin the TTS process.
+        assertThat(speaker.prepares).isEqualTo(0)
+        assertThat(speaker.held).isFalse()
+
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        settle()
+
+        assertThat(speaker.held).isTrue()
+    }
+
+    @Test
+    fun `the engine is given back when the composer is left`() {
+        val speaker = FakeResultSpeaker()
+        val vm = viewModel(speaker = speaker)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        settle()
+        assertThat(speaker.held).isTrue()
+
+        vm.onComposerDismissed()
+        settle()
+
+        assertThat(speaker.releases).isEqualTo(1)
+        assertThat(speaker.held).isFalse()
+    }
+
+    @Test
+    fun `a failed translation holds no engine - there is nothing to read`() {
+        val speaker = FakeResultSpeaker()
+        val vm =
+            viewModel(
+                translator = FakeTranslator().apply { forcedFailure = AttemptCause.OFFLINE },
+                speaker = speaker,
+            )
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        settle()
+
+        assertThat(vm.uiState.value).isInstanceOf(TextUiState.Error::class.java)
+        assertThat(speaker.held).isFalse()
+    }
+
+    @Test
+    fun `the engine is given back when the host goes away`() {
+        val speaker = FakeResultSpeaker()
+        val vm = viewModel(speaker = speaker)
+        settle()
+        vm.onInputChange("Good morning")
+        vm.onTranslate()
+        settle()
+        assertThat(speaker.held).isTrue()
+
+        // A result left on screen never reaches a face that releases, so the
+        // host's own end has to. onCleared is protected — a ViewModelStore is
+        // how the platform reaches it, and how this test does.
+        val store = ViewModelStore()
+        store.put("text", vm)
+        store.clear()
+
+        assertThat(speaker.releases).isEqualTo(1)
+        assertThat(speaker.held).isFalse()
     }
 
     // ---- issue #68: tap-to-reopen + star-to-save -----------------------------
