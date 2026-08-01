@@ -280,9 +280,18 @@ class KonsistArchitectureTest {
      */
     @Test
     fun `no class holds a speech engine it cannot give back`() {
+        // PRODUCTION sources only. The rule is about what the running app holds,
+        // and `app/src/androidTest/.../TtsEngineLifetimeProbe.kt` deliberately
+        // constructs engines and shuts them down bare — measuring the rebind
+        // cost IS its job, and wrapping it in the production guards would
+        // measure the guards. CI caught this and my local run did not, which is
+        // its own finding (#163); CI is the truth here, as it has been twice
+        // before in this repo.
         val holders =
             scope.classes(includeNested = true).filter { klass ->
-                klass.properties().any { code(it.text).contains(ENGINE_TYPE) }
+                val path = klass.containingFile.path.replace('\\', '/')
+                val production = "/src/test/" !in path && "/src/androidTest" !in path
+                production && klass.properties().any { code(it.text).contains(ENGINE_TYPE) }
             }
         // Vacuous-pass guard: the adapter the rule was written for is in scope.
         assertThat(holders.map { it.name }).contains("AndroidResultSpeaker")
