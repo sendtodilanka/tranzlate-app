@@ -62,17 +62,37 @@ class FakeTranslationRepository(
         val normalized = translation.copy(sourceText = normalize(translation.sourceText))
         // Mirror Room's IGNORE + unique C-8 index (issue #53 A9): a duplicate
         // tuple loses the race and reports -1, exactly like the real DAO.
-        val duplicate =
-            store.value.any {
-                it.sourceText == normalized.sourceText &&
-                    it.sourceLang == normalized.sourceLang &&
-                    it.targetLang == normalized.targetLang &&
-                    it.engine == normalized.engine
-            }
-        if (duplicate) return -1L
+        if (store.value.any { sameTuple(it, normalized) }) return -1L
         val id = nextId++
         store.value = store.value + normalized.copy(id = id)
         return id
+    }
+
+    /**
+     * Mirrors [TranslationRepositoryImpl.restore][com.codeboxlk.tranzlate.core.data.repository]:
+     * merge onto the occupant of the C-8 tuple, insert only when it is free. Same
+     * rule as the DAO's `mergeIntoTuple` — the star is OR'd (never cleared in
+     * either direction) and the earlier `created_at` wins.
+     */
+    override suspend fun restore(translation: Translation) {
+        check(!failWrites) { "FakeTranslationRepository.failWrites is set" }
+        val normalized = translation.copy(sourceText = normalize(translation.sourceText))
+        val occupant = store.value.firstOrNull { sameTuple(it, normalized) }
+        if (occupant == null) {
+            save(normalized)
+            return
+        }
+        store.value =
+            store.value.map { row ->
+                if (row.id != occupant.id) {
+                    row
+                } else {
+                    row.copy(
+                        favourite = row.favourite || normalized.favourite,
+                        createdAt = minOf(row.createdAt, normalized.createdAt),
+                    )
+                }
+            }
     }
 
     override suspend fun delete(id: Long) {
@@ -87,4 +107,14 @@ class FakeTranslationRepository(
     }
 
     private fun normalize(raw: String): String = raw.trim().replace(Regex("\\s+"), " ")
+
+    /** The C-8 key the unique index enforces — both source texts already normalized. */
+    private fun sameTuple(
+        row: Translation,
+        other: Translation,
+    ): Boolean =
+        row.sourceText == other.sourceText &&
+            row.sourceLang == other.sourceLang &&
+            row.targetLang == other.targetLang &&
+            row.engine == other.engine
 }
