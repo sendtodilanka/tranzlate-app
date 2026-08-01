@@ -40,7 +40,7 @@ first tells you what to see.
 
 ## The four standing questions — ask all of them, every time
 
-They live in **`CLAUDE.md` rule 10**, and only there. Read it before you start:
+They live in **`CLAUDE.md` rule 11**, and only there. Read it before you start:
 **enumerate · reproduce · mutate · verify-the-documents**, each with the shipped
 defect that put it on the list. This file used to restate them, so did
 `.claude/skills/land-pr/SKILL.md`, and the three copies had begun to drift.

@@ -74,14 +74,14 @@ then rebase the rest onto the new tip. Sibling branches built in parallel are
 exactly the shape that produced both incidents; parallelism belongs in the
 BUILD phase, not the merge phase.
 
-## What a co-verify lens must ask, every time (rule 10)
+## What a co-verify lens must ask, every time (rule 11)
 
 The four standing questions — **enumerate · reproduce · mutate ·
-verify-the-documents** — live in `CLAUDE.md` rule 10, each with the shipped
+verify-the-documents** — live in `CLAUDE.md` rule 11, each with the shipped
 defect that put it on the list. They are deliberately not restated here: this
 file, `CLAUDE.md` and `.claude/agents/co-verify-lens.md` each carried a copy and
 the three had already begun to drift. Run the lens as the `co-verify-lens`
-agent, which reads rule 10 itself and pins a cross-model default.
+agent, which reads rule 11 itself and pins a cross-model default.
 
 ## What the guard will not catch
 

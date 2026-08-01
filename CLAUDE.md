@@ -26,7 +26,9 @@ The ground-up rebuild of the **Tranzlate** Android translator. Kotlin · Jetpack
 **8. The git guard rails are MANDATORY — never bypass, never disable (BLOCKING).** `.claude/hooks/guard-git.sh` (wired in `.claude/settings.json`) denies three acts, and the `/land-pr` skill carries the procedure it protects. **Landing any PR goes through `/land-pr`.** The guard exists because `main` was lost to the SAME accident twice — PR #108, then PRs #132/#134: sibling branches, each green alone, merged off a base older than the tip, so no CI run could ever see the combination. The rule was already written in the checklist when the second one happened; writing a rule down is not enforcing it. If a hook fires, **fix the cause** — a hook edited, skipped, or worked around is a rule violation, not a shortcut. It fails OPEN by design (no `gh`, no network, unparseable command → allow), so a denial is always a real finding.
 
 
-**9. Write so the OWNER can understand it (BLOCKING).** Dilanka does not write code. The old rule said "Sinhala prose ≥70%", and every reply passed it while he understood none of them — a sentence like *"classifier එක PR body එකේ 'tracker' හොයනවා, substring match එකක් නිසා `#60` satisfied වෙනවා hex colour එකකින්"* is 75% Sinhala letters and 0% meaning to him. **The percentage was a proxy and I optimised the proxy.**
+**9. Write so the OWNER can understand it (BLOCKING).** Dilanka does not write code. The old rule said "Sinhala prose ≥70%", and I reported every reply as passing it while he understood none of them. A sentence from that day: *"Classifier එක PR body එකේ 'tracker' හොයනවා, ඒ නිසා #165 එකට තමන්ගේම hook එකෙන් merge වෙන්න බෑ — substring match එකක් නිසා `#60` satisfied වෙනවා hex colour එකකින්."* — **0% meaning to him.**
+
+**And it never passed.** Measured (#170 co-verify): 27.5% of characters are Sinhala, 26.7% of letters, 53.3% of UTF-8 bytes — the most generous reading is still short of 70. The rule was not a bad proxy that I optimised. **It was a proxy I never computed, and asserted compliance with anyway** — a rule 10 violation about the rule that was supposed to be governing me. The figure "75%" stood in this file until #170; it had never been computed either.
 
 The requirement is comprehension, not script:
 - **Lead with what it means for the app or for him**, not with the mechanism. "Downloads could start on mobile data without asking" — not "the consent gate's metered check".
@@ -96,7 +98,7 @@ The whole app's behaviour must equal the **Google Translate** Android app. Tranz
 Feature branch → PR to `main`. A Claude push-guard blocks direct pushes to `main` (feature-branch pushes are fine). Commit/push only when asked.
 
 ## Project rules (`.claude/memory/`)
-- **Replies ≥70% Sinhala script** (English only for code / paths / commands / symbol names / acronyms).
+- **Write so the owner can understand it** — rule 9 above is the statement of it. This line used to restate it as "replies ≥70% Sinhala script"; that percentage is the retired proxy, and a rule restated in two places is a rule that drifts (see rule 11).
 - **No speculation** — every claim needs a source or a disconfirmation experiment, else say "verified data නෑ".
 - **Terminal `./gradlew`** needs `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"` (Java 21; no standalone JDK on this machine).
 

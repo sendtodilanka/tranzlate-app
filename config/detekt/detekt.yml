@@ -28,7 +28,7 @@ style:
   UnusedPrivateMember:
     # Preview functions are entry points for Android Studio / screenshot tooling,
     # not dead code — the project convention REQUIRES a @PreviewLightDark per
-    # public composable (.claude/memory compose-preview convention).
+    # public composable (CLAUDE.md rule 7).
     ignoreAnnotated: ['Preview', 'PreviewLightDark']
   MaxLineLength:
     maxLineLength: 140

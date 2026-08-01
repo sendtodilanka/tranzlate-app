@@ -16,7 +16,7 @@ The ground-up rebuild of the Tranzlate Android translator. **No app code yet —
 | `docs/specs/01-text-translation.md` | First feature spec (template) |
 | `docs/specs/02-…` | Engines + language management |
 | `docs/BUILD_ROADMAP.md` | Build order + MVP + strategy |
-| `.claude/memory/` | Project rules (Sinhala, no-speculation, JAVA_HOME) |
+| `.claude/memory/` | Older project rules — superseded by `CLAUDE.md` where they disagree |
 
 ## References (not in this repo)
 - **Old app** (read-only reference — study behaviour, **never copy code**): `github.com/sendtodilanka/Tranzlate`
