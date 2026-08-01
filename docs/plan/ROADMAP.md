@@ -93,6 +93,9 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   three failure messages, **both live**, one call site each. Six keys × three
   locales for three messages. Best done in Wave 5 with PR-23, or earlier — the
   two screens already share one `DownloadGate` after PR-9.
+- ⬜ **#178** `guard-pr.sh` failed CLOSED on any body it could not read from the
+  command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
+  fail-open contract and denying compliant PRs. **PR #182**, ten mutations.
 - ⬜ **#173** (rows for #173/#174/#175 added by **PR #176**) `verifyStringKeyDocs` has two coverage holes: module discovery is
   a hardcoded path shape a new ring escapes silently, and the reverse direction
   is #152's own unimplemented second ask. Follows #172.
