@@ -25,6 +25,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # C-3 says STRINGS_*.md is the only string-key authority, and until #152 nothing
+      # checked it: PR-6 shipped `cd_lang_back` into three locales and no catalogue with
+      # every gate green. `check` already depends on this task, so `./gradlew build` below
+      # would catch it too — it runs first and by name so the failure is legible in one
+      # minute instead of twenty, and so a future change to `build` cannot silently drop it.
+      - name: "Guard: every shipped string key is in a STRINGS_*.md catalogue (C-3, #152)"
+        run: ./gradlew verifyStringKeyDocs
+
       - name: Build (all variants, unit tests, lint)
         run: ./gradlew build
 

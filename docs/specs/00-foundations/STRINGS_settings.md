@@ -51,9 +51,32 @@ than a blanket lint suppression.
 | `tt_settings_theme_dark` | Dark radio row |
 | `tt_settings_dynamic_color` | dynamic-colour switch |
 
-## 5. NEEDS-TRANSLATION queue (C-12)
+## 5. Data & Downloads sections (added 2026-08-01, issue #152 — C-3 "missing keys get ADDED to STRINGS")
 
-All nine display strings + the CD strings above need `fil` and `pt-rBR`. Filed, not guessed. Until a
-translator provides them, `values-fil/` and `values-pt-rBR/` carry only the keys that already existed;
-the new Settings keys fall back to `en` and are marked with a per-string `tools:ignore` note in the
-default file rather than a blanket suppression.
+These six keys shipped into `feature/settings/src/main/res/values/strings.xml` without a row here.
+Nothing caught it, because until issue #152 nothing checked C-3 at all; `verifyStringKeyDocs` now
+does. `en` values are transcribed **verbatim from the shipped resource**, not re-authored.
+
+| Key | Status | Type | `en` | Args | Notes |
+|-----|--------|------|------|------|-------|
+| `settings_data_header` | SHIPPED | string | `Your data` | — | section header, matching the `Appearance` header style |
+| `settings_history_label` | SHIPPED | string | `History & saved` | — | row title — one row for both lists, because they are one store |
+| `settings_history_supporting` | SHIPPED | string | `Every translation, and the ones you starred` | — | supporting line; says what the row contains rather than what it does |
+| `settings_downloads_header` | SHIPPED | string | `Downloads` | — | section header above the offline-language controls |
+| `settings_mobile_data_label` | SHIPPED | string | `Always allow mobile data` | — | switch row title. "Always allow" is deliberate: OFF is the safe default, and the switch grants standing permission rather than turning a feature on |
+| `settings_mobile_data_supporting` | SHIPPED | string | `Language packs are about 30 MB each. When off, you're asked before mobile data is used` | — | states the cost **and** the off-state behaviour, so nobody has to discover by being charged. ⚠ `about 30 MB` is the same unmeasured approximation as `offline_subtitle` in `STRINGS_language.md` — both need one real number |
+
+> `settings_history_label` renders `&` as `&amp;` in the resource; the row above shows the value as
+> the user sees it.
+
+## 6. NEEDS-TRANSLATION queue (C-12)
+
+All nine display strings + the CD strings above need `fil` and `pt-rBR`. Filed, not guessed.
+
+> **Corrected 2026-08-01 (#152).** The paragraph that stood here described a state the module left
+> behind: it said `values-fil/` and `values-pt-rBR/` carried only pre-existing keys, that the new
+> Settings keys fell back to `en`, and that a per-string `tools:ignore` note guarded them. None of
+> that is true today — all sixteen keys are present in all three locale files (verified by count),
+> and there is no `tools:ignore` anywhere in `feature/settings/src/main/res/`. What is still open
+> is narrower and worth stating plainly: the `fil` and `pt-rBR` wordings were authored in-project,
+> not by a native speaker, so they are queued for review rather than missing.

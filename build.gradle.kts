@@ -13,6 +13,8 @@ plugins {
     alias(libs.plugins.google.services) apply false
     alias(libs.plugins.detekt)
     alias(libs.plugins.spotless)
+    // Whole-repo C-3 gate: a shipped string key with no STRINGS_*.md row fails the build.
+    id("tranzlate.string-key-docs")
 }
 
 // ---- Quality gates (whole-repo, single home) ----------------------------------------------------
