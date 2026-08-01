@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import com.codeboxlk.tranzlate.core.database.LanguageDao
 import com.codeboxlk.tranzlate.core.database.LanguageEntity
 import com.codeboxlk.tranzlate.core.datastore.TranzlatePreferencesDataSource
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
@@ -118,7 +119,7 @@ class LanguageRepositoryImplTest {
             val dao = FakeLanguageDao()
             val repository = repository(dao = dao)
 
-            repository.setLastUsed("iw", atMillis = 42L)
+            repository.setLastUsed("iw", LanguageRole.SOURCE, atMillis = 42L)
 
             assertThat(dao.lastUsedWrites).containsExactly("he" to 42L)
         }
@@ -134,7 +135,7 @@ class LanguageRepositoryImplTest {
             val dao = FakeLanguageDao()
             val repository = repository(dao = dao)
 
-            repository.setLastUsed("zzz", atMillis = 7L)
+            repository.setLastUsed("zzz", LanguageRole.TARGET, atMillis = 7L)
 
             assertThat(dao.lastUsedWrites).containsExactly("zzz" to 7L)
         }
@@ -154,7 +155,7 @@ class LanguageRepositoryImplTest {
         runTest {
             val repository = repository()
 
-            repository.setLastUsed("fr", atMillis = 1_234L)
+            repository.setLastUsed("fr", LanguageRole.TARGET, atMillis = 1_234L)
             // `drop(1)` is the contract, not a workaround — identical to the
             // model-state overlay above. The first emission is the deliberate
             // paint that does not wait on DataStore; recents land on the next.
@@ -170,7 +171,7 @@ class LanguageRepositoryImplTest {
             val dao = FakeLanguageDao()
             val repository = repository(dao = dao)
 
-            repository.setLastUsed("es", atMillis = 99L)
+            repository.setLastUsed("es", LanguageRole.TARGET, atMillis = 99L)
 
             // The table is empty, so the DAO update matched nothing — and the
             // recent is still readable. That is the regression this guards.
@@ -191,7 +192,7 @@ class LanguageRepositoryImplTest {
         runTest {
             val repository = repository()
 
-            repository.setLastUsed("iw", atMillis = 5L)
+            repository.setLastUsed("iw", LanguageRole.SOURCE, atMillis = 5L)
 
             assertThat(
                 repository
@@ -203,6 +204,48 @@ class LanguageRepositoryImplTest {
             ).isEqualTo(5L)
         }
 
+    /**
+     * Behaviour-preservation for the shipped 15a picker (issue #130 rev.3): the
+     * role split happens in the STORE; the overlay this screen reads stays the
+     * union of both sides, newest per id, exactly as before the split.
+     */
+    @Test
+    fun `source and target picks meet in the one merged overlay`() =
+        runTest {
+            val repository = repository()
+
+            repository.setLastUsed("en", LanguageRole.SOURCE, atMillis = 10L)
+            repository.setLastUsed("fr", LanguageRole.TARGET, atMillis = 20L)
+            repository.setLastUsed("en", LanguageRole.TARGET, atMillis = 30L) // newest en wins
+
+            val overlaid =
+                repository
+                    .languages()
+                    .drop(1)
+                    .first()
+                    .filter { it.lastUsedAt != null }
+                    .associate { it.id to it.lastUsedAt }
+            assertThat(overlaid).containsExactly("en", 30L, "fr", 20L)
+        }
+
+    /**
+     * Ruling R6's disconfirming gate at the selection end: a pick writes
+     * RECENTS, never translation-usage. The proof is structural — this class
+     * cannot reach the usage store it does not depend on — and this pins that
+     * structure so wiring `LanguageUsageRepository`/`LanguageUsageDao` into the
+     * catalog repository fails a named test instead of slipping through review.
+     */
+    @Test
+    fun `R6 - the selection path has no route to the translation-usage store`() {
+        val dependencyTypes =
+            LanguageRepositoryImpl::class.java.constructors
+                .flatMap { it.parameterTypes.toList() }
+                .map { it.name }
+
+        assertThat(dependencyTypes).isNotEmpty()
+        dependencyTypes.forEach { assertThat(it).doesNotContain("LanguageUsage") }
+    }
+
     /** Unbounded growth would put every language the user ever touched in one preference. */
     @Test
     fun `the recents store keeps only the newest entries`() =
@@ -211,7 +254,9 @@ class LanguageRepositoryImplTest {
             val repository = repository(store = store)
             val ids = BundledLanguageCatalog.all.take(TranzlatePreferencesDataSource.RECENT_STORE_LIMIT + 3)
 
-            ids.forEachIndexed { index, language -> repository.setLastUsed(language.id, atMillis = index.toLong()) }
+            ids.forEachIndexed { index, language ->
+                repository.setLastUsed(language.id, LanguageRole.SOURCE, atMillis = index.toLong())
+            }
             val remembered =
                 repository
                     .languages()

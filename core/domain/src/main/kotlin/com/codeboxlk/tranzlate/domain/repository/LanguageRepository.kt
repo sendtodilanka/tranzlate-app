@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.domain.repository
 
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -11,8 +12,15 @@ import kotlinx.coroutines.flow.Flow
 interface LanguageRepository {
     fun languages(): Flow<List<Language>>
 
+    /**
+     * Stamps a picker CHOICE for the Recent section, per [role] since issue
+     * #130 rev.3 (16a shows source-recents and target-recents separately).
+     * Selection only — actual translate USE is [LanguageUsageRepository]'s
+     * job, and this method must never write there (ruling R6).
+     */
     suspend fun setLastUsed(
         languageId: String,
+        role: LanguageRole,
         atMillis: Long,
     )
 }

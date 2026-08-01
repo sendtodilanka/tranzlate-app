@@ -5,11 +5,13 @@ import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.EngineAttempt
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.model.TranslationOutcome
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
+import com.codeboxlk.tranzlate.core.testing.FakeLanguageUsageRepository
 import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
 import com.codeboxlk.tranzlate.core.testing.FakeTranslationRepository
 import com.codeboxlk.tranzlate.core.testing.FakeTranslator
@@ -22,7 +24,9 @@ import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
 import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -118,6 +122,7 @@ class TextViewModelTest {
 
         override suspend fun setLastUsed(
             languageId: String,
+            role: LanguageRole,
             atMillis: Long,
         ) = Unit
 
@@ -149,7 +154,9 @@ class TextViewModelTest {
                 usage,
                 RecordingAdsCoordinator(),
                 repository,
+                FakeLanguageUsageRepository(),
                 clock,
+                CoroutineScope(SupervisorJob() + dispatcher),
             )
         return TextViewModel(
             translateText = useCase,

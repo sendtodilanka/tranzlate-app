@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.core.testing
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Entitlement
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.model.Translation
@@ -12,10 +13,15 @@ import com.codeboxlk.tranzlate.domain.translate.TranslateTextUseCase
 import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -23,7 +29,8 @@ import org.junit.Test
 /**
  * Proves the single ask-flow encoding (plan §2): Access check → translate →
  * Usage +1 on success only (metered only, C-10/D-2) → history write (issue #11
- * Recents, best-effort) → Ads ask.
+ * Recents, best-effort) → language-usage stamp (issue #122, success-only R6) →
+ * Ads ask.
  */
 class TranslateTextUseCaseTest {
     private class RecordingAdsCoordinator : AdsCoordinator {
@@ -34,13 +41,24 @@ class TranslateTextUseCaseTest {
         }
     }
 
-    private fun useCase(
+    /**
+     * Extension on [TestScope]: the stamper is fire-and-forget on an
+     * application-lifetime scope, and this stands one up on the TEST scheduler
+     * so `advanceUntilIdle` deterministically flushes the stamp. NOT
+     * `backgroundScope`: its jobs only run while the test body is suspended,
+     * so a launch fired inside `invoke` stays queued through every assertion —
+     * verified empirically before landing here.
+     */
+    private fun TestScope.stamperScope() = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+
+    private fun TestScope.useCase(
         translator: FakeTranslator = FakeTranslator(),
         usage: FakeUsagePolicy = FakeUsagePolicy(left = 5),
         ads: RecordingAdsCoordinator = RecordingAdsCoordinator(),
         repository: FakeTranslationRepository = FakeTranslationRepository(),
         access: FakeFeatureAccess = FakeFeatureAccess(),
-    ) = TranslateTextUseCase(translator, access, usage, ads, repository, FakeClock())
+        languageUsage: FakeLanguageUsageRepository = FakeLanguageUsageRepository(),
+    ) = TranslateTextUseCase(translator, access, usage, ads, repository, languageUsage, FakeClock(), stamperScope())
 
     @Test
     fun `G11 metered ask at limit short-circuits to LimitReached without engine call`() =
@@ -213,7 +231,9 @@ class TranslateTextUseCaseTest {
                     usage,
                     RecordingAdsCoordinator(),
                     FakeTranslationRepository(),
+                    FakeLanguageUsageRepository(),
                     FakeClock(),
+                    stamperScope(),
                 )
 
             val job = launch { uc.invoke("Good morning", "en", "fr", ModeId.NLP35) }
@@ -372,5 +392,162 @@ class TranslateTextUseCaseTest {
             assertThat(repository.save(row)).isGreaterThan(0L)
             assertThat(repository.save(row.copy(createdAt = 9L))).isEqualTo(-1L) // IGNORE semantics
             assertThat(repository.saved).hasSize(1)
+        }
+
+    // ---- issue #122 R6: language-usage stamps on translation success ONLY ----
+
+    @Test
+    fun `success stamps resolved source as SOURCE and target as TARGET`() =
+        runTest {
+            val languageUsage = FakeLanguageUsageRepository()
+
+            useCase(languageUsage = languageUsage).invoke("Good morning", "en", "fr", ModeId.ML2_MINI) // G1
+            advanceUntilIdle() // the stamp is fire-and-forget; flush the app scope
+
+            assertThat(languageUsage.stamps).containsExactly(
+                FakeLanguageUsageRepository.Stamp("en", LanguageRole.SOURCE, FakeClock().nowMillis()),
+                FakeLanguageUsageRepository.Stamp("fr", LanguageRole.TARGET, FakeClock().nowMillis()),
+            )
+        }
+
+    /** The ruling records WHY: an online-served use still proves the user uses that language. */
+    @Test
+    fun `any engine's success stamps - online engines included`() =
+        runTest {
+            val languageUsage = FakeLanguageUsageRepository()
+
+            useCase(languageUsage = languageUsage).invoke("Good morning", "en", "fr", ModeId.NLP35) // G3
+            advanceUntilIdle()
+
+            assertThat(languageUsage.stamps.map { it.languageId to it.role })
+                .containsExactly("en" to LanguageRole.SOURCE, "fr" to LanguageRole.TARGET)
+        }
+
+    @Test
+    fun `failure stamps nothing`() =
+        runTest {
+            val translator = FakeTranslator().apply { forcedFailure = AttemptCause.OFFLINE }
+            val languageUsage = FakeLanguageUsageRepository()
+
+            useCase(translator, languageUsage = languageUsage).invoke("Offline test", "en", "fr", ModeId.ML2_ONLINE)
+            advanceUntilIdle()
+
+            assertThat(languageUsage.stamps).isEmpty()
+        }
+
+    @Test
+    fun `at-limit and access-denied short-circuits stamp nothing`() =
+        runTest {
+            val languageUsage = FakeLanguageUsageRepository()
+            val atLimit = FakeUsagePolicy(left = 0)
+            val denied = FakeFeatureAccess().apply { engineAllowed = false }
+
+            useCase(usage = atLimit, languageUsage = languageUsage).invoke("Quota text", "en", "fr", ModeId.NLP35)
+            useCase(access = denied, languageUsage = languageUsage).invoke("Good morning", "en", "fr", ModeId.NLP35)
+            advanceUntilIdle()
+
+            assertThat(languageUsage.stamps).isEmpty()
+        }
+
+    @Test
+    fun `auto-detect stamps the RESOLVED source id, never the sentinel`() =
+        runTest {
+            val languageUsage = FakeLanguageUsageRepository()
+
+            useCase(languageUsage = languageUsage).invoke("Good morning", "auto", "fr", ModeId.AUTO) // G7 detect→en
+            advanceUntilIdle()
+
+            assertThat(languageUsage.stamps.map { it.languageId to it.role })
+                .containsExactly("en" to LanguageRole.SOURCE, "fr" to LanguageRole.TARGET)
+            assertThat(languageUsage.stamps.map { it.languageId }).doesNotContain("auto")
+        }
+
+    /** An auto success WITHOUT detect metadata has no resolved source — only the target is proven. */
+    @Test
+    fun `undetected auto success stamps the target only`() =
+        runTest {
+            val undetected =
+                FakeTranslator(
+                    golden =
+                        mapOf(
+                            FakeTranslator.GoldenKey("Good morning", "auto", "fr", ModeId.AUTO) to
+                                TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
+                        ),
+                )
+            val languageUsage = FakeLanguageUsageRepository()
+
+            useCase(translator = undetected, languageUsage = languageUsage)
+                .invoke("Good morning", "auto", "fr", ModeId.AUTO)
+            advanceUntilIdle()
+
+            assertThat(languageUsage.stamps.map { it.languageId to it.role })
+                .containsExactly("fr" to LanguageRole.TARGET)
+        }
+
+    /**
+     * A cache-served answer is still a USE of both languages — a pack the user
+     * exercises daily must never look months stale in Manage packs just
+     * because the C-8 cache keeps answering for it (the ruling's own
+     * nudge-to-delete-an-active-pack rationale).
+     */
+    @Test
+    fun `a cache hit stamps both roles too`() =
+        runTest {
+            val languageUsage = FakeLanguageUsageRepository()
+            val repository = FakeTranslationRepository()
+            repository.save(
+                Translation(
+                    sourceLang = "en",
+                    sourceText = "Good morning",
+                    targetLang = "fr",
+                    targetText = "Bonjour (fake)",
+                    engine = Engine.OFFLINE_MLKIT,
+                    createdAt = 1L,
+                ),
+            )
+
+            val outcome =
+                useCase(repository = repository, languageUsage = languageUsage)
+                    .invoke("Good morning", "en", "fr", ModeId.AUTO)
+            advanceUntilIdle()
+
+            assertThat((outcome as TranslationOutcome.Success).fromCache).isTrue()
+            assertThat(languageUsage.stamps.map { it.languageId to it.role })
+                .containsExactly("en" to LanguageRole.SOURCE, "fr" to LanguageRole.TARGET)
+        }
+
+    /** The stamp is fire-and-forget: a dying usage store must cost the stamp, never the translation. */
+    @Test
+    fun `a failed stamp never fails the translation`() =
+        runTest {
+            val languageUsage = FakeLanguageUsageRepository(failStamps = true)
+            val ads = RecordingAdsCoordinator()
+
+            val outcome =
+                useCase(ads = ads, languageUsage = languageUsage)
+                    .invoke("Good morning", "en", "fr", ModeId.ML2_MINI)
+            advanceUntilIdle() // the launched stamp fails HERE, after the outcome returned
+
+            assertThat(outcome).isEqualTo(
+                TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
+            )
+            assertThat(ads.completedCount).isEqualTo(1) // flow continued past the failed stamp
+            assertThat(languageUsage.stamps).isEmpty()
+        }
+
+    /** The outcome must not WAIT on the stamp: it returns before the app scope ever runs. */
+    @Test
+    fun `the stamp is off the critical path - success returns before the stamp lands`() =
+        runTest {
+            val languageUsage = FakeLanguageUsageRepository()
+
+            val outcome = useCase(languageUsage = languageUsage).invoke("Good morning", "en", "fr", ModeId.ML2_MINI)
+
+            // No scheduler flush yet: the user already has the translation…
+            assertThat(outcome).isInstanceOf(TranslationOutcome.Success::class.java)
+            assertThat(languageUsage.stamps).isEmpty()
+            // …and the stamp lands when the background scope gets its turn.
+            advanceUntilIdle()
+            assertThat(languageUsage.stamps).hasSize(2)
         }
 }

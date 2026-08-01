@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate.feature.text
 
 import app.cash.turbine.test
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
@@ -39,15 +40,16 @@ class LanguagePickerViewModelTest {
                     Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
                 ),
             )
-        val lastUsed = mutableListOf<Pair<String, Long>>()
+        val lastUsed = mutableListOf<Triple<String, LanguageRole, Long>>()
 
         override fun languages(): Flow<List<Language>> = catalog
 
         override suspend fun setLastUsed(
             languageId: String,
+            role: LanguageRole,
             atMillis: Long,
         ) {
-            lastUsed += languageId to atMillis
+            lastUsed += Triple(languageId, role, atMillis)
         }
     }
 
@@ -129,21 +131,49 @@ class LanguagePickerViewModelTest {
         }
 
     @Test
-    fun `picking a language stamps it as last used`() =
+    fun `picking a language stamps it as last used under the picked role`() =
         runTest(dispatcher) {
-            viewModel().onLanguagePicked("fr")
+            viewModel().onLanguagePicked("fr", LanguageRole.TARGET)
             runCurrent()
-            assertThat(repository.lastUsed).containsExactly("fr" to clock.nowMillis())
+            assertThat(repository.lastUsed)
+                .containsExactly(Triple("fr", LanguageRole.TARGET, clock.nowMillis()))
+        }
+
+    @Test
+    fun `a source-side pick carries the SOURCE role`() =
+        runTest(dispatcher) {
+            viewModel().onLanguagePicked("en", LanguageRole.SOURCE)
+            runCurrent()
+            assertThat(repository.lastUsed)
+                .containsExactly(Triple("en", LanguageRole.SOURCE, clock.nowMillis()))
         }
 
     /** "auto" is a Translator sentinel, not a catalog row — stamping it would write a ghost. */
     @Test
     fun `picking Detect language stamps nothing`() =
         runTest(dispatcher) {
-            viewModel().onLanguagePicked(DETECT_LANGUAGE_ID)
+            viewModel().onLanguagePicked(DETECT_LANGUAGE_ID, LanguageRole.SOURCE)
             runCurrent()
             assertThat(repository.lastUsed).isEmpty()
         }
+
+    /**
+     * Ruling R6's disconfirming gate at the selection end: a pick writes
+     * RECENTS, never translation-usage. The strongest proof is structural —
+     * the ViewModel cannot reach the usage store it does not depend on — and
+     * this pins that structure so wiring `LanguageUsageRepository` into the
+     * picker fails a named test instead of slipping through review.
+     */
+    @Test
+    fun `R6 - the picker has no path to the translation-usage store`() {
+        val dependencyTypes =
+            LanguagePickerViewModel::class.java.constructors
+                .flatMap { it.parameterTypes.toList() }
+                .map { it.name }
+
+        assertThat(dependencyTypes).isNotEmpty()
+        dependencyTypes.forEach { assertThat(it).doesNotContain("LanguageUsage") }
+    }
 
     // ---- issue #90 consent gate, re-honoured on picker rows ------------------
 

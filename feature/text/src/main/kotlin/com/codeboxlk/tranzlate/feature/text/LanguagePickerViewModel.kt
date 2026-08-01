@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
@@ -73,12 +74,16 @@ class LanguagePickerViewModel
         val pendingConsent: StateFlow<String?> = _pendingConsent.asStateFlow()
 
         /**
-         * Records the pick so the language can surface under Recent next time.
-         * The "auto" sentinel is not a catalog row, so it is never stamped.
+         * Records the pick so the language can surface under Recent next time —
+         * under the side being picked for, since #130 rev.3 split recents per
+         * role. The "auto" sentinel is not a catalog row, so it is never stamped.
          */
-        fun onLanguagePicked(id: String) {
+        fun onLanguagePicked(
+            id: String,
+            role: LanguageRole,
+        ) {
             if (id == DETECT_LANGUAGE_ID) return
-            viewModelScope.launch { languageRepository.setLastUsed(id, clock.nowMillis()) }
+            viewModelScope.launch { languageRepository.setLastUsed(id, role, clock.nowMillis()) }
         }
 
         /** Row ⬇ / ↻. Metered + no standing consent → ask first, download never starts. */

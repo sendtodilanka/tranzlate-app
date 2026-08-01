@@ -57,7 +57,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR-2 | Screen B forever-Loading guard (`onStart emptyMap` on the VM combine) | — | ✅ #132, 2026-08-01 |
 | PR-3 | Manager `states` stateIn + onSubscription conflated refresh + memoized `capableTags` | — | ⬜ |
 | PR-4 | `LanguageTagResolver` lift (core:model) + `LanguageRole` + write-side canonicalisation + picker decoupled from `TextViewModel` | #119 #123.2 | ⬜ |
-| PR-5 | Usage store: Room `language_usage(lang_id, role, last_used_at)` + translation-success stamper + per-role recents. HIGH-RISK data/migration | #122 | ⬜ |
+| PR-5 | Usage store: Room `language_usage(lang_id, role, last_used_at)` + translation-success stamper + per-role recents. HIGH-RISK data/migration | #122 | ✅ #134, 2026-08-01 |
 
 ### Phase 2 — the move (logic-edit zero)
 | PR | Scope | Status |

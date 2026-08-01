@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.core.database.di
 import android.content.Context
 import androidx.room.Room
 import com.codeboxlk.tranzlate.core.database.LanguageDao
+import com.codeboxlk.tranzlate.core.database.LanguageUsageDao
 import com.codeboxlk.tranzlate.core.database.TRANZLATE_MIGRATIONS
 import com.codeboxlk.tranzlate.core.database.TranslationDao
 import com.codeboxlk.tranzlate.core.database.TranzlateDatabase
@@ -45,4 +46,7 @@ internal object DatabaseModule {
 
     @Provides
     fun languageDao(database: TranzlateDatabase): LanguageDao = database.languageDao()
+
+    @Provides
+    fun languageUsageDao(database: TranzlateDatabase): LanguageUsageDao = database.languageUsageDao()
 }
