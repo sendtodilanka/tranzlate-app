@@ -25,6 +25,14 @@ The ground-up rebuild of the **Tranzlate** Android translator. Kotlin · Jetpack
 
 **8. The git guard rails are MANDATORY — never bypass, never disable (BLOCKING).** `.claude/hooks/guard-git.sh` (wired in `.claude/settings.json`) denies three acts, and the `/land-pr` skill carries the procedure it protects. **Landing any PR goes through `/land-pr`.** The guard exists because `main` was lost to the SAME accident twice — PR #108, then PRs #132/#134: sibling branches, each green alone, merged off a base older than the tip, so no CI run could ever see the combination. The rule was already written in the checklist when the second one happened; writing a rule down is not enforcing it. If a hook fires, **fix the cause** — a hook edited, skipped, or worked around is a rule violation, not a shortcut. It fails OPEN by design (no `gh`, no network, unparseable command → allow), so a denial is always a real finding.
 
+**10. Enumerate, reproduce, mutate-first, verify (BLOCKING — the four causes).** In one session a co-verify lens caught a defect I had introduced in **five** PRs (#142, #145, #146, #156, #159). Not carelessness — four specific skips, each now a step that cannot be waved through:
+- **Enumerate before changing.** `grep -c` every call site and path of the thing being touched, and put **"Call sites: N found, N changed"** in the PR body. #146 converted 2 of 6; #150 fixed 5 of 9. Both were one grep away.
+- **Reproduce the harm, then re-run that same reproduction.** Put **"Reproduced: …"** in the PR body — before and after, or `n/a` with a reason. #149 was "fixed" without ever running the harm it described, and the harm survived on the path nobody checked.
+- **Decide the mutation BEFORE writing the test.** A mutation chosen afterwards gets shaped by the code it just read: a sort test whose example data happens to be in order, a stack test at depth 2 where the root hides the missing guard. Both shipped.
+- **Verify documents against code.** The ruling's file list, the Konsist gate's silence and an issue's own count were each wrong. A plan is a plan — including this project's accepted ones.
+
+`.claude/hooks/guard-pr.sh` denies `gh pr create` without the first two markers, and fails open like the git guard. A promise to be careful is the same shape of non-fix as the checklist that was already written the second time `main` broke.
+
 **9. Sinhala prose ≥70%** · **No speculation (verified data only)** · **`./gradlew` needs JAVA_HOME=Android Studio JBR** — see `.claude/memory/`.
 
 > Rules 3-6 are adopted + adapted from the mature `zw-infra-zyntastack` / `zw-voice` projects (Forgejo→GitHub, voice/hardware→Android). Canonical detail: `CONTRIBUTING.md` + `.claude/memory/`.

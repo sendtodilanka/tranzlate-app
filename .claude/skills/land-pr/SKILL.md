@@ -62,6 +62,22 @@ then rebase the rest onto the new tip. Sibling branches built in parallel are
 exactly the shape that produced both incidents; parallelism belongs in the
 BUILD phase, not the merge phase.
 
+## What a co-verify lens must ask, every time (rule 10)
+
+These four are standing questions, not per-PR inventions. Each one is on the
+list because a lens found it AFTER I had shipped the PR:
+
+1. **Enumerate.** How many call sites/paths does this thing have, and how many
+   did the PR change? Run the grep yourself — #146 converted 2 of 6, #150 fixed
+   5 of 9, and both PRs read as complete.
+2. **Reproduce.** Does the fix close the harm the ISSUE describes, not the
+   symptom its title names? Re-run the reproduction. #149 released the engine on
+   one path and left the reported one open.
+3. **Mutate.** Revert the fix and run the suite. If it stays green, the PR has
+   no red bar and the tests are decoration — that has been true three times.
+4. **Verify the documents.** Any claim taken from a plan, ruling or issue must
+   be re-derived from source. Three such claims were wrong this session.
+
 ## What the guard will not catch
 
 It compares commits, not semantics. Two PRs can be behind by zero commits and
