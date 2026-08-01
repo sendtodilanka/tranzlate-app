@@ -32,3 +32,8 @@ keystore*.properties
 .claude/worktrees/
 # Device bug reports pulled while verifying on an emulator
 bugreport-*.zip
+
+# Agent scratch. Mutation lists live here while a PR is built; the record
+# that survives is the PR body, per rule 11. #178 removed the same file by
+# hand — ignoring it stops the next one leaking in.
+scratchpad/
