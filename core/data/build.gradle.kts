@@ -25,4 +25,7 @@ dependencies {
     testImplementation(libs.truth)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
+    // The shipped seam fakes (FakeOfflineVoiceCatalog): a repository test that
+    // rolled its own would stop proving the double features will actually use.
+    testImplementation(projects.core.testing)
 }

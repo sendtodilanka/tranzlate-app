@@ -5,6 +5,34 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+        Makes the installed text-to-speech engines VISIBLE to this app (issue #130
+        ruling U-4, audit P1). From API 30 a package this app has declared no
+        interest in does not exist as far as its own PackageManager is concerned,
+        and TextToSpeech resolves its engine with queryIntentServices from inside
+        THIS process. Without this block that query returns nothing, the engine
+        never initialises, and AndroidOfflineVoiceCatalog enumerates an empty set
+        — every offline-voice mark disappears and the app tells the user this
+        device has no offline voices. It fails closed and it fails SILENTLY:
+        no exception, no log, nothing to notice.
+
+        Measured caveat, recorded so nobody re-derives it from the comment above
+        (experiment E-V1, docs/research/issue-130-e-v1-voice-enumeration.md):
+        removing this block changed NOTHING on the emulator images available to
+        us, because com.google.android.tts carries forceQueryable=true on them
+        and is therefore visible to every app regardless. That is a property of
+        that one package — a third-party engine a user has set as their default
+        (Samsung, Acapela, Vocalizer, eSpeak) carries no such marking and is
+        invisible without this. The block is kept on that basis and on Google's
+        own package-visibility guidance for INTENT_ACTION_TTS_SERVICE; E-V1
+        could not disconfirm it on the hardware to hand.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".TranzlateApplication"
         android:allowBackup="true"

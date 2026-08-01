@@ -1,21 +1,27 @@
 package com.codeboxlk.tranzlate
 
 import com.codeboxlk.tranzlate.core.common.AppClock
+import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.common.DefaultDispatcherProvider
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
 import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
+import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.model.PlanPrices
 import com.codeboxlk.tranzlate.core.model.Tier
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
+import com.codeboxlk.tranzlate.core.testing.FakeOfflineVoiceCatalog
 import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
 import com.codeboxlk.tranzlate.core.testing.FakeTranslator
 import com.codeboxlk.tranzlate.core.testing.FakeUsagePolicy
 import com.codeboxlk.tranzlate.di.TranslateModule
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
+import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
+import com.codeboxlk.tranzlate.domain.speech.OfflineVoiceCatalog
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
@@ -23,6 +29,8 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import javax.inject.Singleton
 
 /**
@@ -77,6 +85,40 @@ object FakeTranslateModule {
     @Provides
     @Singleton
     fun connectivity(): ConnectivityMonitor = FakeConnectivityMonitor()
+
+    /**
+     * PRE-EXISTING GAP, found while adding the voice binding below and fixed
+     * because the source set otherwise does not compile at all: `replaces` also
+     * took `PurchaseFlow` away when billing moved into `TranslateModule`
+     * (commit fabb214), and nothing re-supplied it, so the whole instrumented
+     * graph has been failing to build with `[Dagger/MissingBinding]
+     * PurchaseFlow` since then. CI never builds androidTest, which is why it
+     * went unnoticed — the compile gap is the finding, this is only the unblock.
+     */
+    @Provides
+    @Singleton
+    fun purchaseFlow(): PurchaseFlow =
+        object : PurchaseFlow {
+            override val prices: Flow<PlanPrices> = flowOf(PlanPrices.Unavailable)
+
+            override suspend fun refreshPrices() = Unit
+
+            override suspend fun purchase(offeringId: String): AppResult<Entitlement> =
+                AppResult.Failure(UnsupportedOperationException("no billing in instrumented tests"))
+
+            override suspend fun restore(): AppResult<Entitlement> =
+                AppResult.Failure(UnsupportedOperationException("no billing in instrumented tests"))
+        }
+
+    /**
+     * A UI test must never bind a real TTS engine: the enumeration would depend
+     * on the emulator image's installed voices and, on an image with none, would
+     * spend the catalog's five-second timeout before the language list could
+     * gain its marks.
+     */
+    @Provides
+    @Singleton
+    fun offlineVoiceCatalog(): OfflineVoiceCatalog = FakeOfflineVoiceCatalog(ids = setOf("en", "es", "fr"))
 
     @Provides
     @Singleton

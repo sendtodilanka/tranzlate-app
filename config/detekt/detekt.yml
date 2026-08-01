@@ -15,7 +15,12 @@ build:
 style:
   MagicNumber:
     active: true
-    excludes: ['**/core/designsystem/**', '**/core/testing/**', '**/test/**', '**/androidTest/**', '**/androidTestProd/**']
+    # `testProd` is the unit-test source set of the prod FLAVOR (app/src/testProd),
+    # the same kind of source as `test` — flavor-scoped test sources need their own
+    # entry because these globs match path segments exactly.
+    excludes:
+      ['**/core/designsystem/**', '**/core/testing/**', '**/test/**', '**/testProd/**', '**/androidTest/**',
+        '**/androidTestProd/**']
     ignoreAnnotated: ['Preview', 'PreviewLightDark']
     ignorePropertyDeclaration: true
     ignoreCompanionObjectPropertyDeclaration: true
@@ -45,7 +50,9 @@ complexity:
 naming:
   FunctionNaming:
     ignoreAnnotated: ['Composable']
-    excludes: ['**/test/**', '**/androidTest/**', '**/androidTestProd/**']
+    # `testProd` — see the MagicNumber note above; backticked test names are the
+    # house style and a flavor-scoped test source set is still a test source set.
+    excludes: ['**/test/**', '**/testProd/**', '**/androidTest/**', '**/androidTestProd/**']
   TopLevelPropertyNaming:
     active: false
 

@@ -10,6 +10,8 @@ import com.codeboxlk.tranzlate.core.database.LanguageEntity
 import com.codeboxlk.tranzlate.core.datastore.TranzlatePreferencesDataSource
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.testing.FakeOfflineVoiceCatalog
+import com.codeboxlk.tranzlate.domain.speech.OfflineVoiceCatalog
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -334,11 +336,88 @@ class LanguageRepositoryImplTest {
             assertThat(remembered.map { it.id }).containsNoneIn(ids.take(3).map { it.id })
         }
 
+    /**
+     * Issue #130 rev.3 U-3, and the rule the whole voice overlay hangs off: the
+     * voice set DECORATES rows, it never selects them. A device with no TTS
+     * engine at all — the empty answer — must still get every catalog row, with
+     * no mark on any of them.
+     *
+     * The failure this makes impossible is the tempting one: filtering or
+     * flat-mapping the catalog by the voice set instead of copying a flag onto
+     * it. That reads fine, passes a "marks appear" test, and silently deletes
+     * every language on a device with no voices.
+     */
+    @Test
+    fun `a device with no offline voices still serves every language`() =
+        runTest {
+            val repository = repository(voices = FakeOfflineVoiceCatalog(ids = emptySet()))
+
+            val languages = repository.languages().first()
+
+            assertThat(languages).hasSize(BundledLanguageCatalog.all.size)
+            assertThat(languages.none { it.hasOfflineVoice }).isTrue()
+        }
+
+    /**
+     * The same rule against the harder case: the ask never answers at all.
+     * Enumerating TTS voices binds a service in another process and, on a device
+     * with no engine, ends in a five-second timeout — so "not yet" is a state
+     * this list spends real time in. It paints the full catalog anyway, exactly
+     * as it does for ML Kit's model state.
+     */
+    @Test
+    fun `the catalog is served even when the voice answer never arrives`() =
+        runTest {
+            val repository = repository(voices = SilentOfflineVoiceCatalog())
+
+            val languages = repository.languages().first()
+
+            assertThat(languages).hasSize(BundledLanguageCatalog.all.size)
+            assertThat(languages.none { it.hasOfflineVoice }).isTrue()
+        }
+
+    /**
+     * The other half: when the device DOES answer, the flag lands on exactly the
+     * rows it named and on no others — and the row count is untouched, which is
+     * the "decoration, not selection" rule stated from the marked side.
+     *
+     * `drop(1)` is the same contract as the model-state and recents overlays
+     * above: the first emission is the paint that waits for nothing.
+     */
+    @Test
+    fun `an offline voice is overlaid onto the catalog row`() =
+        runTest {
+            val repository = repository(voices = FakeOfflineVoiceCatalog(ids = setOf("es", "pt-BR")))
+
+            val languages = repository.languages().drop(1).first()
+
+            assertThat(languages).hasSize(BundledLanguageCatalog.all.size)
+            assertThat(languages.filter { it.hasOfflineVoice }.map { it.id })
+                .containsExactly("es", "pt-BR")
+        }
+
+    /**
+     * The seam is a per-DEVICE ask, not a per-row one. Asking inside the row
+     * mapping would bind and release a TTS engine 194 times per emission; the
+     * spy counts what actually happened.
+     */
+    @Test
+    fun `the voice catalog is asked once for the whole list`() =
+        runTest {
+            val voices = FakeOfflineVoiceCatalog(ids = setOf("es"))
+            val repository = repository(voices = voices)
+
+            repository.languages().drop(1).first()
+
+            assertThat(voices.calls).isEqualTo(1)
+        }
+
     private fun repository(
         dao: LanguageDao = FakeLanguageDao(),
         models: OfflineModelManager = FakeOfflineModelManager(),
+        voices: OfflineVoiceCatalog = FakeOfflineVoiceCatalog(),
         store: FakeLanguagePreferencesStore = FakeLanguagePreferencesStore(),
-    ) = LanguageRepositoryImpl(dao, models, TranzlatePreferencesDataSource(store))
+    ) = LanguageRepositoryImpl(dao, models, voices, TranzlatePreferencesDataSource(store))
 }
 
 /**
@@ -397,4 +476,12 @@ private class SilentOfflineModelManager : OfflineModelManager {
     override suspend fun download(languageTag: String) = Unit
 
     override suspend fun delete(languageTag: String) = Unit
+}
+
+/**
+ * Stands in for a TTS engine that binds and then never calls back — the case
+ * the production catalog spends its whole timeout on, seen from the list's side.
+ */
+private class SilentOfflineVoiceCatalog : OfflineVoiceCatalog {
+    override suspend fun offlineVoiceLanguageIds(): Set<String> = awaitCancellation()
 }

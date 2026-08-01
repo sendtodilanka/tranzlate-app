@@ -32,6 +32,7 @@ import com.codeboxlk.tranzlate.di.AppStartupTask
 import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
+import com.codeboxlk.tranzlate.domain.speech.OfflineVoiceCatalog
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
@@ -114,6 +115,18 @@ object TranslateModule {
         @ApplicationContext context: Context,
         dispatchers: DispatcherProvider,
     ): StorageProbe = AndroidStorageProbe(context, dispatchers)
+
+    /**
+     * `@Singleton` is not optional here: the one-shot cache and the mutex that
+     * protects it live on the instance, so a second instance would bind a second
+     * TTS engine and re-enumerate.
+     */
+    @Provides
+    @Singleton
+    fun offlineVoiceCatalog(
+        @ApplicationContext context: Context,
+        dispatchers: DispatcherProvider,
+    ): OfflineVoiceCatalog = AndroidOfflineVoiceCatalog(context, dispatchers)
 
     @Provides
     @Singleton
