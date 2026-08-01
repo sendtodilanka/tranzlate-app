@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.feature.languagepicker
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
+import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -47,11 +49,33 @@ class OfflineLanguagesViewModel
         private val downloadPrefs: DownloadPrefsRepository,
     ) : ViewModel() {
         val rows: StateFlow<List<OfflineLanguageRow>> =
-            combine(languageRepository.languages(), modelManager.modelStates()) { catalog, states ->
-                catalog.mapNotNull { language ->
-                    val state = states[language.id] ?: return@mapNotNull null
-                    OfflineLanguageRow(id = language.id, name = language.name, state = state)
-                }
+            combine(
+                languageRepository.languages(),
+                // Same guard LanguageRepositoryImpl.languages() puts on this exact
+                // source, for the same reason: `combine` waits for EVERY source
+                // before it can emit at all, and on a device without Play Services
+                // the ML Kit answer may effectively never come — unprefixed, that
+                // parked this screen on "Loading…" forever with no retry (the
+                // EDGE_CASES dead-end class: a wait state that guides nowhere).
+                // Prefixed empty, rows paint immediately at their resting state
+                // and flip when the real state arrives — the contract the picker
+                // already honours (its list renders; badges arrive when they do).
+                modelManager.modelStates().onStart { emit(emptyMap()) },
+            ) { catalog, states ->
+                catalog
+                    .filter(Language::offlineAvailable)
+                    .map { language ->
+                        OfflineLanguageRow(
+                            id = language.id,
+                            name = language.name,
+                            // Capability is compile-time catalog truth (D-E2:
+                            // `offlineAvailable` is derived from ML Kit's own tag
+                            // list), so a missing map entry can only mean "no
+                            // answer yet", never "not capable" — the resting
+                            // state is NotDownloaded, not a hidden row.
+                            state = states[language.id] ?: OfflineModelState.NotDownloaded,
+                        )
+                    }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyList())
 
         private val _pendingConsent = MutableStateFlow<String?>(null)
