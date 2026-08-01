@@ -56,6 +56,35 @@ class TranslationRepositoryImpl
 
         override suspend fun save(translation: Translation): Long = translationDao.insert(translation.toEntity())
 
+        /**
+         * Merge FIRST, insert only when the tuple is free — the order matters.
+         *
+         * Insert-first would have to fall back to the merge on the `IGNORE` -1, and
+         * an occupant deleted between the two statements would leave the merge
+         * matching nothing: silently no restore at all, which is issue #179 again.
+         * Merge-first can only lose to a concurrent INSERT of the same tuple, and
+         * that outcome still leaves the content in history — the weaker failure.
+         *
+         * Deliberately insensitive to how SQLite counts an UPDATE that writes the
+         * values a row already holds: if such a merge reported 0, the insert that
+         * follows hits the unique C-8 index, returns -1 and changes nothing — and
+         * the row already carried the star and the stamp the restore was asking
+         * for. Both readings of `changes()` end in the same correct state.
+         */
+        override suspend fun restore(translation: Translation) {
+            val entity = translation.toEntity().copy(id = 0L)
+            val merged =
+                translationDao.mergeIntoTuple(
+                    sourceText = entity.sourceText,
+                    sourceLang = entity.sourceLang,
+                    targetLang = entity.targetLang,
+                    engine = entity.engine,
+                    favourite = entity.favourite,
+                    createdAt = entity.createdAt,
+                )
+            if (merged == 0) translationDao.insert(entity)
+        }
+
         override suspend fun delete(id: Long) = translationDao.delete(id)
 
         override suspend fun setFavourite(

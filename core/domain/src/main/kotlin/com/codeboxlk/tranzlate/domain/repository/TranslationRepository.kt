@@ -41,7 +41,25 @@ interface TranslationRepository {
 
     suspend fun save(translation: Translation): Long
 
-    /** Removes one history row (issue #80 swipe-to-delete; Undo re-inserts the content). */
+    /**
+     * Undo of [delete] (issue #179) — puts [translation] back, `id` ignored.
+     *
+     * [save] alone could not do this. Its insert is `IGNORE`-on-conflict, so when
+     * the row's C-8 tuple had been retaken (delete, then the same text translated
+     * again — reachable for the nine `LanguageTagResolver` legacy aliases since
+     * #177) the write returned -1 and the undo was a silent no-op: the star and the
+     * original stamp were gone and the snackbar had already said "deleted".
+     *
+     * Restore MERGES rather than fighting for the tuple. A row with the same
+     * (text, source, target, engine) is the SAME entry by C-8 — the DB's unique
+     * index says so — so the star is carried across (never cleared in either
+     * direction) and the earlier `created_at` wins. Nothing is deleted: the
+     * alternative, evicting the occupant so the old row can be re-inserted, would
+     * make Undo destroy a row the user never asked to delete.
+     */
+    suspend fun restore(translation: Translation)
+
+    /** Removes one history row (issue #80 swipe-to-delete; Undo restores the content). */
     suspend fun delete(id: Long)
 
     /** D-3: star toggles favourite. */

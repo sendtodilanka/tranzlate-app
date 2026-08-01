@@ -99,6 +99,14 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
 - ⬜ **#173** (rows for #173/#174/#175 added by **PR #176**) `verifyStringKeyDocs` has two coverage holes: module discovery is
   a hardcoded path shape a new ring escapes silently, and the reverse direction
   is #152's own unimplemented second ask. Follows #172.
+- ⬜ **#179** History's Undo restored nothing when the row's C-8 tuple had been
+  retaken — the insert is `IGNORE`-on-conflict, the -1 was discarded, and the
+  star and the original `created_at` were gone while the snackbar had already
+  said the delete was reversible. Fixed by MERGING rather than fighting for the
+  tuple: `TranslationRepository.restore` carries the star across (never clearing
+  one in either direction, as `MigrationOneToTwo` already does) and keeps the
+  earlier stamp. #177 widened the reach — delete-then-retranslate-the-other-way
+  now collides for the nine `LanguageTagResolver` legacy aliases.
 - ⬜ **#151** history rows store raw detector tags while the prefs seam
   canonicalises. Self-contained, `core:domain`.
 - ⬜ **#152** the STRINGS gate — **PR #172**. Scope grew on contact: the gate's

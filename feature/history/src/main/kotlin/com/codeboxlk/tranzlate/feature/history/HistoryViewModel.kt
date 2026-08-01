@@ -40,14 +40,19 @@ class HistoryViewModel
             }
         }
 
-        /** Swipe-to-delete (issue #80). Undo re-inserts the SAME content. */
+        /** Swipe-to-delete (issue #80). Undo restores the SAME content. */
         fun delete(translation: Translation) {
             viewModelScope.launch { repository.delete(translation.id) }
         }
 
+        /**
+         * Issue #179 — this used to call `save(copy(id = 0L))` and throw the result
+         * away. On a retaken C-8 tuple the DAO's `IGNORE` returned -1 and Undo did
+         * nothing at all, silently, after the snackbar had already promised the
+         * delete was reversible. `restore` owns that decision now (one home, per
+         * APP_STRUCTURE) and merges instead of no-op'ing.
+         */
         fun undoDelete(translation: Translation) {
-            viewModelScope.launch {
-                repository.save(translation.copy(id = 0L))
-            }
+            viewModelScope.launch { repository.restore(translation) }
         }
     }
