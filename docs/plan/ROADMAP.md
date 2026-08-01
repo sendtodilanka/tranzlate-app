@@ -83,6 +83,19 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
 
 ## Any time — independent of the waves
 
+- ⬜ **#174** nothing is announced while a translation runs. `a11y_translating`
+  exists in all three locales with **zero** call sites, and `a11y_limit_reached`
+  — also canonical under C-4 — has no resource at all. A screen-reader user gets
+  silence for the whole wait, which is when the feedback matters most. Rides
+  with Wave 3, where `feature/text` is open anyway.
+- ⬜ **#175** the same download failure says two different things depending on
+  the screen: the picker and the offline manager each ship a full set of the
+  three failure messages, **both live**, one call site each. Six keys × three
+  locales for three messages. Best done in Wave 5 with PR-23, or earlier — the
+  two screens already share one `DownloadGate` after PR-9.
+- ⬜ **#173** (rows for #173/#174/#175 added by **PR #176**) `verifyStringKeyDocs` has two coverage holes: module discovery is
+  a hardcoded path shape a new ring escapes silently, and the reverse direction
+  is #152's own unimplemented second ask. Follows #172.
 - ⬜ **#151** history rows store raw detector tags while the prefs seam
   canonicalises. Self-contained, `core:domain`.
 - ⬜ **#152** the STRINGS gate (the dead keys ride with Wave 3; the gate itself can
