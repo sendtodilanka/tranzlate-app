@@ -1,0 +1,116 @@
+package com.codeboxlk.tranzlate.domain.translate
+
+import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
+import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.getAndUpdate
+import javax.inject.Inject
+
+/**
+ * Issue #90's owner ruling, in ONE home: a model download over a METERED
+ * connection is a CONSENT question. The answer comes from the user or from the
+ * standing preference they set in Settings — never from ML Kit's untested
+ * `requireWifi` flag, and never by quietly spending the data plan.
+ *
+ * The rules, all of them:
+ *  - Wi-Fi (or any unmetered link) never asks — [requestDownload] just starts.
+ *  - Metered AND no standing permission → [pendingConsent] carries the id the
+ *    question is about and the download does NOT start. The screen owns nothing
+ *    but the dialog it draws from that one value.
+ *  - Metered AND the standing permission is on → starts, no question.
+ *  - [consentOnce] is a ONE-OFF yes: it closes the question and hands back a
+ *    [ConsentedDownload], and it deliberately does not touch
+ *    [DownloadPrefsRepository]. "Once" means once — the next metered tap asks
+ *    again. A refactor that folds the one-off answer into the standing
+ *    preference costs the user real mobile data and looks like nothing in a
+ *    diff, which is why it has its own test.
+ *  - [dismiss] leaves the row exactly as it was: no spinner, no half-state, no
+ *    dead end (EDGE_CASES). The user can tap again.
+ *
+ * **This class launches nothing of its own.** Every member is either a plain
+ * state transition or a `suspend` call, so the gate adds no lifetime: whatever
+ * it does happens on the CALLER's scope, and the choice of scope stays visible
+ * where the tap is handled.
+ *
+ * That is a claim about the GATE, not about the transfer. Only three things
+ * actually ride the caller's scope — the standing-preference read, the metered
+ * check, and the synchronous pre-flight inside
+ * [OfflineModelManager.download] (capability, in-flight de-duplication, the
+ * free-space probe, the hand-off to `Downloading`). The transfer itself is
+ * launched by the Translation brain on its own process-lifetime scope, on
+ * purpose, so navigating away cannot strand a half-finished download —
+ * `RealOfflineModelManager.kt`, the `downloadScope.launch` at :255 with the
+ * reasoning spelled out at :284-288. A gate that owned a scope would insert a
+ * THIRD lifetime between the tap and that one, for every screen at once; this
+ * project has already lost a write to a scope that died under it (#130 PR-4).
+ *
+ * Deliberately UNSCOPED in the Hilt graph. Each state holder gets its own
+ * instance, so the question raised on one screen is that screen's question —
+ * a `@Singleton` would leak a half-answered dialog across the picker and the
+ * offline manager. Both halves of that — no scope of its own, no scope
+ * annotation — are held by `DownloadGateTest`, against this file's source.
+ */
+class DownloadGate
+    @Inject
+    constructor(
+        private val connectivity: ConnectivityMonitor,
+        private val downloadPrefs: DownloadPrefsRepository,
+        private val modelManager: OfflineModelManager,
+    ) {
+        private val _pendingConsent = MutableStateFlow<String?>(null)
+
+        /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
+        val pendingConsent: StateFlow<String?> = _pendingConsent.asStateFlow()
+
+        /**
+         * A row's ⬇ / ↻ tap. Starts the download, unless the connection is
+         * metered and no standing permission exists — in which case it raises
+         * the question instead and starts NOTHING.
+         */
+        suspend fun requestDownload(id: String) {
+            val allowed = downloadPrefs.allowMobileData.first()
+            if (connectivity.isMetered() && !allowed) {
+                _pendingConsent.value = id
+            } else {
+                modelManager.download(id)
+            }
+        }
+
+        /**
+         * The dialog's "Download once". Closes the question and returns the
+         * answer as a [ConsentedDownload], for the caller to hand to
+         * [downloadConsented] on its own scope; null when nothing was pending
+         * (a second tap on an answered dialog).
+         *
+         * Synchronous on purpose — the dialog must be gone the instant the tap
+         * lands, not one dispatch later.
+         */
+        fun consentOnce(): ConsentedDownload? = _pendingConsent.getAndUpdate { null }?.let(::ConsentedDownload)
+
+        /** The consented download itself — [consentOnce]'s follow-through. */
+        suspend fun downloadConsented(consented: ConsentedDownload) = modelManager.download(consented.id)
+
+        /** "Wait for Wi-Fi", or a dismiss: the row is left untouched and re-tappable. */
+        fun dismiss() {
+            _pendingConsent.value = null
+        }
+    }
+
+/**
+ * Evidence that the user answered "Download once" for [id] — nothing else.
+ *
+ * The constructor is `internal`, so it cannot be produced outside
+ * `:core:domain`, and inside it [DownloadGate.consentOnce] is the only thing
+ * that produces one. That makes skipping the consent question a COMPILE error
+ * in every feature module rather than a naming convention someone has to
+ * remember: the old signature was `download(id: String)`, a public door sitting
+ * one autocomplete away from `requestDownload(id: String)` and taking exactly
+ * the same argument. Picking the wrong one lost issue #90's ruling silently, on
+ * that screen only, and read as a correct line of code in review.
+ */
+class ConsentedDownload internal constructor(
+    val id: String,
+)
