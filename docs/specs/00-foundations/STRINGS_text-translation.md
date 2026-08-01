@@ -178,10 +178,14 @@
 |-----|------|----|----|--------|------|
 | `text_char_counter` | string | ~~`%1$d/%2$d` → "12/500" (NO spaces)~~ → **`%1$d / %2$d` → "12 / 500" (WITH spaces, C-5 amended 2026-07-26)** | reuse | reuse | used,limit |
 | `text_metered_counter` | string | `%1$d/%2$d today` (used/limit, C-6) | NEEDS-TRANSLATION | NEEDS-TRANSLATION | used,limit |
-| `a11y_translating` | string | Translating… | NEEDS-TRANSLATION | NEEDS-TRANSLATION | — |
-| `a11y_result_ready` | string | Translation ready | NEEDS-TRANSLATION | NEEDS-TRANSLATION | — |
-| `a11y_error` | string | Translation failed | NEEDS-TRANSLATION | NEEDS-TRANSLATION | — |
-| `a11y_limit_reached` | string | Daily Advanced-AI limit reached | NEEDS-TRANSLATION | NEEDS-TRANSLATION | — |
+| `a11y_translating` | string | Translating… | Isinasalin… | Traduzindo… | — |
+| `a11y_result_ready` | string | Translation ready: %1$s | Handa na ang pagsasalin: %1$s | Tradução pronta: %1$s | result text |
+| `a11y_error` | string | Translation failed. %1$s | Nabigo ang pagsasalin. %1$s | A tradução falhou. %1$s | reason |
+| ~~`a11y_limit_reached`~~ | ~~string~~ | ~~Daily Advanced-AI limit reached~~ | — | — | — |
+
+> **Rows corrected against the resources 2026-08-02 (issue #174, rule 11 "verify documents against code").** All three live rows said `NEEDS-TRANSLATION` for fil and pt-rBR while both locales had shipped the translations, and the `en` column for `a11y_result_ready`/`a11y_error` omitted the format argument each one actually takes. The values above are copied verbatim from `feature/text/src/main/res/values{,-fil,-pt-rBR}/strings.xml`.
+>
+> **`a11y_limit_reached` is RETIRED (struck), not pending.** It was catalogued here and in C-4 and shipped in no locale for the life of the project. `TextUiState.Limit` has two kinds — quota spent and entitlement denied — so one fixed string is false for the second; both kinds are already announced assertively with their own copy (`tt_text_limit` → `text_error_limit_reached`/`text_error_not_entitled`; the C-11 sheet → `limit_sheet_title_quota`/`limit_sheet_title_pro`). Full reasoning: C-4 rev.2 and `docs/plan/issue-174-translating-announcement.md` §5. Struck per C-3, so it does not count as documenting any future resource of that name.
 
 > **C-3:** this catalogue is the ONLY string-key authority; TEST_A11Y references these keys (no invented `a11y_*`/`cd_*`). `usage_counter` is retired (C-6). NEEDS-TRANSLATION = tracked content task, not a spec blocker (C-12).
 

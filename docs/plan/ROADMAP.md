@@ -83,7 +83,7 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
 
 ## Any time — independent of the waves
 
-- ⬜ **#174** nothing is announced while a translation runs. `a11y_translating`
+- 👁 **#174** — **PR #187** — nothing is announced while a translation runs. `a11y_translating`
   exists in all three locales with **zero** call sites, and `a11y_limit_reached`
   — also canonical under C-4 — has no resource at all. A screen-reader user gets
   silence for the whole wait, which is when the feedback matters most. Rides

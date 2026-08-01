@@ -40,9 +40,12 @@ private const val LINE_SHORT = 0.45f
  *
  * Kept custom on purpose: Material 3 ships no skeleton/placeholder component.
  *
- * Purely decorative: announcements come from the feature's own loading live
- * region (`tt_text_loading`, a11y contract §2.3) — this draws no semantics of
- * its own beyond the [testTag].
+ * Purely decorative: it draws no semantics of its own beyond the [testTag], so
+ * the CALLER supplies the announcement through [modifier] — the text feature
+ * passes the `a11y_translating` live region and the `tt_text_loading` host tag
+ * (a11y contract §2.3). Until issue #174 this KDoc claimed that region already
+ * existed; it did not, and the translating state announced nothing. Anything
+ * reusing this component owes its own live region, or it repeats that gap.
  */
 @Composable
 fun ShimmerResult(

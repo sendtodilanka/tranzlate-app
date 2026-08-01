@@ -386,6 +386,111 @@ class KonsistArchitectureTest {
     }
 
     /**
+     * Issue #174 — the translating state announces that it started.
+     *
+     * `a11y_translating` shipped in three locales with ZERO call sites, so a
+     * TalkBack user who activated Translate heard nothing at all until the
+     * outcome arrived — the one moment where silence is indistinguishable from a
+     * tap that never registered. It read as a dead string to a reference sweep
+     * (#172 nearly deleted it); it was a missing announcement.
+     *
+     * SOURCE-SHAPE assertions, stated with the same honesty as the two gates
+     * above: this repo has no Compose unit-test runtime (no Robolectric, no
+     * `createComposeRule` anywhere), and the instrumented suite is compiled but
+     * unrunnable (#40). So this cannot prove the announcement REACHES TalkBack —
+     * only a device can. What it makes RED is every regression that compiles and
+     * leaves the rest of the suite green:
+     *
+     *  1. the `liveRegion` deleted while the string stays — the exact shape that
+     *     produced #174, and the one a "the string is referenced" test misses;
+     *  2. the region rendered OUTSIDE the `Translating` branch, where it would
+     *     linger and read "Translating…" over a finished result;
+     *  3. a `Translating` branch that renders no announcing face — the second
+     *     render site, or a third one added later (rule 11's first cause: #146
+     *     converted 2 of 6 call sites);
+     *  4. the composable renamed away, which would empty every assertion here.
+     *
+     * Comments and string literals are stripped before matching, so a KDoc that
+     * explains the live region cannot satisfy the rule about having one.
+     */
+    @Test
+    fun `the translating state announces that it started`() {
+        // `single`, not `firstOrNull`: Konsist reports file names WITHOUT the
+        // extension, and a name that stops matching must be loud, not vacuous.
+        val composer = filesUnder("/feature/text/src/main/").single { it.name == COMPOSER_FILE }
+        // Comments stripped everywhere below, so a KDoc that explains the live
+        // region can never stand in for having one. Previews are excluded from
+        // the render rules: a preview legitimately calls the face directly, and
+        // it is not a state branch.
+        val functions =
+            composer
+                .functions()
+                .filterNot { fn -> fn.annotations.any { it.name.startsWith("Preview") } }
+                .associate { it.name to it.text.replace(COMMENT, "") }
+
+        // (4) Vacuous-pass guard FIRST. Every rule below is "for each X, X has
+        //     property P", which an empty X satisfies perfectly — and this repo
+        //     has already lost a Konsist gate to a silently emptied scope (#110).
+        assertThat(functions.keys).contains(TRANSLATING_FACE)
+
+        // (1) The announcement and the live region are on the SAME semantics
+        //     block. Asserting the string alone is exactly what let #174 survive:
+        //     the string shipped in three locales and announced nothing.
+        val face = functions.getValue(TRANSLATING_FACE)
+        assertThat(code(face)).contains("R.string.a11y_translating")
+        assertThat(code(face)).contains("liveRegion")
+        // Polite by ruling (plan §3): this fires while TalkBack is still reading
+        // the Translate control's own label, and Assertive would talk over it.
+        assertThat(code(face)).contains("LiveRegionMode.Polite")
+        // The host tag is a string literal, so it survives comment-stripping only.
+        assertThat(face).contains(LOADING_TAG)
+
+        val renderers = functions.filterKeys { it != TRANSLATING_FACE }
+
+        // (3) The shimmer is decorative on its own, so inside this screen the ONLY
+        //     thing allowed to draw one is the announcing face. A new translating
+        //     surface that reaches for the bare component — or a converted one
+        //     reverted — is the #146 "2 of 6 call sites" shape, and lands here.
+        val bareShimmer = renderers.filterValues { it.contains("$SHIMMER(") }.keys
+        assertThat(bareShimmer).isEmpty()
+
+        // (3b) Both render sites still exist and both announce. Scoped per
+        //      FUNCTION, because the file also holds a non-rendering
+        //      `is TextUiState.Translating ->` (the `requestText` getter) that
+        //      owes no announcement.
+        val branch = "is $STATE_MARKER$TRANSLATING ->"
+        val silentBranches =
+            renderers
+                .filterValues { fn ->
+                    fn.contains(branch) && !fn.contains("$TRANSLATING_FACE(")
+                }.keys
+        assertThat(silentBranches).isEmpty()
+        assertThat(renderers.filterValues { it.contains("$TRANSLATING_FACE(") })
+            .hasSize(RENDER_SITES)
+
+        // (2) …and no OTHER state branch renders it, which is the only way this
+        //     fix could double-announce: a region that outlives its state reads
+        //     "Translating…" over a finished result. Walk back from each call to
+        //     the nearest preceding state marker — it must be Translating.
+        val callsOutsideTranslating =
+            renderers.flatMap { (name, fn) ->
+                fn
+                    .indicesOf("$TRANSLATING_FACE(")
+                    .filter { call ->
+                        val marker = fn.lastIndexOf(STATE_MARKER, call)
+                        marker == -1 || !fn.startsWith("$STATE_MARKER$TRANSLATING", marker)
+                    }.map { name }
+            }
+        assertThat(callsOutsideTranslating).isEmpty()
+    }
+
+    /** Every start index of [token] — the state-branch walk needs positions, not counts. */
+    private fun String.indicesOf(token: String): List<Int> =
+        generateSequence(indexOf(token).takeIf { it != -1 }) { previous ->
+            indexOf(token, previous + token.length).takeIf { it != -1 }
+        }.toList()
+
+    /**
      * Comments AND string literals stripped before matching. Both were found by
      * mutation: deleting the real `tts.shutdown()` left the gate green because
      * the comment explaining why that call needs a guard says `shutdown()` too,
@@ -419,6 +524,33 @@ class KonsistArchitectureTest {
 
         /** The platform type whose instances are bound service connections. */
         const val ENGINE_TYPE = "TextToSpeech"
+
+        // ---- issue #174: the translating announcement -------------------------
+
+        /** Konsist reports file names without the extension (cf. [PREVIEW_EXEMPT]). */
+        const val COMPOSER_FILE = "ComposerScreen"
+
+        /** The one composable allowed to draw a translating face — it carries the live region. */
+        const val TRANSLATING_FACE = "TranslatingFace"
+
+        /** The decorative component. Bare inside this screen = a silent translating state. */
+        const val SHIMMER = "ShimmerResult"
+
+        /** Sealed-state prefix; the walk back from a call site looks for this. */
+        const val STATE_MARKER = "TextUiState."
+
+        /** The in-progress state whose branch owes the announcement. */
+        const val TRANSLATING = "Translating"
+
+        /** Contract §2.3 live-region host for the translating state. */
+        const val LOADING_TAG = "\"tt_text_loading\""
+
+        /**
+         * Portrait read face + split result pane. A literal, not a derived count:
+         * if a third translating surface lands, this gate should FAIL and make
+         * someone say out loud that it announces too.
+         */
+        const val RENDER_SITES = 2
 
         /** The only call that ends the binding (AOSP: nothing else does). */
         const val SHUTDOWN = "shutdown()"
