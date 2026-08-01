@@ -23,7 +23,9 @@ The ground-up rebuild of the **Tranzlate** Android translator. Kotlin · Jetpack
 
 **7. Every composable ships `@PreviewLightDark` (BLOCKING).** No Compose UI merges without previews — **screens AND every custom item built from standard M3 parts** (list rows, row action buttons, cards, chips, dialogs, counters…). One preview per meaningful STATE (e.g. an offline row: downloadable / downloading / downloaded / deleting / failed). House style: preview lives in the SAME file, `private`, wrapped in `TranzlateTheme { … }` (items add `Surface(color = colorScheme.surface)`), literal fake data — **never DI**, never a ViewModel. Named `<Composable><State>Preview`. Owner reviews UI from previews, so a missing preview is a missing deliverable.
 
-**8. Sinhala prose ≥70%** · **No speculation (verified data only)** · **`./gradlew` needs JAVA_HOME=Android Studio JBR** — see `.claude/memory/`.
+**8. The git guard rails are MANDATORY — never bypass, never disable (BLOCKING).** `.claude/hooks/guard-git.sh` (wired in `.claude/settings.json`) denies three acts, and the `/land-pr` skill carries the procedure it protects. **Landing any PR goes through `/land-pr`.** The guard exists because `main` was lost to the SAME accident twice — PR #108, then PRs #132/#134: sibling branches, each green alone, merged off a base older than the tip, so no CI run could ever see the combination. The rule was already written in the checklist when the second one happened; writing a rule down is not enforcing it. If a hook fires, **fix the cause** — a hook edited, skipped, or worked around is a rule violation, not a shortcut. It fails OPEN by design (no `gh`, no network, unparseable command → allow), so a denial is always a real finding.
+
+**9. Sinhala prose ≥70%** · **No speculation (verified data only)** · **`./gradlew` needs JAVA_HOME=Android Studio JBR** — see `.claude/memory/`.
 
 > Rules 3-6 are adopted + adapted from the mature `zw-infra-zyntastack` / `zw-voice` projects (Forgejo→GitHub, voice/hardware→Android). Canonical detail: `CONTRIBUTING.md` + `.claude/memory/`.
 

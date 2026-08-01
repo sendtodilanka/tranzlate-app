@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git.sh\"",
+            "if": "Bash(git *)",
+            "timeout": 40,
+            "statusMessage": "Checking git guard rails"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git.sh\"",
+            "if": "Bash(gh *)",
+            "timeout": 40,
+            "statusMessage": "Checking merge guard rails"
+          }
+        ]
+      }
+    ]
+  }
+}
