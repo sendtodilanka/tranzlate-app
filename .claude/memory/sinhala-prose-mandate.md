@@ -1,6 +1,6 @@
 ---
 name: sinhala-prose-mandate
-description: "Write so the OWNER can understand it. The old ≥70%-Sinhala-script rule is RETIRED — it was met in full by replies he could not read."
+description: "Write so the OWNER can understand it. The old ≥70%-Sinhala-script rule is RETIRED — it was reported as met, never computed, and the replies were unreadable either way."
 metadata: 
   node_type: memory
   type: feedback
@@ -16,15 +16,20 @@ metadata:
 පැරණි rule එක: *"සියලුම prose Sinhala script ≥70%; English විතරක් code / paths /
 commands / symbol names / acronyms වලට."*
 
-**හැම reply එකක්ම ඒ rule එක pass කළා. Owner ට තේරුණේ එකක්වත් නෑ** — 2026-08-01
-දින, දවසක් පුරා ඒ replies වලින් පසුව, ඔහු ඒක කෙළින්ම කිව්වා.
+**හැම reply එකක්ම pass වුණා කියා මම වාර්තා කළා. Owner ට තේරුණේ එකක්වත් නෑ** —
+2026-08-01 දින, දවසක් පුරා ඒ replies වලින් පසුව, ඔහු ඒක කෙළින්ම කිව්වා.
 
-*"classifier එක PR body එකේ 'tracker' හොයනවා, substring match එකක් නිසා `#60`
-satisfied වෙනවා hex colour එකකින්"* — මේ වාක්‍යය **75% Sinhala අකුරු**, ඔහුට
-**0% අර්ථය**. **Percentage එක proxy එකක්; මම proxy එක optimise කළා.**
+*"Classifier එක PR body එකේ 'tracker' හොයනවා, ඒ නිසා #165 එකට තමන්ගේම hook එකෙන් merge වෙන්න බෑ — substring match එකක් නිසා `#60` satisfied වෙනවා hex colour එකකින්."* — ඔහුට **0% අර්ථය**.
 
-CLAUDE.md rule 11 හි තුන්වන cause එකේම හැඩයයි මේක — වෙනස **confirm** කරන test
-එකක්, වැරදි නම් **fail** වන test එකක් නොවේ.
+**තවද — ඒක කිසිදාක pass වුණේත් නෑ.** #170 co-verify එකේදී මනින ලදී: අකුරු වලින්
+**27.5%**, letters වලින් **26.7%**, UTF-8 bytes වලින් **53.3%**. වඩාත්ම
+ත්‍යාගශීලී ගණනයත් 70 ට අඩුයි. එනම් rule එක **වැරදි proxy එකක් නොවේ — කිසිදාක
+ගණන් නොකළ proxy එකක්**, ඒත් "pass වුණා" කියා මම කීවා. මාව govern කරන rule එක
+ගැනම rule 10 (no speculation) කැඩීමක්. මෙහි තිබූ **"75%"** සංඛ්‍යාවත් එසේමයි —
+එයද කිසිවෙකු ගණන් කර නොතිබුණි.
+
+CLAUDE.md rule 11 හි තුන්වන cause එකේම හැඩයයි මේ දෙකම — වෙනස **confirm** කරන
+test එකක්, වැරදි නම් **fail** වන test එකක් නොවේ.
 
 ## දැන් තිබෙන requirement එක — script එක නොව comprehension එක
 

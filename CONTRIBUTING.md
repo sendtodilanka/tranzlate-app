@@ -10,7 +10,7 @@
 5. **`Fixes: #N` trailer** — every fix-class commit references its issue.
 6. **PR co-verify** — ≥1 lens by a session/agent ≠ author before merge; cross-model for high-risk.
 7. **Verify with tests** — no merge without the feature's tests + acceptance green.
-8. **No code copied from Tranzlate** (Mandatory Rule 1). **Sinhala prose ≥70%.**
+8. **No code copied from Tranzlate** (Mandatory Rule 1). **Replies to the owner are written for comprehension, not for a script ratio** — CLAUDE.md rule 9. (This line said "Sinhala prose ≥70%" until #170; that percentage is the retired proxy.)
 
 ## Branch naming
 | Work | Prefix | Example |
