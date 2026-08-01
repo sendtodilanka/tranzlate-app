@@ -6,6 +6,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -116,7 +117,10 @@ class AndroidOfflineVoiceCatalogTest {
 
             val ids = catalog(connector).offlineVoiceLanguageIds()
 
-            assertThat(ids).containsExactly("es", "pt-BR", "zh-TW", "he")
+            // `pt` and `zh` are the fix, not noise: a pt-BR voice must mark the
+            // bare `pt` row, because that is the row the packs screen draws.
+            // This assertion used to read exactly the defect — pt-BR alone.
+            assertThat(ids).containsExactly("es", "pt-BR", "pt", "zh-TW", "zh", "he")
         }
 
     /**
@@ -227,10 +231,103 @@ class AndroidOfflineVoiceCatalogTest {
             assertThat(connector.connections).isEqualTo(1)
         }
 
+    // ---- what a co-verify lens measured, each with its own red bar ---------
+
+    /**
+     * The catalog carries `fr-FR` and `pt-BR` rows next to bare `fr` and `pt`,
+     * and `canonicalId` stops at the first row that matches. So an `fr-FR`
+     * voice used to resolve to `fr-FR` — a row that is not offline-capable and
+     * therefore never drawn — while the French row that IS drawn got nothing.
+     * A device that can speak fr-FR can speak French.
+     *
+     * Spanish is here as the control: it passed before this fix only because
+     * the catalog happens to have no `es-ES` row to absorb the voice.
+     */
+    @Test
+    fun `a regional voice marks the language its row actually uses`() =
+        runTest {
+            val connector =
+                TestConnector(
+                    engine =
+                        FakeSpeechEngine(
+                            voices = listOf(offlineVoice("fr-FR"), offlineVoice("pt-BR"), offlineVoice("es-ES")),
+                        ),
+                )
+
+            val ids = catalog(connector).offlineVoiceLanguageIds()
+
+            assertThat(ids).containsAtLeast("fr", "pt", "es")
+        }
+
+    /**
+     * `TextToSpeech.shutdown()` is not safe by itself: AOSP routes it to
+     * `unbindService` with no guard, so releasing an engine that never bound
+     * throws `IllegalArgumentException: Service not registered`. A lens
+     * reproduced it. Escaping here reaches the picker's `stateIn`, which has
+     * no `.catch`, and takes the screen down.
+     */
+    @Test
+    fun `an engine that throws on release still answers instead of crashing`() =
+        runTest {
+            val connector =
+                TestConnector(
+                    engine =
+                        FakeSpeechEngine(
+                            voices = listOf(offlineVoice("en-US")),
+                            failOnShutdown = true,
+                        ),
+                )
+
+            val ids = catalog(connector).offlineVoiceLanguageIds()
+
+            assertThat(ids).containsExactly("en")
+        }
+
+    /**
+     * "Could not answer" is not "no voices". A busy or cold engine returns null
+     * from the read; caching that would make one unlucky moment at startup mean
+     * this device cannot speak for the rest of the process. The lens measured
+     * exactly that, twice.
+     */
+    @Test
+    fun `a device that could not answer is asked again, not written off`() =
+        runTest {
+            val connector = TestConnector(engine = FakeSpeechEngine(voices = null))
+            val subject = catalog(connector)
+
+            assertThat(subject.offlineVoiceLanguageIds()).isEmpty()
+            connector.engine.installVoices(listOf(offlineVoice("en-US")))
+            val second = subject.offlineVoiceLanguageIds()
+
+            assertThat(second).containsExactly("en")
+            assertThat(connector.connections).isEqualTo(2)
+        }
+
+    /**
+     * Even a real answer expires. Voices are installed from Settings →
+     * Text-to-speech, and PR-12's whole flow is to send the user there and
+     * bring them back — so an answer that never expires means the mark they
+     * just earned never appears. Same conclusion `RealOfflineModelManager`
+     * reached about its own cache, for the same reason.
+     */
+    @Test
+    fun `a voice installed while the app was away is noticed on return`() =
+        runTest {
+            val connector = TestConnector(engine = FakeSpeechEngine(voices = listOf(offlineVoice("en-US"))))
+            val subject = catalog(connector)
+
+            assertThat(subject.offlineVoiceLanguageIds()).containsExactly("en")
+            connector.engine.installVoices(listOf(offlineVoice("en-US"), offlineVoice("si-LK")))
+            advanceTimeBy(AndroidOfflineVoiceCatalog.ANSWER_FRESH_MS + 1)
+
+            assertThat(subject.offlineVoiceLanguageIds()).containsAtLeast("en", "si")
+        }
+
     private fun TestScope.catalog(connector: TestConnector) =
         AndroidOfflineVoiceCatalog(
             dispatchers = TestDispatcherProvider(StandardTestDispatcher(testScheduler)),
             connect = connector::connect,
+            elapsedMillis = { testScheduler.currentTime },
         )
 }
 
@@ -247,9 +344,16 @@ private fun offlineVoice(languageTag: String) = InstalledVoice(languageTag = lan
  * @param failOnRead the binder died between init and the read.
  */
 private class FakeSpeechEngine(
-    private val voices: List<InstalledVoice>? = emptyList(),
+    private var voices: List<InstalledVoice>? = emptyList(),
     private val failOnRead: Boolean = false,
+    /** AOSP's `shutdown()` routes to an unguarded `unbindService` — see the impl. */
+    private val failOnShutdown: Boolean = false,
 ) : SpeechEngine {
+    /** Lets a test move the device's voices between two asks. */
+    fun installVoices(installed: List<InstalledVoice>) {
+        voices = installed
+    }
+
     var shutdowns: Int = 0
         private set
 
@@ -260,6 +364,7 @@ private class FakeSpeechEngine(
 
     override fun shutdown() {
         shutdowns++
+        require(!failOnShutdown) { "Service not registered: android.speech.tts" }
     }
 }
 

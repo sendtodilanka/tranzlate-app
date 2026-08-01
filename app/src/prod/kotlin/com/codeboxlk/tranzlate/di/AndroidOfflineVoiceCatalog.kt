@@ -63,6 +63,14 @@ class AndroidOfflineVoiceCatalog internal constructor(
     private val dispatchers: DispatcherProvider,
     private val connect: (onReady: (Boolean) -> Unit) -> SpeechEngine,
     private val initTimeoutMillis: Long = INIT_TIMEOUT_MS,
+    /**
+     * Monotonic milliseconds, for the freshness window only. `System.nanoTime`
+     * rather than `SystemClock.elapsedRealtime` because this class is covered
+     * by JVM unit tests where the Android class is not mocked and every call
+     * throws — the same seam `RealOfflineModelManager` uses for the same
+     * reason. Tests pass the scheduler's virtual clock.
+     */
+    private val elapsedMillis: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
 ) : OfflineVoiceCatalog {
     constructor(
         context: Context,
@@ -75,10 +83,40 @@ class AndroidOfflineVoiceCatalog internal constructor(
     private val mutex = Mutex()
     private var cached: Set<String>? = null
 
+    /**
+     * Answered once, but not once FOREVER — and never cached when the device
+     * failed to answer.
+     *
+     * A busy or cold engine returns `null` from [readVoices], which is "could
+     * not answer", not "no voices". Storing that would make one unlucky moment
+     * at startup mean "this device cannot speak" for the rest of the process; a
+     * co-verify lens measured exactly that, twice.
+     *
+     * Even a real answer expires. Voices are installed and removed from
+     * Settings → Text-to-speech, which is somewhere the user goes WHILE this
+     * app is backgrounded — and PR-12's whole flow is to send them there and
+     * bring them back. `RealOfflineModelManager` reached the same conclusion
+     * about its own cache after its own lens, for the same reason and in the
+     * same words: a replayed answer is a claim about the device, not a reading
+     * of it.
+     */
     override suspend fun offlineVoiceLanguageIds(): Set<String> =
-        mutex.withLock { cached ?: enumerate().also { cached = it } }
+        mutex.withLock {
+            cached?.takeIf { !answerIsStale() } ?: enumerate().also { fresh ->
+                if (fresh != null) {
+                    cached = fresh
+                    answeredAtMillis = elapsedMillis()
+                }
+            } ?: cached.orEmpty()
+        }
 
-    private suspend fun enumerate(): Set<String> = withContext(dispatchers.io) { offlineIdsOf(readVoices()) }
+    private var answeredAtMillis: Long = Long.MIN_VALUE
+
+    private fun answerIsStale(): Boolean =
+        answeredAtMillis == Long.MIN_VALUE || elapsedMillis() - answeredAtMillis >= ANSWER_FRESH_MS
+
+    /** `null` = the device could not answer; the caller keeps whatever it had. */
+    private suspend fun enumerate(): Set<String>? = withContext(dispatchers.io) { readVoices()?.let(::offlineIdsOf) }
 
     /**
      * The engine round-trip, and the ONLY part of this class allowed to fail.
@@ -118,19 +156,66 @@ class AndroidOfflineVoiceCatalog internal constructor(
             // them means the same thing to a caller: no offline voices.
             voices = emptyList()
         } finally {
-            engine?.shutdown()
+            // shutdown() is NOT safe by itself. AOSP routes it to
+            // `unbindService` with no guard (TextToSpeech.java:956-961 →
+            // Connection.disconnect :2430), and `runAction` catches only
+            // RemoteException — so releasing an engine that never bound throws
+            // IllegalArgumentException: "Service not registered". A lens
+            // reproduced it. Escaping here would reach the picker's `stateIn`,
+            // which has no `.catch`, and crash the screen this seam exists to
+            // keep quiet.
+            try {
+                engine?.shutdown()
+            } catch (
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
+            ) {
+                // The engine is gone either way; that is all shutdown had to achieve.
+            }
         }
         return voices
     }
 
-    private fun offlineIdsOf(voices: List<InstalledVoice>?): Set<String> =
+    /**
+     * Every catalog id a voice can serve — not merely the first one it resolves
+     * to.
+     *
+     * `canonicalId` stops at the first catalog row that matches, and the
+     * catalog carries `fr-FR` and `pt-BR` rows alongside bare `fr` and `pt`. So
+     * an `fr-FR` voice used to resolve to `fr-FR` and stop — a row that is not
+     * offline-capable and therefore never drawn — while the French row that IS
+     * drawn got no mark at all. Spanish appeared to work only because the
+     * catalog happens to have no `es-ES` row to absorb it. A lens measured it:
+     * on every device with Google TTS, French and Portuguese were silently
+     * voice-less while `speak(text, "fr")` worked perfectly.
+     *
+     * A device that can speak `fr-FR` can speak French. So each voice
+     * contributes the exact id AND the base-language id, when the catalog
+     * knows them.
+     */
+    private fun offlineIdsOf(voices: List<InstalledVoice>): Set<String> =
         voices
-            .orEmpty()
             .filterNot(InstalledVoice::requiresNetwork)
-            .mapNotNull { LanguageTagResolver.canonicalId(it.languageTag) }
-            .toSet()
+            .flatMap { voice ->
+                val tag = voice.languageTag
+                listOfNotNull(
+                    LanguageTagResolver.canonicalId(tag),
+                    LanguageTagResolver.canonicalId(tag.substringBefore('-')),
+                )
+            }.toSet()
 
     internal companion object {
+        private const val NANOS_PER_MILLI = 1_000_000L
+
+        /**
+         * How long an answer stays good. Voices are installed from Settings →
+         * Text-to-speech, which is somewhere PR-12 deliberately sends the user
+         * — so an answer has to expire fast enough that coming back shows the
+         * voice they just installed. Short, because the cost of being wrong is
+         * a mark that is missing from a screen the user is looking at, and the
+         * cost of re-asking is one service bind.
+         */
+        internal const val ANSWER_FRESH_MS = 5_000L
+
         /**
          * Long enough for a cold engine bind (the first `TextToSpeech` of a
          * process starts the engine's own process), short enough that a wedged
