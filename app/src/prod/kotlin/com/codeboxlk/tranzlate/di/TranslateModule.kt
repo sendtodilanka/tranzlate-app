@@ -112,7 +112,8 @@ object TranslateModule {
     @Singleton
     fun storageProbe(
         @ApplicationContext context: Context,
-    ): StorageProbe = AndroidStorageProbe(context)
+        dispatchers: DispatcherProvider,
+    ): StorageProbe = AndroidStorageProbe(context, dispatchers)
 
     @Provides
     @Singleton

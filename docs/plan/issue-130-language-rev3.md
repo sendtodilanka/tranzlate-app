@@ -71,7 +71,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR-8 | `TranzlateSheetScaffold` / `TranzlateListSheet` (designsystem, string-free) | ✅ #137, 2026-08-01 |
 | PR-9 | Shared `DownloadGate` — deletes the duplicated consent logic ×2 | ⬜ |
 | PR-10 | Offline-voice seam + `<queries>` TTS_SERVICE + experiment E-V1 | ⬜ |
-| PR-11 | Storage walk (aggregate meter source) + experiment E-S1 | ⬜ |
+| PR-11 | Storage walk (aggregate meter source) — seam only; **E-S1 re-ruled to PR-15**, see below | 🔨 |
 
 ### Phase 4 — 16a Translate-to
 | PR | Scope | Status |
@@ -83,7 +83,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 |---|---|---|
 | PR-13 | Fold-posture WindowInfo extension + host-agnostic saveable contract + pendingConsent → SavedStateHandle | ⬜ |
 | PR-14 | 17a landscape two-pane | ⬜ |
-| PR-15 | 17b foldable two-leaf + aggregate meter | ⬜ |
+| PR-15 | 17b foldable two-leaf + aggregate meter — **E-S1 is a merge gate here** (re-ruled 2026-08-01) | ⬜ |
 | PR-16 | 17c/17d dialog host + E-D1 + measured jank budget gate | ⬜ |
 
 ### Phase 6 — sheets, first-run, snackbars
@@ -118,3 +118,26 @@ cross-model) · full gradle gate · strings ×3 locales + #115 ledger line ·
 E-V1 voice enumeration reliability · E-W1 requireWifi observability (gates
 19a's drawn actions + snackbar 20a-5) · E-D1 IME inside the tablet dialog ·
 E-S1 models-dir walk. Results are recorded in research docs as they run.
+
+### Re-ruling, 2026-08-01: E-S1 moves from PR-11 to PR-15 (owner-approved)
+
+The ruling assigned E-S1 — download a pack, walk the ML Kit models directory,
+pin the sum above zero, then simulate the directory being absent or renamed —
+to PR-11. The co-verify lens correctly flagged shipping PR-11 without it as a
+deviation, and under the owner's standing order a deviation stops and is
+reported rather than improvised. The owner ruled it moves.
+
+**Why it moves rather than gates PR-11.** PR-11 ships a SEAM and nothing else:
+`packsBytes()` has no caller, no screen reads it, and no user-visible statement
+depends on it. What E-S1 actually protects is the claim the METER makes — and
+the meter is PR-15. If the models directory has been renamed since the issue-90
+measurement, `packsBytes()` returns null on every device and the honest
+degrade (free-space only, never zero-as-fact) is what a user would see; the
+experiment is how we learn that before drawing a number, not before defining a
+function.
+
+**What this obliges.** E-S1 is now a PR-15 merge gate, listed in its tracker
+row. PR-15 may not merge on a reasoned path — it needs the device run, its
+result recorded in a research doc, and the outcome in the PR body. Risk R8 in
+the ruling keeps E-S1 as its disconfirming experiment; only the PR it gates
+changed.
