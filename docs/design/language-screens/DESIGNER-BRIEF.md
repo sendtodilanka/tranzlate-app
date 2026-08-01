@@ -2,23 +2,24 @@
 
 **Give this to Claude Design at the start of every language-screens task.**
 
-> ## Status: rev 4 is the spec of record, and it holds ✅
+> ## Status: rev 5 is the spec of record — the commission came back complete ✅
 >
-> `language-screens-spec.html` is rev 4. Re-verified the same way — against the
-> drawings, never the changelog: **zero user-facing percentages** (the only `%`
-> in the file is the CSS keyframe driving the indeterminate bar), **zero per-row
-> sizes**, every MB figure either aggregate ("110 MB used", "12 MB free") or the
-> sanctioned **20–45 MB** range, which is now the only range in the file. Pause /
-> resume / queue / Undo / version appear only in prose explaining their absence.
+> `language-screens-spec.html` is rev 5. **All sixteen §11 corrections are in,
+> verified against the drawings**, plus the structural request: every drawing
+> now carries a `data-screen-label` — **26 labels became 54**, so the ten sheets,
+> the five snackbars, 20c, 20e and 21c can no longer be skipped by a reviewer
+> enumerating frames.
 >
-> Rev 4 delivers the empty state commissioned in §8 (**20f**) and adds an
-> unrequested but welcome **ad layer** (§7 of the spec).
+> The check that caught rev 4's worst defect was re-run as a script this time:
+> every drawn row's ISO code was cross-referenced against
+> `BundledLanguageCatalog.offlineCapableIds`, across all 54 frames. **Zero
+> contradictions** — nothing offers a pack that cannot exist, nothing marks a
+> capable language online-only. Banned figures re-swept in text nodes only:
+> no user-facing percentages, the only MB figures are the sanctioned range, the
+> aggregate totals, and 19b's tight-space number where it belongs.
 >
-> **It also carries nine defects, three of them in the new sections** — the
-> worst offers a download on two languages that can never have a pack. The full
-> list, and the retraction of this review's own first pass, is in **§9**; the ad
-> verdict in **§10**; the rev 5 correction list in **§11**. §7's older leftovers
-> are closed.
+> §9 keeps the rev 4 defect list with each item's outcome. §11 is the commission
+> and its verification. Nothing is outstanding.
 
 This brief exists because the spec was first drawn without knowing what the
 Android platform will and will not tell us at runtime. Nothing below is a matter
@@ -272,7 +273,12 @@ pattern from 18a); no invented figures, per the rest of this brief. The rev3
 
 ---
 
-## 9. Rev 4 review (2026-08-01) — rev 4 is the spec of record, with 9 defects to fix
+## 9. Rev 4 review (2026-08-01) — ALL NINE DEFECTS FIXED IN REV 5
+
+> **Outcome:** every defect A–I below was corrected in rev 5 and re-verified
+> against the drawings; see §11 for the item-by-item evidence. The section is
+> kept intact because the *method* failures it records — enumerating labels
+> instead of drawings, and de-duplicating a scan — are the reusable part.
 
 **Read this section before drawing rev 5.** The first pass of this review was
 too generous, and an independent adversarial lens took it apart. What follows is

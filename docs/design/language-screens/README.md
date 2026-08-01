@@ -1,12 +1,32 @@
-# Offline Translator — Language screens spec · rev 4
+# Offline Translator — Language screens spec · rev 5
 
-`Offline Translator - Language Screens Spec rev4.html` — open in any browser. Self-contained: fonts, icons and frame code are inlined, so it works offline and can be shared as one file.
+`Offline Translator - Language Screens Spec rev5.html` — open in any browser. Self-contained: fonts, icons and frame code are inlined, so it works offline and can be shared as one file.
 
-## Rev 4 — what changed since rev 3
+## Rev 5 — corrections only, no new screens
 
-- **20f · Manage packs with zero packs.** The state every fresh install opens on. The storage card degrades honestly (free space is the only figure; the packs legend reads "none yet"), the 18a "No packs yet" block and its keyboard/locale suggestions carry the way forward, and the hygiene nudge, dated rows and "of 59" counter are all absent because nothing exists yet to be stale or counted.
-- **Section 7 · Ads for free users.** Two slots in the whole feature — an anchored adaptive banner on the picker and Manage packs, and one native card at the tail of the Manage packs list — plus the refused placements (21c) and a full implementation guide: every screen ruled, layout numbers, no-fill behaviour, UMP consent, build order, open owner decisions.
-- **Two documentation leftovers fixed**, both flagged in the brief's §7a: the "three rules" no longer claims rows state pack size, and the sanctioned range reads 20–45 MB throughout.
+Every item below was a frame disagreeing with another frame, or with what the app can actually do (brief §9/§11).
+
+**Drawings**
+
+- **21b** — Azerbaijani and Basque now read `ONLINE ONLY`; neither is in the offline-capable set. Belarusian keeps its download.
+- **21b** — running state restored: Afrikaans is the selected source (Spanish is the target), the pinned section is `Recent`, and the list header reads `5 of 59 packs on device`.
+- **19m** — redrawn on Afrikaans, the language the document actually has as the source.
+- **20f** — French reads `Common where you are`, matching 18a.
+- **Free space** — the running state reads `1.4 GB free`, so the in-flight Arabic download is possible. 19b keeps `12 MB` as its own tight-space figure. Every storage bar was re-drawn to agree with its figures: 110 MB of packs cannot plot against a whole device without lying about one number or the other, so on 20b, 20d, 21a **and 19b** the bar is used-against-free and the packs figure stands on its own — in the hero line on the Manage packs cards, and in 20e, which is where the breakdown belongs. 20f was already self-consistent and is untouched. One vocabulary and one colour for the used segment across all five cards.
+- **19i and 19j are cut**, with the reason stated where each stood. Detection is on-device, so the Detect row's `ONLINE ONLY` chip is gone everywhere and 19i has no trigger; 19j was opened by a mark that is only drawn when offline voice exists.
+- **The failed row** (Hindi) has its `HI` avatar. Its position under the A block is now declared in 15a's caption as a drawing convenience — in the app it keeps its alphabetical slot.
+- **The speaker mark** means *this device can speak the language offline* — the installed voice, independent of the translate pack. Explainers in 16a, 17a, 17b and 17d say so, which is why the mark can sit on a row whose pack is not downloaded.
+- **`workspace_premium` → `info`** on the "packs are free and unlimited" card (15b, 17b ×2). Its `Learn more` opens 19n, stated in the caption.
+
+**Captions** — 15a drops "and size"; 15b drops "the Pro ceiling"; 18a and section 3 say the buttons read `Get`.
+
+**Ad guide (§7)**
+
+- One `showAds` boolean split into `mayComposeSlot` and `mayRequestAd`, so a download in flight stops new requests without tearing out a filled banner.
+- One naming for the unit ids: `translator_picker_banner`, `translator_managepacks_banner`, `translator_managepacks_native`, on the drawings too.
+- The native mock draws its required `{icon}` and no longer draws `{store}` — store and rating exist only on app-install ads, and the inventory says so.
+
+**Structural** — every drawing now carries `data-screen-label`, including the eight sheets, the five snackbars, 20c, 20e and 21c (54 in total, up from 26), so enumerating labels enumerates the whole document.
 
 ## What is inside
 
@@ -14,7 +34,7 @@
 2. **Translate to · phone portrait** — 16a, light + dark.
 3. **First run, no packs** — 18a phone (list + download confirm sheet), 18b foldable.
 4. **Adaptive layouts** — 17a landscape phone 892×412, 17b foldable 760×812, 17c tablet portrait 800×1280, 17d tablet landscape 1280×800; each drawn for both From and To.
-5. **Sheets** — ten cases (mobile data, no space, failed download, remove, remove-in-use, offline, detect offline, no offline voice, already-the-source, how it works), light + dark.
+5. **Sheets** — eight cases (mobile data, no space, failed download, remove, remove-in-use, offline, already-the-source, how it works), light + dark. 19i (detect offline) and 19j (no offline voice) were cut in rev 5: neither had a trigger that can fire.
 6. **Snackbars and Manage packs** — 20a five snackbars (download started, ready, removed with "Download again", failed, waiting for Wi-Fi), 20b Manage packs on phone with the storage-hygiene nudge, 20c pack actions list sheet, 20d Manage packs at 1280×800 as list-detail, 20e the Free up space cleanup sheet, 20f Manage packs with zero packs — the fresh-install state.
 
 7. **Ads for free users** — 21a Manage packs with both slots (anchored banner + native card), 21b Translate from with the banner, 21c the two refused placements, and the implementation guide: every screen ruled, the slot inventory, layout numbers, no-fill behaviour, UMP consent, build order and the open owner decisions.
@@ -66,9 +86,9 @@ Every figure the app cannot source has been removed from the drawings, per `DESI
 
 **The ✕ on a downloading row is labelled "Stop download and remove"** and never "Cancel" — there is no pause and no resume.
 
-**Kept, because the platform supports it:** the offline-voice speaker mark (`Voice.isNetworkConnectionRequired`), aggregate storage meters, saved-phrase counts per language, keyboard/locale suggestions on first run, and all four adaptive layouts.
+**Kept, because the platform supports it:** the offline-voice speaker mark (`Voice.isNetworkConnectionRequired`, which reports the installed device voice — not the translate pack), aggregate storage meters, saved-phrase counts per language, keyboard/locale suggestions on first run, and all four adaptive layouts.
 
-Sheets are now ten (19a, 19b, 19d, 19f, 19g, 19h, 19i, 19j, 19m, 19n) and snackbars five.
+Sheets are now eight (19a, 19b, 19d, 19f, 19g, 19h, 19m, 19n) and snackbars five. 19i and 19j joined 19e, 19k and 19l as cut — in every case because no trigger can fire.
 
 ## Sheet or snackbar
 
