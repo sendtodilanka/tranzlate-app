@@ -114,14 +114,41 @@ class PickerHostAgnosticTest {
 
     /**
      * The other half of the same rule: the position the list starts at must come
-     * from the caller. `LazyListState()` with no arguments always starts at the
+     * from the caller. `LazyGridState()` with no arguments always starts at the
      * top — a restored scroll position silently thrown away, which is exactly
      * what a state-loss defect looks like from the outside.
+     *
+     * **This is the test 17a is most likely to break** (#130 PR-14). A landscape
+     * arrangement is reached by ROTATING, which destroys the composition and
+     * keeps the ViewModel — so a landscape body that built its own list state
+     * would throw away the scroll position on every rotation and on no other
+     * action, which is exactly the shape of defect nobody notices in review.
+     * There is one grid, seeded once, for both arrangements.
      */
     @Test
     fun `the list is seeded from the position it was handed`() {
         assertThat(shippedPickerSource())
-            .contains("LazyListState(listPosition.index, listPosition.offset)")
+            .contains("LazyGridState(listPosition.index, listPosition.offset)")
+    }
+
+    /**
+     * …and it is built ONCE, not once per arrangement.
+     *
+     * Seeding correctly in two places is still two scroll positions: rotating
+     * between them re-enters the other branch's `remember`, which was keyed to a
+     * composition that no longer exists, and the seed only helps the first time.
+     * The single construction is what makes the position survive the rotation
+     * rather than merely start in the right place.
+     */
+    @Test
+    fun `the picker builds exactly one lazy state`() {
+        val constructions = Regex("""LazyGridState\(""").findAll(shippedPickerSource()).count()
+
+        assertWithMessage(
+            "LanguagePickerScreen.kt constructs $constructions lazy states. 17a and 15a are two " +
+                "arrangements of ONE list; a state per arrangement loses the scroll on every rotation.",
+        ).that(constructions)
+            .isEqualTo(1)
     }
 
     /**
@@ -188,9 +215,21 @@ private const val PICKER_SOURCE =
     "feature/language/src/main/kotlin/com/codeboxlk/tranzlate/feature/language/LanguagePickerScreen.kt"
 
 /**
- * The two ways Compose addresses state through the HOST's `SaveableStateHolder`
- * instead of through the picker. Neither may be imported by, or named in, the
- * shipped screen — `rememberLazyListState` is `rememberSaveable` over a
- * `LazyListState`, so the pair is one rule, not two.
+ * Every way Compose addresses state through the HOST's `SaveableStateHolder`
+ * instead of through the picker. None may be imported by, or named in, the
+ * shipped screen: each of the three `remember*` helpers is `rememberSaveable`
+ * over one kind of scroll state, so this is one rule, not four.
+ *
+ * `rememberLazyGridState` and `rememberScrollState` were added by #130 PR-14,
+ * which gave the picker a grid and a scrolling side pane. Neither door existed
+ * when PR-13 wrote the rule, and a rule that lists the doors has to be extended
+ * whenever one is cut — which is the honest cost of naming symbols rather than
+ * resolving them, and is written down here rather than left to be rediscovered.
  */
-private val HOST_SCOPED_STATE = listOf("rememberSaveable", "rememberLazyListState")
+private val HOST_SCOPED_STATE =
+    listOf(
+        "rememberSaveable",
+        "rememberLazyListState",
+        "rememberLazyGridState",
+        "rememberScrollState",
+    )

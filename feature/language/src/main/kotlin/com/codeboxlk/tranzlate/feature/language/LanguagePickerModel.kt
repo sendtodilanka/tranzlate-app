@@ -2,12 +2,14 @@ package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
+import com.codeboxlk.tranzlate.core.ui.FoldPosture
 import com.codeboxlk.tranzlate.core.ui.languageAvatarCode
 import com.codeboxlk.tranzlate.core.ui.languageDisplayName
 import com.codeboxlk.tranzlate.core.ui.languageEndonym
@@ -22,12 +24,17 @@ const val RECENT_LIMIT = 5
  * Where the picker's list is standing: the first row still on screen and how far
  * it is pushed off the top edge.
  *
- * The two numbers `LazyListState` can be built from and restored to, named as one
+ * The two numbers `LazyGridState` can be built from and restored to, named as one
  * thing so they cannot be persisted or passed half-way. Kept OUT of the
  * composable that owns the list for the reason #130 PR-13 exists: a
- * `rememberLazyListState()` is addressed through whichever `SaveableStateHolder`
+ * `rememberLazyGridState()` is addressed through whichever `SaveableStateHolder`
  * is drawing the picker, so it is lost the moment the picker is drawn from
  * somewhere else. [LanguagePickerViewModel.listPosition] is the home instead.
+ *
+ * [index] counts ITEMS, not rows of the layout — which is what lets the same
+ * position mean the same language in 15a's single column and 17a's two (#130
+ * PR-14). A layout that indexed pairs would land every restored position at
+ * twice its language.
  */
 @Immutable
 data class PickerListPosition(
@@ -38,6 +45,80 @@ data class PickerListPosition(
         /** A list that has not been scrolled. */
         val Top = PickerListPosition()
     }
+}
+
+/**
+ * How the picker arranges itself in the window it was handed (17a).
+ *
+ * @property twoPane the side pane is drawn beside the catalog instead of
+ *   scrolling above it.
+ * @property columns how many language columns the catalog grid gets. Always 1 in
+ *   the single-pane arrangement; 1 or 2 in two-pane, depending on what fits.
+ */
+@Immutable
+data class PickerArrangement(
+    val twoPane: Boolean,
+    val columns: Int,
+) {
+    companion object {
+        /** 15a / 16a as shipped: one column, everything in one scroller. */
+        val SinglePane = PickerArrangement(twoPane = false, columns = 1)
+    }
+}
+
+/** The gap between the side pane and the catalog. */
+internal val PANE_GUTTER: Dp = 8.dp
+
+/**
+ * Below this the two-pane arrangement has nowhere to put its second pane:
+ * [Dimensions.pickerSidePaneWidth] + [PANE_GUTTER] + one
+ * [Dimensions.pickerColumnMin] column + the [Dimensions.touchTargetMin] the A–Z
+ * rail overlays on the trailing edge.
+ */
+private val TWO_PANE_MIN_WIDTH: Dp =
+    Dimensions.pickerSidePaneWidth + PANE_GUTTER + Dimensions.pickerColumnMin + Dimensions.touchTargetMin
+
+/**
+ * Which arrangement 17a's window gets — the whole of PR-14's gate, in one pure
+ * function so a JVM test can drive it (this module has no Compose test runtime,
+ * #186, and CI compiles instrumented tests without running them, #40).
+ *
+ * Three conditions, and each one is a layout this PR must NOT steal:
+ *
+ * - **[posture] must be [FoldPosture.FLAT].** A half-open foldable is 17b's
+ *   two-leaf layout with a crease gutter (PR-15), and a tabletop fold puts a
+ *   dead strip across the middle; neither is a side pane beside a catalog. Note
+ *   this asks POSTURE, not `WindowInfo.hinged` — a dual-screen device held fully
+ *   open is FLAT and still separating, and it is 17a's layout it should get,
+ *   with the hinge handled where content is placed rather than by refusing the
+ *   arrangement outright.
+ * - **[heightCompact] must hold.** A tall window is either phone portrait (15a /
+ *   16a) or a tablet, and a tablet is 17c/17d's dialog host (PR-16). Height is
+ *   the axis that separates 892×412 from 1280×800 — width cannot, because both
+ *   are at least medium.
+ * - **[availableWidth] must clear [TWO_PANE_MIN_WIDTH].** A dp sum rather than a
+ *   size class, for the reason issue #99 recorded: the owner's OnePlus 7 Pro is
+ *   832dp in landscape, 8dp short of the EXPANDED breakpoint, so a class-gated
+ *   17a would leave a real device in the portrait layout while it has room for
+ *   both panes.
+ *
+ * @param availableWidth the width the picker's own content was handed — the
+ *   `BoxWithConstraints` maximum, not the raw window, so a nav rail or a
+ *   side-by-side host is already subtracted.
+ */
+fun pickerArrangement(
+    availableWidth: Dp,
+    heightCompact: Boolean,
+    posture: FoldPosture,
+): PickerArrangement {
+    val twoPane =
+        posture == FoldPosture.FLAT &&
+            heightCompact &&
+            availableWidth >= TWO_PANE_MIN_WIDTH
+    if (!twoPane) return PickerArrangement.SinglePane
+    val catalogWidth = availableWidth - Dimensions.pickerSidePaneWidth - PANE_GUTTER - Dimensions.touchTargetMin
+    val columns = if (catalogWidth >= Dimensions.pickerColumnMin * 2) 2 else 1
+    return PickerArrangement(twoPane = true, columns = columns)
 }
 
 /**
@@ -340,6 +421,18 @@ data class PickerListPlan(
     val recentHeader: RecentHeader?,
     val showAllHeader: Boolean,
     val railOffset: Int,
+    /**
+     * 17a's side pane is drawn. False in the single-pane arrangement, and false
+     * in two-pane when the pane would have nothing in it — see [pickerListPlan].
+     */
+    val sidePane: Boolean = false,
+    /**
+     * The on-device counter sits in the top bar rather than beside the
+     * "All languages" header. 17a moves it there because in two-pane that header
+     * heads only the catalog pane, while the counter is a statement about the
+     * whole screen.
+     */
+    val counterInTopBar: Boolean = false,
 )
 
 /**
@@ -380,9 +473,21 @@ data class PickerListPlan(
  *   the same place in the 16a frame, appears the moment the device answers, and
  *   [railOffset] never has to know it exists.
  *
+ * **17a moves three of those things out of the list entirely**, and that is the
+ * whole of [twoPane]'s effect here. The detect row, the recents section and the
+ * legend go into the side pane, which is not the catalog's scroller — so
+ * [railOffset] must stop counting them, or every rail letter lands as many rows
+ * short as the side pane happens to hold. It is the same class of silent,
+ * deterministic miss the third rule above describes, arriving from the opposite
+ * direction: there, an uncounted item; here, items counted that are no longer
+ * there. A bonus the arrangement gets for free: nothing can be inserted at index
+ * 0 of the anchored catalog any more, because the two things that arrive late —
+ * the device's voice answer and the recents store — both land in the side pane.
+ *
  * @param detectRowPresent the source-only "Detect language" pseudo-row.
  * @param anyVoiceMark at least one row would draw the speaker ([showsVoiceMark]).
  * @param railed the A–Z rail is up: a full, unfiltered, non-empty catalog.
+ * @param twoPane the 17a landscape arrangement ([PickerArrangement.twoPane]).
  */
 fun pickerListPlan(
     role: LanguageRole,
@@ -390,6 +495,7 @@ fun pickerListPlan(
     recentCount: Int,
     anyVoiceMark: Boolean,
     railed: Boolean,
+    twoPane: Boolean = false,
 ): PickerListPlan {
     val showVoiceLegend = role == LanguageRole.TARGET && anyVoiceMark
     val recentHeader =
@@ -400,16 +506,27 @@ fun pickerListPlan(
         }
     // Emission order, and therefore counting order: detect row · recents
     // (header + rows) · "All languages" header · the alphabet. The legend is
-    // deliberately absent from both — it is not an item of this list.
-    val railOffset =
-        (if (detectRowPresent) 1 else 0) +
-            (if (recentHeader == null) 0 else recentCount + 1) +
-            (if (railed) 1 else 0)
+    // deliberately absent from both — it is not an item of this list. In
+    // two-pane the first two move to the side pane and stop being counted; only
+    // the "All languages" header is left above the alphabet.
+    val aboveTheAlphabet =
+        if (twoPane) {
+            0
+        } else {
+            (if (detectRowPresent) 1 else 0) + (if (recentHeader == null) 0 else recentCount + 1)
+        }
+    // A side pane with nothing in it is 272dp of empty surface next to the
+    // results — reachable the moment a search clears the recents on the source
+    // side. EDGE_CASES' no-dead-end rule cuts the same way for furniture as it
+    // does for errors: the pane goes, and the catalog takes the width back.
+    val sidePane = twoPane && (recentHeader != null || detectRowPresent || showVoiceLegend)
     return PickerListPlan(
         showVoiceLegend = showVoiceLegend,
         recentHeader = recentHeader,
         showAllHeader = railed,
-        railOffset = railOffset,
+        railOffset = aboveTheAlphabet + (if (railed) 1 else 0),
+        sidePane = sidePane,
+        counterInTopBar = twoPane,
     )
 }
 

@@ -99,6 +99,46 @@ object Dimensions {
     /** A–Z rail active-letter pill. */
     val pickerRailPill: Dp = 16.dp
 
+    // ---- Language picker, landscape two-pane (17a, issue #130 PR-14) --------
+    // Measured off the export's `from · landscape` / `to · landscape` frames
+    // (892×412), except where a measurement would break an a11y floor — noted
+    // on the token that changed.
+
+    /**
+     * The 17a side pane: recents, plus the role's own extra (the "Detect
+     * language" row on the source side, the offline-voice legend on the target
+     * side). Fixed, as the export draws it — a proportional pane would grow the
+     * shortcut list at the expense of the catalog, which is the wrong way round.
+     */
+    val pickerSidePaneWidth: Dp = 272.dp
+
+    /**
+     * The narrowest a language column may be before it stops being one.
+     *
+     * Token arithmetic, not taste: [pickerLeadingInset] 12 + [iconChip] 40 +
+     * 16 gap + 96 for a name + 8 gap + [touchTargetMin] 48 for the trailing
+     * control + 16 end margin = 236, rounded up. The 96dp name allowance is the
+     * one judgement in the sum, and it is roughly six characters of `bodyLarge`
+     * — below that every row in the catalog ellipsises.
+     */
+    val pickerColumnMin: Dp = 240.dp
+
+    /**
+     * The 17a top bar, which carries the title, the search field and the
+     * on-device counter in ONE row.
+     *
+     * The export draws 52dp around a 40dp search field. The field here is
+     * [touchTargetMin] instead — C-14 makes 48dp the authoritative a11y floor
+     * and a 40dp target is below it — so the bar is 56dp, which is that field
+     * plus its own 4dp of breathing room. Still 8dp shorter than
+     * [topBarHeight], which is the point of the landscape treatment: at 412dp
+     * of window height the standard bar costs a whole extra row of languages.
+     */
+    val pickerCompactBarHeight: Dp = 56.dp
+
+    /** 17a's inline search field stops here rather than stretching to the counter. */
+    val pickerSearchMaxWidth: Dp = 420.dp
+
     /** ListDetailPaneScaffold: list/input pane minimum (C-13). */
     val paneListMin: Dp = 360.dp
 

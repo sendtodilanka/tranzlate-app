@@ -44,7 +44,39 @@ and points at what **does** work; it promises no date, because we cannot keep on
 
 | Key | Type | `en` | Args | Notes |
 |-----|------|------|------|-------|
-| `text_lang_detect` | string | `Detect language` | — | the auto-detect entry on a language pill (Google Translate parity). Lives in `:core:ui` because it is read by the shared `languageLabel()` composable, which is called today from `:feature:language`'s `LanguagePickerScreen` and from `:feature:text`'s `HomeScreen` and `ComposerScreen` — verified by call-site sweep. Duplicating the label per feature is how two surfaces start disagreeing about the same word. |
+| `text_lang_detect` | string | `Detect language` | — | the auto-detect entry on a language pill (Google Translate parity). Lives in `:core:ui` because it is read by the shared `languageLabel()` composable, which is called today from `:feature:language`'s `LanguagePickerScreen` and from `:feature:text`'s `HomeScreen` and `ComposerScreen` — verified by call-site sweep. Duplicating the label per feature is how two surfaces start disagreeing about the same word. **Variant settle (#130 PR-14) — see below.** |
+
+> ### `text_lang_detect` is ONE key for every shape the Detect affordance takes
+>
+> The rev3 ruling gives PR-14 "Detect chip variant string ruling-key settle
+> (C-conventions single key)". Settled, against the rev 5 export rather than
+> against the ruling text:
+>
+> - **The words never change with the shape.** Decoding the spec's bundler block
+>   and reading each frame's markup, the Detect affordance is drawn as a list row
+>   in `15a picker light/dark`, in 17a's `from · landscape` and in
+>   `from · foldable`, and as a **chip in the top bar** in `from · tablet portrait`
+>   and `from · tablet landscape`. All five spell `Detect language`. The chip is a
+>   different container, not different copy.
+> - **The one frame that says something else is a rejected one.** `15b picker`
+>   draws `Detect language automatically`; 15b is REJECT §7.8 in the ruling, so
+>   that string is not built and no key is reserved for it.
+> - **Therefore: no `text_lang_detect_chip`, and no per-variant key of any kind.**
+>   PR-16 builds the tablet chip against THIS key. C-3 already says one key has one
+>   home; this row says which shapes that one key has to cover, so the question
+>   does not get re-opened by the PR that draws a new one.
+> - **`languageBlockLabel()` is the precedent, not an exception:** it upper-cases
+>   this same key for the result block. One key, three presentations, already
+>   shipped.
+>
+> PR-14 itself adds **zero** string keys — its landscape bar reuses
+> `cd_lang_back`, `text_lang_sheet_{source,target}_title`,
+> `text_lang_on_device_count` and `text_lang_all_header`. That is deliberate:
+> `:feature:language` already carries TWO divergent sets of the same three
+> failure messages and the same four mobile-data dialog strings
+> (`text_lang_error_*` / `offline_error_*`, `text_lang_data_dialog_*` /
+> `offline_data_dialog_*` — issue #175 open), and the ruling's REJECT §7.8 bounces
+> a third copy at review.
 
 ## 4. Camera scaffold (`:feature:camera`)
 

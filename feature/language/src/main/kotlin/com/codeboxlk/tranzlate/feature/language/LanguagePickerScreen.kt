@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate.feature.language
 
 import android.text.format.Formatter
 import androidx.annotation.StringRes
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,18 +14,24 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -78,6 +85,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
@@ -91,6 +99,7 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 import com.codeboxlk.tranzlate.core.ui.languageLabel
+import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 import com.codeboxlk.tranzlate.core.ui.searchNormalize
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -198,8 +207,21 @@ fun LanguagePickerScreen(
  * outward — which is how M3 draws list containers. The margin rule still
  * governs the app bar and the search field.
  *
+ * **Landscape (17a) is an ARRANGEMENT of this same screen, not a second one.**
+ * Each landscape frame in the export carries one title — "Translate from" OR
+ * "Translate to" — so 17a is one picker in one role, split into a shortcut pane
+ * and a catalog pane; it is emphatically not a source picker beside a target
+ * picker. Composing this screen twice would therefore draw a screen the design
+ * does not have, and would hand two panes one ViewModel's single search query
+ * and single scroll position. So the branch lives here, guarded by
+ * [pickerArrangement], and the catalog, the rows, the search and the state stay
+ * in one place.
+ *
  * @param sizes measured on-disk bytes per tag; empty in production today, see
  *   [LanguageRowState.Downloaded].
+ * @param arrangementOverride PREVIEWS ONLY. Production leaves it null so the
+ *   window answers; a preview cannot resize its host, so it says which
+ *   arrangement it is showing.
  */
 @Composable
 fun LanguagePickerContent(
@@ -221,8 +243,8 @@ fun LanguagePickerContent(
     onDismissConsent: () -> Unit = {},
     listPosition: PickerListPosition = PickerListPosition.Top,
     onListPositionChange: (PickerListPosition) -> Unit = {},
+    arrangementOverride: PickerArrangement? = null,
 ) {
-    val spacing = LocalSpacing.current
     val title =
         when (target) {
             LanguageRole.SOURCE -> stringResource(R.string.text_lang_sheet_source_title)
@@ -245,10 +267,88 @@ fun LanguagePickerContent(
         onConfirm = onDownloadAnyway,
         onDismiss = onDismissConsent,
     )
+    // The arrangement is read from the CONSTRAINTS this screen was handed, not
+    // from the raw window: a nav rail, or a host that draws the picker beside
+    // something else, has already been subtracted here and has not been there.
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val window = rememberWindowInfo()
+        val arrangement =
+            arrangementOverride
+                ?: pickerArrangement(maxWidth, window.heightCompact, window.posture)
+        val railed = !sections.searching && !sections.catalogEmpty
+        val plan =
+            remember(target, sections.detect, sections.recent, sections.anyVoiceMark, railed, arrangement) {
+                pickerListPlan(
+                    role = target,
+                    detectRowPresent = sections.detect != null,
+                    recentCount = sections.recent.size,
+                    anyVoiceMark = sections.anyVoiceMark,
+                    railed = railed,
+                    twoPane = arrangement.twoPane,
+                )
+            }
+        PickerScaffold(
+            title = title,
+            target = target,
+            sections = sections,
+            plan = plan,
+            arrangement = arrangement,
+            railed = railed,
+            query = query,
+            onQueryChange = onQueryChange,
+            catalogSize = languages.size,
+            onSelect = onSelect,
+            onBack = onBack,
+            onDownload = onDownload,
+            onStop = onStop,
+            listPosition = listPosition,
+            onListPositionChange = onListPositionChange,
+        )
+    }
+}
+
+/**
+ * The chrome, and which of the two bodies goes under it.
+ *
+ * Split out of [LanguagePickerContent] only so the arrangement can be decided
+ * above it — everything here is the same screen either way.
+ */
+@Composable
+private fun PickerScaffold(
+    title: String,
+    target: LanguageRole,
+    sections: PickerSections,
+    plan: PickerListPlan,
+    arrangement: PickerArrangement,
+    railed: Boolean,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    catalogSize: Int,
+    onSelect: (String) -> Unit,
+    onBack: () -> Unit,
+    onDownload: (String) -> Unit,
+    onStop: (String) -> Unit,
+    listPosition: PickerListPosition,
+    onListPositionChange: (PickerListPosition) -> Unit,
+) {
+    val spacing = LocalSpacing.current
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
-        topBar = { PickerTopBar(title = title, onBack = onBack) },
-        modifier = modifier.fillMaxSize(),
+        topBar = {
+            if (arrangement.twoPane) {
+                PickerCompactBar(
+                    title = title,
+                    onBack = onBack,
+                    query = query,
+                    onQueryChange = onQueryChange,
+                    catalogSize = catalogSize,
+                    counts = if (plan.counterInTopBar) sections.counts else null,
+                )
+            } else {
+                PickerTopBar(title = title, onBack = onBack)
+            }
+        },
+        modifier = Modifier.fillMaxSize(),
     ) { padding ->
         Column(
             modifier =
@@ -257,20 +357,27 @@ fun LanguagePickerContent(
                     .padding(padding)
                     .padding(horizontal = adaptiveMarginShim()),
         ) {
-            PickerSearchField(
-                query = query,
-                onQueryChange = onQueryChange,
-                catalogSize = languages.size,
-                modifier =
-                    Modifier.padding(
-                        start = spacing.md16,
-                        end = spacing.md16,
-                        bottom = spacing.sm8,
-                    ),
-            )
-            PickerList(
+            // Portrait keeps the search field in the body; 17a has already put it
+            // in the bar, where the row it saves is a row of languages.
+            if (!arrangement.twoPane) {
+                PickerSearchField(
+                    query = query,
+                    onQueryChange = onQueryChange,
+                    catalogSize = catalogSize,
+                    modifier =
+                        Modifier.padding(
+                            start = spacing.md16,
+                            end = spacing.md16,
+                            bottom = spacing.sm8,
+                        ),
+                )
+            }
+            PickerBody(
                 target = target,
                 sections = sections,
+                plan = plan,
+                arrangement = arrangement,
+                railed = railed,
                 query = query,
                 onSelect = onSelect,
                 onDownload = onDownload,
@@ -357,65 +464,204 @@ private fun rememberPickerSections(
 }
 
 /**
- * The list plus its A–Z rail. The rail overlays the list rather than taking a
- * column of its own, exactly as the design draws it; it is hidden while a
- * search is running, because an index over five results indexes nothing.
+ * Which of the two bodies is drawn — everything below this point is shared.
+ *
+ * Portrait stacks the shortcuts on top of the catalog in one scroller. 17a puts
+ * the shortcuts in a side pane and gives the catalog the rest, in one or two
+ * columns depending on what fits ([PickerArrangement.columns]).
  */
 @Composable
-private fun PickerList(
+private fun PickerBody(
     target: LanguageRole,
     sections: PickerSections,
+    plan: PickerListPlan,
+    arrangement: PickerArrangement,
+    railed: Boolean,
     query: String,
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
     onClearQuery: () -> Unit,
-    listPosition: PickerListPosition = PickerListPosition.Top,
-    onListPositionChange: (PickerListPosition) -> Unit = {},
+    listPosition: PickerListPosition,
+    onListPositionChange: (PickerListPosition) -> Unit,
 ) {
     val spacing = LocalSpacing.current
-    // `remember`, NOT `rememberLazyListState()`. The saveable version keeps a
-    // SECOND copy of this position inside the host's SaveableStateHolder, and on
-    // a host change it is the copy that comes back empty — while quietly winning
-    // over the seed passed in here, because a restored saveable ignores its
-    // initial arguments. One home for the position, and it is the caller's.
-    val listState =
-        remember { LazyListState(listPosition.index, listPosition.offset) }
+    // ONE grid state for both arrangements, and one home for the position that
+    // seeds it. `remember`, NOT `rememberLazyGridState()`: the saveable version
+    // keeps a SECOND copy inside the host's SaveableStateHolder, and on a host
+    // change it is the copy that comes back empty — while quietly winning over
+    // the seed passed in here, because a restored saveable ignores its initial
+    // arguments. One home for the position, and it is the caller's.
+    val gridState =
+        remember { LazyGridState(listPosition.index, listPosition.offset) }
     // The callback is read through `rememberUpdatedState` and is NOT an effect
     // key. A bound method reference is a fresh object on a ViewModel the compiler
     // cannot prove stable, so keying on it would tear down and restart the
     // collection below on every keystroke in the search field.
     val reportPosition by rememberUpdatedState(onListPositionChange)
-    LaunchedEffect(listState) {
+    LaunchedEffect(gridState) {
         // Read in a snapshot observer rather than in composition: a fling changes
         // these every frame, and reading them up here would recompose the whole
         // list for each one.
         //
-        // Safe before the catalog arrives: `LazyListScrollPosition` refuses to
-        // overwrite the position from a measure of an EMPTY list
-        // (`LazyListScrollPosition.kt:56-57`, foundation 1.8.3 —
-        // `hadFirstNotEmptyLayout`), so the frame between restore and first
-        // emission cannot report the list back to the top and erase what was
-        // restored.
-        snapshotFlow { PickerListPosition(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+        // Safe before the catalog arrives: the lazy scroll position refuses to
+        // overwrite itself from a measure of an EMPTY list
+        // (`LazyGridScrollPosition.kt` — `hadFirstNotEmptyLayout`, the same guard
+        // `LazyListScrollPosition.kt:56-57` carries), so the frame between restore
+        // and first emission cannot report the list back to the top and erase
+        // what was restored.
+        snapshotFlow { PickerListPosition(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset) }
             .collect { reportPosition(it) }
     }
-    val visibleRows = if (sections.searching) sections.results else sections.all
-    val railed = !sections.searching && !sections.catalogEmpty
-    // Every "is this section here?" answer, and with them the index the A–Z
-    // rail scrolls into, comes from ONE pure function — so the arithmetic that
-    // has to agree with the emission order below is readable by a unit test
-    // rather than only by a screenshot.
-    val plan =
-        remember(target, sections.detect, sections.recent, sections.anyVoiceMark, railed) {
-            pickerListPlan(
-                role = target,
-                detectRowPresent = sections.detect != null,
-                recentCount = sections.recent.size,
-                anyVoiceMark = sections.anyVoiceMark,
+    if (arrangement.twoPane) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            if (plan.sidePane) {
+                PickerSidePane(
+                    target = target,
+                    sections = sections,
+                    plan = plan,
+                    onSelect = onSelect,
+                    onDownload = onDownload,
+                    onStop = onStop,
+                )
+                Spacer(Modifier.width(PANE_GUTTER))
+            }
+            PickerCatalog(
+                target = target,
+                sections = sections,
+                plan = plan,
+                columns = arrangement.columns,
+                shortcutsInGrid = false,
                 railed = railed,
+                query = query,
+                gridState = gridState,
+                onSelect = onSelect,
+                onDownload = onDownload,
+                onStop = onStop,
+                onClearQuery = onClearQuery,
+                modifier = Modifier.weight(1f),
             )
         }
+    } else {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // ABOVE the grid, not inside it. The device's voice answer lands
+            // after the list has been laid out, and an item that appears at index
+            // 0 of an already-anchored lazy list is placed above the viewport and
+            // never seen — see `pickerListPlan` for the measurement. Here it
+            // simply appears, in the same place the 16a frame draws it, and the
+            // list below keeps its own scroll position.
+            if (plan.showVoiceLegend) {
+                VoiceLegend(
+                    modifier =
+                        Modifier.padding(
+                            start = spacing.sm8,
+                            // Matches the list's own end inset so the legend pill
+                            // and the row pills line up while the rail is up.
+                            end = if (railed) Dimensions.touchTargetMin else spacing.sm8,
+                        ),
+                )
+            }
+            PickerCatalog(
+                target = target,
+                sections = sections,
+                plan = plan,
+                columns = arrangement.columns,
+                shortcutsInGrid = true,
+                railed = railed,
+                query = query,
+                gridState = gridState,
+                onSelect = onSelect,
+                onDownload = onDownload,
+                onStop = onStop,
+                onClearQuery = onClearQuery,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * 17a's shortcut pane: the recents section, then the role's own extra — the
+ * "Detect language" row on the source side, the offline-voice legend on the
+ * target side. Both landscape frames put that extra at the FOOT of the pane,
+ * which is where the export draws it; portrait keeps it at the top, where the
+ * export draws it there.
+ *
+ * It scrolls with a plain [ScrollState] rather than `rememberScrollState()` for
+ * the same reason the grid does not use `rememberLazyGridState()`: that helper
+ * is `rememberSaveable` underneath, and every saveable in this file would be
+ * addressed through whichever host is drawing the picker.
+ */
+@Composable
+private fun PickerSidePane(
+    target: LanguageRole,
+    sections: PickerSections,
+    plan: PickerListPlan,
+    onSelect: (String) -> Unit,
+    onDownload: (String) -> Unit,
+    onStop: (String) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Column(
+        modifier =
+            Modifier
+                .width(Dimensions.pickerSidePaneWidth)
+                .fillMaxHeight()
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .verticalScroll(remember { ScrollState(0) })
+                .padding(horizontal = spacing.xs4, vertical = spacing.sm8)
+                .testTag("tt_lang_side_pane"),
+    ) {
+        plan.recentHeader?.let { header ->
+            SectionHeader(recentHeaderRes(header))
+            sections.recent.forEach { row ->
+                LanguageRow(row, target, onSelect, onDownload, onStop)
+            }
+        }
+        sections.detect?.let { detect ->
+            LanguageRow(detect, target, onSelect, onDownload, onStop)
+        }
+        if (plan.showVoiceLegend) {
+            VoiceLegend(modifier = Modifier.padding(top = spacing.sm8))
+        }
+    }
+}
+
+/**
+ * The catalog grid plus its A–Z rail. The rail overlays the grid rather than
+ * taking a column of its own, exactly as the design draws it; it is hidden while
+ * a search is running, because an index over five results indexes nothing.
+ *
+ * A grid at one column, rather than a `LazyColumn`, in BOTH arrangements — and
+ * that is the point rather than a convenience. A grid indexes ITEMS, so item 40
+ * is the 41st language whether it is drawn in one column or two, and the single
+ * [PickerListPosition] the ViewModel holds therefore means the same place on
+ * both sides of a rotation. A two-column list of paired rows would have indexed
+ * PAIRS, and every restored position would have landed at twice its language.
+ *
+ * @param shortcutsInGrid the detect row and the recents section are emitted here
+ *   (portrait). In 17a they live in [PickerSidePane] instead, and
+ *   [PickerListPlan.railOffset] stops counting them.
+ */
+@Composable
+private fun PickerCatalog(
+    target: LanguageRole,
+    sections: PickerSections,
+    plan: PickerListPlan,
+    columns: Int,
+    shortcutsInGrid: Boolean,
+    railed: Boolean,
+    query: String,
+    gridState: LazyGridState,
+    onSelect: (String) -> Unit,
+    onDownload: (String) -> Unit,
+    onStop: (String) -> Unit,
+    onClearQuery: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    val visibleRows = if (sections.searching) sections.results else sections.all
     val letters =
         remember(visibleRows, plan.railOffset, railed) {
             if (railed) {
@@ -424,87 +670,94 @@ private fun PickerList(
                 emptyList()
             }
         }
-    Column(modifier = Modifier.fillMaxSize()) {
-        // ABOVE the LazyColumn, not inside it. The device's voice answer lands
-        // after the list has been laid out, and an item that appears at index 0
-        // of an already-anchored LazyColumn is placed above the viewport and
-        // never seen — see `pickerListPlan` for the measurement. Here it simply
-        // appears, in the same place the 16a frame draws it, and the list below
-        // keeps its own scroll position.
-        if (plan.showVoiceLegend) {
-            VoiceLegend(
-                modifier =
-                    Modifier.padding(
-                        start = spacing.sm8,
-                        // Matches the list's own end inset so the legend pill and
-                        // the row pills line up while the rail is up.
-                        end = if (railed) Dimensions.touchTargetMin else spacing.sm8,
-                    ),
-            )
-        }
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            LazyColumn(
-                state = listState,
-                contentPadding =
-                    PaddingValues(
-                        start = spacing.sm8,
-                        // The rail is an OVERLAY with a 48dp touch strip on this
-                        // edge, and it wins the hit test. At an 8dp inset the rows
-                        // ran under it and it swallowed the right half of every
-                        // trailing control: tapping the outer edge of a row's ⬇
-                        // scrolled the list instead of starting the download —
-                        // deterministic, not a race. While the rail is up, the list
-                        // ends where the rail begins.
-                        end = if (railed) Dimensions.touchTargetMin else spacing.sm8,
-                        bottom = spacing.sm8,
-                    ),
-                modifier = Modifier.fillMaxSize().testTag("tt_lang_list"),
-            ) {
-                // Emission order IS the order pickerListPlan counts in.
+    Box(modifier = modifier) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            state = gridState,
+            horizontalArrangement = Arrangement.spacedBy(spacing.md16),
+            contentPadding =
+                PaddingValues(
+                    start = spacing.sm8,
+                    // The rail is an OVERLAY with a 48dp touch strip on this
+                    // edge, and it wins the hit test. At an 8dp inset the rows
+                    // ran under it and it swallowed the right half of every
+                    // trailing control: tapping the outer edge of a row's ⬇
+                    // scrolled the list instead of starting the download —
+                    // deterministic, not a race. While the rail is up, the list
+                    // ends where the rail begins.
+                    end = if (railed) Dimensions.touchTargetMin else spacing.sm8,
+                    bottom = spacing.sm8,
+                ),
+            modifier = Modifier.fillMaxSize().testTag("tt_lang_list"),
+        ) {
+            // Emission order IS the order pickerListPlan counts in.
+            if (shortcutsInGrid) {
                 sections.detect?.let { detect ->
                     item(key = "detect_${detect.id}", contentType = CONTENT_TYPE_ROW) {
                         LanguageRow(detect, target, onSelect, onDownload, onStop)
                     }
                 }
-                if (sections.catalogEmpty) {
-                    item(key = "catalog_loading") { CatalogLoading() }
-                }
-                if (sections.nothingFound) {
-                    item(key = "empty_result") { NoSearchResults(query = query, onShowAll = onClearQuery) }
-                }
+            }
+            if (sections.catalogEmpty) {
+                fullSpanItem(key = "catalog_loading") { CatalogLoading() }
+            }
+            if (sections.nothingFound) {
+                fullSpanItem(key = "empty_result") { NoSearchResults(query = query, onShowAll = onClearQuery) }
+            }
+            if (shortcutsInGrid) {
                 plan.recentHeader?.let { header ->
-                    item(key = "header_recent", contentType = CONTENT_TYPE_HEADER) {
+                    fullSpanItem(key = "header_recent", contentType = CONTENT_TYPE_HEADER) {
                         SectionHeader(recentHeaderRes(header))
                     }
                     pickerRows(sections.recent, "rec", target, onSelect, onDownload, onStop)
                 }
-                // No "All languages" banner over a filtered list: the results ARE
-                // the list, and a counter beside them would count the catalog, not
-                // them.
-                if (plan.showAllHeader) {
-                    item(key = "header_all", contentType = CONTENT_TYPE_HEADER) {
-                        SectionHeader(R.string.text_lang_all_header, sections.counts)
-                    }
+            }
+            // No "All languages" banner over a filtered list: the results ARE
+            // the list, and a counter beside them would count the catalog, not
+            // them.
+            if (plan.showAllHeader) {
+                fullSpanItem(key = "header_all", contentType = CONTENT_TYPE_HEADER) {
+                    SectionHeader(
+                        titleRes = R.string.text_lang_all_header,
+                        // In 17a the counter is in the bar: this header names the
+                        // catalog PANE, and a screen-wide count beside it would be
+                        // counting something the pane does not contain.
+                        counts = if (plan.counterInTopBar) null else sections.counts,
+                    )
                 }
-                pickerRows(visibleRows, "all", target, onSelect, onDownload, onStop)
             }
-            if (letters.isNotEmpty()) {
-                AlphabetRail(
-                    letters = letters,
-                    listState = listState,
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(vertical = spacing.lg24),
-                )
-            }
+            pickerRows(visibleRows, "all", target, onSelect, onDownload, onStop)
+        }
+        if (letters.isNotEmpty()) {
+            AlphabetRail(
+                letters = letters,
+                gridState = gridState,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(vertical = spacing.lg24),
+            )
         }
     }
 }
 
 /**
+ * A header or a message spans the whole grid — at one column that is what an
+ * ordinary item already does, and at two an un-spanned header would sit in the
+ * left column with a language beside it.
+ *
+ * It is still ONE item either way, which is what keeps
+ * [PickerListPlan.railOffset]'s arithmetic true in both arrangements.
+ */
+private fun LazyGridScope.fullSpanItem(
+    key: String,
+    contentType: String? = null,
+    content: @Composable () -> Unit,
+) = item(key = key, span = { GridItemSpan(maxLineSpan) }, contentType = contentType) { content() }
+
+/**
  * The same language legitimately appears under Recent AND under All languages
- * (GT does the same), so [prefix] is what keeps LazyColumn's keys unique —
+ * (GT does the same), so [prefix] is what keeps the grid's keys unique —
  * duplicate keys are a hard crash, not a warning.
  */
-private fun LazyListScope.pickerRows(
+private fun LazyGridScope.pickerRows(
     rows: List<LanguagePickerRow>,
     prefix: String,
     target: LanguageRole,
@@ -544,6 +797,84 @@ private fun PickerTopBar(
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
     )
+}
+
+/**
+ * 17a's bar: back · title · the search field · the on-device counter, in ONE
+ * row.
+ *
+ * A plain `Row` rather than a `TopAppBar`, because an M3 top app bar is 64dp
+ * with a title slot and an actions slot, and this bar has to be shorter than
+ * that AND hold a text field between the two. At 412dp of window height the
+ * 8dp difference is a whole row of languages — see
+ * [Dimensions.pickerCompactBarHeight] for the arithmetic and for why the field
+ * inside it is 48dp rather than the export's 40dp.
+ *
+ * The counter reads the whole catalog, not the pane it sits above, which is
+ * exactly why 17a moves it up here out of the "All languages" header.
+ */
+@Composable
+private fun PickerCompactBar(
+    title: String,
+    onBack: () -> Unit,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    catalogSize: Int,
+    counts: OnDeviceCount?,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                // The insets an M3 `TopAppBar` would have applied for us. A plain
+                // Row applies none, and the first device run drew this bar's title
+                // straight through the status-bar clock and its counter through the
+                // signal icons. `TopAppBarDefaults.windowInsets` is systemBars top
+                // AND horizontal, which is the right pair here: landscape is exactly
+                // where a display cutout eats into the leading edge.
+                .windowInsetsPadding(TopAppBarDefaults.windowInsets)
+                .height(Dimensions.pickerCompactBarHeight)
+                .padding(horizontal = spacing.xs4),
+    ) {
+        IconButton(onClick = onBack, modifier = Modifier.testTag("tt_lang_back")) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(R.string.cd_lang_back),
+            )
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.semantics { heading() },
+        )
+        PickerSearchField(
+            query = query,
+            onQueryChange = onQueryChange,
+            catalogSize = catalogSize,
+            modifier = Modifier.weight(1f).widthIn(max = Dimensions.pickerSearchMaxWidth),
+        )
+        if (counts != null) {
+            Text(
+                text =
+                    pluralStringResource(
+                        R.plurals.text_lang_on_device_count,
+                        counts.downloaded,
+                        counts.downloaded,
+                        counts.capable,
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.padding(end = spacing.sm8).testTag("tt_lang_counter"),
+            )
+        }
+    }
 }
 
 /**
@@ -1199,7 +1530,7 @@ private fun rowContainerColor(state: LanguageRowState): Color =
 @Composable
 private fun AlphabetRail(
     letters: List<Pair<Char, Int>>,
-    listState: LazyListState,
+    gridState: LazyGridState,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.width(Dimensions.touchTargetMin).fillMaxHeight()) {
@@ -1216,7 +1547,7 @@ private fun AlphabetRail(
         val fits = (maxHeight / Dimensions.pickerRailLetter).toInt().coerceAtLeast(1)
         val shown = remember(letters, fits) { letters.sampledTo(fits) }
         if (shown.size >= MIN_RAIL_LETTERS) {
-            RailColumn(letters = shown, listState = listState)
+            RailColumn(letters = shown, gridState = gridState)
         }
     }
 }
@@ -1224,13 +1555,13 @@ private fun AlphabetRail(
 @Composable
 private fun RailColumn(
     letters: List<Pair<Char, Int>>,
-    listState: LazyListState,
+    gridState: LazyGridState,
 ) {
     val scope = rememberCoroutineScope()
     val active: State<Char?> =
-        remember(letters, listState) {
+        remember(letters, gridState) {
             derivedStateOf {
-                val first = listState.firstVisibleItemIndex
+                val first = gridState.firstVisibleItemIndex
                 letters.lastOrNull { it.second <= first }?.first
             }
         }
@@ -1259,7 +1590,7 @@ private fun RailColumn(
                                 val slot = railSlot(change.position.y, size.height, letters.size)
                                 if (slot != lastSlot) {
                                     lastSlot = slot
-                                    scope.launch { listState.scrollToItem(letters[slot].second) }
+                                    scope.launch { gridState.scrollToItem(letters[slot].second) }
                                 }
                             }
                         }
@@ -1454,6 +1785,7 @@ private fun LanguagePickerSourcePreview() {
             onQueryChange = {},
             onSelect = {},
             onBack = {},
+            arrangementOverride = PickerArrangement.SinglePane,
             recents = previewRecents,
             offlineStates = previewStates,
         )
@@ -1472,6 +1804,7 @@ private fun LanguagePickerTargetPreview() {
             onQueryChange = {},
             onSelect = {},
             onBack = {},
+            arrangementOverride = PickerArrangement.SinglePane,
             recents = previewRecents,
             offlineStates = previewStates,
         )
@@ -1490,6 +1823,7 @@ private fun LanguagePickerSearchingPreview() {
             onQueryChange = {},
             onSelect = {},
             onBack = {},
+            arrangementOverride = PickerArrangement.SinglePane,
             recents = previewRecents,
             offlineStates = previewStates,
         )
@@ -1508,6 +1842,7 @@ private fun LanguagePickerNoResultsPreview() {
             onQueryChange = {},
             onSelect = {},
             onBack = {},
+            arrangementOverride = PickerArrangement.SinglePane,
         )
     }
 }
@@ -1524,6 +1859,7 @@ private fun LanguagePickerLoadingPreview() {
             onQueryChange = {},
             onSelect = {},
             onBack = {},
+            arrangementOverride = PickerArrangement.SinglePane,
         )
     }
 }
@@ -1540,8 +1876,163 @@ private fun LanguagePickerConsentDialogPreview() {
             onQueryChange = {},
             onSelect = {},
             onBack = {},
+            arrangementOverride = PickerArrangement.SinglePane,
             pendingConsent = "sq",
         )
+    }
+}
+
+// ---- 17a landscape (issue #130 PR-14) ---------------------------------------
+// A preview cannot resize the window it is rendered in, so each frame below
+// borrows the export's own landscape geometry and states which arrangement it
+// is showing. The 892×412 pair is `from · landscape` / `to · landscape`; the
+// narrow frame is the same arrangement on a window with room for one column.
+
+private val previewLandscapeWidth: Dp = 892.dp
+private val previewLandscapeHeight: Dp = 412.dp
+private val previewNarrowLandscapeWidth: Dp = 640.dp
+private val previewNarrowLandscapeHeight: Dp = 360.dp
+
+@Composable
+private fun LandscapePreviewFrame(
+    width: Dp = previewLandscapeWidth,
+    height: Dp = previewLandscapeHeight,
+    content: @Composable () -> Unit,
+) {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Box(modifier = Modifier.size(width = width, height = height)) { content() }
+        }
+    }
+}
+
+/**
+ * `from · landscape`: the side pane carries Recent and the "Detect language"
+ * row, the catalog takes two columns, and no row anywhere shows a speaker —
+ * the mark is target-only, which that frame confirms by drawing none.
+ */
+@PreviewLightDark
+@Composable
+private fun PickerLandscapeFromPreview() {
+    LandscapePreviewFrame {
+        LanguagePickerContent(
+            target = LanguageRole.SOURCE,
+            languages = previewLanguages,
+            selectedId = "af",
+            query = "",
+            onQueryChange = {},
+            onSelect = {},
+            onBack = {},
+            recents = previewRecents,
+            offlineStates = previewStates,
+            arrangementOverride = previewTwoPaneWide,
+        )
+    }
+}
+
+/**
+ * `to · landscape`: the side pane carries "Recently used as target" and the
+ * voice legend where the source side carries Detect, and the counter has moved
+ * into the bar.
+ */
+@PreviewLightDark
+@Composable
+private fun PickerLandscapeToPreview() {
+    LandscapePreviewFrame {
+        LanguagePickerContent(
+            target = LanguageRole.TARGET,
+            languages = previewLanguages,
+            selectedId = "es",
+            query = "",
+            onQueryChange = {},
+            onSelect = {},
+            onBack = {},
+            recents = previewRecents,
+            offlineStates = previewStates,
+            arrangementOverride = previewTwoPaneWide,
+        )
+    }
+}
+
+/**
+ * The state the export does not draw: a search on the source side clears the
+ * recents and filters out the Detect row, so the side pane would have nothing
+ * in it — and 272dp of empty surface beside a "no results" message is furniture
+ * reporting a failure of its own. The pane goes and the catalog takes the width.
+ */
+@PreviewLightDark
+@Composable
+private fun PickerLandscapeNoSidePanePreview() {
+    LandscapePreviewFrame {
+        LanguagePickerContent(
+            target = LanguageRole.SOURCE,
+            languages = previewLanguages,
+            selectedId = "af",
+            query = "klingon",
+            onQueryChange = {},
+            onSelect = {},
+            onBack = {},
+            recents = previewRecents,
+            offlineStates = previewStates,
+            arrangementOverride = previewTwoPaneWide,
+        )
+    }
+}
+
+/**
+ * Two panes, one column: a landscape window wide enough for the side pane but
+ * not for a second column of languages. This is the arrangement the owner's
+ * OnePlus 7 Pro class of device gets, and the reason the gate is a dp sum rather
+ * than a size class.
+ */
+@PreviewLightDark
+@Composable
+private fun PickerLandscapeSingleColumnPreview() {
+    LandscapePreviewFrame(width = previewNarrowLandscapeWidth, height = previewNarrowLandscapeHeight) {
+        LanguagePickerContent(
+            target = LanguageRole.TARGET,
+            languages = previewLanguages,
+            selectedId = "es",
+            query = "",
+            onQueryChange = {},
+            onSelect = {},
+            onBack = {},
+            recents = previewRecents,
+            offlineStates = previewStates,
+            arrangementOverride = previewTwoPaneNarrow,
+        )
+    }
+}
+
+/** What [pickerArrangement] returns for the two frames above — stated, not assumed. */
+private val previewTwoPaneWide = PickerArrangement(twoPane = true, columns = 2)
+private val previewTwoPaneNarrow = PickerArrangement(twoPane = true, columns = 1)
+
+/** The landscape bar on its own: with the counter, and before the catalog arrives. */
+@PreviewLightDark
+@Composable
+private fun PickerCompactBarPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column(modifier = Modifier.width(previewLandscapeWidth)) {
+                PickerCompactBar(
+                    title = "Translate to",
+                    onBack = {},
+                    query = "",
+                    onQueryChange = {},
+                    catalogSize = 194,
+                    counts = OnDeviceCount(downloaded = 5, capable = 59),
+                )
+                PickerCompactBar(
+                    title = "Translate from",
+                    onBack = {},
+                    query = "span",
+                    onQueryChange = {},
+                    catalogSize = 0,
+                    counts = null,
+                )
+            }
+        }
     }
 }
 
@@ -1806,12 +2297,12 @@ private fun AlphabetRailPreview() {
             Box(modifier = Modifier.size(width = Dimensions.touchTargetMin, height = previewRailHeight)) {
                 AlphabetRail(
                     letters = ('A'..'J').mapIndexed { index, letter -> letter to index },
-                    // `remember`, not `rememberLazyListState()`: this file may not
+                    // `remember`, not `rememberLazyGridState()`: this file may not
                     // IMPORT the saveable versions at all, because an import is the
                     // one place an alias cannot hide what was imported and that is
                     // what `PickerHostAgnosticTest` reads. A preview has no state to
                     // restore anyway.
-                    listState = remember { LazyListState() },
+                    gridState = remember { LazyGridState() },
                 )
             }
         }
