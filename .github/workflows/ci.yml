@@ -31,6 +31,25 @@ jobs:
       - name: Unit tests incl. golden-table + Konsist gates
         run: ./gradlew test :app:testTranzlateProdDebugUnitTest
 
+      # `./gradlew build` does NOT assemble androidTest sources, so the
+      # instrumentation suite can be broken on main indefinitely with every run
+      # green. It was: a missing PurchaseFlow binding (#111) sat there from
+      # fabb214 until PR-10 needed that source set for a device probe and
+      # tripped over it. Compiling is the cheap half of the gate and catches the
+      # whole class — a retired signature, a fake that no longer implements its
+      # interface, a binding removed from a module it was still wired into.
+      #
+      # Compile, not run: running is blocked by #40 (Espresso onIdle ->
+      # InputManager.getInstance on API 35+), which is a separate fix and needs
+      # a device this workflow does not have.
+      #
+      # `assembleAndroidTest` rather than a named variant: only tranzlateProd
+      # has an androidTest variant today, and naming it would make this gate
+      # silently skip a flavour that gains one later — the same shape of miss
+      # this gate exists to catch.
+      - name: "Guard: instrumentation sources still compile (#148)"
+        run: ./gradlew :app:assembleAndroidTest
+
       # ---- plan §6.6 guards ------------------------------------------------------
 
       - name: "Guard: prod/release runtime classpath excludes fake/test modules"
