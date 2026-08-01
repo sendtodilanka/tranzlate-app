@@ -142,6 +142,51 @@ class RealOfflineModelManagerTest {
                 .isNotEqualTo(OfflineModelState.Deleting)
         }
 
+    /**
+     * Issue #123 item 3 (risk R1): the picker shows a ⬇ on a Deleting row, so a
+     * user CAN start a new download while the old delete is still in flight.
+     * The delete's finally used to clear the transient UNCONDITIONALLY, wiping
+     * the new download's Downloading and letting a second tap queue a second
+     * download. Ownership rule: only the job that set a transient may clear it.
+     */
+    @Test
+    fun `delete in flight, then redownload - the row STAYS Downloading when the delete lands`() =
+        runTest {
+            val base = FakeStore()
+            base.committed = mutableSetOf("fr") // model already on disk
+            val deleteGate = CompletableDeferred<Unit>()
+            val store =
+                object : ModelStore by base {
+                    override suspend fun delete(tag: String) {
+                        deleteGate.await() // park the delete so a download can race it
+                        base.delete(tag)
+                    }
+                }
+            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+
+            // The user deletes the model; the platform delete is slow.
+            val screen = launch { manager.delete("fr") }
+            runCurrent()
+            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Deleting)
+
+            // Mid-delete, the user re-downloads from the picker row.
+            manager.download("fr")
+            runCurrent()
+            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
+
+            // The stale delete lands — it no longer owns the row's transient,
+            // so it must NOT clear the new download's Downloading.
+            deleteGate.complete(Unit)
+            runCurrent()
+            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloading)
+
+            // And the download it raced still completes truthfully.
+            base.downloadGate.complete(Unit)
+            runCurrent()
+            assertThat(manager.modelStates().first()["fr"]).isEqualTo(OfflineModelState.Downloaded)
+            screen.join()
+        }
+
     @Test
     fun `a second download tap while one is in flight is a no-op`() =
         runTest {

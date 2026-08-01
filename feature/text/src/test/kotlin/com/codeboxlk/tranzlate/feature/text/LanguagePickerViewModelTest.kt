@@ -12,8 +12,10 @@ import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -69,6 +71,15 @@ class LanguagePickerViewModelTest {
         }
     }
 
+    /** Stands in for ML Kit never answering — the flow that emits nothing, ever. */
+    private class SilentModelManager : OfflineModelManager {
+        override fun modelStates(): Flow<Map<String, OfflineModelState>> = flow { awaitCancellation() }
+
+        override suspend fun download(languageTag: String) = Unit
+
+        override suspend fun delete(languageTag: String) = Unit
+    }
+
     private class FakeDownloadPrefs : DownloadPrefsRepository {
         val state = MutableStateFlow(false)
 
@@ -118,14 +129,25 @@ class LanguagePickerViewModelTest {
     /**
      * The list never waits on the badges. A model-state source that never emits
      * must not be able to hold the catalog hostage — which is why this is two
-     * flows and not one `combine`.
+     * flows and not one `combine`. The manager here is genuinely SILENT (the
+     * `awaitCancellation` pattern from LanguageRepositoryImplTest): the earlier
+     * version of this test used a fake that emitted at once, so it passed
+     * whether or not the property in its name held (issue #123 item 4).
      */
     @Test
     fun `a silent model-state source does not stall the catalog`() =
         runTest(dispatcher) {
-            viewModel().languages.test {
-                assertThat(awaitItem()).isEmpty()
-                assertThat(awaitItem()).hasSize(2)
+            val vm =
+                LanguagePickerViewModel(
+                    languageRepository = repository,
+                    clock = clock,
+                    modelManager = SilentModelManager(),
+                    connectivity = connectivity,
+                    downloadPrefs = prefs,
+                )
+            vm.languages.test {
+                assertThat(awaitItem()).isEmpty() // pre-emission frame
+                assertThat(awaitItem().map { it.id }).containsExactly("en", "fr").inOrder()
                 cancelAndIgnoreRemainingEvents()
             }
         }
