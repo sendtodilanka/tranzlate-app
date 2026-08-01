@@ -2,13 +2,17 @@ package com.codeboxlk.tranzlate.feature.text
 
 import com.codeboxlk.tranzlate.core.model.AttemptCause
 import com.codeboxlk.tranzlate.core.model.Engine
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.ModeId
 
-/** Which composer chip opened the language picker sheet. */
-enum class LanguagePickerTarget {
-    SOURCE,
-    TARGET,
-}
+/**
+ * Which composer chip opened the language picker — literally the picker's
+ * [LanguageRole] since issue #130 rev.3 ruled ONE type across the picker
+ * param, the usage store and the per-role recents. A thin alias rather than
+ * an edit of the composer call sites, which PR-6 git-moves LOGIC-FROZEN; the
+ * alias dies with that move (recorded in `docs/plan/issue-130-language-rev3.md`).
+ */
+typealias LanguagePickerTarget = LanguageRole
 
 /**
  * One fired translate ask — kept on every non-Idle state so the Result screen

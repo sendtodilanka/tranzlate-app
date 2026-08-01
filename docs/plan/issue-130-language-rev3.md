@@ -57,13 +57,13 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR-1 | #123.3 delete/download ownership race in `RealOfflineModelManager` + #123.4 non-discriminating picker-VM test. HIGH-RISK concurrency; the new race test must be shown to FAIL on pre-fix code | #123.3 #123.4 | ✅ #133, 2026-08-01 |
 | PR-2 | Screen B forever-Loading guard (`onStart emptyMap` on the VM combine) | — | ✅ #132, 2026-08-01 |
 | PR-3 | Manager `states` stateIn + onSubscription conflated refresh + memoized `capableTags` | — | ⬜ |
-| PR-4 | `LanguageTagResolver` lift (core:model) + `LanguageRole` + write-side canonicalisation + picker decoupled from `TextViewModel` | #119 #123.2 | ⬜ |
+| PR-4 | `LanguageTagResolver` lift (core:model) + `LanguageRole` + write-side canonicalisation + picker decoupled from `TextViewModel` | #119 #123.2 | ✅ #141, 2026-08-01 |
 | PR-5 | Usage store: Room `language_usage(lang_id, role, last_used_at)` + translation-success stamper + per-role recents. HIGH-RISK data/migration | #122 | ✅ #134, 2026-08-01 |
 
 ### Phase 2 — the move (logic-edit zero)
 | PR | Scope | Status |
 |---|---|---|
-| PR-6 | Create `:feature:language`; git-mv picker (4 prod files + 4 test suites + strings ×3) verbatim | ⬜ |
+| PR-6 | Create `:feature:language`; git-mv picker (4 prod files + 4 test suites + strings ×3) verbatim. PR-4 note: `LanguagePickerTarget` survives ONLY as `typealias LanguagePickerTarget = LanguageRole` in `TextUiState.kt` because composer files (`ComposerScreen`/`HomeScreen` `onPickLanguage`) still reference it and PR-6 moves them logic-frozen — retire the alias with the move | ⬜ |
 | PR-7 | git-mv packs screen; delete `:feature:languagepicker`; Screen B localized-names one-liner | ⬜ |
 
 ### Phase 3 — seams + primitives

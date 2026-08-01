@@ -3,33 +3,44 @@ package com.codeboxlk.tranzlate.feature.text
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppClock
+import com.codeboxlk.tranzlate.core.common.ApplicationScope
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
+import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
+import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val SUBSCRIBE_TIMEOUT_MS = 5_000L
 
+/** DECISIONS defaults table (pre-first-emission frame only — DataStore owns the real default). */
+private const val FALLBACK_SOURCE_LANG = "en"
+private const val FALLBACK_TARGET_LANG = "fr"
+
 /**
- * The picker's OWN state holder (issue #117).
- *
- * `TextViewModel` owns the *choice* (which language the composer translates
- * from/to). This class owns everything the picker needs to present that choice
- * honestly: the catalog, the live per-language offline-model state, the
- * last-used stamp that feeds Recent, and the row-level download controls the
- * redesigned rows carry.
+ * The picker's OWN state holder (issue #117; decoupled from `TextViewModel`
+ * per issue #130 rev.3 / #123.2): everything the picker needs to present AND
+ * change the choice it was opened for — the catalog, the live per-language
+ * offline-model state, the last-used stamp that feeds Recent, the row-level
+ * download controls, and since the decouple the selection itself, read and
+ * written straight through [TranslatePrefsRepository]. The composer's chips
+ * read the SAME DataStore keys through the same repository, so the two
+ * screens agree by construction, not by callback plumbing.
  *
  * Two independent [StateFlow]s rather than one `combine`: a model-state source
  * that is slow to first-emit must never be able to hold the language list
@@ -49,6 +60,8 @@ class LanguagePickerViewModel
         private val modelManager: OfflineModelManager,
         private val connectivity: ConnectivityMonitor,
         private val downloadPrefs: DownloadPrefsRepository,
+        private val translatePrefs: TranslatePrefsRepository,
+        @param:ApplicationScope private val appScope: CoroutineScope,
     ) : ViewModel() {
         /** Catalog rows, exactly as the repository serves them (no UI shaping here). */
         val languages: StateFlow<List<Language>> =
@@ -68,22 +81,108 @@ class LanguagePickerViewModel
                 .modelStates()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyMap())
 
+        /**
+         * The current choice per side, straight from the SAME repository (and
+         * therefore the same DataStore keys) the composer's chips read — the
+         * picker no longer borrows `TextViewModel` to know what is selected.
+         *
+         * Each id is presented through [LanguageTagResolver]: a preference
+         * persisted before write-side canonicalisation (issue #119) can still
+         * hold a detector spelling ("iw", "zh-CN"), and served raw it would
+         * tick NO row while the chip reads "Hebrew" — the #123.2 contradiction.
+         * The "auto" sentinel resolves to null and passes through unchanged.
+         */
+        private val sourceSelection: StateFlow<String> =
+            translatePrefs.sourceLang
+                .map(LanguageTagResolver::canonicalOrSelf)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), FALLBACK_SOURCE_LANG)
+
+        private val targetSelection: StateFlow<String> =
+            translatePrefs.targetLang
+                .map(LanguageTagResolver::canonicalOrSelf)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), FALLBACK_TARGET_LANG)
+
+        /** The id the [role] side's radio should tick right now. */
+        fun selection(role: LanguageRole): StateFlow<String> =
+            when (role) {
+                LanguageRole.SOURCE -> sourceSelection
+                LanguageRole.TARGET -> targetSelection
+            }
+
         private val _pendingConsent = MutableStateFlow<String?>(null)
 
         /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
         val pendingConsent: StateFlow<String?> = _pendingConsent.asStateFlow()
 
         /**
-         * Records the pick so the language can surface under Recent next time —
-         * under the side being picked for, since #130 rev.3 split recents per
-         * role. The "auto" sentinel is not a catalog row, so it is never stamped.
+         * A row tap: the WHOLE selection, in one place and in a fixed order —
+         * the CHOICE first, then the Recent stamp (per role since #130 rev.3
+         * split recents; the "auto" sentinel is not a catalog row, so it is
+         * never stamped), both through the same repositories the composer's
+         * swap/history writes use. One coroutine, so the stamp can never race
+         * behind the write that closes the screen.
+         *
+         * The order is load-bearing, and it used to be the other way round.
+         * These are two separate DataStore commits plus a Room write; nothing
+         * makes them atomic. Whatever runs second is the half that can be lost
+         * — to a throw, or to the process dying in the gap while the user is
+         * already walking away from the screen. Losing the stamp costs Manage
+         * packs one date. Losing the choice means the language appears under
+         * Recent while the composer still shows the old one: the screen
+         * contradicting itself, which is the exact defect this epic exists to
+         * remove. So the half that may be lost is the cheap one.
          */
-        fun onLanguagePicked(
+        fun select(
             id: String,
             role: LanguageRole,
         ) {
-            if (id == DETECT_LANGUAGE_ID) return
-            viewModelScope.launch { languageRepository.setLastUsed(id, role, clock.nowMillis()) }
+            // NOT viewModelScope. Selecting pops the screen, and the nav
+            // decorator clears this ViewModel's store on pop — cancelling the
+            // coroutine. DataStore's `edit` runs its transform in the CALLER's
+            // context, so a cancelled caller DROPS the write: the user taps a
+            // language, the screen closes, and the composer still shows the old
+            // one. Worse, the recents stamp above it writes to a DIFFERENT store
+            // and can survive, so the picked language turns up under Recent while
+            // the choice itself was lost — the screen contradicting itself, which
+            // is the exact class this epic exists to remove.
+            //
+            // Before the decouple this write lived on the hoisted TextViewModel,
+            // whose scope outlives the pop. The ruling called the move
+            // "behaviour-preserving (same DataStore keys)": true of the keys,
+            // false of the durability. Found by the co-verify lens, not the tests
+            // — every one of them drives the coroutine to completion.
+            appScope.launch {
+                when (role) {
+                    LanguageRole.SOURCE -> translatePrefs.setSourceLang(id)
+                    LanguageRole.TARGET -> translatePrefs.setTargetLang(id)
+                }
+                if (id != DETECT_LANGUAGE_ID) {
+                    stampSafely(id, role)
+                }
+            }
+        }
+
+        /**
+         * Best-effort Recent stamp. It writes to a different store than the
+         * choice above, and a disk error there must not take the choice with
+         * it — nor reach [appScope], which has no `CoroutineExceptionHandler`,
+         * so an escaping throw would take the process down for a missed date.
+         * Same shape as `TranslateTextUseCase.stampSafely`, and for the same
+         * reason: cancellation is rethrown so structured concurrency still
+         * works.
+         */
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
+        private suspend fun stampSafely(
+            id: String,
+            role: LanguageRole,
+        ) {
+            try {
+                languageRepository.setLastUsed(id, role, clock.nowMillis())
+            } catch (rethrown: CancellationException) {
+                throw rethrown
+            } catch (ignored: Exception) {
+                // Manage packs misses one date; the selection itself is safe.
+            }
         }
 
         /** Row ⬇ / ↻. Metered + no standing consent → ask first, download never starts. */

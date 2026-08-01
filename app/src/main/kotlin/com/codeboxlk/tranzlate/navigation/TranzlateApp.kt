@@ -18,6 +18,7 @@ import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
 import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
 import com.codeboxlk.tranzlate.feature.languagepicker.OfflineLanguagesScreen
 import com.codeboxlk.tranzlate.feature.paywall.PaywallScreen
@@ -26,7 +27,6 @@ import com.codeboxlk.tranzlate.feature.text.COMPOSER_CARD_SHARED_KEY
 import com.codeboxlk.tranzlate.feature.text.ComposerScreen
 import com.codeboxlk.tranzlate.feature.text.HomeScreen
 import com.codeboxlk.tranzlate.feature.text.LanguagePickerScreen
-import com.codeboxlk.tranzlate.feature.text.LanguagePickerTarget
 import com.codeboxlk.tranzlate.feature.text.TextViewModel
 
 /**
@@ -99,7 +99,7 @@ private fun AppNavDisplay(
                         onOpenComposer = { onNavigate(ComposerNavKey) },
                         onPickLanguage = { target ->
                             onNavigate(
-                                LanguagePickerNavKey(forSource = target == LanguagePickerTarget.SOURCE),
+                                LanguagePickerNavKey(forSource = target == LanguageRole.SOURCE),
                             )
                         },
                         onOpenSettings = { onNavigate(SettingsNavKey) },
@@ -128,7 +128,7 @@ private fun AppNavDisplay(
                         onOpenPaywall = { onNavigate(PaywallNavKey) },
                         onPickLanguage = { target ->
                             onNavigate(
-                                LanguagePickerNavKey(forSource = target == LanguagePickerTarget.SOURCE),
+                                LanguagePickerNavKey(forSource = target == LanguageRole.SOURCE),
                             )
                         },
                         cardModifier =
@@ -142,15 +142,13 @@ private fun AppNavDisplay(
                             },
                     )
                 }
+                // No TextViewModel handed in since the #130 rev.3 decouple:
+                // the picker's own ViewModel reads/writes the selection through
+                // TranslatePrefsRepository — the same DataStore keys the chips
+                // read — so coherence needs no shared handle.
                 entry<LanguagePickerNavKey> { key ->
                     LanguagePickerScreen(
-                        viewModel = textViewModel,
-                        target =
-                            if (key.forSource) {
-                                LanguagePickerTarget.SOURCE
-                            } else {
-                                LanguagePickerTarget.TARGET
-                            },
+                        target = if (key.forSource) LanguageRole.SOURCE else LanguageRole.TARGET,
                         onDone = { backStack.removeLastOrNull() },
                     )
                 }
