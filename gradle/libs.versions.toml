@@ -38,6 +38,11 @@ androidxTestExtJunit = "1.3.0"
 javaxInject = "1"
 detekt = "1.23.8"
 spotless = "8.8.0"
+# Debug-only leak watcher. 2.14 is the newest STABLE line — 3.0 has only ever
+# published alphas (verified 2026-08-02 against Maven Central's
+# com/squareup/leakcanary/leakcanary-android/maven-metadata.xml: 2.14 then
+# 3.0-alpha-1..9). A tool that watches for leaks is not a place to run an alpha.
+leakcanary = "2.14"
 
 [libraries]
 # Kotlin / coroutines / serialization
@@ -112,6 +117,9 @@ qonversion = { group = "io.qonversion.android.sdk", name = "sdk", version.ref = 
 
 # Desugaring
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
+
+# Leak watcher — `debugImplementation` ONLY (see :app/build.gradle.kts).
+leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
 
 # Test
 junit = { group = "junit", name = "junit", version.ref = "junit" }

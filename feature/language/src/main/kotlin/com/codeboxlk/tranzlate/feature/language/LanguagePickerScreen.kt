@@ -50,14 +50,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -124,8 +124,14 @@ private fun railSlot(
  * composer's chips read, so no `TextViewModel` handle is borrowed to keep the
  * two screens coherent — plus everything the picker needs to present that
  * choice honestly: catalog, live offline-model state, the per-role last-used
- * stamp and the row-level download controls. Search state is held here so the
- * content stays stateless and previewable.
+ * stamp and the row-level download controls.
+ *
+ * **Nothing in this file is `rememberSaveable`, and that is deliberate**
+ * (#130 PR-13). The search text and the list position live in the ViewModel's
+ * `SavedStateHandle`; the reason is written out in
+ * [LanguagePickerViewModel.query]. In one line: `rememberSaveable` is addressed
+ * through whichever `SaveableStateHolder` is drawing this screen, and the same
+ * picker is about to be drawn from three different ones.
  */
 @Composable
 fun LanguagePickerScreen(
@@ -139,14 +145,14 @@ fun LanguagePickerScreen(
     val pendingConsent by viewModel.pendingConsent.collectAsStateWithLifecycle()
     val selectedId by viewModel.selection(target).collectAsStateWithLifecycle()
     val recents by viewModel.recents(target).collectAsStateWithLifecycle()
-    var query by rememberSaveable { mutableStateOf("") }
+    val query by viewModel.query.collectAsStateWithLifecycle()
     LanguagePickerContent(
         target = target,
         languages = languages,
         selectedId = selectedId,
         recents = recents,
         query = query,
-        onQueryChange = { query = it },
+        onQueryChange = viewModel::onQueryChange,
         onSelect = { id ->
             viewModel.select(id, target)
             onDone()
@@ -159,6 +165,11 @@ fun LanguagePickerScreen(
         pendingConsent = pendingConsent,
         onDownloadAnyway = viewModel::downloadAnyway,
         onDismissConsent = viewModel::dismissConsent,
+        // Read here, not captured in the ViewModel: a rotation rebuilds this
+        // composition and keeps the ViewModel, so the seed has to be the position
+        // as of the last scroll.
+        listPosition = viewModel.listPosition(),
+        onListPositionChange = viewModel::onListPositionChange,
     )
 }
 
@@ -205,6 +216,8 @@ fun LanguagePickerContent(
     pendingConsent: String? = null,
     onDownloadAnyway: () -> Unit = {},
     onDismissConsent: () -> Unit = {},
+    listPosition: PickerListPosition = PickerListPosition.Top,
+    onListPositionChange: (PickerListPosition) -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     val title =
@@ -260,6 +273,8 @@ fun LanguagePickerContent(
                 onDownload = onDownload,
                 onStop = onStop,
                 onClearQuery = { onQueryChange("") },
+                listPosition = listPosition,
+                onListPositionChange = onListPositionChange,
             )
         }
     }
@@ -352,9 +367,36 @@ private fun PickerList(
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
     onClearQuery: () -> Unit,
+    listPosition: PickerListPosition = PickerListPosition.Top,
+    onListPositionChange: (PickerListPosition) -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
-    val listState = rememberLazyListState()
+    // `remember`, NOT `rememberLazyListState()`. The saveable version keeps a
+    // SECOND copy of this position inside the host's SaveableStateHolder, and on
+    // a host change it is the copy that comes back empty — while quietly winning
+    // over the seed passed in here, because a restored saveable ignores its
+    // initial arguments. One home for the position, and it is the caller's.
+    val listState =
+        remember { LazyListState(listPosition.index, listPosition.offset) }
+    // The callback is read through `rememberUpdatedState` and is NOT an effect
+    // key. A bound method reference is a fresh object on a ViewModel the compiler
+    // cannot prove stable, so keying on it would tear down and restart the
+    // collection below on every keystroke in the search field.
+    val reportPosition by rememberUpdatedState(onListPositionChange)
+    LaunchedEffect(listState) {
+        // Read in a snapshot observer rather than in composition: a fling changes
+        // these every frame, and reading them up here would recompose the whole
+        // list for each one.
+        //
+        // Safe before the catalog arrives: `LazyListScrollPosition` refuses to
+        // overwrite the position from a measure of an EMPTY list
+        // (`LazyListScrollPosition.kt:56-57`, foundation 1.8.3 —
+        // `hadFirstNotEmptyLayout`), so the frame between restore and first
+        // emission cannot report the list back to the top and erase what was
+        // restored.
+        snapshotFlow { PickerListPosition(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+            .collect { reportPosition(it) }
+    }
     val visibleRows = if (sections.searching) sections.results else sections.all
     val railed = !sections.searching && !sections.catalogEmpty
     // Every "is this section here?" answer, and with them the index the A–Z

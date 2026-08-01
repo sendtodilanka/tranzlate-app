@@ -2,11 +2,8 @@ package com.codeboxlk.tranzlate.domain.translate
 
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.getAndUpdate
 import javax.inject.Inject
 
 /**
@@ -52,6 +49,12 @@ import javax.inject.Inject
  * a `@Singleton` would leak a half-answered dialog across the picker and the
  * offline manager. Both halves of that — no scope of its own, no scope
  * annotation — are held by `DownloadGateTest`, against this file's source.
+ *
+ * The question itself is kept in a [ConsentQuestionStore] rather than in a field
+ * here, so that a process death in the middle of it does not silently withdraw a
+ * question the user was looking at (#130 PR-13, loss class PP-5.f). The gate does
+ * not know or care whether that storage is durable; read the store's own KDoc
+ * for why moving it there cannot become a second way to reach a download.
  */
 class DownloadGate
     @Inject
@@ -59,11 +62,10 @@ class DownloadGate
         private val connectivity: ConnectivityMonitor,
         private val downloadPrefs: DownloadPrefsRepository,
         private val modelManager: OfflineModelManager,
+        private val consentQuestion: ConsentQuestionStore,
     ) {
-        private val _pendingConsent = MutableStateFlow<String?>(null)
-
         /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
-        val pendingConsent: StateFlow<String?> = _pendingConsent.asStateFlow()
+        val pendingConsent: StateFlow<String?> = consentQuestion.question
 
         /**
          * A row's ⬇ / ↻ tap. Starts the download, unless the connection is
@@ -73,7 +75,7 @@ class DownloadGate
         suspend fun requestDownload(id: String) {
             val allowed = downloadPrefs.allowMobileData.first()
             if (connectivity.isMetered() && !allowed) {
-                _pendingConsent.value = id
+                consentQuestion.raise(id)
             } else {
                 modelManager.download(id)
             }
@@ -88,14 +90,14 @@ class DownloadGate
          * Synchronous on purpose — the dialog must be gone the instant the tap
          * lands, not one dispatch later.
          */
-        fun consentOnce(): ConsentedDownload? = _pendingConsent.getAndUpdate { null }?.let(::ConsentedDownload)
+        fun consentOnce(): ConsentedDownload? = consentQuestion.take()?.let(::ConsentedDownload)
 
         /** The consented download itself — [consentOnce]'s follow-through. */
         suspend fun downloadConsented(consented: ConsentedDownload) = modelManager.download(consented.id)
 
         /** "Wait for Wi-Fi", or a dismiss: the row is left untouched and re-tappable. */
         fun dismiss() {
-            _pendingConsent.value = null
+            consentQuestion.take()
         }
     }
 

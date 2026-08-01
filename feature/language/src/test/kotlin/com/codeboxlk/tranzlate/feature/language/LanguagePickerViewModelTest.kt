@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
@@ -13,6 +14,7 @@ import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
+import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
@@ -183,15 +185,18 @@ class LanguagePickerViewModelTest {
 
     private fun viewModel() = viewModelWith(appScope)
 
-    private fun viewModelWith(appScope: CoroutineScope) =
-        LanguagePickerViewModel(
-            languageRepository = repository,
-            clock = clock,
-            modelManager = manager,
-            downloadGate = DownloadGate(connectivity, prefs, manager),
-            translatePrefs = translatePrefs,
-            appScope = appScope,
-        )
+    private fun viewModelWith(
+        appScope: CoroutineScope,
+        handle: SavedStateHandle = SavedStateHandle(),
+    ) = LanguagePickerViewModel(
+        languageRepository = repository,
+        clock = clock,
+        modelManager = manager,
+        downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+        translatePrefs = translatePrefs,
+        savedStateHandle = handle,
+        appScope = appScope,
+    )
 
     /**
      * The 16a wiring: the target side's recents section reads the TARGET flow
@@ -265,8 +270,9 @@ class LanguagePickerViewModelTest {
                     languageRepository = repository,
                     clock = clock,
                     modelManager = SilentModelManager(),
-                    downloadGate = DownloadGate(connectivity, prefs, manager),
+                    downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
                     translatePrefs = translatePrefs,
+                    savedStateHandle = SavedStateHandle(),
                     appScope = appScope,
                 )
             vm.languages.test {
@@ -536,4 +542,98 @@ class LanguagePickerViewModelTest {
             advanceUntilIdle()
             assertThat(translatePrefs.targetLang.first()).isEqualTo("es")
         }
+
+    // ---- the picker's own screen state (#130 PR-13) --------------------------
+
+    /**
+     * What is typed in the search field and how far the list is scrolled used to
+     * live in the composable, in `rememberSaveable`. They survived a process
+     * death — but only inside the composition that declared them, because every
+     * `rememberSaveable` slot is addressed through the nearest
+     * `SaveableStateHolder`, and the nav shell gives each destination its own
+     * (`TranzlateApp.kt`). The picker is about to be drawn from three different
+     * ones (PR-14 pane, PR-15 leaf, PR-16 dialog), so "same key, different slot,
+     * state gone" was queued up three times over.
+     *
+     * **How process death is simulated, and what it is worth.** A new ViewModel
+     * over the SAME [SavedStateHandle] — the house pattern, from
+     * `TextViewModelTest`'s issue-#48 recovery suite. It faithfully tests the
+     * half that can be got wrong in code: whether the state travels as DATA in
+     * the handle or dies with the object. It does not exercise the Bundle
+     * round-trip (no Android runtime here) and it cannot mount two hosts (no
+     * Compose unit-test runtime — #186; CI never runs instrumented tests — #40).
+     * The other half of the promise — that the SCREEN keeps nothing of its own
+     * for a host to lose — is `PickerHostAgnosticTest`, as a source rule, stated
+     * honestly there.
+     */
+    @Test
+    fun `a fresh picker opens with an empty query at the top of the list`() {
+        val subject = viewModel()
+
+        assertThat(subject.query.value).isEmpty()
+        assertThat(subject.listPosition()).isEqualTo(PickerListPosition.Top)
+    }
+
+    @Test
+    fun `the search query survives process death`() {
+        val handle = SavedStateHandle()
+        viewModelWith(appScope, handle).onQueryChange("span")
+
+        assertThat(viewModelWith(appScope, handle).query.value).isEqualTo("span")
+    }
+
+    /** Clearing the field is a real state, not "no state" — it must survive as cleared. */
+    @Test
+    fun `a cleared query survives process death as cleared`() {
+        val handle = SavedStateHandle()
+        val first = viewModelWith(appScope, handle)
+        first.onQueryChange("span")
+        first.onQueryChange("")
+
+        assertThat(viewModelWith(appScope, handle).query.value).isEmpty()
+    }
+
+    /**
+     * The mutation this was written against, decided first: make
+     * `onListPositionChange` a no-op. Rebuilding the screen — which is what a
+     * host change, a rotation and a process death all do — then drops the user
+     * back at Afrikaans after they had scrolled to Swedish.
+     */
+    @Test
+    fun `the list position survives a rebuild of the screen`() {
+        val handle = SavedStateHandle()
+        viewModelWith(appScope, handle).onListPositionChange(PickerListPosition(index = 142, offset = 17))
+
+        assertThat(viewModelWith(appScope, handle).listPosition())
+            .isEqualTo(PickerListPosition(142, 17))
+    }
+
+    /**
+     * Read live, never captured when the ViewModel was built. A rotation keeps
+     * this object and destroys the composition, so the seed for the new
+     * `LazyListState` has to be the position as of the last scroll.
+     */
+    @Test
+    fun `the list position is read live, not captured at construction`() {
+        val subject = viewModel()
+        assertThat(subject.listPosition()).isEqualTo(PickerListPosition.Top)
+
+        subject.onListPositionChange(PickerListPosition(index = 8, offset = 3))
+
+        assertThat(subject.listPosition()).isEqualTo(PickerListPosition(8, 3))
+    }
+
+    /** Independent slots: one may not carry, clobber or resurrect the other. */
+    @Test
+    fun `query and list position survive together`() {
+        val handle = SavedStateHandle()
+        val first = viewModelWith(appScope, handle)
+        first.onQueryChange("swe")
+        first.onListPositionChange(PickerListPosition(index = 3, offset = 40))
+
+        val restored = viewModelWith(appScope, handle)
+
+        assertThat(restored.query.value).isEqualTo("swe")
+        assertThat(restored.listPosition()).isEqualTo(PickerListPosition(3, 40))
+    }
 }

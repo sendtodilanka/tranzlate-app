@@ -78,6 +78,18 @@ jobs:
             echo "::error::real brain/:lib:* module leaked into the fake runtime classpath:"; echo "$LEAKS"; exit 1
           fi
 
+      # LeakCanary is a `debugImplementation` (#130 PR-13). That is a one-word
+      # difference from `implementation`, it compiles either way, and the damage
+      # is invisible until a user's release build starts dumping its own heap.
+      # Reading the build file is not evidence — resolving the classpath is.
+      - name: "Guard: release runtime classpath carries no leak watcher"
+        run: |
+          set -euo pipefail
+          LEAKS=$(./gradlew -q :app:dependencies --configuration tranzlateProdReleaseRuntimeClasspath | grep -i "leakcanary" || true)
+          if [ -n "$LEAKS" ]; then
+            echo "::error::leakcanary leaked into the prod release runtime classpath:"; echo "$LEAKS"; exit 1
+          fi
+
       - name: "Guard: no fakeRelease variant, no Play-publish task outside Prod"
         run: |
           set -euo pipefail

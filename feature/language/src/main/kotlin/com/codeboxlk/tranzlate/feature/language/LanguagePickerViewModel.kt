@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppClock
@@ -28,6 +29,14 @@ private const val FALLBACK_SOURCE_LANG = "en"
 private const val FALLBACK_TARGET_LANG = "fr"
 
 /**
+ * Saved-state keys for the picker's own screen state. Namespaced, because the
+ * handle belongs to the whole ViewModel, not to any one of its jobs.
+ */
+private const val KEY_QUERY = "picker.query"
+private const val KEY_SCROLL_INDEX = "picker.scroll_index"
+private const val KEY_SCROLL_OFFSET = "picker.scroll_offset"
+
+/**
  * The picker's OWN state holder (issue #117; decoupled from `TextViewModel`
  * per issue #130 rev.3 / #123.2): everything the picker needs to present AND
  * change the choice it was opened for — the catalog, the live per-language
@@ -46,6 +55,11 @@ private const val FALLBACK_TARGET_LANG = "fr"
  * this redesign, so the picker asks it too. Shipping the same button without the
  * gate would have spent the user's data plan behind their back. The rule itself
  * lives in [DownloadGate]; this screen routes taps into it.
+ *
+ * **This class is also where the picker's own screen state lives** — what was
+ * typed into the search field and how far the list is scrolled. That looks like
+ * state a composable should own with `rememberSaveable`, and it was, until #130
+ * PR-13. The reason it moved is in [query].
  */
 @HiltViewModel
 class LanguagePickerViewModel
@@ -56,8 +70,56 @@ class LanguagePickerViewModel
         private val modelManager: OfflineModelManager,
         private val downloadGate: DownloadGate,
         private val translatePrefs: TranslatePrefsRepository,
+        private val savedStateHandle: SavedStateHandle,
         @param:ApplicationScope private val appScope: CoroutineScope,
     ) : ViewModel() {
+        /**
+         * What is typed in the search field.
+         *
+         * `rememberSaveable` would be the ordinary home for this, and it was the
+         * shipped one. It survives process death, but only inside the composition
+         * that declared it: every `rememberSaveable` slot is addressed through
+         * the nearest `SaveableStateHolder`, and the nav shell gives each
+         * destination its own (`TranzlateApp.kt`,
+         * `rememberSaveableStateHolderNavEntryDecorator`). The picker is about to
+         * be shown from more than one place — a full screen (15a/16a), a
+         * side-by-side pane (17a/17b) and a dialog raised outside the NavDisplay
+         * entirely (17c/17d) — and each of those is a different holder. Same key,
+         * different slot, state gone.
+         *
+         * Held here, the state is addressed by the picker instead of by whoever
+         * is drawing it, so a change of host is a change of host and nothing
+         * else. That is the whole of the "host-agnostic saveable contract" the
+         * rev.3 ruling asks PR-13 for: the screen composable owns no saveable
+         * state of its own, and `PickerHostAgnosticTest` holds it to that.
+         */
+        val query: StateFlow<String> = savedStateHandle.getStateFlow(KEY_QUERY, "")
+
+        /** The search field's every keystroke. */
+        fun onQueryChange(text: String) {
+            savedStateHandle[KEY_QUERY] = text
+        }
+
+        /**
+         * Where the list is, read fresh — never captured once at construction.
+         *
+         * A configuration change destroys the composition and keeps this
+         * ViewModel, so the seed for the new `LazyListState` has to be the
+         * position as of the LAST scroll, not as of whenever the ViewModel
+         * happened to be built.
+         */
+        fun listPosition(): PickerListPosition =
+            PickerListPosition(
+                index = savedStateHandle[KEY_SCROLL_INDEX] ?: 0,
+                offset = savedStateHandle[KEY_SCROLL_OFFSET] ?: 0,
+            )
+
+        /** The list moved. Cheap on purpose — two map writes, no flow to collect. */
+        fun onListPositionChange(position: PickerListPosition) {
+            savedStateHandle[KEY_SCROLL_INDEX] = position.index
+            savedStateHandle[KEY_SCROLL_OFFSET] = position.offset
+        }
+
         /** Catalog rows, exactly as the repository serves them (no UI shaping here). */
         val languages: StateFlow<List<Language>> =
             languageRepository

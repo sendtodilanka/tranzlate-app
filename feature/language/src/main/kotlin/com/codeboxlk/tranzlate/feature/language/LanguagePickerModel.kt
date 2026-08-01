@@ -19,6 +19,28 @@ import java.util.Locale
 const val RECENT_LIMIT = 5
 
 /**
+ * Where the picker's list is standing: the first row still on screen and how far
+ * it is pushed off the top edge.
+ *
+ * The two numbers `LazyListState` can be built from and restored to, named as one
+ * thing so they cannot be persisted or passed half-way. Kept OUT of the
+ * composable that owns the list for the reason #130 PR-13 exists: a
+ * `rememberLazyListState()` is addressed through whichever `SaveableStateHolder`
+ * is drawing the picker, so it is lost the moment the picker is drawn from
+ * somewhere else. [LanguagePickerViewModel.listPosition] is the home instead.
+ */
+@Immutable
+data class PickerListPosition(
+    val index: Int = 0,
+    val offset: Int = 0,
+) {
+    companion object {
+        /** A list that has not been scrolled. */
+        val Top = PickerListPosition()
+    }
+}
+
+/**
  * What a picker row IS — exactly one of six (issue #117 plan §3 matrix).
  *
  * A sealed type rather than the `selected`/`downloaded`/`downloading`/`failed`

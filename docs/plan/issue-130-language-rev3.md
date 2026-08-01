@@ -76,7 +76,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR | Scope | Status |
 |---|---|---|
 | PR-8 | `TranzlateSheetScaffold` / `TranzlateListSheet` (designsystem, string-free) | ✅ #137, 2026-08-01 |
-| PR-9 | Shared `DownloadGate` — deletes the duplicated consent logic ×2 | 👁 #166, 2026-08-01 |
+| PR-9 | Shared `DownloadGate` — deletes the duplicated consent logic ×2 | ✅ #166, 2026-08-01 |
 | PR-10 | Offline-voice seam + `<queries>` TTS_SERVICE + experiment E-V1 | ✅ #147, 2026-08-01 |
 | PR-11 | Storage walk (aggregate meter source) — seam only; **E-S1 re-ruled to PR-15**, see below | ✅ #138, 2026-08-01 |
 
@@ -88,7 +88,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 5 — adaptive
 | PR | Scope | Status |
 |---|---|---|
-| PR-13 | Fold-posture WindowInfo extension + host-agnostic saveable contract + pendingConsent → SavedStateHandle | ⬜ |
+| PR-13 | Fold-posture `WindowInfo` extension + host-agnostic saveable contract (query + list position out of `rememberSaveable`, into the picker VM's `SavedStateHandle`) + `pendingConsent` → `SavedStateHandle` behind a storage seam + LeakCanary debug-only rider. **`LanguageSheetRequest` is NOT built here** — it has no members until PR-17; see below | 🔨 |
 | PR-14 | 17a landscape two-pane | ⬜ |
 | PR-15 | 17b foldable two-leaf + aggregate meter — **E-S1 is a merge gate here** (re-ruled 2026-08-01) | ⬜ |
 | PR-16 | 17c/17d dialog host + E-D1 + measured jank budget gate | ⬜ |
@@ -112,6 +112,36 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR-26 | 20d list-detail (camera card + pair-share line omitted) | ⬜ |
 | PR-27 | Ruling 2 execution: remove the Detect "ONLINE ONLY" chip; 19i never built | ⬜ |
 | PR-28 | 19n flavor-scoped copy (ruling 4) | ⬜ |
+
+### PR-13 deviations from the ruling's PR-13 row (2026-08-02)
+
+Three, each verified against the code rather than against the ruling text
+(mandatory rule 11, fourth cause).
+
+1. **`LanguageSheetRequest` is not created.** The ruling lists it in PR-13's
+   saveable contract, and the ruling's own §1 puts its twelve sheet members in
+   PR-17 to PR-22. It does not exist in the tree today (`grep`: three hits, all
+   in the ruling doc). An empty sealed interface would be a type with nothing to
+   serialize and nothing to test. The one sheet request the app actually ships is
+   the metered-consent question, and that is exactly what item 3 makes durable —
+   through the same `SavedStateHandle`, so PR-17 inherits a working pattern
+   rather than an empty placeholder.
+2. **The consent question moves behind a storage seam, not into the gate.**
+   `DownloadGate` lives in `:core:domain`, which the Konsist gate keeps JVM-pure,
+   so it cannot hold a `SavedStateHandle`. It now takes a `ConsentQuestionStore`;
+   the durable implementation and its Hilt binding live in `:app`, the
+   composition root. Neither ViewModel changed for this — one seam fixed both
+   screens.
+3. **The ruling's test plan ("instrumented restore host×2 harness") is not
+   what shipped.** CI runs `test` and `assembleAndroidTest` and never runs an
+   instrumented test (#40 open); there is no Compose unit-test runtime anywhere
+   either (#186). An instrumented-only test here would be a test nobody ever sees
+   fail. What shipped instead: JVM tests over a real `SavedStateHandle` for the
+   behaviour (`LanguagePickerViewModelTest`, `SavedStateConsentQuestionStoreTest`,
+   `DownloadGateTest`), a pure `foldPosture()` function with its own table
+   (`FoldPostureTest`), and one named-file source rule for the part no JVM test
+   can reach — that the screen keeps no host-scoped saveable state
+   (`PickerHostAgnosticTest`, honest about being a source rule).
 
 ## Spec of record — rev 5 (2026-08-01)
 
