@@ -14,9 +14,25 @@
     <string name="text_lang_on_device">Nasa device</string>
     <string name="text_lang_on_device_size">Nasa device · %1$s</string>
     <string name="text_lang_downloading">Nagda-download…</string>
-    <string name="text_lang_error_network">Walang koneksyon. Kumonekta muli at subukan ulit.</string>
-    <string name="text_lang_error_storage">Kulang ang espasyo. Maglaan ng espasyo at subukan ulit.</string>
-    <string name="text_lang_error_generic">Hindi natapos ang pag-download. Subukan ulit.</string>
+    <!-- The ONE failed-download line, both screens (#175) — the picker's wording
+         survived; see values/strings.xml. -->
+    <string name="lang_pack_error_network">Walang koneksyon. Kumonekta muli at subukan ulit.</string>
+    <string name="lang_pack_error_storage">Kulang ang espasyo. Maglaan ng espasyo at subukan ulit.</string>
+    <string name="lang_pack_error_generic">Hindi natapos ang pag-download. Subukan ulit.</string>
+    <!-- Sheets 19d and 19b — see values/strings.xml for why the body says nothing
+         is on the device yet, and why 19b has one action rather than two. -->
+    <string name="lang_sheet_failed_title">Hindi na-download ang %1$s</string>
+    <string name="lang_sheet_failed_body_network">Naputol ang koneksyon bago naging handa ang pack, kaya wala pang nasa device.</string>
+    <string name="lang_sheet_failed_cause_network">Dahilan: nawalan ng koneksyon. Sisimulan muli ng Subukan ulit ang pag-download.</string>
+    <string name="lang_sheet_failed_body_generic">Tumigil ang pag-download bago naging handa ang pack, kaya wala pang nasa device.</string>
+    <string name="lang_sheet_failed_cause_generic">Dahilan: hindi iniulat. Sisimulan muli ng Subukan ulit ang pag-download.</string>
+    <string name="lang_sheet_failed_close">Isara</string>
+    <string name="lang_sheet_failed_retry">Subukan ulit</string>
+    <string name="lang_sheet_space_title">Kulang ang espasyo</string>
+    <string name="lang_sheet_space_body">May %1$s na libre sa device na ito. Karaniwang nangangailangan ng 20–45 MB ang isang language pack.</string>
+    <string name="lang_sheet_space_used">Ibang app at system</string>
+    <string name="lang_sheet_space_free">%1$s na libre</string>
+    <string name="lang_sheet_space_manage">Pamahalaan ang mga pack</string>
     <!-- Sheet 19a — see values/strings.xml for why there is no language name and
          why the second action is not "Wait for Wi-Fi". -->
     <string name="lang_sheet_data_title">I-download gamit ang mobile data?</string>
@@ -58,7 +74,7 @@
     <string name="cd_text_lang_row_voice">%1$s, kayang bigkasin offline</string>
     <string name="cd_text_lang_download">I-download ang %1$s para magamit offline</string>
     <string name="cd_text_lang_stop">Ihinto ang pag-download at alisin ang %1$s</string>
-    <string name="cd_text_lang_retry">Subukang i-download muli ang %1$s</string>
+    <string name="cd_text_lang_retry">Subukan ulit ang pag-download ng %1$s</string>
     <!-- The picker owns its own back description: `cd_text_back` stays with the
          composer, and C-3 gives one key one home rather than two modules one name. -->
     <string name="cd_lang_back">Bumalik</string>
@@ -70,9 +86,6 @@
     <string name="offline_cd_stop">Itigil ang pag-download ng %1$s</string>
     <string name="offline_cd_delete">Burahin ang %1$s</string>
     <string name="offline_cd_retry">Subukang i-download muli ang %1$s</string>
-    <string name="offline_error_storage">Kulang ang espasyo — magbakante ng storage, pagkatapos ay subukang muli</string>
-    <string name="offline_error_network">Nabigo ang pag-download — suriin ang koneksyon, pagkatapos ay subukang muli</string>
-    <string name="offline_error_generic">Nagkaproblema — subukang muli</string>
     <!-- 17c/17d tablet dialog (#130 PR-16). -->
     <string name="lang_dialog_manage_packs">Pamahalaan ang mga pack</string>
     <string name="lang_dialog_cancel">Kanselahin</string>

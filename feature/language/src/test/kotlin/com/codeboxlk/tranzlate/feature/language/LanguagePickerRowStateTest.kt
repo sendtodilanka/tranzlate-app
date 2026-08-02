@@ -200,11 +200,71 @@ class LanguagePickerRowStateTest {
         assertThat(index['S']).isEqualTo(4) // Sinhala, the FIRST S — not Spanish
     }
 
+    // ---- the failed row's PLACE (designer-brief defect G, #130 PR-18) -------
+
+    /**
+     * **The rule, against the drawing.** 15a, 16a and 18a all draw the failed
+     * Hindi row with a `cloud_off` glyph where every other row has its ISO-code
+     * avatar, and place it immediately after Azerbaijani — out of A–Z order.
+     * `README.md:65` and the rev 5 answer say the opposite for the APP: *"The
+     * failed row (Hindi) has its `HI` avatar. Its position under the A block is
+     * now declared in 15a's caption as a drawing convenience — in the app it
+     * keeps its alphabetical slot."* 21c refuses inline ads for the same reason,
+     * in the same words: **position means letter**.
+     *
+     * The code has always done the right thing, by construction — one avatar
+     * rule for every row, one `Collator` sort over the whole list — and that is
+     * exactly why this test is worth writing. Nothing named the rule, so nothing
+     * would have gone red the day someone opened the export, saw `cloud_off`,
+     * and "fixed" the app to match the picture.
+     */
+    @Test
+    fun `a failed row keeps its ISO avatar and its alphabetical slot`() {
+        val states = mapOf("hi" to OfflineModelState.Failed(OfflineModelFailure.NETWORK))
+        val rows = buildPickerRows(failureCatalog, states, selectedId = "", locale = Locale.ENGLISH)
+
+        assertThat(rows.map { it.displayName })
+            .containsExactly("Azerbaijani", "English", "Hindi", "Spanish")
+            .inOrder()
+        val hindi = rows.first { it.id == "hi" }
+        assertThat(hindi.state).isEqualTo(LanguageRowState.Failed(OfflineModelFailure.NETWORK))
+        assertThat(hindi.avatar).isEqualTo(LanguageAvatar.Code("HI"))
+    }
+
+    /**
+     * The same rule from the rail's side, which is where "position means letter"
+     * is cashed in: touch H and you land on the failed row, because it files
+     * under H like anything else.
+     */
+    @Test
+    fun `the rail files a failed row under its own letter`() {
+        val states = mapOf("hi" to OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+        val rows = buildPickerRows(failureCatalog, states, selectedId = "", locale = Locale.ENGLISH)
+
+        val index = rows.letterIndex(offset = 0)
+
+        assertThat(index['H']).isEqualTo(2)
+        assertThat(rows[2].id).isEqualTo("hi")
+    }
+
     private val mixedCatalog =
         listOf(
             Language("en", "English", offlineAvailable = true, offlineDownloaded = true),
             Language("es", "Spanish", offlineAvailable = true, offlineDownloaded = false),
             Language("ja", "Japanese", offlineAvailable = false, offlineDownloaded = false),
             Language("si", "Sinhala", offlineAvailable = false, offlineDownloaded = false),
+        )
+
+    /**
+     * The export's own cast for the failed row: Azerbaijani is the row the
+     * drawing files Hindi under, so a catalogue containing both is the one that
+     * can tell the RULE from the DRAWING apart.
+     */
+    private val failureCatalog =
+        listOf(
+            Language("az", "Azerbaijani", offlineAvailable = false, offlineDownloaded = false),
+            Language("hi", "Hindi", offlineAvailable = true, offlineDownloaded = false),
+            Language("en", "English", offlineAvailable = true, offlineDownloaded = true),
+            Language("es", "Spanish", offlineAvailable = true, offlineDownloaded = false),
         )
 }

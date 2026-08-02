@@ -137,6 +137,12 @@ fun PickerDialogHost(
         LanguagePickerScreen(
             target = role,
             onDone = onDismiss,
+            // The SAME action the docked bar below carries, and deliberately the
+            // same lambda: sheet 19b (#130 PR-18) offers "Manage packs" too, and
+            // in this host that means dismissing the card BEFORE pushing —
+            // an order the shell owns and `TranzlateApp.manageLanguagePacks`
+            // explains. Two ways in, one behaviour.
+            onManagePacks = onManagePacks,
             modifier = Modifier.weight(1f),
             host = PickerHost.DIALOG,
             viewModel = viewModel,

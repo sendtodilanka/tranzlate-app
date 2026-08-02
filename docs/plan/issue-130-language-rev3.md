@@ -97,7 +97,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR | Scope | Status |
 |---|---|---|
 | PR-17 | 19a mobile-data sheet: `MeteredConsentDialog` + Screen B's inline dialog both deleted, their two string sets retired, one `MobileDataSheet` raised by both screens, the standing "Always ask" preference changeable in the sheet. **E-W1 has never been run, so the drawn "Wait for Wi-Fi" is not shipped** — the owner's pre-approved interim "Not now" is (ruling 8). **Deviations below** | ✅ #209, 2026-08-02 |
-| PR-18 | 19d + 19b + failure-cause map ×1 + 15a Retry-pill deviation fix | ⬜ |
+| PR-18 | 19d + 19b + failure-cause map ×1 + 15a Retry-pill deviation fix. **Closes #175.** Deviations below | 👁 #210 |
 | PR-19 | 19f + 19g (fallback per ruling 3) + saved-count query | ⬜ |
 | PR-20 | 19h + 19m + app-shell sheet host | ⬜ |
 | PR-21 | 18a/18b first run (LocaleList suggestions + E-K1) | ⬜ |
@@ -441,6 +441,168 @@ the alternative is inventing copy; recorded because the app now states a pack
 size in three places and the other two (`offline_subtitle`,
 `settings_mobile_data_supporting`) both say `~30 MB`, which the measurements
 contradict by more.
+
+### PR-18 mutation register — decided BEFORE the tests (2026-08-02)
+
+Rule 11, third cause: a mutation chosen after reading the code gets shaped by it.
+Written down before the first line of production or test code, run afterwards,
+and every one of them reddened the test it was aimed at.
+
+| # | Mutation (one edit to production code) | Test that went RED |
+|---|---|---|
+| M1 | un-fold `WIFI_REQUIRED` from `NETWORK` | `DownloadFailureTest` ×2 — the fold, and the shared sheet |
+| M2 | `STORAGE` opens 19d instead of 19b | `DownloadFailureTest` + `PackFailureSheetRaisingTest` ×2 |
+| M3 | an unexplained failure reuses the connection copy | `DownloadFailureTest` + `PackFailureSheetsTest` |
+| M4 | raise the sheet for ANY observed failure, not only a requested one | `PackFailureSheetRaisingTest` — the un-asked failure |
+| M5 | invert the consent guard (`!=`) | `PackFailureSheetRaisingTest` ×3 |
+| M6 | swap free/total on the no-space request | `PackFailureSheetRaisingTest` — the no-space figures |
+| M7 | put `Icons.Filled.Refresh` back in place of the pill | `PackFailureCopyTest` — the labelled Retry |
+| M8 | sort failed rows out of A–Z order | `LanguagePickerRowStateTest` ×2 |
+| M9 | a second `when (cause)` in the offline manager | `DownloadFailureSourceTest` ×2 |
+| M10 | 19b's one action only dismisses | `PackFailureSheetsTest` — the action leads somewhere |
+
+M7 is the one worth reading twice: the tag did not change with the control, so
+every tag-based assertion in the repository stays green under it. The assertion
+had to be on the LABEL.
+
+### PR-18 deviations from the ruling's PR-18 row (2026-08-02)
+
+Each checked against the export's markup, the repo's own record or the code
+rather than against the ruling text (mandatory rule 11, fourth cause). The two
+sheets were read out of the export's `__bundler/template` island per frame
+container, never off a flattened token list — the #183 trap.
+
+1. **19d's drawn body contradicts 19d's own caption, and the BODY ships.** The
+   caption says *"The important reassurance — progress is kept — leads the
+   copy."* The body says *"…so nothing is on the device yet."* This project
+   settled it before the frame was drawn: `DESIGNER-BRIEF.md:73` — *"No resume
+   control. The system may or may not resume internally; we cannot observe it,
+   so we must not promise it. A failed download offers retry, not resume. **Do
+   not claim kept progress.**"* — and `README.md:73`, which lists resume among
+   the things replaced by "Nothing". `RemoteModelManager.download()` returns
+   `Task<Void>`; there is no handle on a partial transfer, and this app's Retry
+   starts a fresh download. **The caption is the half that is wrong**, and
+   `PackFailureSheetsTest.19d promises no kept progress` is where that ruling is
+   now enforced rather than merely written down.
+   *One precision, because the project has measured the exception:* an
+   interrupted download DOES leave bytes behind, in ML Kit's store-root scratch
+   directory (E-S1c — one real 14,779,264-byte file survived indefinitely). Those
+   bytes are not a pack, cannot be translated with, and are excluded from the
+   library meter. The sentence is about the pack, and "yet" is doing its work.
+
+2. **19d's body and cause line are per cause; the drawn frame has one cause.**
+   The export writes 19d for a dropped connection ("The connection dropped…",
+   "Cause: connection lost."). ML Kit's other failures report no reason at all —
+   `Exception.toFailure()` maps `IOException` to `NETWORK` and **everything else
+   to `UNKNOWN`** — so reusing the drawn sentences for them would state a reason
+   the app does not have, which is the same class of invention as a percentage on
+   an indeterminate download. Two undrawn strings ship
+   (`lang_sheet_failed_{body,cause}_generic`), flagged as undrawn in
+   `STRINGS_language.md` §5.2.
+
+3. **19b ships ONE action, not the two that are drawn.** `Free up space` opens
+   20e, which is **PR-25**. The ruling pre-decided this exact case (PR-18 row:
+   *""Free up space" button 20e එනකම් omit (single action "Manage packs" — no
+   dead end)"*), and EDGE_CASES §7 is why: a button that opens nothing is the
+   dead end, and one that silently did something else would be worse. `Manage
+   packs` therefore becomes the sole action and is FILLED rather than the text
+   action the frame draws it as — a lone action is by definition the likely
+   intent (sheet anatomy §5). It leads to the offline manager, which is where
+   space is actually freed, so the sheet stays inside the no-dead-end rule with
+   one action instead of two. `PackFailureSheetsTest` asserts both halves: that
+   the action navigates rather than dismisses, and that "Free up space" is
+   absent.
+
+4. **19b's bar is used-against-free on the whole volume, and its numbers are read
+   at the moment of refusal.** Not from the offline-library meter, which answers
+   a different question (how much of the disk THIS APP's packs occupy) and
+   degrades to `null` when ML Kit's store cannot be found. Both figures come from
+   one `StorageProbe` call pair on IO, so the fill and the legend cannot describe
+   two moments. The rule the export states five times over
+   (`docs/design/language-screens/README.md:15`) is that at 110 MB the library
+   cannot be plotted against a whole device without misstating one of the two
+   numbers; a `deviceUsedFraction` unit table pins the clamp, the swap and the
+   unmeasurable-volume degrade.
+
+5. **The failed row's Retry is a labelled pill, and defect G's OTHER half needed
+   no change.** The ruling names this deviation as *"icon → spec filled pill"*
+   and that is what shipped: `Icons.Filled.Refresh` in an `IconButton` became a
+   `Button` reading **Retry**, error-filled as drawn, at
+   `Dimensions.touchTargetMin` where the frame draws 40dp (C-14's floor, the same
+   collision PR-14 settled the same way for the landscape search field).
+   **Defect G's first half — "no ISO-code avatar, and out of A–Z order" — was
+   already right in the code and is left alone**: every row's avatar is
+   `LanguageAvatar.Code` regardless of state, and `buildPickerRows` sorts the
+   whole list through one `Collator`. Nothing NAMED that rule, though, so nothing
+   would have gone red the day someone opened the export, saw `cloud_off` after
+   Azerbaijani, and "fixed" the app to match the picture. Two tests now name it
+   (`LanguagePickerRowStateTest`), which is the deliverable defect G actually
+   had.
+
+6. **`cd_text_lang_retry` changed VALUE, and the label is why.** It read *"Try
+   downloading %1$s again"* while the control was a bare glyph. WCAG 2.5.3
+   (*Label in Name*) requires a control's accessible name to CONTAIN the words
+   drawn on it — otherwise a voice-control user says "tap Retry" and nothing
+   happens — so the moment the word appears on the button, that description stops
+   containing its own label. Now *"Retry download for %1$s"*, in three locales.
+   The key survives rather than being retired: a screen-reader user still needs
+   the language name that the sighted user reads a few dp to the left.
+
+7. **The surviving failure copy is the picker's on all three messages, and
+   #175's own recommendation is deviated from twice.** The issue recommends
+   keeping the `offline_*` NAMES and taking the offline manager's wording for
+   `generic`. Neither was followed. *Names:* the key is no longer either
+   screen's — it is read by two screens and two sheets — and `offline_*` is
+   Screen B's namespace on a screen PR-23 rewrites; `lang_*` has been this
+   module's shared prefix since PR-17's sheet-19a set. *Wording:* each of the
+   picker's three sentences states the fact and then the way out, which is
+   EDGE_CASES §7 in one line, while `Something went wrong — retry` states
+   neither.
+
+8. **The sheets are raised by the PICKER only, and only for a download that
+   screen asked for.** Two consequences, both deliberate. *Only the picker,*
+   because 19b's action navigates to the offline manager and raising it FROM
+   that manager would be a button to where the user already is; Screen B keeps
+   its row cause line — now the shared sentence — and PR-23 rewrites that screen
+   anyway. *Only for a requested download,* because the manager's state map is
+   shared by every screen and outlives the screen that caused a failure, so a
+   picker opened after a failure elsewhere would otherwise be ambushed by a sheet
+   about something the user did not just do.
+
+9. **A watcher, not an event — and the honest limit that comes with it.** The
+   Translation brain has no outcome API by design (`download()` hands the
+   transfer to a process-lifetime scope and returns, so leaving the screen cannot
+   strand it), and U-1 `PackEvents` — the sanctioned outcome channel — is
+   **PR-22**. Building a second one here is what REJECT §7.8 bounces, so
+   `LanguagePickerViewModel` watches the shared state map for the one attempt it
+   started. **The case it cannot report:** a Retry refused for the SAME reason
+   already on the row writes the identical value, so the map never changes and no
+   second sheet opens. That is left as the better behaviour rather than papered
+   over — re-opening a modal sheet to say exactly what the user read and
+   dismissed a second ago is worse than the row's own line, which is still there,
+   still names the cause and still offers Retry. Pinned by
+   `PackFailureSheetRaisingTest.a retry refused for the same reason does not
+   interrupt twice`, with the reasoning in the ViewModel so a change of mind has
+   to be a decision. PR-22 can delete the whole watcher.
+
+10. **A second divergent pair was found and deliberately NOT folded in.**
+    `cd_text_lang_retry` ("Try downloading %1$s again") against
+    `offline_cd_retry` ("Retry downloading %1$s") — the same #175 shape, on the
+    control that answers the failure #175 was about, in the accessibility layer
+    where nobody looks. `STRINGS_language.md` §9 never listed it. It is recorded
+    for its own issue rather than folded in, because #175's brief enumerates six
+    keys and a PR that quietly does eight is a PR whose `Call sites:` line stops
+    meaning anything.
+
+**What the mutation register found that the tests did not** — nothing, which is
+worth stating rather than leaving as silence. All ten mutations were written down
+before the first test (`Reproduced:` in the PR body carries the run), all ten
+reddened the test they were aimed at, and none of them reddened a test that had
+no business failing. The one thing no JVM test in this repo can reach is the
+same thing `MobileDataSheetTest` names: a PIXEL. The sheets' colours — 19d's
+error-container icon slot and cause card against 19b's primary-container one, the
+error-filled Retry pill — are checked on the device screenshots in the PR body
+and nowhere else.
 
 ## Spec of record — rev 5 (2026-08-01)
 

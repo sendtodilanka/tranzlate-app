@@ -19,9 +19,44 @@
     <string name="text_lang_on_device">On device</string>
     <string name="text_lang_on_device_size">On device · %1$s</string>
     <string name="text_lang_downloading">Downloading…</string>
-    <string name="text_lang_error_network">No connection. Reconnect and try again.</string>
-    <string name="text_lang_error_storage">Not enough space. Free some up and try again.</string>
-    <string name="text_lang_error_generic">Download didn\'t finish. Try again.</string>
+    <!-- The ONE failed-download line, on the picker's rows AND the offline
+         manager's (#175, #130 PR-18). It replaced text_lang_error_* and
+         offline_error_*, which said the same three things in two voices: one
+         dropped connection read "No connection. Reconnect and try again." in the
+         picker and "Download failed — check your connection, then retry" in
+         Settings, which invites the reading that they are two faults. The
+         surviving wording is the picker's on all three, because each of its
+         sentences states the fact and then the way out; the retired set's
+         "Something went wrong" states neither. Owned by DownloadFailure.kt. -->
+    <string name="lang_pack_error_network">No connection. Reconnect and try again.</string>
+    <string name="lang_pack_error_storage">Not enough space. Free some up and try again.</string>
+    <string name="lang_pack_error_generic">Download didn\'t finish. Try again.</string>
+    <!-- Sheet 19d — the download the user just asked for stopped. The title
+         names the language; the body and the cause line are per cause, because
+         the drawn frame is written for a dropped connection and ML Kit does not
+         explain its other failures. "nothing is on the device yet" is the drawn
+         copy and it ships as drawn: the frame's own caption claims progress is
+         kept, and DESIGNER-BRIEF.md:73 forbids that claim — there is no resume,
+         and Retry starts a fresh download. -->
+    <string name="lang_sheet_failed_title">%1$s did not download</string>
+    <string name="lang_sheet_failed_body_network">The connection dropped before the pack was ready, so nothing is on the device yet.</string>
+    <string name="lang_sheet_failed_cause_network">Cause: connection lost. Retrying starts the download again.</string>
+    <string name="lang_sheet_failed_body_generic">The download stopped before the pack was ready, so nothing is on the device yet.</string>
+    <string name="lang_sheet_failed_cause_generic">Cause: not reported. Retrying starts the download again.</string>
+    <string name="lang_sheet_failed_close">Close</string>
+    <string name="lang_sheet_failed_retry">Retry</string>
+    <!-- Sheet 19b — the download was refused before it started, because the disk
+         cannot hold a pack (the 150 MB pre-flight in RealOfflineModelManager).
+         The bar is used-against-free on ONE volume and never packs-against-
+         device: at 110 MB the library cannot be plotted against a whole device
+         without misstating one of the two figures (spec rev 5). The drawn second
+         action, "Free up space", opens 20e, which is PR-25 — omitted rather than
+         wired to nothing, per the rev3 ruling. -->
+    <string name="lang_sheet_space_title">Not enough space</string>
+    <string name="lang_sheet_space_body">There is %1$s free on this device. A language pack usually needs 20–45 MB.</string>
+    <string name="lang_sheet_space_used">Other apps and system</string>
+    <string name="lang_sheet_space_free">%1$s free</string>
+    <string name="lang_sheet_space_manage">Manage packs</string>
     <!-- Sheet 19a — the ONE mobile-data consent copy (#130 PR-17). It replaced
          text_lang_data_dialog_* and offline_data_dialog_*, two identical sets
          behind two dialogs. No language name: an answer here can be made
@@ -94,7 +129,10 @@
     <string name="cd_text_lang_download">Download %1$s for offline use</string>
     <!-- Never "Cancel": ML Kit has no cancel, so stopping IS removing (plan R2). -->
     <string name="cd_text_lang_stop">Stop download and remove %1$s</string>
-    <string name="cd_text_lang_retry">Try downloading %1$s again</string>
+    <!-- Contains the word drawn on the pill (WCAG 2.5.3 Label in Name). While the
+         control was a bare ↻ icon this read "Try downloading %1$s again"; the label
+         made that description stop containing its own button. -->
+    <string name="cd_text_lang_retry">Retry download for %1$s</string>
     <!-- The picker owns its own back description: `cd_text_back` stays with the
          composer, and C-3 gives one key one home rather than two modules one name. -->
     <string name="cd_lang_back">Back</string>
@@ -106,9 +144,6 @@
     <string name="offline_cd_stop">Stop downloading %1$s</string>
     <string name="offline_cd_delete">Delete %1$s</string>
     <string name="offline_cd_retry">Retry downloading %1$s</string>
-    <string name="offline_error_storage">Not enough space — free some storage, then retry</string>
-    <string name="offline_error_network">Download failed — check your connection, then retry</string>
-    <string name="offline_error_generic">Something went wrong — retry</string>
     <!-- 17c/17d — the tablet dialog host (#130 PR-16). Three keys, and each one
          exists only in this host: the phone picker is a screen, so its way out is
          a back arrow and it has no docked bar to put actions in.

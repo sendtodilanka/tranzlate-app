@@ -40,9 +40,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -148,11 +149,13 @@ private fun railSlot(
 fun LanguagePickerScreen(
     target: LanguageRole,
     onDone: () -> Unit,
+    onManagePacks: () -> Unit,
     modifier: Modifier = Modifier,
     host: PickerHost = PickerHost.NAV_ENTRY,
     viewModel: LanguagePickerViewModel = hiltViewModel(),
 ) {
     val languages by viewModel.languages.collectAsStateWithLifecycle()
+    val packFailure by viewModel.packFailure.collectAsStateWithLifecycle()
     val offlineStates by viewModel.offlineStates.collectAsStateWithLifecycle()
     val pendingConsent by viewModel.pendingConsent.collectAsStateWithLifecycle()
     val alwaysAsk by viewModel.alwaysAsk.collectAsStateWithLifecycle()
@@ -188,6 +191,9 @@ fun LanguagePickerScreen(
         listPosition = viewModel.listPosition(),
         onListPositionChange = viewModel::onListPositionChange,
         library = library,
+        packFailure = packFailure,
+        onDismissFailure = viewModel::dismissPackFailure,
+        onManagePacks = onManagePacks,
     )
 }
 
@@ -262,6 +268,9 @@ fun LanguagePickerContent(
     listPosition: PickerListPosition = PickerListPosition.Top,
     onListPositionChange: (PickerListPosition) -> Unit = {},
     library: OfflineLibraryMeter? = null,
+    packFailure: PackFailureRequest? = null,
+    onDismissFailure: () -> Unit = {},
+    onManagePacks: () -> Unit = {},
     arrangementOverride: PickerArrangement? = null,
 ) {
     val title =
@@ -289,6 +298,16 @@ fun LanguagePickerContent(
         onAlwaysAskChange = onAlwaysAskChange,
         onDownloadNow = onDownloadAnyway,
         onDismiss = onDismissConsent,
+    )
+    // Sheets 19d / 19b (PR-18). The NAME comes from `sections.all`, which is the
+    // unfiltered row list, so the sheet says exactly what the row says and a
+    // search running when the download failed cannot empty the title.
+    PackFailureSheetHost(
+        request = packFailure,
+        nameOf = { id -> sections.all.firstOrNull { it.id == id }?.displayName },
+        onRetry = onDownload,
+        onManagePacks = onManagePacks,
+        onDismiss = onDismissFailure,
     )
     // BOTH sizes are read from the CONSTRAINTS this screen was handed, never from
     // the window: a nav rail, or a host that draws the picker beside something
@@ -352,6 +371,59 @@ fun LanguagePickerContent(
             onListPositionChange = onListPositionChange,
             library = library,
         )
+    }
+}
+
+/**
+ * Which failure sheet is on screen, if any — the one place the request type
+ * becomes a drawing.
+ *
+ * It is a `when` over [PackFailureRequest] rather than two `if`s at the call
+ * site so that the two sheets cannot both be up: they answer the same question
+ * ("your download did not happen") and a user looking at two of them is looking
+ * at a bug. The ViewModel already guarantees one request at a time; this makes
+ * it a property of the type as well.
+ *
+ * @param nameOf the language's display name as the ROW spells it. A `null`
+ *   answer draws nothing: the catalogue has not arrived yet (or, impossibly, the
+ *   id is not in it), and a sheet titled *" did not download"* would be worse
+ *   than a sheet that waits a frame — the row underneath still reports the
+ *   failure and still offers Retry, so nothing is lost while it does.
+ */
+@Composable
+private fun PackFailureSheetHost(
+    request: PackFailureRequest?,
+    nameOf: (String) -> String?,
+    onRetry: (String) -> Unit,
+    onManagePacks: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (request == null) return
+    when (request) {
+        is PackFailureRequest.NoSpace -> {
+            NoSpaceSheet(
+                freeBytes = request.freeBytes,
+                volumeBytes = request.volumeBytes,
+                onManagePacks = onManagePacks,
+                onDismiss = onDismiss,
+            )
+        }
+
+        is PackFailureRequest.Interrupted -> {
+            val name = nameOf(request.id)
+            val sheet = downloadFailureCopy(request.cause).sheet
+            if (name != null && sheet is DownloadFailureSheet.Interrupted) {
+                InterruptedSheet(
+                    languageName = name,
+                    sheet = sheet,
+                    onRetry = {
+                        onDismiss()
+                        onRetry(request.id)
+                    },
+                    onDismiss = onDismiss,
+                )
+            }
+        }
     }
 }
 
@@ -1430,9 +1502,15 @@ private fun rowSupportingText(state: LanguageRowState): String? {
     val context = LocalContext.current
     return when (state) {
         is LanguageRowState.Selected -> rowSupportingText(state.inner)
+
         is LanguageRowState.Downloaded -> onDeviceLine(context, state.sizeBytes)
+
         LanguageRowState.Downloading -> stringResource(R.string.text_lang_downloading)
-        is LanguageRowState.Failed -> stringResource(failureCauseRes(state.cause))
+
+        // The SAME sentence the offline manager's failed row shows — one map,
+        // one string set, `DownloadFailure.kt` (#175, PR-18).
+        is LanguageRowState.Failed -> stringResource(downloadFailureCopy(state.cause).rowLine)
+
         LanguageRowState.Downloadable, LanguageRowState.OnlineOnly -> null
     }
 }
@@ -1452,14 +1530,6 @@ private fun onDeviceLine(
         stringResource(R.string.text_lang_on_device)
     } else {
         stringResource(R.string.text_lang_on_device_size, Formatter.formatShortFileSize(context, sizeBytes))
-    }
-
-@StringRes
-private fun failureCauseRes(cause: OfflineModelFailure): Int =
-    when (cause) {
-        OfflineModelFailure.STORAGE -> R.string.text_lang_error_storage
-        OfflineModelFailure.NETWORK, OfflineModelFailure.WIFI_REQUIRED -> R.string.text_lang_error_network
-        OfflineModelFailure.UNKNOWN -> R.string.text_lang_error_generic
     }
 
 /**
@@ -1602,18 +1672,73 @@ private fun RowTrailing(
         }
 
         is LanguageRowState.Failed -> {
-            IconButton(
-                onClick = { onDownload(row.id) },
-                modifier = Modifier.testTag("tt_lang_retry_${row.id}"),
-            ) {
-                Icon(
-                    Icons.Filled.Refresh,
-                    contentDescription = stringResource(R.string.cd_text_lang_retry, row.displayName),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(Dimensions.pickerStateIcon),
-                )
-            }
+            RetryPill(row = row, onRetry = onDownload)
         }
+    }
+}
+
+/**
+ * The failed row's action — a labelled **Retry** pill, which is the 15a
+ * deviation the rev3 ruling asks PR-18 to close (*"icon → spec filled pill"*).
+ *
+ * What was here was `Icons.Filled.Refresh` in an `IconButton`: the same glyph
+ * this app uses for "reload" everywhere else, sitting where every other row in
+ * the list draws a state — a cloud, a download arrow, a chip. A circular arrow
+ * beside a red sentence asks the user to infer that the arrow undoes the
+ * sentence. The export draws the word instead, and the word is the whole
+ * argument: it is the ONE row state whose control performs an action rather than
+ * reporting a fact, and a label is what says so.
+ *
+ * **The description now CONTAINS the visible word, and that is a fix the label
+ * forced.** A control's accessible name must contain the text drawn on it (WCAG
+ * 2.5.3, *Label in Name*) — otherwise a voice-control user says "tap Retry" and
+ * nothing happens. While the control was an icon there was no visible text and
+ * `cd_text_lang_retry` could read "Try downloading Hindi again"; the moment the
+ * word appears on the button, that description stops containing its own label.
+ * The key's VALUE changed with the control ("Retry download for Hindi"), in all
+ * three locales, rather than the key being retired: a screen-reader user still
+ * needs the language name, which the sighted user reads a few dp to the left.
+ *
+ * **Height, where the export and C-14 disagree.** The frame draws a 40dp pill.
+ * C-14 makes [Dimensions.touchTargetMin] the authoritative floor, and PR-14
+ * settled the same collision the same way for the landscape search field, so the
+ * pill's own box is 48dp. It sits inside a 60dp row, so nothing grows.
+ *
+ * The colours ARE the export's: an error-filled container, which is the spec §5
+ * reservation applied correctly — this is the one control on the screen that
+ * belongs to a failure, and the row's other ink already carries it.
+ */
+@Composable
+private fun RetryPill(
+    row: LanguagePickerRow,
+    onRetry: (String) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    val spoken = stringResource(R.string.cd_text_lang_retry, row.displayName)
+    Button(
+        onClick = { onRetry(row.id) },
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError,
+            ),
+        contentPadding = PaddingValues(horizontal = spacing.md16),
+        modifier =
+            Modifier
+                .heightIn(min = Dimensions.touchTargetMin)
+                .testTag("tt_lang_retry_${row.id}")
+                .semantics { contentDescription = spoken },
+    ) {
+        // Left in the semantics tree on purpose. TalkBack prefers the button's
+        // `contentDescription` over its text, so the word is not announced twice
+        // — and leaving it there is what lets a test read the LABEL rather than
+        // only the tag, which is the difference between catching the icon coming
+        // back and not.
+        Text(
+            text = stringResource(R.string.lang_sheet_failed_retry),
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+        )
     }
 }
 

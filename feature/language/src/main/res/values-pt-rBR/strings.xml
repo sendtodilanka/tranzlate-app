@@ -14,9 +14,25 @@
     <string name="text_lang_on_device">No dispositivo</string>
     <string name="text_lang_on_device_size">No dispositivo · %1$s</string>
     <string name="text_lang_downloading">Baixando…</string>
-    <string name="text_lang_error_network">Sem conexão. Reconecte e tente novamente.</string>
-    <string name="text_lang_error_storage">Espaço insuficiente. Libere espaço e tente novamente.</string>
-    <string name="text_lang_error_generic">O download não foi concluído. Tente novamente.</string>
+    <!-- The ONE failed-download line, both screens (#175) — the picker's wording
+         survived; see values/strings.xml. -->
+    <string name="lang_pack_error_network">Sem conexão. Reconecte e tente novamente.</string>
+    <string name="lang_pack_error_storage">Espaço insuficiente. Libere espaço e tente novamente.</string>
+    <string name="lang_pack_error_generic">O download não foi concluído. Tente novamente.</string>
+    <!-- Sheets 19d and 19b — see values/strings.xml for why the body says nothing
+         is on the device yet, and why 19b has one action rather than two. -->
+    <string name="lang_sheet_failed_title">%1$s não foi baixado</string>
+    <string name="lang_sheet_failed_body_network">A conexão caiu antes de o pacote ficar pronto, então ainda não há nada no dispositivo.</string>
+    <string name="lang_sheet_failed_cause_network">Causa: conexão perdida. Tentar de novo recomeça o download.</string>
+    <string name="lang_sheet_failed_body_generic">O download parou antes de o pacote ficar pronto, então ainda não há nada no dispositivo.</string>
+    <string name="lang_sheet_failed_cause_generic">Causa: não informada. Tentar de novo recomeça o download.</string>
+    <string name="lang_sheet_failed_close">Fechar</string>
+    <string name="lang_sheet_failed_retry">Tentar de novo</string>
+    <string name="lang_sheet_space_title">Espaço insuficiente</string>
+    <string name="lang_sheet_space_body">Há %1$s livres neste dispositivo. Um pacote de idioma costuma precisar de 20 a 45 MB.</string>
+    <string name="lang_sheet_space_used">Outros apps e sistema</string>
+    <string name="lang_sheet_space_free">%1$s livres</string>
+    <string name="lang_sheet_space_manage">Gerenciar pacotes</string>
     <!-- Sheet 19a — see values/strings.xml for why there is no language name and
          why the second action is not "Wait for Wi-Fi". -->
     <string name="lang_sheet_data_title">Baixar usando dados móveis?</string>
@@ -58,7 +74,7 @@
     <string name="cd_text_lang_row_voice">%1$s, pode ser falado off-line</string>
     <string name="cd_text_lang_download">Baixar %1$s para uso off-line</string>
     <string name="cd_text_lang_stop">Parar o download e remover %1$s</string>
-    <string name="cd_text_lang_retry">Tentar baixar %1$s novamente</string>
+    <string name="cd_text_lang_retry">Tentar de novo o download de %1$s</string>
     <!-- The picker owns its own back description: `cd_text_back` stays with the
          composer, and C-3 gives one key one home rather than two modules one name. -->
     <string name="cd_lang_back">Voltar</string>
@@ -70,9 +86,6 @@
     <string name="offline_cd_stop">Parar o download de %1$s</string>
     <string name="offline_cd_delete">Excluir %1$s</string>
     <string name="offline_cd_retry">Tentar baixar %1$s novamente</string>
-    <string name="offline_error_storage">Espaço insuficiente — libere armazenamento e tente de novo</string>
-    <string name="offline_error_network">Falha no download — verifique a conexão e tente de novo</string>
-    <string name="offline_error_generic">Algo deu errado — tente de novo</string>
     <!-- 17c/17d tablet dialog (#130 PR-16). -->
     <string name="lang_dialog_manage_packs">Gerenciar pacotes</string>
     <string name="lang_dialog_cancel">Cancelar</string>

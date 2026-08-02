@@ -182,20 +182,15 @@ private fun OfflineRow(
             // Issue #90 (EDGE_CASES no-dead-end): a Failed row explains WHY —
             // ↻ on a full disk re-fails silently otherwise. This is an error
             // line, not the always-on sub-line the owner removed in #82.
+            //
+            // The sentence itself comes from `DownloadFailure.kt` and is the SAME
+            // one the picker's failed row shows (#175, PR-18). This screen used
+            // to spell its own `when` over the same enum into its own three
+            // string keys, so one dropped connection read differently depending
+            // on which of the two screens the user was standing in.
             if (row.state is OfflineModelState.Failed) {
                 Text(
-                    text =
-                        stringResource(
-                            when (row.state.cause) {
-                                OfflineModelFailure.STORAGE -> R.string.offline_error_storage
-
-                                OfflineModelFailure.NETWORK,
-                                OfflineModelFailure.WIFI_REQUIRED,
-                                -> R.string.offline_error_network
-
-                                OfflineModelFailure.UNKNOWN -> R.string.offline_error_generic
-                            },
-                        ),
+                    text = stringResource(downloadFailureCopy(row.state.cause).rowLine),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.testTag("tt_offline_error_line"),

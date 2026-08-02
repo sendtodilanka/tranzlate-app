@@ -10,6 +10,7 @@ import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
+import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
@@ -20,13 +21,18 @@ import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -401,16 +407,157 @@ class LanguagePickerViewModel
             }
         }
 
+        private val raisedFailure = MutableStateFlow<PackFailureRequest?>(null)
+
+        /**
+         * Sheet 19b or 19d, or neither — the failure the user is owed an
+         * interruption about (#130 PR-18).
+         *
+         * **Only a download THIS screen asked for can raise it.** The manager's
+         * state map is shared by every screen and outlives the one that caused
+         * the failure, so a picker opened after a failure in Settings would
+         * otherwise be met by a sheet about something the user did not just do.
+         * A failure nobody here asked for is still reported — on the row, with
+         * its cause and its Retry — which is where an unrequested fact belongs.
+         */
+        val packFailure: StateFlow<PackFailureRequest?> = raisedFailure.asStateFlow()
+
+        /** "Close" on 19d, a scrim tap, a back press: the row keeps its cause line and its Retry. */
+        fun dismissPackFailure() {
+            raisedFailure.value = null
+        }
+
         /** Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts. */
         fun download(id: String) {
-            viewModelScope.launch { downloadGate.requestDownload(id) }
+            val before = offlineStates.value[id]
+            viewModelScope.launch {
+                downloadGate.requestDownload(id)
+                // The gate only ASKED. Nothing started, so there is no outcome to
+                // wait for — and waiting would leave a collector suspended on a
+                // question the user may never answer.
+                if (downloadGate.pendingConsent.value == id) return@launch
+                reportFailure(id, before)
+            }
         }
 
         /** Dialog "Download once": THIS download only — the standing pref is untouched. */
         fun downloadAnyway() {
             val consented = downloadGate.consentOnce() ?: return
-            viewModelScope.launch { downloadGate.downloadConsented(consented) }
+            val before = offlineStates.value[consented.id]
+            viewModelScope.launch {
+                downloadGate.downloadConsented(consented)
+                reportFailure(consented.id, before)
+            }
         }
+
+        /**
+         * Watch ONE download attempt to its end, and raise a sheet if it failed.
+         *
+         * This is a watcher rather than a return value because the Translation
+         * brain deliberately does not have one: `OfflineModelManager.download`
+         * hands the transfer to a process-lifetime scope and returns, so that
+         * leaving the screen cannot strand a half-finished download (#82/#83).
+         * The outcome therefore arrives the same way every other pack fact does
+         * — through the shared state map. The rev3 ruling's U-1 `PackEvents`
+         * (PR-22) is the outcome channel this will be able to use instead; it
+         * does not exist yet, and inventing a second one here would be the third
+         * copy REJECT §7.8 bounces.
+         *
+         * ### How an attempt is told apart from what was already on the row
+         *
+         * [before] is the state the row was showing when the user tapped —
+         * `NotDownloaded` on a first attempt, `Failed(…)` on a Retry. The shared
+         * map is a `StateFlow` fed by a `combine` on another scope, so it can
+         * still be one emission behind the write `download()` has already made
+         * by the time this runs. Dropping while the value is unchanged waits for
+         * it to catch up, and everything after that is this attempt.
+         *
+         * Then two shapes, both real:
+         * - **The transfer ran and failed.** `Downloading` → `Failed(cause)`.
+         * - **It never started.** The pre-flight refuses a download the disk
+         *   cannot hold before enqueueing anything, so the row goes straight to
+         *   `Failed(STORAGE)` with no `Downloading` in between — the ruling's
+         *   named PR-18 test, and the only trigger 19b has.
+         *
+         * Anything else — `Downloaded`, `Deleting` after the user hit Stop,
+         * `NotDownloaded` again — concludes the attempt without a failure and the
+         * watcher stops.
+         *
+         * ### The one case it does not report, stated rather than left to be found
+         *
+         * A Retry that is refused for the **same** reason already on the row
+         * (`Failed(STORAGE)` → `Failed(STORAGE)`) writes the identical value, so
+         * the map never changes and this never passes its first step: no second
+         * sheet, and one coroutine left suspended on a shared flow until the
+         * picker closes. Both halves are deliberate. A modal sheet that re-opens
+         * saying exactly what the user read and dismissed a second ago is worse
+         * than the row's own line, which is still there, still names the cause,
+         * and still offers Retry — no dead end. `LanguagePickerViewModelTest`
+         * pins the behaviour so a later change is a decision rather than a drift.
+         */
+        private suspend fun reportFailure(
+            id: String,
+            before: OfflineModelState?,
+        ) {
+            val cause =
+                modelManager
+                    .modelStates()
+                    .map { it[id] }
+                    .dropWhile { it == before }
+                    .transformWhile { state ->
+                        when (state) {
+                            OfflineModelState.Downloading -> {
+                                true
+                            }
+
+                            is OfflineModelState.Failed -> {
+                                emit(state.cause)
+                                false
+                            }
+
+                            else -> {
+                                false
+                            }
+                        }
+                    }.firstOrNull() ?: return
+            raisedFailure.value = packFailureRequest(id, cause)
+        }
+
+        /**
+         * Which sheet, and what it needs to draw itself.
+         *
+         * The choice is [downloadFailureCopy]'s and not repeated here — that map
+         * is the single home for "what does this cause mean", and a `when` over
+         * the same enum in a ViewModel would be the second copy of it.
+         *
+         * 19b's two figures are read HERE rather than passed down from the
+         * library meter, and the difference matters: the meter answers "how much
+         * of this disk do my packs use", which is a question about packs, and
+         * degrades to `null` when the model store cannot be found. 19b's bar is
+         * used-against-free on the whole volume — a question about the device —
+         * and both numbers come from the same probe in the same breath, so the
+         * sheet cannot draw a fill and a legend that describe two moments. They
+         * are disk reads, so they are taken off the main thread, exactly as the
+         * meter's three are.
+         */
+        private suspend fun packFailureRequest(
+            id: String,
+            cause: OfflineModelFailure,
+        ): PackFailureRequest =
+            when (downloadFailureCopy(cause).sheet) {
+                DownloadFailureSheet.NoSpace -> {
+                    withContext(dispatchers.io) {
+                        PackFailureRequest.NoSpace(
+                            freeBytes = storageProbe.freeBytes(),
+                            volumeBytes = storageProbe.totalBytes(),
+                        )
+                    }
+                }
+
+                is DownloadFailureSheet.Interrupted -> {
+                    PackFailureRequest.Interrupted(id = id, cause = cause)
+                }
+            }
 
         /** Dialog "Wait for Wi-Fi" (or dismiss): the row stays downloadable — no dead end. */
         fun dismissConsent() = downloadGate.dismiss()
