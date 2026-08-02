@@ -60,15 +60,31 @@
 # so there is no escalation — but it is disclosure, and it is named here rather
 # than discovered later.
 #
-# FAIL OPEN, like every guard here: an unreadable claim file, a malformed
-# payload, no `jq`, or a command this cannot resolve → silent. It never blocks
-# the tool call; every branch below either warns or says nothing.
+# FAIL OPEN, like every guard here: it NEVER blocks the tool call. Every path
+# either warns or says nothing.
 #
-# NOTE: "no claim file → silent" belonged in this list until the fix below, and
-# was the whole defect (#213) — it is now the nudge at the bottom. The #214 lens
-# caught this sentence still claiming the old behaviour eight lines above the
-# code that contradicts it, inside the PR whose subject is documents that
-# disagree with their code. Corrected rather than left as a small thing.
+# Silent, enumerated from the code rather than from memory — the `exit 0`s
+# before any message: no `jq` or a malformed payload (:75), an empty command
+# (:76), a command with no `adb` (:80) or no driving verb (:81), and anything
+# outside a git repo (:83, :85). Then, past the message branches: a claim file
+# whose first line is EMPTY (:137-138) — verified with both a zero-byte file and
+# a blank-lines one. Note the consequence, since the nudge tells the reader to
+# create this file: `touch .claude/device-claim` silences the hook completely —
+# no claim message and no nudge. Naming it here because the natural mistake and
+# the total-silence path are the same keystroke.
+#
+# NOT silent, and this is where the comment was wrong TWICE:
+#   - "no claim file"      — was the whole defect (#213); now the nudge at :119.
+#   - "an unreadable one"  — `[ ! -r "$claim" ]` at :119 catches missing AND
+#                            unreadable in ONE branch, so a `chmod 000` claim
+#                            file produces the same nudge. Verified live.
+#
+# The #214 lens caught the first clause. I fixed that clause and left the one
+# beside it in the same sentence unchecked — the identical code path, one
+# comma away. It found that too, on re-attack. The lesson is not "be careful
+# with comments": it is that a correction scoped to exactly what you were told
+# is the same narrow search that caused the original error. This block is now
+# derived from `grep -n "exit 0"` and a live run of each branch.
 set -uo pipefail
 
 payload=$(cat)
