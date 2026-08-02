@@ -90,7 +90,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 |---|---|---|
 | PR-13 | Fold-posture `WindowInfo` extension + host-agnostic saveable contract (query + list position out of `rememberSaveable`, into the picker VM's `SavedStateHandle`) + `pendingConsent` → `SavedStateHandle` behind a storage seam + LeakCanary debug-only rider. **`LanguageSheetRequest` is NOT built here** — it has no members until PR-17; see below | 👁 **PR #192** |
 | PR-14 | 17a landscape two-pane: a `pickerArrangement()` window gate + a side pane beside the catalog + the catalog on a grid so ONE list position means the same language in both arrangements + the Detect-key settle. **Deviations below** | ✅ #198, 2026-08-02 |
-| PR-15 | 17b foldable two-leaf (24dp crease gutter, 296dp leaf) + the offline-library meter (U-5) with its two honest degrades. **E-S1 ran and passed** — `docs/research/issue-130-e-s1-storage-walk.md`. **Deviations below** | 👁 PR-15 |
+| PR-15 | 17b foldable two-leaf (24dp crease gutter, 296dp leaf) + the offline-library meter (U-5) with its two honest degrades. **E-S1 ran and passed** — `docs/research/issue-130-e-s1-storage-walk.md`. **Deviations below** | ✅ #200, 2026-08-02 |
 | PR-16 | 17c/17d dialog host + E-D1 + measured jank budget gate | ⬜ |
 
 ### Phase 6 — sheets, first-run, snackbars
