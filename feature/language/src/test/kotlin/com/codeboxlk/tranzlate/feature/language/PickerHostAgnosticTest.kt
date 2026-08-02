@@ -159,6 +159,81 @@ class PickerHostAgnosticTest {
             .isEqualTo(1)
     }
 
+    // ---- the third host (#130 PR-16) ----------------------------------------
+
+    /**
+     * The dialog host may not cut a new door either.
+     *
+     * PR-13's rule reads ONE file by path, and the card is a second one. Its
+     * query and its list position come from the same
+     * `LanguagePickerViewModel.SavedStateHandle`, so a `rememberSaveable` here
+     * would undo PR-13 from a file PR-13's rule does not read — which is exactly
+     * the shape of the alias regression #192's lens found.
+     *
+     * The card's OPEN/CLOSED flag is legitimately `rememberSaveable`, and it is
+     * deliberately not in this file: it lives in the app shell (`TranzlateApp`),
+     * where the ruling puts it, because it is a fact about what the shell is
+     * showing rather than about what the picker holds.
+     */
+    @Test
+    fun `the dialog host holds no host-scoped saveable state`() {
+        val lines = sourceLines(DIALOG_HOST_SOURCE)
+
+        // Never vacuous: a moved or renamed host fails here rather than
+        // satisfying every "does not contain" below by being empty.
+        assertThat(lines.joinToString("\n")).contains("fun PickerDialogHost")
+
+        val imported = lines.filter(::isImport).map(::importedSymbol)
+        assertThat(imported).isNotEmpty()
+        assertWithMessage(
+            "PickerDialogHost.kt imports host-scoped state. The card's query and scroll live " +
+                "in LanguagePickerViewModel's SavedStateHandle, and the open/closed flag " +
+                "belongs to the app shell.",
+        ).that(imported.filter { it.substringAfterLast('.') in HOST_SCOPED_STATE })
+            .isEmpty()
+    }
+
+    /**
+     * **The one line the whole host exists for**, and the one a mutation reaches
+     * for first: `hiltViewModel(rememberPickerDialogScope())` → `hiltViewModel()`.
+     *
+     * Outside `NavDisplay` the bare call resolves to the ACTIVITY's
+     * `ViewModelStore`, which gives the picker a ViewModel that outlives every
+     * screen — the third screen-outliving scope the ruling's §2 inventory bounces
+     * — and the visible symptom is a card that reopens holding the last search.
+     *
+     * Honest about being a source rule. `hiltViewModel` needs a Hilt-instrumented
+     * application and this module's Compose tests are plain Robolectric (#186),
+     * so the behaviour half is [PickerDialogScopeTest] driving
+     * `rememberPickerDialogScope` directly, and this is what ties the host to it.
+     */
+    @Test
+    fun `the dialog host scopes its ViewModel to the card`() {
+        val code =
+            sourceLines(DIALOG_HOST_SOURCE)
+                .joinToString("\n")
+                .replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), "")
+                .replace(Regex("//.*"), "")
+
+        // Whole lines, not a `[^)]*` capture: the argument is itself a call, so a
+        // regex that stops at the first `)` reads `rememberPickerDialogScope(`
+        // and would go green on `hiltViewModel(somethingElse())`.
+        val calls =
+            code
+                .lines()
+                .filter { it.contains("hiltViewModel(") }
+                .map { it.substringAfter("hiltViewModel(").substringBeforeLast(")") }
+
+        assertWithMessage("PickerDialogHost.kt makes ${calls.size} hiltViewModel calls")
+            .that(calls)
+            .hasSize(1)
+        assertWithMessage(
+            "hiltViewModel() with no owner resolves to the Activity outside NavDisplay — a " +
+                "picker ViewModel that outlives every screen in the app.",
+        ).that(calls.single().trim())
+            .isEqualTo("rememberPickerDialogScope()")
+    }
+
     /**
      * Every symbol the file imports, resolved through any alias.
      *
@@ -167,28 +242,28 @@ class PickerHostAgnosticTest {
      * backticks are stripped so an unusual-but-legal spelling cannot slip a
      * banned symbol past the comparison.
      */
-    private fun pickerImports(): List<String> =
-        pickerLines()
-            .filter(::isImport)
-            .map { line ->
-                line
-                    .trim()
-                    .removePrefix("import ")
-                    .substringBefore(" as ")
-                    .trim()
-                    .removeSuffix(";")
-                    .replace("`", "")
-                    .trim()
-            }
+    private fun importedSymbol(line: String): String =
+        line
+            .trim()
+            .removePrefix("import ")
+            .substringBefore(" as ")
+            .trim()
+            .removeSuffix(";")
+            .replace("`", "")
+            .trim()
 
-    private fun isImport(line: String) = line.trimStart().startsWith("import ")
-
-    private fun pickerLines(): List<String> {
+    private fun sourceLines(path: String): List<String> {
         val checkoutRoot =
             generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
                 .first { File(it, "settings.gradle.kts").isFile }
-        return checkoutRoot.resolve(PICKER_SOURCE).readText().lines()
+        return checkoutRoot.resolve(path).readText().lines()
     }
+
+    private fun pickerImports(): List<String> = pickerLines().filter(::isImport).map(::importedSymbol)
+
+    private fun isImport(line: String) = line.trimStart().startsWith("import ")
+
+    private fun pickerLines(): List<String> = sourceLines(PICKER_SOURCE)
 
     /**
      * The shipped BODY of the screen: imports, comments, string literals and
@@ -221,6 +296,10 @@ class PickerHostAgnosticTest {
 
 private const val PICKER_SOURCE =
     "feature/language/src/main/kotlin/com/codeboxlk/tranzlate/feature/language/LanguagePickerScreen.kt"
+
+/** The third host (17c/17d), which is a second file the same rule has to reach. */
+private const val DIALOG_HOST_SOURCE =
+    "feature/language/src/main/kotlin/com/codeboxlk/tranzlate/feature/language/PickerDialogHost.kt"
 
 /**
  * Every way Compose addresses state through the HOST's `SaveableStateHolder`

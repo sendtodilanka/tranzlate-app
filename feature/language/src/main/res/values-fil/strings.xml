@@ -74,4 +74,8 @@
     <string name="offline_error_storage">Kulang ang espasyo — magbakante ng storage, pagkatapos ay subukang muli</string>
     <string name="offline_error_network">Nabigo ang pag-download — suriin ang koneksyon, pagkatapos ay subukang muli</string>
     <string name="offline_error_generic">Nagkaproblema — subukang muli</string>
+    <!-- 17c/17d tablet dialog (#130 PR-16). -->
+    <string name="lang_dialog_manage_packs">Pamahalaan ang mga pack</string>
+    <string name="lang_dialog_cancel">Kanselahin</string>
+    <string name="lang_dialog_close">Isara</string>
 </resources>

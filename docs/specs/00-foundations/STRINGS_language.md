@@ -60,6 +60,19 @@ Drawn at the foot of the shortcut leaf, and **only** on a folded window — 17a'
 | `text_lang_library_free` | plurals | `of %1$d packs · %2$s free` | offline-capable, size label | the line for **"the size is not knowable"**: the store directory is absent, renamed or empty while packs are counted. `0 MB used` would be a claim about the disk that nothing checked (risk R8). It is **also the first card a new user sees** — a `pm clear` on `emulator-5554` read `1 of 59 packs · 8.6 GB free`, because ML Kit counts the English pivot as on device before anything is downloaded and this app's store does not exist yet (E-S1b, `docs/research/issue-130-e-s1-storage-walk.md`). Not a rare degrade |
 | `text_lang_library_none` | plurals | `of %1$d packs · nothing downloaded` | offline-capable | outranks both of the above whenever the count is zero, however the walk answers: a store can outlive the packs deleted from it, and a size printed under a count of nought is a size for something the user does not have. Close to unreachable on Play-Services hardware for the E-S1b reason above; kept because a zero count still needs a truthful card |
 
+### 3.2 Tablet dialog host (17c/17d · issue #130 PR-16)
+
+The picker on a tablet is a card over the screen that asked for it, not a
+destination. Two of these three keys exist only because of that: a card has a
+Close cross where a screen has a back arrow, and a docked action bar where a
+screen has none.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_dialog_manage_packs` | string | `Manage packs` | — | the docked action, as drawn in all four tablet frames. It opens the SAME destination the Home row does, and owner ruling 5 relabels that row **"Language packs"** in PR-23 — the two are deliberately left un-unified here rather than silently changed in one place, because the relabel is PR-23's across three locales |
+| `lang_dialog_cancel` | string | `Cancel` | — | close the card, change nothing. The engineering brief §9 already ruled these four tablet dismisses read "Cancel" correctly; the prohibition on the word applies to the ✕ on a **downloading row**, which stops a download and removes it |
+| `lang_dialog_close` | string | `Close` | — | content description for the card's leading cross. Not `cd_lang_back`: that key says "Back", which promises a return to somewhere, and the card returns to a screen that never left |
+
 ## 4. Language picker — empty, loading and failure states (EDGE_CASES, no dead ends)
 
 | Key | Type | `en` | Args | Notes |

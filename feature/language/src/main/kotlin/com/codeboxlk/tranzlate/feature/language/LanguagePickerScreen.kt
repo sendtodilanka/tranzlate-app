@@ -150,6 +150,7 @@ fun LanguagePickerScreen(
     target: LanguageRole,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    host: PickerHost = PickerHost.NAV_ENTRY,
     viewModel: LanguagePickerViewModel = hiltViewModel(),
 ) {
     val languages by viewModel.languages.collectAsStateWithLifecycle()
@@ -172,6 +173,7 @@ fun LanguagePickerScreen(
         },
         onBack = onDone,
         modifier = modifier,
+        host = host,
         offlineStates = offlineStates,
         onDownload = viewModel::download,
         onStop = viewModel::stopAndRemove,
@@ -219,8 +221,17 @@ fun LanguagePickerScreen(
  * [pickerArrangement], and the catalog, the rows, the search and the state stay
  * in one place.
  *
+ * **The tablet dialog (17c/17d) is an arrangement of this same screen too**, and
+ * it is the third host rather than a third screen for the same reason. What the
+ * card changes is decided by [pickerArrangement] from the CARD's constraints —
+ * one column or two, and no A–Z rail — plus the one thing a measurement cannot
+ * tell it, which is that its way out is a Close button rather than a back arrow.
+ * That is what [host] carries, and it is the only branch it opens here.
+ *
  * @param sizes measured on-disk bytes per tag; empty in production today, see
  *   [LanguageRowState.Downloaded].
+ * @param host which host is drawing this picker ([PickerHost]) — production
+ *   passes the answer [pickerHost] gave the shell.
  * @param arrangementOverride PREVIEWS ONLY. Production leaves it null so the
  *   window answers; a preview cannot resize its host, so it says which
  *   arrangement it is showing.
@@ -235,6 +246,7 @@ fun LanguagePickerContent(
     onSelect: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    host: PickerHost = PickerHost.NAV_ENTRY,
     recents: Map<String, Long> = emptyMap(),
     offlineStates: Map<String, OfflineModelState> = emptyMap(),
     sizes: Map<String, Long> = emptyMap(),
@@ -282,16 +294,33 @@ fun LanguagePickerContent(
         val window = rememberWindowInfo()
         val arrangement =
             arrangementOverride
-                ?: pickerArrangement(maxWidth, maxHeight, window.posture, window.hinged)
-        val railed = !sections.searching && !sections.catalogEmpty
+                ?: pickerArrangement(maxWidth, maxHeight, window.posture, window.hinged, host)
+        // TWO questions that used to be one, and the device run is what separated
+        // them (#130 PR-16). "The catalog is whole" decides the "All languages"
+        // header, the on-device counter under it and therefore `catalogOffset`;
+        // "the rail is up" decides the letters and the inset they need. They were
+        // the same boolean until the dialog became the first host that wants the
+        // header WITHOUT the rail — and tying them together silently dropped
+        // "5 of 59 packs on device" from all four tablet frames, which the export
+        // draws in every one of them.
+        val wholeCatalog = !sections.searching && !sections.catalogEmpty
+        val railed = arrangement.rail && wholeCatalog
         val plan =
-            remember(target, sections.detect, sections.recent, sections.anyVoiceMark, railed, arrangement, library) {
+            remember(
+                target,
+                sections.detect,
+                sections.recent,
+                sections.anyVoiceMark,
+                wholeCatalog,
+                arrangement,
+                library,
+            ) {
                 pickerListPlan(
                     role = target,
                     detectRowPresent = sections.detect != null,
                     recentCount = sections.recent.size,
                     anyVoiceMark = sections.anyVoiceMark,
-                    railed = railed,
+                    wholeCatalog = wholeCatalog,
                     arrangement = arrangement,
                     libraryReady = library != null,
                 )
@@ -302,6 +331,7 @@ fun LanguagePickerContent(
             sections = sections,
             plan = plan,
             arrangement = arrangement,
+            host = host,
             railed = railed,
             query = query,
             onQueryChange = onQueryChange,
@@ -330,6 +360,7 @@ private fun PickerScaffold(
     sections: PickerSections,
     plan: PickerListPlan,
     arrangement: PickerArrangement,
+    host: PickerHost,
     railed: Boolean,
     query: String,
     onQueryChange: (String) -> Unit,
@@ -344,7 +375,13 @@ private fun PickerScaffold(
 ) {
     val spacing = LocalSpacing.current
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
+        // The card paints its own floating surface and this Scaffold is INSIDE
+        // it, so a second opaque fill here would cover it — the picker would draw
+        // the page colour over a white card and the two would look like one flat
+        // sheet. On a screen there is nothing underneath, so the page colour is
+        // exactly right.
+        containerColor =
+            if (host == PickerHost.DIALOG) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
             if (arrangement.twoPane) {
                 PickerCompactBar(
@@ -356,7 +393,7 @@ private fun PickerScaffold(
                     counts = if (plan.counterInTopBar) sections.counts else null,
                 )
             } else {
-                PickerTopBar(title = title, onBack = onBack)
+                PickerTopBar(title = title, onBack = onBack, host = host)
             }
         },
         modifier = Modifier.fillMaxSize(),
@@ -960,20 +997,38 @@ private fun recentHeaderRes(header: RecentHeader): Int =
 
 // ---- pieces ----------------------------------------------------------------
 
-/** 64dp bar, left-aligned 22sp title, 48dp back target, no trailing action (design §2). */
+/**
+ * 64dp bar, left-aligned 22sp title, 48dp back target, no trailing action
+ * (design §2).
+ *
+ * **The dialog's bar is the same bar with the other way out** (17c/17d). A back
+ * arrow promises a screen behind it that the arrow will take you back to; in the
+ * card that screen is already on show behind the scrim and nothing is going to
+ * be popped, so the export draws a Close cross — leading, where the arrow was,
+ * because the export puts it trailing and M3 puts a full-screen dialog's Close
+ * at the start. Trailing here would also collide with the trailing edge the rail
+ * has just been taken off. Same testTag either way: it is one control with one
+ * job, and a test that had to know which host it was in would be testing the
+ * host.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PickerTopBar(
     title: String,
     onBack: () -> Unit,
+    host: PickerHost = PickerHost.NAV_ENTRY,
 ) {
+    val dialog = host == PickerHost.DIALOG
     TopAppBar(
         title = { Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = {
             IconButton(onClick = onBack, modifier = Modifier.testTag("tt_lang_back")) {
                 Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.cd_lang_back),
+                    if (dialog) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription =
+                        stringResource(
+                            if (dialog) R.string.lang_dialog_close else R.string.cd_lang_back,
+                        ),
                 )
             }
         },
@@ -1928,8 +1983,13 @@ private fun MeteredConsentDialog(
  * the row that proves a pack does not imply a voice. Arabic carries a voice
  * while its pack is still downloading, which is the other half of that
  * independence and the case 17a's landscape "to" frame draws.
+ *
+ * `internal` rather than file-private since #130 PR-16: the dialog host's
+ * previews are in their own file and draw the same picker, and two casts would
+ * mean two sets of rows that could quietly stop agreeing about which language
+ * has a voice.
  */
-private val previewLanguages =
+internal val previewLanguages =
     listOf(
         Language("af", "Afrikaans", offlineAvailable = true, offlineDownloaded = true),
         Language("sq", "Albanian", offlineAvailable = true, offlineDownloaded = false),
@@ -1960,9 +2020,9 @@ private val previewLanguages =
     )
 
 /** Newest first: Spanish, English, Afrikaans — the export's recents order. */
-private val previewRecents = mapOf("es" to 3L, "en" to 2L, "af" to 1L)
+internal val previewRecents = mapOf("es" to 3L, "en" to 2L, "af" to 1L)
 
-private val previewStates =
+internal val previewStates =
     mapOf(
         "ar" to OfflineModelState.Downloading,
         "am" to OfflineModelState.Failed(OfflineModelFailure.NETWORK),

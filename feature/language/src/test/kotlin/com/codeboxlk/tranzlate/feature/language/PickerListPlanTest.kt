@@ -40,7 +40,7 @@ class PickerListPlanTest {
         detectRowPresent = detect,
         recentCount = recentCount,
         anyVoiceMark = anyVoiceMark,
-        railed = railed,
+        wholeCatalog = railed,
         arrangement = arrangement,
         libraryReady = libraryReady,
     )
@@ -197,7 +197,7 @@ class PickerListPlanTest {
                 detectRowPresent = false,
                 recentCount = recent.size,
                 anyVoiceMark = rows.any { it.showsVoiceMark(LanguageRole.TARGET) },
-                railed = true,
+                wholeCatalog = true,
             )
 
         assertThat(built.showVoiceLegend).isTrue()

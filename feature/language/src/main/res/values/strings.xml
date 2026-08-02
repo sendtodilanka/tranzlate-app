@@ -104,4 +104,14 @@
     <string name="offline_error_storage">Not enough space — free some storage, then retry</string>
     <string name="offline_error_network">Download failed — check your connection, then retry</string>
     <string name="offline_error_generic">Something went wrong — retry</string>
+    <!-- 17c/17d — the tablet dialog host (#130 PR-16). Three keys, and each one
+         exists only in this host: the phone picker is a screen, so its way out is
+         a back arrow and it has no docked bar to put actions in.
+         `lang_dialog_manage_packs` reads as the export draws it. The Home row that
+         opens the SAME destination is relabelled "Language packs" by owner ruling 5
+         in PR-23; the two are deliberately not unified here, because the relabel is
+         that PR's to make in one place across three locales. -->
+    <string name="lang_dialog_manage_packs">Manage packs</string>
+    <string name="lang_dialog_cancel">Cancel</string>
+    <string name="lang_dialog_close">Close</string>
 </resources>
