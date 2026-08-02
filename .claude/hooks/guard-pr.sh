@@ -62,6 +62,16 @@ printf '%s' "$body" | grep -q 'Call sites:' || missing="Call sites:"
 if ! printf '%s' "$body" | grep -q 'Reproduced:'; then
   missing="${missing:+$missing and }Reproduced:"
 fi
+# #206. `Call sites: N found, N changed` says a number; it says nothing about
+# how the number was reached. #171 shipped `4 found, 4 changed` and was wrong,
+# because the grep was written from a phrase I already remembered and could
+# only find what I already knew — CONTRIBUTING.md said "Sinhala prose ≥70%"
+# and the pattern was `70% Sinhala|Sinhala script`. The same shape produced
+# three more errors in one session. The fix is not a better grep; it is TWO
+# searches that could not both miss the same thing.
+if ! printf '%s' "$body" | grep -q 'Enumerated by:'; then
+  missing="${missing:+$missing and }Enumerated by:"
+fi
 [ -z "$missing" ] && exit 0
 
 jq -nc --arg r "PR body is missing: ${missing}
@@ -73,6 +83,12 @@ Issue #161: five of my PRs in one session shipped a defect a lens then caught, a
 
   Reproduced: <the harm, before and after>   (or 'n/a — <why>')
       #149 was 'fixed' without ever running the harm it described, and the harm survived.
+
+  Enumerated by: <search A> and <search B>   (or 'none — <why>')
+      #171 said 'Call sites: 4 found, 4 changed' and was wrong: one grep, written
+      from the phrase I remembered, found only what I already knew. Name two
+      searches that could not both miss the same thing — by concept and by symbol,
+      by name and by call site, a grep and a compiler error.
 
 Run the grep and the repro, then put the numbers in the body. If neither applies, say so in those words — an explicit 'none' and 'n/a' both pass." \
   '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
