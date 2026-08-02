@@ -4,6 +4,7 @@ import com.codeboxlk.tranzlate.core.ui.languageLabel
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import com.lemonappdev.konsist.api.Konsist
+import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
 import org.junit.Test
 import java.io.File
 
@@ -592,11 +593,29 @@ class KonsistArchitectureTest {
      *
      * Comments and string literals are stripped first, so a KDoc that explains
      * the surface cannot stand in for having one.
+     *
+     * ## What defeated the first version of this gate (PR-194 co-verify)
+     *
+     * It read `HistoryScreen`'s own function text and asserted a list of
+     * substrings. Changing `LaunchedEffect(failure)` to `LaunchedEffect(Unit)` —
+     * which makes the effect run once, while the failure is still null, and never
+     * react again — left every one of those substrings in place and the gate
+     * green. The #193 class exactly.
+     *
+     * So it now reads the WHOLE FILE (extraction into a private helper is a
+     * refactor, not a violation), resolves import aliases instead of grepping for
+     * one spelling, and asserts the announcing effect's KEY, which is the thing
+     * that was broken.
+     *
+     * KNOWN LIMIT, stated rather than implied: this still cannot prove a snackbar
+     * appears — only a device can, and #186 is why. It also assumes the announcing
+     * effect and its key live in the same file; a sibling-file extraction would
+     * make it fail loudly rather than pass quietly, which is the safe direction.
      */
     @Test
     fun `the History screen shows a write that failed`() {
         val screen = filesUnder(HISTORY_MAIN).single { it.name == HISTORY_SCREEN_FILE }
-        val host = code(screen.functions().single { it.name == HISTORY_SCREEN_FILE }.text)
+        val host = code(screen.text)
 
         // Vacuous-pass guard: the surface is read from the ViewModel at all.
         assertThat(host).contains("viewModel.failure")
@@ -624,6 +643,163 @@ class KonsistArchitectureTest {
         val retried = host.indexOf("viewModel.retry(")
         assertThat(consumed).isGreaterThan(-1)
         assertThat(consumed).isLessThan(retried)
+
+        // The effect that announces a failure must WATCH the failure. An effect
+        // keyed on a constant fires once, before there is anything to say, and
+        // then never again — the whole surface above becomes decoration.
+        val allEffects = effects(screen, host)
+        assertThat(allEffects).isNotEmpty() // the alias resolution found something
+        val announcing =
+            allEffects.filter { effect ->
+                HISTORY_ARM.findAll(effect.body).count() == HISTORY_FAILURE_STRINGS.size
+            }
+        assertThat(announcing).hasSize(1)
+        // The key must be the very identifier the body reads to decide there IS a
+        // failure — `val pending = <x> ?: return`. Renaming either is a refactor;
+        // keying on something else is the defect.
+        val watched = ELVIS_SOURCE.find(announcing.single().body)?.groupValues?.get(1)
+        assertThat(watched).isNotNull()
+        assertThat(announcing.single().keys).contains(watched)
+
+        // The confirmation this failure contradicts is WITHDRAWN before the
+        // correction is queued, not merely dismissed. `SnackbarHostState`
+        // serialises on a mutex, so a "Translation deleted" that has not reached
+        // the screen yet is invisible to `currentSnackbarData` and would still
+        // take its four seconds AFTER the error saying it never happened.
+        val body = announcing.single().body
+        val withdrawn = body.indexOf(SNACKBAR_WITHDRAW)
+        assertThat(withdrawn).isGreaterThan(-1)
+        assertThat(withdrawn).isLessThan(body.indexOf("showSnackbar"))
+    }
+
+    /**
+     * Issue #190, PR-194 co-verify — one swipe performs its write ONCE.
+     *
+     * `confirmValueChange` is a PREDICATE. AOSP asks it "may I move to this
+     * value?" at every decision point of a gesture, so a callback that ACTS
+     * inside it acts several times. Measured on a device before this gate
+     * existed: one delete swipe called `onDelete` **4 times** (three runs,
+     * identical) and one save swipe called `setFavourite` **9 times**, landing on
+     * the opposite of what the user asked for. Material3 1.4.0 deprecates the
+     * parameter outright and offers `SwipeToDismissBox(onDismiss = …)`, which it
+     * fires from `LaunchedEffect(settledValue, onDismiss)` — once per settle.
+     *
+     * That guarantee has a second half the compiler will not enforce: the lambda
+     * is part of the effect's KEY, so one rebuilt on every recomposition re-fires
+     * the write. `remember` with no keys is what pins it.
+     *
+     * SOURCE-SHAPE, like its neighbours (#186): it cannot count gesture callbacks,
+     * only refuse the shapes that were measured to multiply them.
+     */
+    @Test
+    fun `a History swipe performs its write once`() {
+        val screen = filesUnder(HISTORY_MAIN).single { it.name == HISTORY_SCREEN_FILE }
+        val host = code(screen.text)
+
+        // Vacuous-pass guard: there is a swipe box here at all.
+        assertThat(host).contains(SWIPE_BOX)
+
+        // (1) The deprecated predicate is gone. A named argument cannot be
+        //     aliased, so this token is not defeatable by a rename.
+        assertThat(host).doesNotContain(SWIPE_PREDICATE)
+
+        // (2) The write runs from the once-per-settle callback, and that callback
+        //     is a STABLE instance — `onDismiss = { … }` written inline is a new
+        //     lambda per recomposition, a new effect key, and the same defect.
+        val dismissName = ON_DISMISS_ARG.find(host)?.groupValues?.get(1)
+        assertThat(dismissName).isNotNull()
+        val remembered = rememberedBlock(host, localName(screen, REMEMBER_FQ), dismissName!!)
+        assertThat(remembered).isNotNull()
+
+        // (3) …and it maps the two swipe directions to two DIFFERENT writes. Both
+        //     arms re-pointed at one write leaves every call textually present —
+        //     that is #194's own M10 shape, one screen along.
+        val arms =
+            SWIPE_ARM
+                .findAll(remembered!!)
+                .associate { it.groupValues[1] to it.groupValues[2].trim() }
+        assertThat(arms.keys).containsExactly("StartToEnd", "EndToStart", "Settled")
+        assertThat(setOf(arms.getValue("StartToEnd"), arms.getValue("EndToStart"))).hasSize(2)
+
+        // (4) EDGE_CASES §94: the row comes back. A write the screen cannot yet
+        //     know the outcome of must not leave a hole where the row was — a
+        //     failed delete would otherwise read as "gone" for a row still there.
+        val resetting =
+            effects(screen, host).filter { it.keys.contains(SETTLED_VALUE) }
+        assertThat(resetting).isNotEmpty()
+        assertThat(resetting.any { it.body.contains(SWIPE_RESET) }).isTrue()
+    }
+
+    /**
+     * One `LaunchedEffect(keys…) { body }` in [code], with the alias the file
+     * actually uses resolved from its imports (#193: a gate that greps one
+     * spelling guards one spelling).
+     */
+    private data class EffectCall(
+        val keys: String,
+        val body: String,
+    )
+
+    private fun effects(
+        file: KoFileDeclaration,
+        code: String,
+    ): List<EffectCall> {
+        val call = "${localName(file, LAUNCHED_EFFECT_FQ)}("
+        return code.indicesOf(call).mapNotNull { start ->
+            val open = start + call.length - 1
+            val close = matching(code, open, '(', ')') ?: return@mapNotNull null
+            val braceOpen = code.indexOf('{', close)
+            val braceClose = braceOpen.takeIf { it != -1 }?.let { matching(code, it, '{', '}') }
+            if (braceClose == null) return@mapNotNull null
+            EffectCall(code.substring(open + 1, close), code.substring(braceOpen + 1, braceClose))
+        }
+    }
+
+    /** The body of `val <name> = remember { … }`, or null if it is not remembered. */
+    private fun rememberedBlock(
+        code: String,
+        remember: String,
+        name: String,
+    ): String? {
+        val declaration = Regex("""val\s+$name\s*=\s*$remember\s*\{""").find(code) ?: return null
+        val braceOpen = declaration.range.last
+        val braceClose = matching(code, braceOpen, '{', '}') ?: return null
+        return code.substring(braceOpen + 1, braceClose)
+    }
+
+    /**
+     * The local spelling of [fqName]'s simple name in [file] — its import alias
+     * when it has one. This is the #197 bar: resolve the alias rather than
+     * forbidding it.
+     */
+    private fun localName(
+        file: KoFileDeclaration,
+        fqName: String,
+    ): String {
+        val alias =
+            file.imports
+                .firstOrNull { it.name == fqName }
+                ?.alias
+                ?.name
+        val simple = fqName.substringAfterLast('.')
+        return if (alias.isNullOrBlank() || alias == fqName) simple else alias
+    }
+
+    /** Index of the bracket closing the one at [open]. Comments/strings are already gone. */
+    private fun matching(
+        text: String,
+        open: Int,
+        opener: Char,
+        closer: Char,
+    ): Int? {
+        var depth = 0
+        for (index in open until text.length) {
+            when (text[index]) {
+                opener -> depth++
+                closer -> if (--depth == 0) return index
+            }
+        }
+        return null
     }
 
     /** Every start index of [token] — the state-branch walk needs positions, not counts. */
@@ -739,6 +915,43 @@ class KonsistArchitectureTest {
          * `stringResource` call into the arm still reads as one distinct message.
          */
         val HISTORY_ARM = Regex("""HistoryWrite\.(DELETE|RESTORE|FAVOURITE)\s*->\s*([^\n]+)""")
+
+        /**
+         * `val pending = <x> ?: return…` — [x] is what the announcing effect must
+         * be keyed on. Captured from the body rather than assumed, so renaming
+         * either the local or the state is a refactor and not a failure.
+         */
+        val ELVIS_SOURCE = Regex("""val\s+\w+\s*=\s*(\w+)\s*\?:\s*return""")
+
+        /** Withdrawing the queued confirmation, not just dismissing the visible one. */
+        const val SNACKBAR_WITHDRAW = ".cancel()"
+
+        // ---- #190 / PR-194 co-verify: one swipe, one write -------------------
+
+        /** Resolved through the file's imports, so an alias cannot silence the rule. */
+        const val LAUNCHED_EFFECT_FQ = "androidx.compose.runtime.LaunchedEffect"
+        const val REMEMBER_FQ = "androidx.compose.runtime.remember"
+
+        /** Vacuous-pass guard for the swipe gate. */
+        const val SWIPE_BOX = "SwipeToDismissBox("
+
+        /**
+         * The predicate AOSP polls several times per gesture — deprecated in
+         * Material3 1.4.0 "without replacement". A NAMED ARGUMENT, so unlike an
+         * import it has exactly one spelling and cannot be aliased away.
+         */
+        const val SWIPE_PREDICATE = "confirmValueChange"
+
+        /** The once-per-settle callback that replaced it. */
+        val ON_DISMISS_ARG = Regex("""onDismiss\s*=\s*(\w+)\s*,""")
+
+        /** One arm of the direction-to-write map inside the remembered callback. */
+        val SWIPE_ARM =
+            Regex("""SwipeToDismissBoxValue\.(StartToEnd|EndToStart|Settled)\s*->\s*([^\n]+)""")
+
+        /** The state the row's return-to-rest effect must watch, and what it must do. */
+        const val SETTLED_VALUE = "settledValue"
+        const val SWIPE_RESET = ".reset()"
 
         /** The only call that ends the binding (AOSP: nothing else does). */
         const val SHUTDOWN = "shutdown()"

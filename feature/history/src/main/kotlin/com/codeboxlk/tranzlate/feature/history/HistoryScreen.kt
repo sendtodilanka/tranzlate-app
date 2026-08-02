@@ -55,6 +55,7 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import com.codeboxlk.tranzlate.core.designsystem.R as DsR
 
@@ -91,12 +92,26 @@ fun HistoryScreen(
     val restoreFailed = stringResource(R.string.history_restore_failed)
     val favouriteFailed = stringResource(R.string.history_favourite_failed)
     val retryLabel = stringResource(R.string.history_retry)
+
+    // The live "Translation deleted" jobs, one per row (#190, PR-194 co-verify).
+    // Held so a confirmation can be WITHDRAWN rather than merely dismissed:
+    // `SnackbarHostState` serialises on a mutex, so a message that has not
+    // reached the screen yet is invisible to `currentSnackbarData` and would
+    // still take its four seconds AFTER the error saying it never happened.
+    // Cancelling covers both — showing and queued — which is what makes a
+    // failure visible on every timing rather than only the lucky ones.
+    //
+    // Keyed by row, not one slot: two quick deletes each owe the user their own
+    // Undo, and only the one whose write actually failed has become untrue.
+    val deletedConfirmations = remember { mutableMapOf<Long, Job>() }
     LaunchedEffect(failure) {
         val pending = failure ?: return@LaunchedEffect
         // "Translation deleted" was shown optimistically, the instant the swipe
-        // landed, because Undo has to be reachable immediately. If the delete then
-        // failed, that message is now untrue — and SnackbarHostState serialises, so
-        // the correction would otherwise wait out the message it contradicts.
+        // landed, because Undo has to be reachable immediately. If that row's
+        // delete then failed, the message is now untrue and is withdrawn before
+        // the correction is queued, so the user is never left holding a
+        // confirmation for something that did not happen.
+        deletedConfirmations.remove(pending.translation.id)?.cancel()
         snackbarHostState.currentSnackbarData?.dismiss()
         val result =
             snackbarHostState.showSnackbar(
@@ -123,15 +138,24 @@ fun HistoryScreen(
         onToggleFavourite = viewModel::toggleFavourite,
         onDelete = { translation ->
             viewModel.delete(translation)
-            scope.launch {
-                val result =
-                    snackbarHostState.showSnackbar(
-                        message = deletedMessage,
-                        actionLabel = undoLabel,
-                        duration = SnackbarDuration.Short,
-                    )
-                if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete(translation)
-            }
+            deletedConfirmations[translation.id] =
+                scope.launch {
+                    try {
+                        val result =
+                            snackbarHostState.showSnackbar(
+                                message = deletedMessage,
+                                actionLabel = undoLabel,
+                                duration = SnackbarDuration.Short,
+                            )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            viewModel.undoDelete(translation)
+                        }
+                    } finally {
+                        // Cancelling a finished job is a no-op, but a map that only
+                        // ever grows is a leak on a screen the user can sit on.
+                        deletedConfirmations.remove(translation.id)
+                    }
+                }
         },
         onPick = onPick,
         onBack = onBack,
@@ -244,10 +268,35 @@ private fun EmptyState(text: String) {
 
 /**
  * Swipe actions (issue #80, owner): leading (→) toggles Saved, trailing (←)
- * DELETES — the caller shows the Undo snackbar. The save swipe snaps back
- * (it's a toggle, not a dismissal).
+ * DELETES — the caller shows the Undo snackbar. Both swipes return the row to
+ * its resting place; the row leaves the list only when the DATABASE loses it.
+ *
+ * ## Why the action is not run from `confirmValueChange` (#190, PR-194 co-verify)
+ *
+ * It used to be, and one swipe therefore performed the write **several times.**
+ * Measured on `emulator-5556` against `TranslationRepositoryImpl.delete` faulted
+ * with `withContext(Dispatchers.IO) { throw … }`: one delete swipe called
+ * `onDelete` **4 times** in 218 ms (three runs, identical), and one save swipe
+ * called `setFavourite` **9 times**, flip-flopping the star and settling on the
+ * value the user did not ask for.
+ *
+ * `confirmValueChange` is a PREDICATE, not a callback: AOSP asks it "may I move
+ * to this value?" at every decision point of a gesture. The four stack traces
+ * came from four different ones — `updateIfNeeded` during the drag
+ * (`AnchoredDraggable.kt:1107`), `settle` on finger-up (`:1077`),
+ * `updateIfNeeded` again inside the settle animation (`:1456`), and the
+ * `anchoredDrag` completion block (`:1210`). Nothing recomposed; the repeat is
+ * the gesture pipeline asking again. A successful delete only fired once because
+ * the row left the list before the later stages ran, which is why the crash this
+ * PR replaced hid the whole thing.
+ *
+ * Material3 1.4.0 says the same in its own words: `confirmValueChange` is
+ * `@Deprecated` — *"deprecated without replacement. Rather than relying on a
+ * callback to veto state changes, the anchor set should not include disallowed
+ * anchors."* — and [SwipeToDismissBox] grew an `onDismiss` parameter, which it
+ * fires from `LaunchedEffect(settledValue, onDismiss)`: once per settle, and
+ * never mid-gesture.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeableHistoryRow(
     translation: Translation,
@@ -256,32 +305,45 @@ private fun SwipeableHistoryRow(
     onPick: (Translation) -> Unit,
 ) {
     val spacing = LocalSpacing.current
-    // PR-81 lens O1: confirmValueChange is captured ONCE by the state — without
+    // PR-81 lens O1: the dismiss lambda is captured ONCE (see below) — without
     // rememberUpdatedState the closure freezes the first composition's row and a
     // second consecutive save-swipe silently no-ops on the stale favourite.
     val currentRow by rememberUpdatedState(translation)
-    val state =
-        rememberSwipeToDismissBoxState(
-            confirmValueChange = { value ->
-                when (value) {
-                    SwipeToDismissBoxValue.StartToEnd -> {
-                        onToggleFavourite(currentRow)
-                        false // toggle: snap back, row stays
-                    }
+    val currentToggleFavourite by rememberUpdatedState(onToggleFavourite)
+    val currentDelete by rememberUpdatedState(onDelete)
+    val state = rememberSwipeToDismissBoxState()
 
-                    SwipeToDismissBoxValue.EndToStart -> {
-                        onDelete(currentRow)
-                        true // dismiss: the row leaves (Undo re-inserts)
-                    }
-
-                    SwipeToDismissBoxValue.Settled -> {
-                        false
-                    }
+    // `remember` with NO keys, deliberately: `SwipeToDismissBox` runs this from
+    // `LaunchedEffect(settledValue, onDismiss)`, so a lambda rebuilt on each
+    // recomposition is a NEW key and re-fires the write — the same "one gesture,
+    // several writes" defect by another route. One instance for the row's whole
+    // lifetime is what makes "at most one write per gesture" a guarantee rather
+    // than a hope about lambda memoisation; `rememberUpdatedState` above is what
+    // keeps that one instance from going stale.
+    val onDismiss =
+        remember {
+            { direction: SwipeToDismissBoxValue ->
+                when (direction) {
+                    SwipeToDismissBoxValue.StartToEnd -> currentToggleFavourite(currentRow)
+                    SwipeToDismissBoxValue.EndToStart -> currentDelete(currentRow)
+                    SwipeToDismissBoxValue.Settled -> Unit
                 }
-            },
-        )
+            }
+        }
+
+    // EDGE_CASES §94, no dead end: a swiped row must never be left as a hole. The
+    // screen cannot know yet whether the write landed, so it does not pretend —
+    // the row always comes back, and disappears only when the Room flow stops
+    // listing it. A delete that fails therefore leaves the row exactly where it
+    // was, next to the snackbar that says so, instead of an empty red band the
+    // user reads as "gone" for a translation that is still there.
+    LaunchedEffect(state.settledValue) {
+        if (state.settledValue != SwipeToDismissBoxValue.Settled) state.reset()
+    }
+
     SwipeToDismissBox(
         state = state,
+        onDismiss = onDismiss,
         modifier = Modifier.testTag("tt_history_swipe"),
         backgroundContent = {
             val toDelete = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
