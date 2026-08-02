@@ -29,6 +29,12 @@
 # Claim:   printf '%s\n' "<who> <why>" > .claude/device-claim
 # Release: rm -f .claude/device-claim
 #
+# KNOWN LIMIT (#207 lens): `head -c 300` follows a symlink, so a claim file that
+# is a link surfaces the target's first line in the warning. Low severity —
+# planting one needs the same `.claude/` write access a legitimate claim does,
+# so there is no escalation — but it is disclosure, and it is named here rather
+# than discovered later.
+#
 # FAIL OPEN, like every guard here: no claim file, an unreadable one, a stale
 # one, or a command this cannot resolve → silent. A message is always a real
 # finding.
@@ -41,7 +47,7 @@ cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
 # Only commands that DRIVE a device. `adb devices` and `adb -l` list; listing is
 # not driving, and warning on it would train the reader to ignore the message.
 printf '%s' "$cmd" | grep -qE '(^|[;&|[:space:]])adb([[:space:]]|$)' || exit 0
-printf '%s' "$cmd" | grep -qE '(^|[;&|[:space:]])adb[^;&|]*[[:space:]](shell|install|uninstall|emu|push|pull|logcat|screencap|uiautomator|forward|reverse|root|unroot)([[:space:]]|$)' || exit 0
+printf '%s' "$cmd" | grep -qE '(^|[;&|[:space:]])adb[^;&|]*[[:space:]](shell|install|uninstall|emu|push|pull|logcat|screencap|uiautomator|forward|reverse|root|unroot|reboot|kill-server|start-server|tcpip|usb|connect|disconnect|sideload|exec-out|bugreport|remount)([[:space:]]|$)' || exit 0
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 # Worktrees share a repo but not a checkout; the claim lives with the main one.
