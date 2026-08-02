@@ -85,7 +85,12 @@ class PackFailureCopyTest {
                 OfflineLanguagesContent(
                     rows = listOf(OfflineLanguageRow("hi", "Hindi", OfflineModelState.Failed(cause))),
                     onDownload = { retried += it },
-                    onDelete = {},
+                    // `onDelete` split in two when the 🗑 became a confirmed remove
+                    // (#130 PR-19): the bin raises a question, the ⏹ still stops a
+                    // download outright. Neither is this test's subject — it is
+                    // about the failure SENTENCE — so both are inert here.
+                    onStopDownload = {},
+                    onRequestRemove = {},
                     onBack = {},
                 )
             }
