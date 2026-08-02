@@ -17,7 +17,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * `MigrationCoverageTest` fails the build if this chain has a gap, so the mistake
  * that destructive fallback used to paper over cannot reach a release instead.
  */
-val TRANZLATE_MIGRATIONS: List<Migration> = listOf(MigrationOneToTwo, MigrationTwoToThree)
+val TRANZLATE_MIGRATIONS: List<Migration> =
+    listOf(MigrationOneToTwo, MigrationTwoToThree, MigrationThreeToFour)
 
 /**
  * v1 → v2 — the C-8 cache key becomes UNIQUE.
@@ -117,6 +118,51 @@ internal object MigrationTwoToThree : Migration(2, 3) {
                 "`role` TEXT NOT NULL, " +
                 "`last_used_at` INTEGER NOT NULL, " +
                 "PRIMARY KEY(`lang_id`, `role`))",
+        )
+    }
+}
+
+/**
+ * v3 → v4 — the two saved-by-language indices land (issue #130 PR-19, U-10).
+ *
+ * Purely additive, and additive in the cheapest possible way: two `CREATE INDEX`
+ * statements over an existing table. No column changes, no row rewrites, nothing
+ * to collapse. The delta between `schemas/…/3.json` and `4.json` is exactly the
+ * two new entries in `translation.indices`.
+ *
+ * They exist because the remove-pack sheet asks *"how many saved phrases use
+ * this language"* while it is opening, and that question may not walk the user's
+ * saved rows. `TranslationDao.savedCountUsing` documents the measured query plan
+ * and, in particular, why the obvious `OR` spelling would leave both of these
+ * indices unused on every real install.
+ *
+ * Index creation over an existing table is not free — SQLite builds each one by
+ * sorting the table — but this table is a personal translation history, and the
+ * two indices are `(favourite, source_lang)` and `(favourite, target_lang)`, so
+ * the build cost is proportional to a history a person typed by hand.
+ *
+ * Full statements, not constants shared with the entity, for the reason the
+ * file header gives: a migration keeps describing the schema as it was at THIS
+ * version even after the entity moves on. They match Room's own generated
+ * `createSql` for [TranslationEntity]'s two new `Index` entries byte-for-byte
+ * (checked against the exported `4.json`) — a drifted hand-written statement is
+ * what Room's schema validation rejects on the next open.
+ *
+ * Same verification stance as v2→v3, and it is a real gap rather than a
+ * formality: `MigrationCoverageTest` gates the chain and the exported schema
+ * structurally, but the SQL is NOT executed in CI (issue #40 — the
+ * instrumentation suite that `MigrationTestHelper` needs does not run).
+ */
+@Suppress("MagicNumber")
+internal object MigrationThreeToFour : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_translation_favourite_source_lang` " +
+                "ON `translation` (`favourite`, `source_lang`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_translation_favourite_target_lang` " +
+                "ON `translation` (`favourite`, `target_lang`)",
         )
     }
 }

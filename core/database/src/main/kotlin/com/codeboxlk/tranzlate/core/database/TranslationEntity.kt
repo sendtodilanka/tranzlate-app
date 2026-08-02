@@ -8,7 +8,8 @@ import androidx.room.PrimaryKey
 /**
  * DATA_MODEL `translation` table — column names exact.
  * Indices: C-8 cache lookup `(source_text, source_lang, target_lang, engine)`,
- * `favourite`, `created_at DESC` (history paging).
+ * `favourite`, `created_at DESC` (history paging), and the two saved-by-language
+ * pairs behind [TranslationDao.savedCountUsing] (#130 PR-19, U-10).
  */
 @Entity(
     tableName = "translation",
@@ -18,6 +19,19 @@ import androidx.room.PrimaryKey
         Index(value = ["source_text", "source_lang", "target_lang", "engine"], unique = true),
         Index(value = ["favourite"]),
         Index(value = ["created_at"], orders = [Index.Order.DESC]),
+        // U-10 (#130 PR-19): "3 saved phrases use Spanish" is asked while a
+        // remove-pack sheet is opening, so it may not walk the user's saved
+        // rows. Both columns are paired with `favourite` because the question
+        // is always "SAVED rows that use this language" — never one alone — and
+        // pairing makes each index COVERING for its branch, so the count is
+        // answered without touching the table at all.
+        //
+        // Two indices rather than one because a language can be used on either
+        // side, and SQLite cannot serve `a = ? OR b = ?` from one index. Which
+        // shape of query actually reaches them is measured, not assumed —
+        // see [TranslationDao.savedCountUsing].
+        Index(value = ["favourite", "source_lang"]),
+        Index(value = ["favourite", "target_lang"]),
     ],
 )
 data class TranslationEntity(

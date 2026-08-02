@@ -11,8 +11,10 @@ import androidx.room.RoomDatabase
  * v2 (issue #53 A9): the C-8 cache index became UNIQUE — see [TRANZLATE_MIGRATIONS].
  * v3 (issue #122): the `language_usage` table lands — translation-success stamps
  * per (id, role), what Manage packs' deletion honesty reads from.
+ * v4 (issue #130 PR-19, U-10): two saved-by-language indices on `translation`,
+ * so the remove-pack sheet's "3 saved phrases use Spanish" costs no table walk.
  */
-const val TRANZLATE_DB_VERSION = 3
+const val TRANZLATE_DB_VERSION = 4
 
 /**
  * DATA_MODEL — Room db `tranzlate.db`. Collections tables land with their feature spec.

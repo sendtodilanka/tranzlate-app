@@ -62,7 +62,27 @@ class FakeTranslationRepository(
     /** @see beforeDelete */
     var beforeSetFavourite: (suspend () -> Unit)? = null
 
+    /**
+     * @see beforeDelete — armed by PR-19's remove-pack sheet, which must open
+     *   even when the saved count cannot be read.
+     */
+    var beforeSavedCount: (suspend () -> Unit)? = null
+
     val saved: List<Translation> get() = store.value
+
+    /**
+     * Puts rows in directly, ids and all — for suites that need a HISTORY to
+     * read rather than a write path to exercise.
+     *
+     * Deliberately bypasses [save]: that method applies C-8 normalization and
+     * the unique-tuple `IGNORE`, and mints its own ids, so a fixture built
+     * through it cannot state which row is which. Nothing here is asserted
+     * about writing; these rows are the world the test starts in.
+     */
+    fun seed(vararg rows: Translation) {
+        store.value = rows.toList()
+        nextId = (rows.maxOfOrNull(Translation::id) ?: 0L) + 1L
+    }
 
     override fun history(): Flow<List<Translation>> = store.map { it.sortedByDescending(Translation::createdAt) }
 
@@ -137,6 +157,23 @@ class FakeTranslationRepository(
                     )
                 }
             }
+    }
+
+    /**
+     * The saved-by-language count (#130 PR-19, U-10), computed over the same
+     * rows the fake already holds rather than from a settable field.
+     *
+     * A field would let a test assert a number this fake was told to return,
+     * which proves nothing about the rule — that a phrase counts when the
+     * language is on EITHER side, that an unsaved row never counts, and that a
+     * row using the language on both sides is one phrase. The DAO's own SQL is
+     * pinned separately against a real SQLite (`SavedCountQueryTest`).
+     */
+    override suspend fun savedCountUsing(languageId: String): Int {
+        beforeSavedCount?.invoke()
+        return store.value.count {
+            it.favourite && (it.sourceLang == languageId || it.targetLang == languageId)
+        }
     }
 
     override suspend fun delete(id: Long) {

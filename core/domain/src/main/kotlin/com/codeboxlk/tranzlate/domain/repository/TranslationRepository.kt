@@ -59,6 +59,21 @@ interface TranslationRepository {
      */
     suspend fun restore(translation: Translation)
 
+    /**
+     * How many SAVED translations use [languageId] as their source or their
+     * target — the number in the remove-pack sheet's line *"3 saved phrases use
+     * Spanish"* (issue #130 PR-19, ruling U-10).
+     *
+     * A one-shot read rather than a `Flow`: it is asked once, while a
+     * confirmation sheet is opening, about a language the user has just pointed
+     * at. Nothing on that surface changes the saved set while it is up, so a
+     * subscription would be a live query serving a number that cannot move.
+     *
+     * Saved means starred (D-3 `favourite`) — the History screen's "Saved" tab.
+     * A row using the language on BOTH sides counts once: it is one phrase.
+     */
+    suspend fun savedCountUsing(languageId: String): Int
+
     /** Removes one history row (issue #80 swipe-to-delete; Undo restores the content). */
     suspend fun delete(id: Long)
 

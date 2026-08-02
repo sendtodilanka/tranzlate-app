@@ -40,6 +40,19 @@
     <string name="lang_sheet_data_always_ask">Palaging magtanong bago gumamit ng mobile data</string>
     <string name="lang_sheet_data_download">I-download ngayon</string>
     <string name="lang_sheet_data_not_now">Hindi ngayon</string>
+    <!-- Sheets 19f + 19g — see values/strings.xml for why 19g's body and its
+         saved line do not say what the export draws. -->
+    <string name="lang_sheet_remove_title">Alisin ang %1$s?</string>
+    <string name="lang_sheet_remove_body">Magbabakante ng espasyo sa device na ito. Mangangailangan ng koneksyon ang %1$s para magsalin hangga\'t hindi mo ito muling nada-download.</string>
+    <string name="lang_sheet_remove_confirm">Alisin</string>
+    <string name="lang_sheet_remove_cancel">Kanselahin</string>
+    <string name="lang_sheet_remove_inuse_title">Ginagamit ang %1$s ngayon</string>
+    <string name="lang_sheet_remove_inuse_body">Ito ang iyong target na wika, at mananatili itong target. Mangangailangan ng koneksyon ang mga pagsasalin sa %1$s hangga\'t hindi mo ito muling nada-download.</string>
+    <string name="lang_sheet_remove_inuse_confirm">Alisin pa rin</string>
+    <plurals name="lang_sheet_remove_inuse_saved">
+        <item quantity="one">%1$d na naka-save na parirala ang gumagamit ng %2$s. Mananatili itong naka-save at bubukas pa rin nang walang koneksyon.</item>
+        <item quantity="other">%1$d na naka-save na parirala ang gumagamit ng %2$s. Mananatili silang naka-save at bubukas pa rin nang walang koneksyon.</item>
+    </plurals>
     <plurals name="text_lang_search_hint">
         <item quantity="one">Maghanap sa %1$d wika</item>
         <item quantity="other">Maghanap sa %1$d na wika</item>

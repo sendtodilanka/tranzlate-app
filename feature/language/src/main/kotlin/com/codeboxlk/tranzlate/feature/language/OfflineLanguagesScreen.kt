@@ -57,16 +57,21 @@ fun OfflineLanguagesScreen(
     val rows by viewModel.rows.collectAsStateWithLifecycle()
     val pendingConsent by viewModel.pendingConsent.collectAsStateWithLifecycle()
     val alwaysAsk by viewModel.alwaysAsk.collectAsStateWithLifecycle()
+    val pendingRemoval by viewModel.pendingRemoval.collectAsStateWithLifecycle()
     OfflineLanguagesContent(
         rows = rows,
         onDownload = viewModel::download,
-        onDelete = viewModel::delete,
+        onStopDownload = viewModel::stopDownload,
+        onRequestRemove = viewModel::requestRemove,
         onBack = onBack,
         pendingConsent = pendingConsent,
         alwaysAsk = alwaysAsk,
         onAlwaysAskChange = viewModel::onAlwaysAskChange,
         onDownloadAnyway = viewModel::downloadAnyway,
         onDismissConsent = viewModel::dismissConsent,
+        pendingRemoval = pendingRemoval,
+        onConfirmRemove = viewModel::confirmRemove,
+        onDismissRemove = viewModel::dismissRemove,
         modifier = modifier,
     )
 }
@@ -75,7 +80,8 @@ fun OfflineLanguagesScreen(
 internal fun OfflineLanguagesContent(
     rows: List<OfflineLanguageRow>,
     onDownload: (String) -> Unit,
-    onDelete: (String) -> Unit,
+    onStopDownload: (String) -> Unit,
+    onRequestRemove: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     pendingConsent: String? = null,
@@ -83,6 +89,9 @@ internal fun OfflineLanguagesContent(
     onAlwaysAskChange: (Boolean) -> Unit = {},
     onDownloadAnyway: () -> Unit = {},
     onDismissConsent: () -> Unit = {},
+    pendingRemoval: PendingPackRemoval? = null,
+    onConfirmRemove: () -> Unit = {},
+    onDismissRemove: () -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     val locale = LocalLocale.current.platformLocale
@@ -99,6 +108,30 @@ internal fun OfflineLanguagesContent(
         onAlwaysAskChange = onAlwaysAskChange,
         onDownloadNow = onDownloadAnyway,
         onDismiss = onDismissConsent,
+    )
+    // Sheets 19f/19g (#130 PR-19): the 🗑 asks before it removes. Which of the
+    // two is drawn is decided in the ViewModel — the screen is handed the
+    // question, not the rule. Both dismiss to the untouched row: cancelling a
+    // removal leaves a downloaded pack downloaded, which is the no-dead-end
+    // requirement for a destructive confirm.
+    //
+    // The name is resolved HERE rather than carried in the request, for the
+    // reason every other row in this file resolves it here: `languageDisplayName`
+    // is a CLDR lookup against the composition's locale, and a name captured in
+    // a ViewModel would survive a locale change that every visible row obeys.
+    val removalName = pendingRemoval?.let { languageDisplayName(it.id, locale) }.orEmpty()
+    RemovePackSheet(
+        visible = pendingRemoval != null && !pendingRemoval.inUseAsTarget,
+        languageName = removalName,
+        onRemove = onConfirmRemove,
+        onDismiss = onDismissRemove,
+    )
+    RemoveInUseSheet(
+        visible = pendingRemoval != null && pendingRemoval.inUseAsTarget,
+        languageName = removalName,
+        savedCount = pendingRemoval?.savedCount ?: 0,
+        onRemoveAnyway = onConfirmRemove,
+        onDismiss = onDismissRemove,
     )
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -143,7 +176,12 @@ internal fun OfflineLanguagesContent(
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize().testTag("tt_offline_list")) {
                         items(shown, key = OfflinePackRow::id) { row ->
-                            OfflineRow(row = row, onDownload = onDownload, onDelete = onDelete)
+                            OfflineRow(
+                                row = row,
+                                onDownload = onDownload,
+                                onStopDownload = onStopDownload,
+                                onRequestRemove = onRequestRemove,
+                            )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         }
                     }
@@ -157,7 +195,8 @@ internal fun OfflineLanguagesContent(
 private fun OfflineRow(
     row: OfflinePackRow,
     onDownload: (String) -> Unit,
-    onDelete: (String) -> Unit,
+    onStopDownload: (String) -> Unit,
+    onRequestRemove: (String) -> Unit,
 ) {
     val spacing = LocalSpacing.current
     Row(
@@ -215,7 +254,11 @@ private fun OfflineRow(
 
             OfflineModelState.Downloading -> {
                 IconButton(
-                    onClick = { onDelete(row.id) }, // the verified stop = delete-to-cancel
+                    // The verified stop = delete-to-cancel, and deliberately NOT
+                    // confirm-sheeted: 19f is about removing a pack the user has,
+                    // and this is the way out of a download they no longer want
+                    // (`OfflineLanguagesViewModel.stopDownload`).
+                    onClick = { onStopDownload(row.id) },
                     modifier = Modifier.testTag("tt_offline_stop"),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -234,7 +277,10 @@ private fun OfflineRow(
 
             OfflineModelState.Downloaded -> {
                 IconButton(
-                    onClick = { onDelete(row.id) },
+                    // Asks now (#130 PR-19). Until this PR the tap deleted the
+                    // pack outright with nothing in between — the "unconfirmed 🗑"
+                    // the rev3 ruling's PR-19 row names.
+                    onClick = { onRequestRemove(row.id) },
                     modifier = Modifier.testTag("tt_offline_delete"),
                 ) {
                     Icon(
@@ -299,7 +345,8 @@ private fun OfflineLanguagesScreenPreview() {
         OfflineLanguagesContent(
             rows = previewRows,
             onDownload = {},
-            onDelete = {},
+            onStopDownload = {},
+            onRequestRemove = {},
             onBack = {},
         )
     }
@@ -315,7 +362,13 @@ private fun OfflineLanguagesScreenPreview() {
 @Composable
 private fun OfflineLanguagesLoadingPreview() {
     TranzlateTheme {
-        OfflineLanguagesContent(rows = emptyList(), onDownload = {}, onDelete = {}, onBack = {})
+        OfflineLanguagesContent(
+            rows = emptyList(),
+            onDownload = {},
+            onStopDownload = {},
+            onRequestRemove = {},
+            onBack = {},
+        )
     }
 }
 
@@ -331,7 +384,7 @@ private fun OfflineRowStatesPreview() {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Column {
                 previewShown.forEach { row ->
-                    OfflineRow(row = row, onDownload = {}, onDelete = {})
+                    OfflineRow(row = row, onDownload = {}, onStopDownload = {}, onRequestRemove = {})
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
                 OfflineRow(
@@ -342,7 +395,8 @@ private fun OfflineRowStatesPreview() {
                             OfflineModelState.Failed(OfflineModelFailure.NETWORK),
                         ),
                     onDownload = {},
-                    onDelete = {},
+                    onStopDownload = {},
+                    onRequestRemove = {},
                 )
             }
         }

@@ -160,6 +160,54 @@ this constant IS 19b's trigger.
 
 `tt_lang_sheet_space` (root) · `tt_lang_sheet_space_bar` (the storage bar, semantics cleared —
 the body already says "There is 12 MB free" in words) · `tt_lang_sheet_space_manage`.
+## 5.4 Remove a pack — sheets 19f + 19g (#130 PR-19)
+
+The 🗑 on the offline manager deleted on the tap until this PR; it now asks. Owned by
+`RemovePackSheets.kt`, raised by the offline manager.
+
+**Two of these values do not say what the export draws, and that is the PR.** The drawn 19g reads
+*"It is your target language. Removing it switches the target to English."* and *"They stay saved
+and will need a connection to reopen."* Both are false about this app, checked in code rather than
+argued:
+
+- **Nothing switches.** The language selection has four production writers —
+  `LanguagePickerViewModel.select` and `TextViewModel`'s three `setLanguagePair` calls — and the
+  remove path is none of them. `RealOfflineModelManager` is built from a `ModelStore` and a
+  `StorageProbe`; it cannot reach a preference. Removing a pack takes away OFFLINE capability and
+  nothing else, and the language keeps translating through the AUTO waterfall's online tiers.
+  This also makes rev3 ruling 3 (owner-approved: *the device language if catalog-capable, else
+  `en`*) an answer to a question the app never asks — **no fallback is implemented**.
+- **Reopening a saved phrase needs no connection.** `TextViewModel.onHistoryPick` puts
+  `translation.targetText` — the stored answer — straight into the result state with no engine
+  call, and Retry short-circuits on `TranslationRepository.cachedAny`, a database read.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_sheet_remove_title` | string | `Remove %1$s?` | language name | 19f, as drawn. The verb matches the button's, which is the export's own caption for the frame — and neither is "Delete" |
+| `lang_sheet_remove_body` | string | `Frees space on this device. %1$s will need a connection to translate until you download it again.` | language name | 19f, as drawn, and true: `RealTranslator.waterfall` falls from ML Kit to GOT to GCT, and names this case in its own trace ("MLKit: fr not downloaded · GOT: offline") |
+| `lang_sheet_remove_confirm` | string | `Remove` | — | the error-filled action (spec §5 reserves error for loss and stopping) |
+| `lang_sheet_remove_cancel` | string | `Cancel` | — | **shared by both sheets** — one word, one key. The engineering brief §9 already ruled a sheet dismiss reading "Cancel" is correct; the prohibition is on the ✕ of a downloading row, which stops a download and removes it |
+| `lang_sheet_remove_inuse_title` | string | `%1$s is in use right now` | language name | 19g, as drawn |
+| `lang_sheet_remove_inuse_body` | string | `It is your target language, and it stays your target. Translations into %1$s will need a connection until you download it again.` | language name | **NOT as drawn** — see above. What 19g adds over 19f is immediacy: this is not a capability the user might miss one day, it is the next translation they make |
+| `lang_sheet_remove_inuse_confirm` | string | `Remove anyway` | — | as drawn. The word still reads correctly: the sheet does state a reason to hesitate |
+| `lang_sheet_remove_inuse_saved` | plurals | `%1$d saved phrase uses %2$s. It stays saved and still opens without a connection.` / `%1$d saved phrases use %2$s. They stay saved and still open without a connection.` | count, language name | first sentence as drawn and true — saved rows live in Room and nothing on the delete path can reach them; second sentence corrected. A plural because `%1$d` in a plain string renders "1 saved phrases". **Drawn only above zero** — the line is ABSENT at zero, never a sentence about nothing (the same decision an empty recents section already gets) |
+
+### 5.4.1 Sheets 19f/19g — testTags (C-1)
+
+`tt_lang_sheet_remove` (19f root) · `tt_lang_sheet_remove_confirm` · `tt_lang_sheet_remove_cancel` ·
+`tt_lang_sheet_remove_inuse` (19g root) · `tt_lang_sheet_remove_inuse_confirm` ·
+`tt_lang_sheet_remove_inuse_saved` (the whole bookmark ROW; its glyph is decorative and the
+sentence carries the fact) · `tt_lang_sheet_remove_inuse_cancel`.
+
+### 5.4.2 Accessibility
+
+No `cd_*` keys of their own. Both sheets are `TranzlateSheetScaffold`s, which put `paneTitle` on
+the content root and `heading()` on the title, so the title is what a screen reader lands on when
+the sheet opens; both icons are decorative (`contentDescription = null`) because the title carries
+the meaning. The row 🗑 keeps `offline_cd_delete` ("Delete %1$s") — it still names the action the
+user is starting, and re-wording it to "Remove" for the verb agreement above is a copy change in
+three locales that belongs with the `cd_text_lang_retry` / `offline_cd_retry` pair §9 leaves for its own issue —
+the same divergence shape, in the same accessibility layer.
 
 ## 6. Language picker — accessibility (C-4)
 

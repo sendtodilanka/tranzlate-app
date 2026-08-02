@@ -218,6 +218,13 @@ private class FakeTranslationDao : TranslationDao {
         return changed
     }
 
+    override suspend fun savedCountUsing(languageId: String): Int {
+        calls += "savedCountUsing"
+        return rows.value.count {
+            it.favourite && (it.sourceLang == languageId || it.targetLang == languageId)
+        }
+    }
+
     override suspend fun delete(id: Long) {
         rows.value = rows.value.filterNot { it.id == id }
     }

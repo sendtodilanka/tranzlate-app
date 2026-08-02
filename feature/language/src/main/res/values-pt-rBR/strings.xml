@@ -40,6 +40,19 @@
     <string name="lang_sheet_data_always_ask">Sempre perguntar antes de usar dados móveis</string>
     <string name="lang_sheet_data_download">Baixar agora</string>
     <string name="lang_sheet_data_not_now">Agora não</string>
+    <!-- Sheets 19f + 19g — see values/strings.xml for why 19g's body and its
+         saved line do not say what the export draws. -->
+    <string name="lang_sheet_remove_title">Remover %1$s?</string>
+    <string name="lang_sheet_remove_body">Libera espaço neste dispositivo. O idioma %1$s vai precisar de conexão para traduzir até você baixá-lo de novo.</string>
+    <string name="lang_sheet_remove_confirm">Remover</string>
+    <string name="lang_sheet_remove_cancel">Cancelar</string>
+    <string name="lang_sheet_remove_inuse_title">%1$s está em uso agora</string>
+    <string name="lang_sheet_remove_inuse_body">É o seu idioma de destino, e continua sendo. As traduções para %1$s vão precisar de conexão até você baixá-lo de novo.</string>
+    <string name="lang_sheet_remove_inuse_confirm">Remover mesmo assim</string>
+    <plurals name="lang_sheet_remove_inuse_saved">
+        <item quantity="one">%1$d frase salva usa %2$s. Ela continua salva e ainda abre sem conexão.</item>
+        <item quantity="other">%1$d frases salvas usam %2$s. Elas continuam salvas e ainda abrem sem conexão.</item>
+    </plurals>
     <plurals name="text_lang_search_hint">
         <item quantity="one">Pesquisar %1$d idioma</item>
         <item quantity="other">Pesquisar %1$d idiomas</item>

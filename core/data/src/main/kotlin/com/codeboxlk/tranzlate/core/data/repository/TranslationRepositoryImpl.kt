@@ -74,6 +74,8 @@ class TranslationRepositoryImpl
         override suspend fun restore(translation: Translation) =
             translationDao.restoreTuple(translation.toEntity().copy(id = 0L))
 
+        override suspend fun savedCountUsing(languageId: String): Int = translationDao.savedCountUsing(languageId)
+
         override suspend fun delete(id: Long) = translationDao.delete(id)
 
         override suspend fun setFavourite(
