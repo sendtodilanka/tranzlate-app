@@ -379,7 +379,7 @@ ruling text (mandatory rule 11, fourth cause).
 1. **E-W1 has never been run, so the sheet's second action is "Not now".** The
    ruling makes the DRAWN actions conditional on it and the tracker lists it as
    an outstanding device experiment. There is no research record for it, no
-   issue, no commit; `docs/research/issue-90-offline-download-lifecycle.md`
+   issue, no commit; `docs/plan/issue-90-download-lifecycle.md`
    parks the same probe as *"X6 (v2 only): requireWifi mid-download drop probe —
    future tail"*. So the owner's pre-approved interim (ruling 8) ships, and no
    E-W1 result is claimed. **What this PR also removes is a promise that was
@@ -496,7 +496,7 @@ research docs as they run.
 
 **E-W1 status, stated because PR-17 needed it and could not find it: NOT RUN.**
 No research record, no issue, no commit mentions it; the nearest thing in the
-tree is `docs/research/issue-90-offline-download-lifecycle.md`, which parks the
+tree is `docs/plan/issue-90-download-lifecycle.md`, which parks the
 same probe as "X6 (v2 only)". PR-17 therefore shipped the owner's pre-approved
 interim (ruling 8) and claims no E-W1 result. **It still gates snackbar 20a-5
 in PR-22**, and the follow-up issue the ruling asks for is the owner's to file.

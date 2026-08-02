@@ -73,7 +73,12 @@ private const val KEY_SCROLL_OFFSET = "picker.scroll_offset"
 class LanguagePickerViewModel
     @Inject
     constructor(
-        // ELEVEN collaborators, one over detekt's threshold, and the suppression
+        // TEN collaborators, and detekt's threshold IS ten — it trips AT the
+        // threshold, not above it, so the old "eleven, one over" was wrong twice
+        // over (#209 lens). Verified by removing this suppression: detekt names
+        // all ten and answers "The current threshold is set to 10". The
+        // suppression is necessary; the arithmetic that justified it was not. An
+        // eleventh collaborator is a finding, not a threshold to raise.
         // is the honest option rather than the tidy one. The tidy one is a
         // parameter object, which would hide the same dependencies from Dagger
         // and from the next reader while the class kept doing the same amount.
