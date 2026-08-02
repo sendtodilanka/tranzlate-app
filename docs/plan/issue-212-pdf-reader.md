@@ -114,6 +114,10 @@ volume — and it pays for five model loads per document.
 2. Accept iff the existing ML Kit language identifier returns non-null **AND**
    the identified script matches the recogniser that produced the text. The
    identifier's below-threshold-returns-nothing behaviour is the guard.
+   ⚠️ **This step is not implementable as written — see R7.** The identifier
+   returns a BCP-47 *language* tag, never a script, and no language→script-family
+   table exists in the repo. R7 owes that table before phase 4 starts; do not
+   implement this condition from D3 alone.
 3. On rejection, escalate to the next recogniser.
 4. Full five-deep escalation runs **once**, on the first non-blank sampled page,
    max 3 blank skips.
@@ -261,7 +265,7 @@ standalone English model to restore).
   | Kotlin (`feature/text/.../HomeScreen.kt`) | **5 lines, 2 sites** | `:396` `:397` `:401` the live card · **`:920` `:921` the `@PreviewLightDark` sample**, which carries its own `tt_preview_tool_offline` and no search for the tag would have found |
   | string resources | **6 lines, 3 locales** | `values/strings.xml:37,42` · `values-fil:32,33` · `values-pt-rBR:32,33` |
   | test | **1** | `NavShellSmokeTest.kt:40` |
-  | documents | **8** | `DECISIONS.md:77` (C-1 tag registry, **authoritative**) · `STRINGS_text-translation.md:242` (string registry, **authoritative**) · `specs/01-text-translation.md:69` · `docs/design/UI_SPEC.md:40` (design table, plain prose) · **`docs/CLEAN_ROOM_UX_REQUIREMENTS.md:13,32,77`** (the navigation contract — names the card three times in live prose) · `VerifyStringKeyDocsTask.kt:42-43` (KDoc example) · `launch-blockers.md:87` · `launch-readiness.md:172` |
+  | documents | **8 files, 13 lines** | `DECISIONS.md:41,77` — **`:41` is D-5 rev.3, the owner's own navigation ruling**, naming the card in the 2×2 tool grid; `:77` is the C-1 tag registry. Both authoritative · `STRINGS_text-translation.md:242` (string registry, **authoritative**) · `specs/01-text-translation.md:69` · `docs/design/UI_SPEC.md:40` (design table) · `docs/CLEAN_ROOM_UX_REQUIREMENTS.md:13,32,77` (navigation contract) · `VerifyStringKeyDocsTask.kt:42,43` (KDoc example) · `launch-blockers.md:71,87` — `:71` names the card in the behaviour table, `:87` the key · `launch-readiness.md:172` |
 
   **The table was 7 on the first correction, and co-verify found the eighth** —
   `CLEAN_ROOM_UX_REQUIREMENTS.md`, the navigation contract, which names the card
@@ -278,6 +282,27 @@ standalone English model to restore).
     failure the debate's own verifier caught, recurring on a different token.
     `\b` is not the fix here — see **#221**, where `git grep -E` was found to
     match nothing for `\b`; the working form was `grep -rnE "Offline mode([^l]|$)"`.
+
+  **And the third correction fixed the file set while leaving the line set
+  stale.** Co-verify pass 3 found `DECISIONS.md:41` and `launch-blockers.md:71`
+  — both inside files the table *already listed*. The phrase search that found
+  `CLEAN_ROOM_UX_REQUIREMENTS.md` had been run to hunt for **new files**, and its
+  line hits inside already-known files were discarded; the `where` cells still
+  carried only the lines the earlier *symbol* searches had found. `:41` is
+  **D-5 rev.3, the owner's navigation ruling** — the highest-authority statement
+  about this card in the repo, and the one a table-driven rename would have left
+  describing a tool grid that no longer exists.
+
+  So the corrected lesson is narrower than "enumerate by reference class": **an
+  enumeration is a set of `file:line`, not a set of files.** Finding the right
+  files and then not re-deriving their lines is a distinct failure, and it
+  survived two rounds of fixing the first one. The row above is now the output of
+  one per-file sweep across all eight, not an accumulation of earlier searches.
+
+  One pre-existing defect surfaced by that sweep, **not introduced here**:
+  `launch-readiness.md:172` cites `values/strings.xml:38` for
+  `home_tool_offline_sub`, which now sits at `:42`. The rename PR touches that
+  line anyway — recorded so it is fixed rather than re-copied.
 
   Two consequences the "2" hid. **`STRINGS_text-translation.md:242` is a build
   gate, not a note** — `VerifyStringKeyDocsTask` checks resource keys against
