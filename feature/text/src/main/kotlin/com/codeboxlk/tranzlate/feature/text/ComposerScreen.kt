@@ -31,8 +31,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -130,6 +133,38 @@ fun ComposerScreen(
     val onNotify: (String) -> Unit = { message ->
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
+
+    // Issue #195 — the star's write used to throw out of a handler-less scope and
+    // end the process. It reports now, and it has to report HERE rather than
+    // through `onNotify`: that helper shows a bare message, and EDGE_CASES:114
+    // rules this control needs a way forward — `Save / star … offline write
+    // fails → [Retry]`.
+    val starFailure by viewModel.starFailure.collectAsStateWithLifecycle()
+    val starSaveFailed = stringResource(R.string.text_star_save_failed)
+    val starRemoveFailed = stringResource(R.string.text_star_remove_failed)
+    val starRetryLabel = stringResource(R.string.button_retry)
+    LaunchedEffect(starFailure) {
+        val pending = starFailure ?: return@LaunchedEffect
+        val shown =
+            snackbarHostState.showSnackbar(
+                message =
+                    when (pending.intent) {
+                        StarIntent.SAVE -> starSaveFailed
+                        StarIntent.REMOVE -> starRemoveFailed
+                    },
+                actionLabel = starRetryLabel,
+                // Long, not Short: an error the user is expected to act on needs
+                // longer than the four seconds a confirmation gets.
+                duration = SnackbarDuration.Long,
+            )
+        // Consume BEFORE retrying, in this order. The retry can fail the same
+        // way, and this screen has to see that as a NEW pending failure —
+        // clearing after it would wipe the second failure and leave the user
+        // with no message at all, which is the silence the fix is for.
+        viewModel.onStarFailureShown(pending)
+        if (shown == SnackbarResult.ActionPerformed) viewModel.retryStar(pending)
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -1782,6 +1817,57 @@ private fun ComposerChromeItemsPreview() {
                 SourceLabelRow(label = "English", showClear = true, onClear = {})
                 SourceLabelRow(label = "Detect language", showClear = false, onClear = {})
             }
+        }
+    }
+}
+
+/**
+ * The star-write failure face (issue #195).
+ *
+ * `SnackbarHost` builds its own `Snackbar` from the queued data and a static
+ * preview runs no effects, so previewing the screen would show nothing at all.
+ * This renders the same M3 component the host does, with the same copy and the
+ * same Retry action — which is what the owner has to be able to look at.
+ *
+ * Both strings arrive as parameters rather than being read here, deliberately:
+ * it keeps every `R.string` reference for this surface inside `ComposerScreen`
+ * and the previews, so the architecture gate that checks the surface exists
+ * cannot be satisfied by this helper standing in for it.
+ */
+@Composable
+private fun StarFailureSnackbar(
+    message: String,
+    retryLabel: String,
+) {
+    Snackbar(action = { TextButton(onClick = {}) { Text(retryLabel) } }) {
+        Text(message)
+    }
+}
+
+/** The tap was on an UNFILLED star: the save did not land. */
+@PreviewLightDark
+@Composable
+private fun ComposerStarSaveFailedPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            StarFailureSnackbar(
+                message = stringResource(R.string.text_star_save_failed),
+                retryLabel = stringResource(R.string.button_retry),
+            )
+        }
+    }
+}
+
+/** The tap was on a FILLED star: the un-save did not land, and the star stays filled. */
+@PreviewLightDark
+@Composable
+private fun ComposerStarRemoveFailedPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            StarFailureSnackbar(
+                message = stringResource(R.string.text_star_remove_failed),
+                retryLabel = stringResource(R.string.button_retry),
+            )
         }
     }
 }

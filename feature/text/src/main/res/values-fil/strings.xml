@@ -95,6 +95,8 @@
     <string name="a11y_error">Nabigo ang pagsasalin. %1$s</string>
     <string name="text_over_char_limit">Limitado sa %1$d characters bawat pagsasalin. Paikliin ang text.</string>
     <string name="text_star_unavailable">Hindi ito ma-save — hindi natukoy ang wika nito.</string>
+    <string name="text_star_save_failed">Hindi ma-save ang pagsasaling ito.</string>
+    <string name="text_star_remove_failed">Hindi ito maalis sa naka-save.</string>
     <string name="cd_favourite_remove">Alisin sa naka-save</string>
     <string name="text_paste_empty">Walang laman ang clipboard.</string>
     <string name="text_swap_needs_detect">Magsalin muna para malaman ang wika bago baligtarin.</string>

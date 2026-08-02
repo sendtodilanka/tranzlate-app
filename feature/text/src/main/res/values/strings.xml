@@ -115,6 +115,12 @@
     <!-- EDGE_CASES OVER_CHAR_LIMIT — shown inline; input is never truncated (spec-01 §8/§9) -->
     <string name="text_over_char_limit">Limited to %1$d characters per translation. Shorten the text to translate.</string>
     <string name="text_star_unavailable">Couldn\'t save this one — its language wasn\'t detected.</string>
+    <!-- Issue #195: the star's write can fail (disk full, database locked). It used
+         to end the process; now it says so and offers Retry (EDGE_CASES:114). Two
+         messages because the star toggles both ways and "couldn't save" is untrue
+         for the tap that was trying to un-save. -->
+    <string name="text_star_save_failed">Couldn\'t save this translation.</string>
+    <string name="text_star_remove_failed">Couldn\'t remove this from saved.</string>
     <string name="cd_favourite_remove">Remove from saved</string>
     <string name="text_paste_empty">Clipboard is empty.</string>
     <string name="text_swap_needs_detect">Translate once to detect the language before swapping.</string>

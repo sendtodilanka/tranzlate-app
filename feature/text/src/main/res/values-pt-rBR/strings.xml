@@ -95,6 +95,8 @@
     <string name="a11y_error">A tradução falhou. %1$s</string>
     <string name="text_over_char_limit">Limite de %1$d caracteres por tradução. Encurte o texto.</string>
     <string name="text_star_unavailable">Não deu para salvar — o idioma não foi detectado.</string>
+    <string name="text_star_save_failed">Não deu para salvar esta tradução.</string>
+    <string name="text_star_remove_failed">Não deu para remover isto das salvas.</string>
     <string name="cd_favourite_remove">Remover das salvas</string>
     <string name="text_paste_empty">A área de transferência está vazia.</string>
     <string name="text_swap_needs_detect">Traduza primeiro para detectar o idioma antes de inverter.</string>

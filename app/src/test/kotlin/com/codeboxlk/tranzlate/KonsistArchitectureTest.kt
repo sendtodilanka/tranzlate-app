@@ -507,7 +507,7 @@ class KonsistArchitectureTest {
     fun `the translating state announces that it started`() {
         // `single`, not `firstOrNull`: Konsist reports file names WITHOUT the
         // extension, and a name that stops matching must be loud, not vacuous.
-        val composer = filesUnder("/feature/text/src/main/").single { it.name == COMPOSER_FILE }
+        val composer = filesUnder(TEXT_MAIN).single { it.name == COMPOSER_FILE }
         // Comments stripped everywhere below, so a KDoc that explains the live
         // region can never stand in for having one. Previews are excluded from
         // the render rules: a preview legitimately calls the face directly, and
@@ -802,6 +802,127 @@ class KonsistArchitectureTest {
         return null
     }
 
+    /**
+     * Issue #195 — the composer shows a star write that failed.
+     *
+     * `TextViewModelTest` proves the ViewModel stops the throw and records the
+     * failure. Nothing there proves anyone SHOWS it: delete the `LaunchedEffect`
+     * from `ComposerScreen` and every one of those tests stays green while the
+     * app goes back to a star that fails in silence — the #179 shape, one level
+     * down from the crash this issue opened for.
+     *
+     * SOURCE-SHAPE assertions, and the same honesty the gates above owe. This
+     * repo has no Compose unit-test runtime (#186), so nothing here can prove a
+     * snackbar appears. What it makes RED is every regression that compiles and
+     * leaves the suite green: the surface deleted, the Retry action dropped, one
+     * of the two messages left unwired, the two arms SWAPPED, or the consume
+     * moved after the retry (which would clear the failure the retry is about to
+     * produce and put the user back in silence on the second failure).
+     *
+     * The swap is in that list because it was NOT, and a co-verify lens proved
+     * it: swapping the arms so a user un-saving is told "Couldn't save" — the
+     * precise harm the two-message design exists to prevent — left this suite
+     * BUILD SUCCESSFUL and this testcase green. Asserting the arms are distinct
+     * FROM EACH OTHER and that both keys appear SOMEWHERE in the file says
+     * nothing about which arm reaches which key, and the swap changes neither
+     * property. The arms are now resolved to the string key each one actually
+     * names, through the local `val` that binds it. (The rename-resistance
+     * claimed for M13 was never the thing that failed here; that claim stands,
+     * and this was a different hole beside it.)
+     *
+     * **Its limits, named rather than implied** (#193 asks for exactly this):
+     *
+     *  1. It reads the FILE minus its previews, not one function, so a legitimate
+     *     extraction into a private helper or a file-level constant still passes —
+     *     the #188 defeat, where the violation was re-spelled rather than removed,
+     *     does not work here. The cost is that moving the surface into a SIBLING
+     *     FILE would fail this gate even though the app is correct. That trade is
+     *     deliberate: a false alarm is answered by a human reading the diff, and a
+     *     silent pass is not answered at all.
+     *  2. The distinctness check reads a `when` over [StarIntent]. Rewriting the
+     *     mapping as an `if` empties the match and this FAILS rather than passing
+     *     silently — fail-closed on a shape change, so the next author has to say
+     *     out loud that both messages are still wired.
+     *  3. The arm-to-key resolution follows ONE hop: the arm either names
+     *     `R.string.…` itself, or names a `val` in the same file that does. An arm
+     *     routed through a second variable, a `when`, or a function call this gate
+     *     cannot read resolves to nothing and FAILS — fail-closed again, and for
+     *     the same reason: a gate that cannot see the mapping must not report that
+     *     the mapping is right.
+     *
+     * Comments and string literals are stripped first, so a KDoc that explains
+     * the surface cannot stand in for having one.
+     */
+    @Test
+    fun `the composer shows a star write that failed`() {
+        val composer = filesUnder(TEXT_MAIN).single { it.name == COMPOSER_FILE }
+        // Previews removed, not the whole file kept: the two `@PreviewLightDark`
+        // failure faces name the same strings, and every assertion below would
+        // pass on their strength alone with the real surface deleted.
+        val previews =
+            composer.functions().filter { fn -> fn.annotations.any { it.name.startsWith("Preview") } }
+        val surface = code(previews.fold(composer.text) { text, fn -> text.replace(fn.text, "") })
+
+        // Vacuous-pass guard: the failure is read from the ViewModel at all.
+        assertThat(surface).contains("viewModel.$STAR_FAILURE")
+        assertThat(surface).contains("showSnackbar")
+
+        // §94's way forward, and the copy for BOTH directions of the toggle — one
+        // message wired for `save` alone tells the un-saving user the wrong thing.
+        assertThat(surface).contains("R.string.button_retry")
+        assertThat(surface).contains("actionLabel")
+        STAR_FAILURE_STRINGS.forEach { assertThat(surface).contains(it) }
+        assertThat(surface).contains("viewModel.retryStar(")
+        assertThat(surface).contains("SnackbarResult.ActionPerformed")
+
+        // …and each direction gets its OWN message. Asserting the two strings are
+        // merely PRESENT is not enough: a branch re-pointed at the other one leaves
+        // both `stringResource` calls in place and reads as a pass (#190's M10).
+        val arms =
+            STAR_ARM
+                .findAll(surface)
+                .associate { it.groupValues[1] to it.groupValues[2].trim() }
+        assertThat(arms.keys).containsExactly("SAVE", "REMOVE")
+        assertThat(arms.values.toSet()).hasSize(STAR_FAILURE_STRINGS.size)
+
+        // …and each direction gets THE RIGHT one. Distinctness alone survives a
+        // swap — proven, not supposed: with the arms exchanged, so that un-saving
+        // reports "Couldn't save", this testcase stayed green. Both arms are still
+        // distinct and both keys are still in the file; only the mapping is wrong,
+        // so only the mapping catches it.
+        STAR_ARM_KEYS.forEach { (intent, key) ->
+            assertThat(keyBehindArm(surface, arms.getValue(intent))).isEqualTo(key)
+        }
+
+        // The order is load-bearing, not stylistic.
+        val consumed = surface.indexOf(STAR_CONSUME)
+        val retried = surface.indexOf("viewModel.retryStar(")
+        assertThat(consumed).isGreaterThan(-1)
+        assertThat(consumed).isLessThan(retried)
+    }
+
+    /**
+     * The string key one `when` arm ultimately names, or null when this gate
+     * cannot see it (issue #195 co-verify, F4).
+     *
+     * Two shapes, because both are honest Compose: the arm may hold the
+     * `R.string.…` lookup itself, or — as the composer does, since
+     * `stringResource` may not be called from inside a `LaunchedEffect` — it may
+     * name a `val` hoisted above the effect. One hop, then it gives up and
+     * returns null, which fails the assertion rather than excusing it.
+     *
+     * @param surface the composer file with comments and string literals already
+     *   stripped, so a key mentioned in prose cannot resolve an arm.
+     */
+    private fun keyBehindArm(
+        surface: String,
+        rhs: String,
+    ): String? {
+        STRING_KEY.find(rhs)?.let { return it.groupValues[1] }
+        val bindings = STRING_BINDING.findAll(surface).associate { it.groupValues[1] to it.groupValues[2] }
+        return bindings[rhs.trim().trimEnd(',')]
+    }
+
     /** Every start index of [token] — the state-branch walk needs positions, not counts. */
     private fun String.indicesOf(token: String): List<Int> =
         generateSequence(indexOf(token).takeIf { it != -1 }) { previous ->
@@ -952,6 +1073,49 @@ class KonsistArchitectureTest {
         /** The state the row's return-to-rest effect must watch, and what it must do. */
         const val SETTLED_VALUE = "settledValue"
         const val SWIPE_RESET = ".reset()"
+        // ---- issue #195: the composer's star failure reaches the user ---------
+
+        /** The module root the composer lives under; [COMPOSER_FILE] names the file. */
+        const val TEXT_MAIN = "/feature/text/src/main/"
+
+        /** The held failure the screen must read — the gate's vacuous-pass guard. */
+        const val STAR_FAILURE = "starFailure"
+
+        /**
+         * Which key each direction of the toggle must reach — the MAPPING, which
+         * is what the swap defeated, not merely the pair of keys. "Couldn't save"
+         * is untrue for an un-save, and it is untrue in exactly the way a gate
+         * that only counts distinct arms cannot see.
+         */
+        val STAR_ARM_KEYS =
+            mapOf(
+                "SAVE" to "text_star_save_failed",
+                "REMOVE" to "text_star_remove_failed",
+            )
+
+        /** One per direction of the toggle — derived, so the two lists cannot drift apart. */
+        val STAR_FAILURE_STRINGS = STAR_ARM_KEYS.values.map { "R.string.$it" }
+
+        /** An `R.string.…` lookup wherever it sits — inside an arm, or inside the `val` it names. */
+        val STRING_KEY = Regex("""R\.string\.(\w+)""")
+
+        /**
+         * `val label = stringResource(R.string.key)` — the one hop from an arm's
+         * identifier to the key behind it. The right-hand side is read to the end
+         * of the line rather than as a call, so a wrapper around `stringResource`
+         * still resolves.
+         */
+        val STRING_BINDING = Regex("""val\s+(\w+)[^\n=]*=\s*[^\n]*R\.string\.(\w+)""")
+
+        /** Must run BEFORE the retry, or the retry's own failure is cleared unread. */
+        const val STAR_CONSUME = "viewModel.onStarFailureShown("
+
+        /**
+         * One `when` arm of the intent-to-copy map. The right-hand side is captured
+         * to the end of the line rather than as an identifier, so inlining the
+         * `stringResource` call into the arm still reads as one distinct message.
+         */
+        val STAR_ARM = Regex("""StarIntent\.(SAVE|REMOVE)\s*->\s*([^\n]+)""")
 
         /** The only call that ends the binding (AOSP: nothing else does). */
         const val SHUTDOWN = "shutdown()"
