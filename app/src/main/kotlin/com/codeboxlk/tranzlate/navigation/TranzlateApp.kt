@@ -275,6 +275,11 @@ private fun AppNavDisplay(
                         // `key`, not a bare `LanguagePickerNavKey` — the picker is
                         // the one key carrying data, so identity means THIS picker.
                         onDone = { pop(key) },
+                        // Sheet 19b's one action (#130 PR-18). A PUSH, not the
+                        // card's dismiss-then-push: this picker IS on the back
+                        // stack, so Manage packs lands on top of it and Back
+                        // returns to the language the user was trying to get.
+                        onManagePacks = { onNavigate(LanguagesNavKey) },
                     )
                 }
                 // Camera + Conversation are BOTH doors to features that have not

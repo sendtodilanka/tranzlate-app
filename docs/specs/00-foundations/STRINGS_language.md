@@ -80,9 +80,28 @@ screen has none.
 | `text_lang_loading` | string | `Loading languages…` | — | first paint |
 | `text_lang_no_results` | string | `No languages match “%1$s”` | query | names the query back |
 | `text_lang_no_results_body` | string | `Check the spelling, or try the language's own name.` | — | the way out, not just the bad news |
-| `text_lang_error_network` | string | `No connection. Reconnect and try again.` | — | download outcome |
-| `text_lang_error_storage` | string | `Not enough space. Free some up and try again.` | — | download outcome |
-| `text_lang_error_generic` | string | `Download didn't finish. Try again.` | — | download outcome |
+
+### 4.1 Failed-download copy — ONE set, every surface (#175, #130 PR-18)
+
+Owned by `DownloadFailure.kt`, which is the only `when` over `OfflineModelFailure` in the
+feature. It is read by the picker's failed row, the offline manager's failed row and (through
+the same map) by sheets 19d/19b. `NETWORK` and `WIFI_REQUIRED` share one line deliberately —
+the app cannot queue for Wi-Fi (E-W1 never ran, REJECT §7.8), so a separate `WIFI_REQUIRED`
+sentence would have to promise a wait that never happens.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_pack_error_network` | string | `No connection. Reconnect and try again.` | — | download outcome — also `WIFI_REQUIRED` |
+| `lang_pack_error_storage` | string | `Not enough space. Free some up and try again.` | — | download outcome; the same refusal 19b explains at length |
+| `lang_pack_error_generic` | string | `Download didn't finish. Try again.` | — | download outcome, cause unreported by ML Kit |
+
+These three replaced SIX (§8). The wording is the picker's on all three, and the reason is per
+message rather than per set: each of its sentences states the fact and then the way out, which
+is EDGE_CASES §7's requirement in one line. #175's own recommendation was to keep the
+`offline_*` NAMES and take "the offline manager's" generic wording; **both halves are deviated
+from, on purpose.** `Something went wrong — retry` names no fact, and `offline_*` is Screen B's
+namespace on a key that is now nobody's screen — `lang_*` is this module's shared prefix since
+PR-17's sheet-19a set.
 
 ## 5. Mobile-data consent — sheet 19a (ONE set, both screens)
 
@@ -103,6 +122,45 @@ identical sets behind two dialogs (`text_lang_data_dialog_*`, `offline_data_dial
 `tt_lang_sheet_data_always_ask` (the whole toggleable ROW, which is the 48dp target and the one
 semantics node — the `Checkbox` inside it is read-only and announces nothing of its own).
 
+## 5.2 Failed download — sheet 19d "Interrupted" (#130 PR-18)
+
+Raised by the picker when a download **this screen asked for** ends in a failure that is not
+about space. Owned by `PackFailureSheets.kt`.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_sheet_failed_title` | string | `%1$s did not download` | language name | cause-free — the title is the same sentence whatever stopped it |
+| `lang_sheet_failed_body_network` | string | `The connection dropped before the pack was ready, so nothing is on the device yet.` | — | as drawn. **The frame's own caption says "progress is kept" and the frame's body says the opposite; the body ships.** `DESIGNER-BRIEF.md:73` — "we must not promise it… Do not claim kept progress" — and `README.md:73`. An interrupted download does leave debris in ML Kit's scratch directory (E-S1c), but debris is not a pack: the sentence is about the pack |
+| `lang_sheet_failed_cause_network` | string | `Cause: connection lost. Retrying starts the download again.` | — | the tonal cause card. It states what Retry does, because there is no resume to offer |
+| `lang_sheet_failed_body_generic` | string | `The download stopped before the pack was ready, so nothing is on the device yet.` | — | ⚠ **not drawn.** The frame is written for one cause; ML Kit's other failures report none, and reusing the connection sentence for them would invent a reason |
+| `lang_sheet_failed_cause_generic` | string | `Cause: not reported. Retrying starts the download again.` | — | ⚠ not drawn, same reason |
+| `lang_sheet_failed_close` | string | `Close` | — | the text action, error ink (spec §5: error is reserved for loss and stopping, and this is the label that leaves the loss standing) |
+| `lang_sheet_failed_retry` | string | `Retry` | — | the filled action — and the SAME key the failed row's pill spells, because they are one action in two places |
+
+### 5.2.1 Sheet 19d — testTags (C-1)
+
+`tt_lang_sheet_failed` (root) · `tt_lang_sheet_failed_cause` (the tonal cause card, one merged
+semantics node) · `tt_lang_sheet_failed_close` · `tt_lang_sheet_failed_retry`.
+
+## 5.3 No space — sheet 19b (#130 PR-18)
+
+Raised by the pre-flight in `RealOfflineModelManager.download`, which refuses before enqueueing
+anything when free space is under `REQUIRED_FREE_BYTES` (150 MB). The rev3 ruling settled that
+this constant IS 19b's trigger.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_sheet_space_title` | string | `Not enough space` | — | no language name: the pre-flight refuses every pack equally |
+| `lang_sheet_space_body` | string | `There is %1$s free on this device. A language pack usually needs 20–45 MB.` | free space | the figure is measured at the moment of refusal, never the drawn `12 MB`. The `20–45 MB` range is copy, and the same range `lang_sheet_data_body` uses — see the note there about the two packs this project has measured |
+| `lang_sheet_space_used` | string | `Other apps and system` | — | the bar's FILL. Used-against-free on one volume, never packs-against-device: at 110 MB the library cannot be plotted against a whole device without misstating one of the two figures (`docs/design/language-screens/README.md:15`) |
+| `lang_sheet_space_free` | string | `%1$s free` | free space | the bar's track |
+| `lang_sheet_space_manage` | string | `Manage packs` | — | the sole action. The drawn second action, `Free up space`, opens 20e — **PR-25** — so it is omitted rather than wired to nothing (rev3 ruling, PR-18 row). A third wording of "Manage packs" is not introduced: `lang_dialog_manage_packs` is the tablet card's docked action and owner ruling 5 relabels the Home row in PR-23, so this key joins that relabel rather than pre-empting it |
+
+### 5.3.1 Sheet 19b — testTags (C-1)
+
+`tt_lang_sheet_space` (root) · `tt_lang_sheet_space_bar` (the storage bar, semantics cleared —
+the body already says "There is 12 MB free" in words) · `tt_lang_sheet_space_manage`.
+
 ## 6. Language picker — accessibility (C-4)
 
 Row descriptions carry the language name **and** its state, because the trailing icon alone says
@@ -120,11 +178,21 @@ nothing to a screen reader.
 | `cd_text_lang_row_voice` | string | `%1$s, can be spoken offline` | the already-formatted row description above |
 | `cd_text_lang_download` | string | `Download %1$s for offline use` | language name |
 | `cd_text_lang_stop` | string | `Stop download and remove %1$s` | language name |
-| `cd_text_lang_retry` | string | `Try downloading %1$s again` | language name |
+| `cd_text_lang_retry` | string | `Retry download for %1$s` | language name |
 | `cd_lang_back` | string | `Back` | — |
 
 > **Never "Cancel".** ML Kit's `RemoteModelManager.download()` has no cancel, so stopping a
 > download *is* removing the partial model — `cd_text_lang_stop` says what actually happens.
+
+> **`cd_text_lang_retry` changed VALUE in #130 PR-18, and the control is why.** It read
+> `Try downloading %1$s again` while the failed row's action was a bare ↻ icon with no visible
+> text. PR-18 replaces the icon with the drawn `Retry` pill, and WCAG 2.5.3 (*Label in Name*)
+> requires a control's accessible name to CONTAIN the words drawn on it — otherwise a
+> voice-control user says "tap Retry" and nothing happens. `Retry download for %1$s` contains
+> it; the old wording did not. The key survives rather than being retired, because a screen
+> reader user still needs the language name the sighted user reads a few dp to the left. The
+> offline manager's row keeps its own icon-only control and its own `offline_cd_retry` — a
+> divergence §9 now names.
 
 > **`cd_text_lang_row_voice` wraps, it does not replace.** The speaker glyph itself is silent to
 > TalkBack (`contentDescription = null`); the fact is folded into the row's one description so a
@@ -145,9 +213,10 @@ nothing to a screen reader.
 | `offline_title` | string | `Offline translation` | — | screen title |
 | `offline_subtitle` | string | `Download languages to translate without internet (~30MB each)` | — | ⚠ `~30MB` is a fixed estimate in the copy. The picker's own per-row size (`text_lang_on_device_size`) is a **measured** on-disk byte count that falls back to no number when it cannot be measured (plan R3) — so one screen measures and the other guesses, and `settings_mobile_data_supporting` guesses a third time at `about 30 MB`. One real number, stated once |
 | `offline_loading` | string | `Loading languages…` | — | |
-| `offline_error_storage` | string | `Not enough space — free some storage, then retry` | — | |
-| `offline_error_network` | string | `Download failed — check your connection, then retry` | — | |
-| `offline_error_generic` | string | `Something went wrong — retry` | — | |
+
+> **This screen has no failure copy of its own since #130 PR-18.** Its failed row reads the
+> shared `lang_pack_error_*` set (§4.1) through the same map the picker reads — which is the
+> whole of issue #175.
 
 ### 7.1 Offline manager — accessibility (C-4)
 
@@ -176,6 +245,8 @@ these keys to a resource file fails the build instead of quietly matching this r
 | ~~`offline_state_available`~~ · ~~`offline_state_downloading`~~ · ~~`offline_state_downloaded`~~ · ~~`offline_state_deleting`~~ · ~~`offline_state_failed`~~ | issue #152 | the always-on per-row state sub-line was removed from the design in #82; the five keys survived the #146 module move because that PR's contract was a byte-identical move. Zero Kotlin references across every module and source set at the point of deletion. |
 | ~~`text_lang_data_dialog_title`~~ · ~~`text_lang_data_dialog_body`~~ · ~~`text_lang_data_dialog_once`~~ · ~~`text_lang_data_dialog_wait`~~ | #130 PR-17 | the picker's `MeteredConsentDialog`, replaced by sheet 19a (§5). Call sites at deletion: 4 `stringResource` in `LanguagePickerScreen.kt`, 12 resource lines across three locales, zero test references. |
 | ~~`offline_data_dialog_title`~~ · ~~`offline_data_dialog_body`~~ · ~~`offline_data_dialog_once`~~ · ~~`offline_data_dialog_wait`~~ | #130 PR-17 | the offline manager's inline `AlertDialog`, the second copy of the set above, replaced by the SAME sheet. Call sites at deletion: 4 `stringResource` in `OfflineLanguagesScreen.kt`, 12 resource lines, zero test references. |
+| ~~`text_lang_error_network`~~ · ~~`text_lang_error_storage`~~ · ~~`text_lang_error_generic`~~ | #175, #130 PR-18 | the picker's half of the doubled failure copy. The WORDING survives, under `lang_pack_error_*` (§4.1); only the screen-scoped names are retired, because the key is now read by two screens and two sheets. Call sites at deletion: 3 `stringResource` (all inside `LanguagePickerScreen.failureCauseRes`, itself deleted), 9 resource lines across three locales, zero test references. |
+| ~~`offline_error_storage`~~ · ~~`offline_error_network`~~ · ~~`offline_error_generic`~~ | #175, #130 PR-18 | the offline manager's half — the copy that DIVERGED. One dropped connection read "No connection. Reconnect and try again." on one screen and "Download failed — check your connection, then retry" on the other, which invites the reading that they are two faults. Call sites at deletion: 3 `stringResource` in `OfflineLanguagesScreen.kt`'s inline `when`, itself deleted; 9 resource lines across three locales, zero test references. |
 
 > **Both `_wait` keys said "Wait for Wi-Fi", and the app never waited for Wi-Fi.** They shipped
 > from #90 onwards while `RealOfflineModelManager` passed a bare `DownloadConditions` and nothing
@@ -185,19 +256,23 @@ these keys to a resource file fails the build instead of quietly matching this r
 ## 9. Known duplication — a consolidation task, not a gate failure
 
 The picker and the offline manager were built by different PRs and shipped **four sets of the same
-copy twice**. One of the four is gone: `text_lang_data_dialog_*` ≡ `offline_data_dialog_*` were
-merged into the single sheet-19a set (§5) by #130 PR-17, which is where the pattern is going.
+copy twice**. **Two of the four are now gone:** `text_lang_data_dialog_*` ≡ `offline_data_dialog_*`
+merged into the single sheet-19a set (§5) by #130 PR-17, and the three `text_lang_error_*` ≡
+`offline_error_*` merged into `lang_pack_error_*` (§4.1) by #130 PR-18, which is **#175**. The
+ruling's REJECT §7.8 bounces any PR that adds a third copy of either, and
+`DownloadFailureSourceTest` now makes a third failure map a red test rather than a review reflex.
 
-Still doubled: the three `text_lang_error_*` against the three `offline_error_*` (same three
-outcomes, **different wording** — this is **#175**, and the ruling's REJECT §7.8 bounces any PR
-that adds a third), `text_lang_loading` against `offline_loading` (identical), and `cd_lang_back`
-against `offline_cd_back` (both `Back`).
+Still doubled: `text_lang_loading` against `offline_loading` (identical), and `cd_lang_back`
+against `offline_cd_back` (both `Back`). Both are identical wording, so neither can tell a user
+two different things; they are tidiness, not a defect.
 
-Recorded here rather than fixed in passing: merging them is a behaviour-visible copy change across
-two screens and belongs in its own issue with the owner's sign-off on the surviving wording. The
-divergent pair is the one that matters — a user meeting "Not enough space. Free some up and try
-again." on one screen and "Not enough space — free some storage, then retry" on the other is being
-told the same thing twice in two voices.
+**A third pair this section never listed**, found by the independent enumeration PR-18 ran over
+the concept rather than over remembered key names: `cd_text_lang_retry` (`Try downloading %1$s
+again`) against `offline_cd_retry` (`Retry downloading %1$s`) — the SAME divergence shape as
+#175, on the control that answers the failure #175 was about, in the accessibility layer where
+nobody looks. It is left for its own issue rather than folded in here, because #175's brief
+enumerates six keys and a PR that quietly does eight is a PR whose `Call sites:` line stops
+meaning anything.
 
 ## 10. Translation status (C-12)
 
