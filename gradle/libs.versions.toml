@@ -43,6 +43,29 @@ spotless = "8.8.0"
 # com/squareup/leakcanary/leakcanary-android/maven-metadata.xml: 2.14 then
 # 3.0-alpha-1..9). A tool that watches for leaks is not a place to run an alpha.
 leakcanary = "2.14"
+# Compose unit-test runtime (#186). 4.16.1 is the newest STABLE line: Maven
+# Central's org/robolectric/robolectric/maven-metadata.xml reports
+# <latest>/<release> = 4.17-beta-2, and the whole 4.17 line is betas — the same
+# judgement recorded for leakcanary above. Verified 2026-08-02.
+robolectric = "4.16.1"
+# Robolectric's Android runtime image, pinned as a REAL Gradle dependency rather
+# than left to the download Robolectric does out-of-band at test time.
+#
+# Two reasons, both about CI rather than taste. (1) The jar is 213,431,622 bytes
+# (Maven Central content-length, verified 2026-08-02); fetched by Robolectric it
+# lands in a cache `gradle/actions/setup-gradle` does not save, so every CI run
+# pays for it again. Declared here it lands in `modules-2`, which that action
+# already restores. (2) A dependency resolved outside Gradle is a dependency CI
+# can fail to get while a warm developer machine sails through — the shape of
+# #163, where local green was not evidence. `robolectric.offline=true` (wired in
+# `tranzlate.compose-test`) removes the fallback, so a broken pin fails loudly
+# instead of quietly downloading its way out of trouble.
+#
+# The value is NOT free-form: `DefaultSdkProvider` inside robolectric-4.16.1.jar
+# maps API 36 — this repo's targetSdk, and the level Robolectric picks from the
+# merged manifest — to exactly build id 13921718 (read with `javap -c`; the map
+# tops out at 36, so 4.16.1 is also the floor for running here at all).
+robolectricAndroidAll = "16-robolectric-13921718-i7"
 
 [libraries]
 # Kotlin / coroutines / serialization
@@ -128,6 +151,11 @@ truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 konsist = { group = "com.lemonappdev", name = "konsist", version.ref = "konsist" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
+# Consumed ONLY through the `tranzlate.compose-test` convention plugin (#186) —
+# a module opts into the Compose unit-test runtime with one line and never
+# copies a dependency block.
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+robolectric-android-all = { group = "org.robolectric", name = "android-all-instrumented", version.ref = "robolectricAndroidAll" }
 
 # Gradle plugin artifacts (for build-logic classpath)
 android-gradle-plugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
@@ -166,3 +194,4 @@ tranzlate-android-feature = { id = "tranzlate.android.feature" }
 tranzlate-android-room = { id = "tranzlate.android.room" }
 tranzlate-jvm-library = { id = "tranzlate.jvm.library" }
 tranzlate-hilt = { id = "tranzlate.hilt" }
+tranzlate-compose-test = { id = "tranzlate.compose-test" }

@@ -59,5 +59,9 @@ gradlePlugin {
             id = "tranzlate.string-key-docs"
             implementationClass = "StringKeyDocsConventionPlugin"
         }
+        register("composeTest") {
+            id = "tranzlate.compose-test"
+            implementationClass = "ComposeTestConventionPlugin"
+        }
     }
 }

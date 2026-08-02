@@ -110,9 +110,9 @@ fun rememberWindowInfo(): WindowInfo {
  * [Posture] → [FoldPosture], as a plain function so a JVM test can drive it.
  *
  * Left out of [rememberWindowInfo] on purpose: a decision made inside a
- * `@Composable` is a decision no test in this repo can reach (there is no
- * Compose unit-test runtime — issue #186 — and CI compiles instrumented tests
- * without running them — issue #40). The same reasoning that pulled
+ * `@Composable` is a decision no test in THIS MODULE can reach: #186 added the
+ * `tranzlate.compose-test` runtime, and `:core:ui` has not opted into it, while CI
+ * compiles instrumented tests without running them (issue #40). The same reasoning that pulled
  * `pickerListPlan` out of the picker's list composable.
  *
  * TABLETOP is checked first because it is the more specific claim: Material sets

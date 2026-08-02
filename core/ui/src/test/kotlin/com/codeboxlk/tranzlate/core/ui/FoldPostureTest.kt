@@ -17,9 +17,9 @@ import org.junit.Test
  * `HingeInfo` and `Rect` are all pure Kotlin — Material derives them from
  * WindowManager's `FoldingFeature`, but the derived form carries no Android type,
  * so the decision this file checks is reachable without a device. That matters
- * here: this repo has no Compose unit-test runtime (#186) and CI compiles
- * instrumented tests without running them (#40), so anything left inside
- * `rememberWindowInfo()` would be checked by nothing at all.
+ * here: this module has not opted into the `tranzlate.compose-test` runtime #186
+ * added, and CI compiles instrumented tests without running them (#40), so
+ * anything left inside `rememberWindowInfo()` would be checked by nothing at all.
  *
  * Hinge shapes are written against
  * `androidx.compose.material3.adaptive:adaptive:1.2.0`,

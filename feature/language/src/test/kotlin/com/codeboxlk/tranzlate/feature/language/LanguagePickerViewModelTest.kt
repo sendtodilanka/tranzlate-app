@@ -560,8 +560,8 @@ class LanguagePickerViewModelTest {
      * `TextViewModelTest`'s issue-#48 recovery suite. It faithfully tests the
      * half that can be got wrong in code: whether the state travels as DATA in
      * the handle or dies with the object. It does not exercise the Bundle
-     * round-trip (no Android runtime here) and it cannot mount two hosts (no
-     * Compose unit-test runtime — #186; CI never runs instrumented tests — #40).
+     * round-trip (no Android runtime here) and it does not mount two hosts (#186
+     * added a Compose runtime to this module; no host-swap test is written yet).
      * The other half of the promise — that the SCREEN keeps nothing of its own
      * for a host to lose — is `PickerHostAgnosticTest`, as a source rule, stated
      * honestly there.

@@ -12,20 +12,35 @@ import java.util.Locale
  * `LanguageRow` and that nothing in this module could reach.
  *
  * A co-verify lens proved the gap rather than argued it: it deleted the
- * `!voiceMark` half of the condition, which collapses the voice-but-no-pack row
- * to the 56dp single-line box and clips away the very mark 16a exists to draw,
- * and `:feature:language:testDebugUnitTest` finished BUILD SUCCESSFUL with zero
- * failures. The module has no Robolectric and no Compose test rule — the only
- * `createComposeRule` in the repo is under `app/src/androidTestProd` — so the
- * fix is the same one `pickerListPlan` already applies one level up: move the
- * decision out of the composable, and test it there.
+ * `!voiceMark` half of the condition and
+ * `:feature:language:testDebugUnitTest` finished BUILD SUCCESSFUL with zero
+ * failures. The fix was the same one `pickerListPlan` already applies one level
+ * up: move the decision out of the composable, and test it there.
+ *
+ * **Correction, measured under the runtime added by #186.** The lens's account of
+ * the HARM does not survive rendering. `PickerRowRenderTest` lays the real row out
+ * and the voice-but-no-pack row measures 67dp against this function's 60dp answer:
+ * `heightIn` sets a MINIMUM, and the name plus the supporting line that hosts the
+ * mark already demand more than the minimum, so the tall branch never binds and
+ * nothing is clipped. Re-applying the deletion there confirmed it — the pure tests
+ * below go red, the rendered row does not move at all.
+ *
+ * That does not retire this file. It pins the contract [pickerRowMinHeight]
+ * states, which is what a caller reads and what a future row with shorter content
+ * would depend on. It does mean the `voiceMark` term is, at today's row content,
+ * a floor under a box that is already taller than the floor — worth knowing before
+ * anyone cites it as protection.
  */
 class PickerRowHeightTest {
     /**
      * The case the lens broke. `Downloadable` and `OnlineOnly` rows have no
      * supporting words at all, so on a device that CAN speak the language the
      * mark is the only thing on that line — and the mark lives on the supporting
-     * line. A 56dp box has no room for it.
+     * line, which is why the contract asks for the two-line box.
+     *
+     * ("A 56dp box has no room for it" stood here and was wrong: `heightIn` is a
+     * minimum, so a smaller one cannot shrink a row whose content is already
+     * larger. Measured in `PickerRowRenderTest`. See this class's KDoc.)
      */
     @Test
     fun `voiceOnlyRowStaysTheTallRow`() {

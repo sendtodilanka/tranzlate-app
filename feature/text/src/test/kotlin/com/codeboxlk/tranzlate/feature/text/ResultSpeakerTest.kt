@@ -11,12 +11,17 @@ import org.junit.Test
  * The parts of `AndroidResultSpeaker` that decide something, tested without the
  * platform (issue #159 co-verify).
  *
- * `TextToSpeech` cannot be constructed on the JVM and there is no Robolectric in
- * this project, so the two decisions that were wrong are lifted out of the
- * adapter into named functions rather than left untestable: **how a speak tap
- * treats a bind that has not reported yet** (block 2), and **what happens when
- * one half of the release throws** (medium 4). Both are exercised here through
- * their own arguments — no Android class is loaded.
+ * `TextToSpeech` cannot be constructed on the JVM, so the two decisions that were
+ * wrong are lifted out of the adapter into named functions rather than left
+ * untestable: **how a speak tap treats a bind that has not reported yet**
+ * (block 2), and **what happens when one half of the release throws** (medium 4).
+ * Both are exercised here through their own arguments — no Android class is loaded.
+ *
+ * This KDoc used to give "there is no Robolectric in this project" as part of the
+ * reason. #186 has since put Robolectric on this module's test classpath, so that
+ * half is no longer true — but the conclusion is unchanged, because a shadowed
+ * `TextToSpeech` would exercise the shadow's behaviour rather than the adapter's,
+ * which is the opposite of what these tests are for.
  */
 class ResultSpeakerTest {
     // ---- block 2: a bind in flight is not an unavailable engine --------------

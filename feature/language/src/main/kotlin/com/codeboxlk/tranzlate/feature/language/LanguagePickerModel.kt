@@ -508,10 +508,12 @@ enum class RecentHeader {
 
 /**
  * What the picker's list emits above the alphabet, decided in one pure place so
- * a plain unit test can read it. This module has no Robolectric and no Compose
- * test rule, so a decision left inside the composable is a decision no test can
- * reach — and "recents empty → the section is ABSENT" is precisely a claim about
- * something that is not on screen.
+ * a plain unit test can read it. When this was written the module had no Compose
+ * test runtime at all, so a decision left inside the composable was a decision no
+ * test could reach; #186 has since added one (`tranzlate.compose-test`). The
+ * extraction still earns its place — "recents empty → the section is ABSENT" is a
+ * claim about something that is NOT on screen, which a pure function states
+ * directly and a rendered tree can only imply.
  *
  * @property showVoiceLegend the `volume_up` explainer, drawn ABOVE the
  *   `LazyColumn` and never inside it — see [pickerListPlan] for why that
@@ -650,12 +652,18 @@ fun pickerListPlan(
  * How short a picker row is allowed to be.
  *
  * Pulled out of the row composable for the same reason [pickerListPlan] was
- * pulled out of the list composable: this module has no Robolectric and no
- * Compose test rule, so a decision left inside a `@Composable` is a decision no
- * test can reach. A co-verify lens proved that literally — it deleted the
- * `!voiceMark` half of this condition, the whole module's unit tests stayed
- * BUILD SUCCESSFUL with zero failures, and the row it broke is the one the
- * comment says must not break.
+ * pulled out of the list composable: when this was written the module had no
+ * Compose test runtime, so a decision left inside a `@Composable` was a decision
+ * no test could reach. A co-verify lens proved that literally — it deleted the
+ * `!voiceMark` half of this condition and the whole module's unit tests stayed
+ * BUILD SUCCESSFUL with zero failures.
+ *
+ * #186 added the runtime, and rendering the row corrected the story: the
+ * voice-but-no-pack row measures 67dp, so the 60dp this function returns for it is
+ * a floor it never reaches. `heightIn` is a minimum and cannot shrink a row whose
+ * content is larger, so the deletion above does not in fact clip the mark — the
+ * contract below is right, the harm attributed to breaking it was not. Measured in
+ * `PickerRowRenderTest`.
  *
  * The rule: the mark is drawn on the SUPPORTING line, so any row that carries a
  * mark needs the two-line box even when it has no supporting words. The

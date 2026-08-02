@@ -484,12 +484,8 @@ class KonsistArchitectureTest {
      * tap that never registered. It read as a dead string to a reference sweep
      * (#172 nearly deleted it); it was a missing announcement.
      *
-     * SOURCE-SHAPE assertions, stated with the same honesty as the two gates
-     * above: this repo has no Compose unit-test runtime (no Robolectric, no
-     * `createComposeRule` anywhere), and the instrumented suite is compiled but
-     * unrunnable (#40). So this cannot prove the announcement REACHES TalkBack —
-     * only a device can. What it makes RED is every regression that compiles and
-     * leaves the rest of the suite green:
+     * SOURCE-SHAPE assertions. What they make RED is every regression that
+     * compiles and leaves the rest of the suite green:
      *
      *  1. the `liveRegion` deleted while the string stays — the exact shape that
      *     produced #174, and the one a "the string is referenced" test misses;
@@ -502,6 +498,35 @@ class KonsistArchitectureTest {
      *
      * Comments and string literals are stripped before matching, so a KDoc that
      * explains the live region cannot satisfy the rule about having one.
+     *
+     * **Partly superseded, deliberately kept (#186).** This KDoc used to say the
+     * repo had no Compose unit-test runtime, so nothing could prove the
+     * announcement reaches an accessibility service. That is no longer true:
+     * `ComposerAnnouncementTest` in `:feature:text` renders the composer under
+     * Robolectric and reads the live region out of the semantics tree, which
+     * covers case 1 properly rather than by proxy.
+     *
+     * It is kept anyway, and the division of labour is measured rather than
+     * assumed — every mutation below was run:
+     *
+     *  - `liveRegion` deleted outright → BOTH red. The overlap is real.
+     *  - the semantics block computed into an unused local and the unmodified
+     *    modifier passed on (#193 row 1, verbatim) → **this gate GREEN, the
+     *    behavioural test RED.** Every string matched below is still in the
+     *    function text, and nothing reaches the tree. That case is the reason a
+     *    shape gate cannot be the last word here.
+     *  - the announcing face extracted into a `Modifier` helper — a pure refactor
+     *    that changes no behaviour → **this gate RED, the behavioural test
+     *    GREEN.** A gate that fails on a refactor and passes on a defect is
+     *    exactly backwards, and that is the cost being accepted for cases 2-4.
+     *  - the `ShimmerResult` import aliased and the call renamed with it → BOTH
+     *    green, which is a hole rather than a success: case 3's "only the
+     *    announcing face may draw a shimmer" is a substring match, so a new
+     *    surface calling the aliased name would not be seen. Recorded, not fixed
+     *    here — it belongs to #193.
+     *
+     * So: case 1 is now better covered elsewhere; cases 2-4 are still only
+     * covered here, which is why nothing is deleted.
      */
     @Test
     fun `the translating state announces that it started`() {
