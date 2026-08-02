@@ -17,10 +17,13 @@
     <string name="text_lang_error_network">Walang koneksyon. Kumonekta muli at subukan ulit.</string>
     <string name="text_lang_error_storage">Kulang ang espasyo. Maglaan ng espasyo at subukan ulit.</string>
     <string name="text_lang_error_generic">Hindi natapos ang pag-download. Subukan ulit.</string>
-    <string name="text_lang_data_dialog_title">I-download ang %1$s gamit ang mobile data?</string>
-    <string name="text_lang_data_dialog_body">Malalaki ang mga language pack. Puwede kang maghintay ng Wi-Fi.</string>
-    <string name="text_lang_data_dialog_once">I-download nang isang beses</string>
-    <string name="text_lang_data_dialog_wait">Maghintay ng Wi-Fi</string>
+    <!-- Sheet 19a — see values/strings.xml for why there is no language name and
+         why the second action is not "Wait for Wi-Fi". -->
+    <string name="lang_sheet_data_title">I-download gamit ang mobile data?</string>
+    <string name="lang_sheet_data_body">Karaniwang 20–45 MB ang isang language pack. Maaaring maningil ang iyong plan para dito.</string>
+    <string name="lang_sheet_data_always_ask">Palaging magtanong bago gumamit ng mobile data</string>
+    <string name="lang_sheet_data_download">I-download ngayon</string>
+    <string name="lang_sheet_data_not_now">Hindi ngayon</string>
     <plurals name="text_lang_search_hint">
         <item quantity="one">Maghanap sa %1$d wika</item>
         <item quantity="other">Maghanap sa %1$d na wika</item>
@@ -67,10 +70,6 @@
     <string name="offline_cd_stop">Itigil ang pag-download ng %1$s</string>
     <string name="offline_cd_delete">Burahin ang %1$s</string>
     <string name="offline_cd_retry">Subukang i-download muli ang %1$s</string>
-    <string name="offline_data_dialog_title">I-download ang %1$s gamit ang mobile data?</string>
-    <string name="offline_data_dialog_body">Malalaki ang mga language pack. Puwede ring maghintay ng Wi-Fi.</string>
-    <string name="offline_data_dialog_once">I-download nang isang beses</string>
-    <string name="offline_data_dialog_wait">Maghintay ng Wi-Fi</string>
     <string name="offline_error_storage">Kulang ang espasyo — magbakante ng storage, pagkatapos ay subukang muli</string>
     <string name="offline_error_network">Nabigo ang pag-download — suriin ang koneksyon, pagkatapos ay subukang muli</string>
     <string name="offline_error_generic">Nagkaproblema — subukang muli</string>

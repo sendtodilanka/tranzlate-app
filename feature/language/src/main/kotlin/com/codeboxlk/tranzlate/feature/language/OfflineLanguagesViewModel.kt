@@ -2,15 +2,19 @@ package com.codeboxlk.tranzlate.feature.language
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.codeboxlk.tranzlate.core.common.ApplicationScope
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -39,6 +43,8 @@ class OfflineLanguagesViewModel
         languageRepository: LanguageRepository,
         private val modelManager: OfflineModelManager,
         private val downloadGate: DownloadGate,
+        private val downloadPrefs: DownloadPrefsRepository,
+        @param:ApplicationScope private val appScope: CoroutineScope,
     ) : ViewModel() {
         val rows: StateFlow<List<OfflineLanguageRow>> =
             combine(
@@ -70,8 +76,26 @@ class OfflineLanguagesViewModel
                     }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyList())
 
-        /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
+        /** Language id awaiting the mobile-data consent sheet; null = no sheet. */
         val pendingConsent: StateFlow<String?> = downloadGate.pendingConsent
+
+        /**
+         * Sheet 19a's checkbox, exactly as the picker exposes it — the stored
+         * `allowMobileData` read from the other end ([alwaysAskOf]). Both screens
+         * raise the SAME sheet, so both must answer it the same way; a second
+         * polarity or a second scope here is the drift the one-home rule exists
+         * to stop. See `LanguagePickerViewModel.alwaysAsk` for why the seed is
+         * `true` and why the write runs on the application scope.
+         */
+        val alwaysAsk: StateFlow<Boolean> =
+            downloadPrefs.allowMobileData
+                .map(::alwaysAskOf)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), true)
+
+        /** The checkbox moved: write the STANDING preference Settings and the gate share. */
+        fun onAlwaysAskChange(alwaysAsk: Boolean) {
+            appScope.launch { downloadPrefs.setAllowMobileData(allowMobileDataOf(alwaysAsk)) }
+        }
 
         /** Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts. */
         fun download(id: String) {

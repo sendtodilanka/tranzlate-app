@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DownloadForOffline
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -25,7 +24,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -58,12 +56,15 @@ fun OfflineLanguagesScreen(
 ) {
     val rows by viewModel.rows.collectAsStateWithLifecycle()
     val pendingConsent by viewModel.pendingConsent.collectAsStateWithLifecycle()
+    val alwaysAsk by viewModel.alwaysAsk.collectAsStateWithLifecycle()
     OfflineLanguagesContent(
         rows = rows,
         onDownload = viewModel::download,
         onDelete = viewModel::delete,
         onBack = onBack,
         pendingConsent = pendingConsent,
+        alwaysAsk = alwaysAsk,
+        onAlwaysAskChange = viewModel::onAlwaysAskChange,
         onDownloadAnyway = viewModel::downloadAnyway,
         onDismissConsent = viewModel::dismissConsent,
         modifier = modifier,
@@ -78,6 +79,8 @@ internal fun OfflineLanguagesContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     pendingConsent: String? = null,
+    alwaysAsk: Boolean = true,
+    onAlwaysAskChange: (Boolean) -> Unit = {},
     onDownloadAnyway: () -> Unit = {},
     onDismissConsent: () -> Unit = {},
 ) {
@@ -87,29 +90,16 @@ internal fun OfflineLanguagesContent(
     // picker's own KDoc makes this a rule; a CLDR lookup in a list item runs on
     // every frame a fling produces.
     val shown = remember(rows, locale) { buildOfflineRows(rows, locale) }
-    // Issue #90: metered-download consent — ONE dialog at peak intent, wifi
-    // waiting keeps the row NotDownloaded (no spinner, no dead end).
-    pendingConsent?.let { id ->
-        val name = shown.firstOrNull { it.id == id }?.displayName ?: id
-        AlertDialog(
-            onDismissRequest = onDismissConsent,
-            title = { Text(stringResource(R.string.offline_data_dialog_title, name)) },
-            text = { Text(stringResource(R.string.offline_data_dialog_body)) },
-            confirmButton = {
-                TextButton(
-                    onClick = onDownloadAnyway,
-                    modifier = Modifier.testTag("tt_offline_data_once"),
-                ) { Text(stringResource(R.string.offline_data_dialog_once)) }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = onDismissConsent,
-                    modifier = Modifier.testTag("tt_offline_data_wait"),
-                ) { Text(stringResource(R.string.offline_data_dialog_wait)) }
-            },
-            modifier = Modifier.testTag("tt_offline_data_dialog"),
-        )
-    }
+    // Issue #90's consent question, now asked by the SAME sheet the picker
+    // raises (#130 PR-17) — one copy, one anatomy, one set of strings. Declining
+    // leaves the row NotDownloaded: no spinner, no dead end.
+    MobileDataSheet(
+        visible = pendingConsent != null,
+        alwaysAsk = alwaysAsk,
+        onAlwaysAskChange = onAlwaysAskChange,
+        onDownloadNow = onDownloadAnyway,
+        onDismiss = onDismissConsent,
+    )
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface,
@@ -320,20 +310,10 @@ private fun OfflineLanguagesScreenPreview() {
     }
 }
 
-/** The metered-consent dialog (issue #90) over the list. */
-@PreviewLightDark
-@Composable
-private fun OfflineLanguagesConsentDialogPreview() {
-    TranzlateTheme {
-        OfflineLanguagesContent(
-            rows = previewRows,
-            onDownload = {},
-            onDelete = {},
-            onBack = {},
-            pendingConsent = "de",
-        )
-    }
-}
+// The metered-consent preview that stood here is GONE for the reason given at
+// the foot of `LanguagePickerScreen.kt`: 19a is a `ModalBottomSheet`, the
+// tooling renders no window, so this preview would have drawn the plain list
+// while claiming to show the consent state. Previewed in `MobileDataSheet.kt`.
 
 /** Empty/loading face — the rows have not arrived yet. */
 @PreviewLightDark

@@ -203,6 +203,7 @@ class LanguagePickerViewModelTest {
         clock = clock,
         modelManager = manager,
         downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+        downloadPrefs = prefs,
         translatePrefs = translatePrefs,
         storageProbe = probe,
         dispatchers = TestDispatcherProvider(dispatcher),
@@ -283,6 +284,7 @@ class LanguagePickerViewModelTest {
                     clock = clock,
                     modelManager = SilentModelManager(),
                     downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+                    downloadPrefs = prefs,
                     translatePrefs = translatePrefs,
                     storageProbe = storage,
                     dispatchers = TestDispatcherProvider(dispatcher),
@@ -498,7 +500,115 @@ class LanguagePickerViewModelTest {
             assertThat(vm.pendingConsent.value).isNull()
         }
 
-    /** "Wait for Wi-Fi" closes the gate's question from this screen too. */
+    /**
+     * Sheet 19a's checkbox writes the STANDING preference, and this asserts what
+     * that preference then DOES — not merely that a write happened.
+     *
+     * Two mutations are covered, both decided before the test was written:
+     * dropping the repository write, and writing `alwaysAsk` where
+     * `!alwaysAsk` belongs. The box says "Always **ask**" and the store says
+     * "Always **allow**"; a polarity slip there turns a consent prompt into a
+     * standing permission the user believes they just tightened, and it reads as
+     * a correct line in a diff. So the second half of this test asks the GATE:
+     * the next metered tap must download without asking.
+     */
+    @Test
+    fun `unticking Always ask grants the standing permission`() =
+        runTest(dispatcher) {
+            connectivity.metered = true
+            val vm = viewModel()
+
+            vm.onAlwaysAskChange(false)
+            runCurrent()
+
+            assertThat(prefs.allowMobileData.first()).isTrue()
+
+            vm.download("fr")
+            runCurrent()
+            assertThat(manager.downloads).containsExactly("fr")
+            assertThat(vm.pendingConsent.value).isNull()
+        }
+
+    /** …and back again: re-ticking the box must restore the question. */
+    @Test
+    fun `re-ticking Always ask revokes the standing permission`() =
+        runTest(dispatcher) {
+            connectivity.metered = true
+            prefs.state.value = true
+            val vm = viewModel()
+
+            vm.onAlwaysAskChange(true)
+            runCurrent()
+
+            assertThat(prefs.allowMobileData.first()).isFalse()
+
+            vm.download("fr")
+            runCurrent()
+            assertThat(manager.downloads).isEmpty()
+            assertThat(vm.pendingConsent.value).isEqualTo("fr")
+        }
+
+    /**
+     * What the sheet's checkbox is DRAWN from, seeded honestly.
+     *
+     * `true` before the store has answered is a fact rather than an optimistic
+     * guess: the only way the sheet is on screen is that the gate found the
+     * standing permission off. A `false` seed would draw the box clear for one
+     * frame on a consent surface — the same class of first-frame lie that keeps
+     * 194 rows from being labelled "Online only".
+     */
+    @Test
+    fun `the checkbox reads the standing preference from the other end`() =
+        runTest(dispatcher) {
+            prefs.state.value = false
+            val vm = viewModel()
+
+            // The seed, before any collector has driven the store.
+            assertThat(vm.alwaysAsk.value).isTrue()
+
+            vm.alwaysAsk.test {
+                assertThat(awaitItem()).isTrue() // still asking
+                prefs.state.value = true
+                assertThat(awaitItem()).isFalse() // the box clears when permission stands
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /**
+     * #130 PR-13's loss class, driven through the ViewModel the SCREEN reads
+     * rather than through the store alone: a question asked before the process
+     * died is still open after it, and it is still a QUESTION — nothing has
+     * downloaded.
+     */
+    @Test
+    fun `a rebuilt picker still shows the sheet it asked before`() =
+        runTest(dispatcher) {
+            val restored = InMemoryConsentQuestionStore().apply { raise("de") }
+            val vm =
+                LanguagePickerViewModel(
+                    languageRepository = repository,
+                    clock = clock,
+                    modelManager = manager,
+                    downloadGate = DownloadGate(connectivity, prefs, manager, restored),
+                    downloadPrefs = prefs,
+                    translatePrefs = translatePrefs,
+                    storageProbe = storage,
+                    dispatchers = TestDispatcherProvider(dispatcher),
+                    savedStateHandle = SavedStateHandle(),
+                    appScope = appScope,
+                )
+
+            assertThat(vm.pendingConsent.value).isEqualTo("de")
+            assertThat(manager.downloads).isEmpty()
+
+            vm.downloadAnyway()
+            runCurrent()
+
+            assertThat(manager.downloads).containsExactly("de")
+            assertThat(vm.pendingConsent.value).isNull()
+        }
+
+    /** "Not now" closes the gate's question from this screen too. */
     @Test
     fun `dismissing the dialog reaches the gate`() =
         runTest(dispatcher) {

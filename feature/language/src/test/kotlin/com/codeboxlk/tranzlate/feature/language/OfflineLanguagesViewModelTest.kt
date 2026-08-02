@@ -11,14 +11,19 @@ import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -36,7 +41,19 @@ class OfflineLanguagesViewModelTest {
     private val manager = RecordingModelManager()
     private val connectivity = FakeConnectivityMonitor()
     private val prefs = FakeDownloadPrefsRepository()
+
+    /**
+     * The standing-preference write runs on the APPLICATION scope, for the
+     * reason `LanguagePickerViewModelTest` gives: a preference the user just
+     * changed must not be dropped because they walked off the screen. Same shape
+     * here so the two screens' consent behaviour is tested the same way.
+     */
+    private val appScope = CoroutineScope(dispatcherRule.dispatcher + SupervisorJob())
+
     private lateinit var viewModel: OfflineLanguagesViewModel
+
+    @After
+    fun stopAppScope() = appScope.cancel()
 
     @Before
     fun setUp() {
@@ -45,6 +62,8 @@ class OfflineLanguagesViewModelTest {
                 languageRepository = StaticLanguageRepository(),
                 modelManager = manager,
                 downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+                downloadPrefs = prefs,
+                appScope = appScope,
             )
     }
 
@@ -70,7 +89,46 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingConsent.value).isNull()
         }
 
-    /** "Wait for Wi-Fi" closes the gate's question from this screen too. */
+    /**
+     * The SAME sheet is raised here as on the picker, so it must be answered the
+     * same way — including the polarity of its checkbox. This screen having its
+     * own idea of what "Always ask" means is precisely the drift that made two
+     * dialogs worth deleting.
+     */
+    @Test
+    fun `unticking Always ask grants the standing permission here too`() =
+        runTest {
+            connectivity.metered = true
+
+            viewModel.onAlwaysAskChange(false)
+            runCurrent()
+
+            assertThat(prefs.allowMobileData.first()).isTrue()
+
+            viewModel.download("de")
+            runCurrent()
+            assertThat(manager.downloads).containsExactly("de")
+            assertThat(viewModel.pendingConsent.value).isNull()
+        }
+
+    @Test
+    fun `re-ticking Always ask revokes the standing permission here too`() =
+        runTest {
+            connectivity.metered = true
+            prefs.state.value = true
+
+            viewModel.onAlwaysAskChange(true)
+            runCurrent()
+
+            assertThat(prefs.allowMobileData.first()).isFalse()
+
+            viewModel.download("de")
+            runCurrent()
+            assertThat(manager.downloads).isEmpty()
+            assertThat(viewModel.pendingConsent.value).isEqualTo("de")
+        }
+
+    /** "Not now" closes the gate's question from this screen too. */
     @Test
     fun `dismissing the dialog reaches the gate`() =
         runTest {
@@ -98,6 +156,8 @@ class OfflineLanguagesViewModelTest {
                     languageRepository = StaticLanguageRepository(),
                     modelManager = SilentModelManager(),
                     downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+                    downloadPrefs = prefs,
+                    appScope = appScope,
                 )
             viewModel.rows.launchIn(backgroundScope)
             runCurrent()
@@ -118,6 +178,8 @@ class OfflineLanguagesViewModelTest {
                     languageRepository = StaticLanguageRepository(),
                     modelManager = scripted,
                     downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+                    downloadPrefs = prefs,
+                    appScope = appScope,
                 )
             viewModel.rows.launchIn(backgroundScope)
             runCurrent()
@@ -149,6 +211,8 @@ class OfflineLanguagesViewModelTest {
                     languageRepository = MixedTierLanguageRepository(),
                     modelManager = SilentModelManager(),
                     downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+                    downloadPrefs = prefs,
+                    appScope = appScope,
                 )
             viewModel.rows.launchIn(backgroundScope)
             runCurrent()

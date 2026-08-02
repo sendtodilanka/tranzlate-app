@@ -84,14 +84,24 @@ screen has none.
 | `text_lang_error_storage` | string | `Not enough space. Free some up and try again.` | — | download outcome |
 | `text_lang_error_generic` | string | `Download didn't finish. Try again.` | — | download outcome |
 
-## 5. Language picker — mobile-data consent dialog
+## 5. Mobile-data consent — sheet 19a (ONE set, both screens)
+
+Owned by `MobileDataSheet.kt` and raised by the picker AND the offline manager. It replaced two
+identical sets behind two dialogs (`text_lang_data_dialog_*`, `offline_data_dialog_*` — §8).
 
 | Key | Type | `en` | Args | Notes |
 |-----|------|------|------|-------|
-| `text_lang_data_dialog_title` | string | `Download %1$s over mobile data?` | language name | asked before spending the user's data |
-| `text_lang_data_dialog_body` | string | `Language packs are large. You can wait for Wi-Fi instead.` | — | |
-| `text_lang_data_dialog_once` | string | `Download once` | — | confirm |
-| `text_lang_data_dialog_wait` | string | `Wait for Wi-Fi` | — | dismiss |
+| `lang_sheet_data_title` | string | `Download over mobile data?` | — | **No language name**, and that is the drawing (spec rev 5, 19a). The checkbox below can make the answer STANDING, so a title naming one language would misdescribe what unticking it does; the row that raised the sheet is behind it either way |
+| `lang_sheet_data_body` | string | `A language pack is usually 20–45 MB. Your plan may charge for it.` | — | ⚠ the app states a pack size in three places and this is the third wording — see the `offline_subtitle` note in §7. The two measured packs are 44.2 MB (E-S1, af↔en) and 45.7 MB (#90 E3, de↔en), so `~30MB` is the one that is wrong; consolidating them is #175's neighbour, not this row's job |
+| `lang_sheet_data_always_ask` | string | `Always ask before using mobile data` | — | the standing preference, **inverted**: ticked = keep asking = `allowMobileData` is false. The Settings row says the same bit the other way round (`settings_mobile_data_label`, "Always allow mobile data") |
+| `lang_sheet_data_download` | string | `Download now` | — | the filled action (the likely intent, spec §5) |
+| `lang_sheet_data_not_now` | string | `Not now` | — | the text action. The export draws **"Wait for Wi-Fi"**; nothing in this app queues a download for Wi-Fi, experiment **E-W1** has never been run, and the rev3 ruling's REJECT §7.8 refuses that word until it has. This is the owner's pre-approved interim (ruling 8) |
+
+### 5.1 Sheet 19a — testTags (C-1)
+
+`tt_lang_sheet_data` (root) · `tt_lang_sheet_data_download` · `tt_lang_sheet_data_not_now` ·
+`tt_lang_sheet_data_always_ask` (the whole toggleable ROW, which is the 48dp target and the one
+semantics node — the `Checkbox` inside it is read-only and announces nothing of its own).
 
 ## 6. Language picker — accessibility (C-4)
 
@@ -149,14 +159,10 @@ nothing to a screen reader.
 | `offline_cd_delete` | string | `Delete %1$s` | language name |
 | `offline_cd_retry` | string | `Retry downloading %1$s` | language name |
 
-### 7.2 Offline manager — mobile-data consent dialog
+### 7.2 Offline manager — mobile-data consent
 
-| Key | Type | `en` | Args |
-|-----|------|------|------|
-| `offline_data_dialog_title` | string | `Download %1$s over mobile data?` | language name |
-| `offline_data_dialog_body` | string | `Language packs are large. You can wait for Wi-Fi instead.` | — |
-| `offline_data_dialog_once` | string | `Download once` | — |
-| `offline_data_dialog_wait` | string | `Wait for Wi-Fi` | — |
+No keys of its own since #130 PR-17. The screen raises the SAME sheet the picker raises, from the
+same set — §5.
 
 ---
 
@@ -168,17 +174,27 @@ these keys to a resource file fails the build instead of quietly matching this r
 | Key | Retired by | Why |
 |-----|-----------|-----|
 | ~~`offline_state_available`~~ · ~~`offline_state_downloading`~~ · ~~`offline_state_downloaded`~~ · ~~`offline_state_deleting`~~ · ~~`offline_state_failed`~~ | issue #152 | the always-on per-row state sub-line was removed from the design in #82; the five keys survived the #146 module move because that PR's contract was a byte-identical move. Zero Kotlin references across every module and source set at the point of deletion. |
+| ~~`text_lang_data_dialog_title`~~ · ~~`text_lang_data_dialog_body`~~ · ~~`text_lang_data_dialog_once`~~ · ~~`text_lang_data_dialog_wait`~~ | #130 PR-17 | the picker's `MeteredConsentDialog`, replaced by sheet 19a (§5). Call sites at deletion: 4 `stringResource` in `LanguagePickerScreen.kt`, 12 resource lines across three locales, zero test references. |
+| ~~`offline_data_dialog_title`~~ · ~~`offline_data_dialog_body`~~ · ~~`offline_data_dialog_once`~~ · ~~`offline_data_dialog_wait`~~ | #130 PR-17 | the offline manager's inline `AlertDialog`, the second copy of the set above, replaced by the SAME sheet. Call sites at deletion: 4 `stringResource` in `OfflineLanguagesScreen.kt`, 12 resource lines, zero test references. |
+
+> **Both `_wait` keys said "Wait for Wi-Fi", and the app never waited for Wi-Fi.** They shipped
+> from #90 onwards while `RealOfflineModelManager` passed a bare `DownloadConditions` and nothing
+> queued anything — which the rev3 ruling's REJECT §7.8 refuses pre-**E-W1**. Retiring them is the
+> honesty half of PR-17; `lang_sheet_data_not_now` is what replaced the promise.
 
 ## 9. Known duplication — a consolidation task, not a gate failure
 
-The picker and the offline manager were built by different PRs and ship **two copies of the same
-copy**: `text_lang_data_dialog_*` ≡ `offline_data_dialog_*` (identical `en` strings), the three
-`text_lang_error_*` against the three `offline_error_*` (same three outcomes, different wording),
-`text_lang_loading` against `offline_loading` (identical), and `cd_lang_back` against
-`offline_cd_back` (both `Back`).
+The picker and the offline manager were built by different PRs and shipped **four sets of the same
+copy twice**. One of the four is gone: `text_lang_data_dialog_*` ≡ `offline_data_dialog_*` were
+merged into the single sheet-19a set (§5) by #130 PR-17, which is where the pattern is going.
 
-Recorded here rather than fixed: merging them is a behaviour-visible copy change across two
-screens and belongs in its own issue with the owner's sign-off on the surviving wording. The
+Still doubled: the three `text_lang_error_*` against the three `offline_error_*` (same three
+outcomes, **different wording** — this is **#175**, and the ruling's REJECT §7.8 bounces any PR
+that adds a third), `text_lang_loading` against `offline_loading` (identical), and `cd_lang_back`
+against `offline_cd_back` (both `Back`).
+
+Recorded here rather than fixed in passing: merging them is a behaviour-visible copy change across
+two screens and belongs in its own issue with the owner's sign-off on the surviving wording. The
 divergent pair is the one that matters — a user meeting "Not enough space. Free some up and try
 again." on one screen and "Not enough space — free some storage, then retry" on the other is being
 told the same thing twice in two voices.
