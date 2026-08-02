@@ -4,8 +4,10 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputFile
@@ -46,7 +48,12 @@ import java.io.File
 @CacheableTask
 abstract class VerifyStringKeyDocsTask : DefaultTask() {
 
-    /** Every shipped `strings.xml`, all modules, all non-test source sets, every locale. */
+    /**
+     * Every shipped `strings.xml`, all modules, all non-test source sets, every locale.
+     *
+     * How that set is discovered — and why it is derived from the registered module list rather
+     * than from a path shape (#173) — lives with the wiring, in `StringKeyDocsConventionPlugin`.
+     */
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val resourceFiles: ConfigurableFileCollection
@@ -55,6 +62,17 @@ abstract class VerifyStringKeyDocsTask : DefaultTask() {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val catalogueFiles: ConfigurableFileCollection
+
+    /**
+     * Gradle paths of the registered modules [resourceFiles] was derived from (`:core:ui`, …).
+     *
+     * Reported, not re-read: the task still touches nothing but the files handed to it. It exists
+     * because #173 was a scan silently narrower than the repository, and a scope nobody can see is
+     * a scope nobody checks. As a task input it also makes a lost ring change the task's output
+     * instead of leaving the result byte-identical.
+     */
+    @get:Input
+    abstract val modulePaths: ListProperty<String>
 
     /** Written on success so the task is up-to-date-checkable and leaves evidence. */
     @get:OutputFile
@@ -82,8 +100,10 @@ abstract class VerifyStringKeyDocsTask : DefaultTask() {
         }
         if (resources.isEmpty()) {
             throw GradleException(
-                "No values*/ strings.xml found. The resourceFiles input of :verifyStringKeyDocs " +
-                    "no longer matches this repository's layout, so the gate would pass vacuously.",
+                "No values*/ strings.xml found across ${modulePaths.get().size} registered " +
+                    "module(s). Either settings.gradle.kts registers nothing, or no module holds " +
+                    "product resources any more — the gate would pass vacuously, which is a " +
+                    "failure and not a pass.",
             )
         }
 
@@ -114,6 +134,7 @@ abstract class VerifyStringKeyDocsTask : DefaultTask() {
         catalogues: List<File>,
         root: File,
     ) {
+        val modules = modulePaths.get()
         val report = reportFile.get().asFile
         report.parentFile?.mkdirs()
         report.writeText(
@@ -121,14 +142,24 @@ abstract class VerifyStringKeyDocsTask : DefaultTask() {
                 appendLine("verifyStringKeyDocs — C-3 string-key authority")
                 appendLine("keys checked:   $keyCount")
                 appendLine("resource files: ${resources.size}")
+                appendLine("modules:        ${modules.size}")
                 appendLine("catalogues:     ${catalogues.size}")
                 catalogues.forEach {
+                    appendLine("  " + it.relativeToOrSelf(root).invariantSeparatorsPath)
+                }
+                appendLine()
+                appendLine("Scanned modules (settings.gradle.kts, #173 — not a path glob):")
+                modules.forEach { appendLine("  $it") }
+                appendLine()
+                appendLine("Scanned files:")
+                resources.forEach {
                     appendLine("  " + it.relativeToOrSelf(root).invariantSeparatorsPath)
                 }
             },
         )
         logger.lifecycle(
-            "verifyStringKeyDocs: $keyCount keys, all documented across " +
+            "verifyStringKeyDocs: $keyCount keys in ${resources.size} resource file(s) across " +
+                "${modules.size} registered module(s), all documented across " +
                 "${catalogues.size} STRINGS_*.md catalogue(s).",
         )
     }
