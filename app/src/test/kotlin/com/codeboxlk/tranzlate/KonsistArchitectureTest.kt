@@ -800,6 +800,9 @@ class KonsistArchitectureTest {
             }
         }
         return null
+    }
+
+    /**
      * Issue #195 — the composer shows a star write that failed.
      *
      * `TextViewModelTest` proves the ViewModel stops the throw and records the
@@ -895,7 +898,8 @@ class KonsistArchitectureTest {
         val consumed = surface.indexOf(STAR_CONSUME)
         val retried = surface.indexOf("viewModel.retryStar(")
         assertThat(consumed).isGreaterThan(-1)
-        assertThat(consumed).isLessThan(retried)    }
+        assertThat(consumed).isLessThan(retried)
+    }
 
     /**
      * The string key one `when` arm ultimately names, or null when this gate
@@ -1112,6 +1116,7 @@ class KonsistArchitectureTest {
          * `stringResource` call into the arm still reads as one distinct message.
          */
         val STAR_ARM = Regex("""StarIntent\.(SAVE|REMOVE)\s*->\s*([^\n]+)""")
+
         /** The only call that ends the binding (AOSP: nothing else does). */
         const val SHUTDOWN = "shutdown()"
 
