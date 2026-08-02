@@ -60,9 +60,15 @@
 # so there is no escalation — but it is disclosure, and it is named here rather
 # than discovered later.
 #
-# FAIL OPEN, like every guard here: no claim file, an unreadable one, a stale
-# one, or a command this cannot resolve → silent. A message is always a real
-# finding.
+# FAIL OPEN, like every guard here: an unreadable claim file, a malformed
+# payload, no `jq`, or a command this cannot resolve → silent. It never blocks
+# the tool call; every branch below either warns or says nothing.
+#
+# NOTE: "no claim file → silent" belonged in this list until the fix below, and
+# was the whole defect (#213) — it is now the nudge at the bottom. The #214 lens
+# caught this sentence still claiming the old behaviour eight lines above the
+# code that contradicts it, inside the PR whose subject is documents that
+# disagree with their code. Corrected rather than left as a small thing.
 set -uo pipefail
 
 payload=$(cat)
