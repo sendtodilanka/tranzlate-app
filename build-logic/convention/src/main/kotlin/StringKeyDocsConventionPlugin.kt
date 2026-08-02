@@ -62,6 +62,16 @@ import org.gradle.language.base.plugins.LifecycleBasePlugin
  * owes no catalogue row — and `build-logic` is outside the scan for the same reason, being an
  * included build rather than a subproject. `include()`-ing such a directory is what would make its
  * keys real, and that is the same act that puts it in this scan.
+ *
+ * The adjacent case, named by the #202 co-verify lens: a directory that WAS registered and scanned
+ * and stops being either — an `include()` line deleted while the resources stay on disk. The count
+ * would move from a plausible N to a plausible N-1 with nothing to notice. **This scan does not
+ * defend against that; something else currently does.** Every resource-bearing module here is a
+ * hardcoded `projects.x.y` accessor in `app/build.gradle.kts`, so removing its `include()` fails
+ * Gradle's own project resolution before any task runs — the lens confirmed it by deleting
+ * `:feature:history`'s line and getting `Unresolved reference 'history'`. That closure is a side
+ * effect of how this repo wires dependencies, not a property asserted here. A resource-bearing
+ * module depended upon by nothing would lose it.
  */
 class StringKeyDocsConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
