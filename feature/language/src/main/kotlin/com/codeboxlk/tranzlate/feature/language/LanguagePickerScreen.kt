@@ -43,7 +43,6 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -156,6 +155,7 @@ fun LanguagePickerScreen(
     val languages by viewModel.languages.collectAsStateWithLifecycle()
     val offlineStates by viewModel.offlineStates.collectAsStateWithLifecycle()
     val pendingConsent by viewModel.pendingConsent.collectAsStateWithLifecycle()
+    val alwaysAsk by viewModel.alwaysAsk.collectAsStateWithLifecycle()
     val selectedId by viewModel.selection(target).collectAsStateWithLifecycle()
     val recents by viewModel.recents(target).collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -178,6 +178,8 @@ fun LanguagePickerScreen(
         onDownload = viewModel::download,
         onStop = viewModel::stopAndRemove,
         pendingConsent = pendingConsent,
+        alwaysAsk = alwaysAsk,
+        onAlwaysAskChange = viewModel::onAlwaysAskChange,
         onDownloadAnyway = viewModel::downloadAnyway,
         onDismissConsent = viewModel::dismissConsent,
         // Read here, not captured in the ViewModel: a rotation rebuilds this
@@ -253,6 +255,8 @@ fun LanguagePickerContent(
     onDownload: (String) -> Unit = {},
     onStop: (String) -> Unit = {},
     pendingConsent: String? = null,
+    alwaysAsk: Boolean = true,
+    onAlwaysAskChange: (Boolean) -> Unit = {},
     onDownloadAnyway: () -> Unit = {},
     onDismissConsent: () -> Unit = {},
     listPosition: PickerListPosition = PickerListPosition.Top,
@@ -276,10 +280,14 @@ fun LanguagePickerContent(
             recents = recents,
             detectLabel = languageLabel(DETECT_LANGUAGE_ID),
         )
-    MeteredConsentDialog(
-        pendingId = pendingConsent,
-        rows = sections.all,
-        onConfirm = onDownloadAnyway,
+    // Sheet 19a. It is handed WHETHER a question is open, never which language
+    // it is about: the sheet's own copy names none, because unticking its
+    // checkbox answers for every language at once (see `MobileDataSheet`).
+    MobileDataSheet(
+        visible = pendingConsent != null,
+        alwaysAsk = alwaysAsk,
+        onAlwaysAskChange = onAlwaysAskChange,
+        onDownloadNow = onDownloadAnyway,
         onDismiss = onDismissConsent,
     )
     // BOTH sizes are read from the CONSTRAINTS this screen was handed, never from
@@ -1943,38 +1951,6 @@ private fun CatalogLoading() {
     )
 }
 
-/**
- * Issue #90's consent ruling, re-honoured: the picker grew download buttons in
- * this redesign, so it asks the same question the offline manager asks before
- * spending someone's data plan.
- */
-@Composable
-private fun MeteredConsentDialog(
-    pendingId: String?,
-    rows: List<LanguagePickerRow>,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    if (pendingId == null) return
-    val name = rows.firstOrNull { it.id == pendingId }?.displayName ?: pendingId
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.text_lang_data_dialog_title, name)) },
-        text = { Text(stringResource(R.string.text_lang_data_dialog_body)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm, modifier = Modifier.testTag("tt_lang_data_once")) {
-                Text(stringResource(R.string.text_lang_data_dialog_once))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("tt_lang_data_wait")) {
-                Text(stringResource(R.string.text_lang_data_dialog_wait))
-            }
-        },
-        modifier = Modifier.testTag("tt_lang_data_dialog"),
-    )
-}
-
 // ---- previews (CLAUDE.md rule 7 — one per meaningful STATE) ------------------
 
 /**
@@ -2119,23 +2095,12 @@ private fun LanguagePickerLoadingPreview() {
     }
 }
 
-@PreviewLightDark
-@Composable
-private fun LanguagePickerConsentDialogPreview() {
-    TranzlateTheme {
-        LanguagePickerContent(
-            target = LanguageRole.TARGET,
-            languages = previewLanguages,
-            selectedId = "es",
-            query = "",
-            onQueryChange = {},
-            onSelect = {},
-            onBack = {},
-            arrangementOverride = PickerArrangement.SinglePane,
-            pendingConsent = "sq",
-        )
-    }
-}
+// The consent preview that stood here is GONE, not moved by accident. It drew
+// the picker with `pendingConsent = "sq"` and an `AlertDialog` over it; 19a is a
+// `ModalBottomSheet`, which opens a window the tooling does not render, so the
+// same preview would now show the resting screen while claiming to show the
+// consent state — a preview that lies is worse than none. The sheet's two
+// meaningful states are previewed where the sheet lives, in `MobileDataSheet.kt`.
 
 // ---- 17a landscape (issue #130 PR-14) ---------------------------------------
 // A preview cannot resize the window it is rendered in, so each frame below

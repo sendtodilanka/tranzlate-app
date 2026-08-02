@@ -22,10 +22,19 @@
     <string name="text_lang_error_network">No connection. Reconnect and try again.</string>
     <string name="text_lang_error_storage">Not enough space. Free some up and try again.</string>
     <string name="text_lang_error_generic">Download didn\'t finish. Try again.</string>
-    <string name="text_lang_data_dialog_title">Download %1$s over mobile data?</string>
-    <string name="text_lang_data_dialog_body">Language packs are large. You can wait for Wi-Fi instead.</string>
-    <string name="text_lang_data_dialog_once">Download once</string>
-    <string name="text_lang_data_dialog_wait">Wait for Wi-Fi</string>
+    <!-- Sheet 19a — the ONE mobile-data consent copy (#130 PR-17). It replaced
+         text_lang_data_dialog_* and offline_data_dialog_*, two identical sets
+         behind two dialogs. No language name: an answer here can be made
+         standing by the checkbox, so a title naming one language would
+         misdescribe it (spec rev 5 draws it that way for the same reason).
+         "Not now", not the drawn "Wait for Wi-Fi": nothing in this app queues a
+         download for Wi-Fi, experiment E-W1 has never been run, and the ruling's
+         REJECT §7.8 refuses that word until it is. -->
+    <string name="lang_sheet_data_title">Download over mobile data?</string>
+    <string name="lang_sheet_data_body">A language pack is usually 20–45 MB. Your plan may charge for it.</string>
+    <string name="lang_sheet_data_always_ask">Always ask before using mobile data</string>
+    <string name="lang_sheet_data_download">Download now</string>
+    <string name="lang_sheet_data_not_now">Not now</string>
     <!-- The real catalog size, never the design's hardcoded 65 (plan §4). -->
     <plurals name="text_lang_search_hint">
         <item quantity="one">Search %1$d language</item>
@@ -97,10 +106,6 @@
     <string name="offline_cd_stop">Stop downloading %1$s</string>
     <string name="offline_cd_delete">Delete %1$s</string>
     <string name="offline_cd_retry">Retry downloading %1$s</string>
-    <string name="offline_data_dialog_title">Download %1$s over mobile data?</string>
-    <string name="offline_data_dialog_body">Language packs are large. You can wait for Wi-Fi instead.</string>
-    <string name="offline_data_dialog_once">Download once</string>
-    <string name="offline_data_dialog_wait">Wait for Wi-Fi</string>
     <string name="offline_error_storage">Not enough space — free some storage, then retry</string>
     <string name="offline_error_network">Download failed — check your connection, then retry</string>
     <string name="offline_error_generic">Something went wrong — retry</string>

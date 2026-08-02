@@ -412,6 +412,44 @@ private fun SheetTextAction(action: TranzlateSheetAction) {
 // surface the host paints. Preview strings are literal fakes, never resources —
 // the module itself stays string-free.
 
+/**
+ * The sheet anatomy on the sheet surface, WITHOUT the modal host — the only way
+ * a feature module can put one of its sheets in front of the owner.
+ *
+ * Rule 7 asks every sheet for a `@PreviewLightDark` per meaningful state, and
+ * [TranzlateSheetScaffold] cannot satisfy it: `ModalBottomSheet` opens a window,
+ * and the tooling renders nothing for a window. The previews in this file get
+ * around that by calling the internal [TranzlateSheetLayout] directly, which
+ * `:feature:language` cannot do. So the same escape is public, named for what it
+ * is for, rather than the two internals being opened up with no statement of
+ * why. Added by #130 PR-17, the first sheet to be built outside this module.
+ *
+ * Preview-only by contract: it has no `onDismissRequest`, no `SheetState` and no
+ * scrim, so it cannot stand in for a real sheet at runtime.
+ */
+@Composable
+fun TranzlateSheetPreviewFrame(
+    title: String,
+    primaryAction: TranzlateSheetAction,
+    tone: TranzlateSheetTone = TranzlateSheetTone.Neutral,
+    icon: (@Composable () -> Unit)? = null,
+    secondaryAction: TranzlateSheetAction? = null,
+    supportingContent: (@Composable ColumnScope.() -> Unit)? = null,
+    body: @Composable () -> Unit,
+) {
+    SheetPreviewSurface {
+        TranzlateSheetLayout(
+            title = title,
+            tone = tone,
+            icon = icon,
+            primaryAction = primaryAction,
+            secondaryAction = secondaryAction,
+            midContent = supportingContent,
+            body = body,
+        )
+    }
+}
+
 @Composable
 internal fun SheetPreviewSurface(content: @Composable () -> Unit) {
     TranzlateTheme {

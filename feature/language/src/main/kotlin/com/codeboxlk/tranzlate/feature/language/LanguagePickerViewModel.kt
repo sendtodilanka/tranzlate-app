@@ -12,6 +12,7 @@ import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
+import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
@@ -68,13 +69,30 @@ private const val KEY_SCROLL_OFFSET = "picker.scroll_offset"
  * PR-13. The reason it moved is in [query].
  */
 @HiltViewModel
+@Suppress("LongParameterList")
 class LanguagePickerViewModel
     @Inject
     constructor(
+        // TEN collaborators, and detekt's threshold IS ten — it trips AT the
+        // threshold, not above it, so the old "eleven, one over" was wrong twice
+        // over (#209 lens). Verified by removing this suppression: detekt names
+        // all ten and answers "The current threshold is set to 10". The
+        // suppression is necessary; the arithmetic that justified it was not. An
+        // eleventh collaborator is a finding, not a threshold to raise.
+        // is the honest option rather than the tidy one. The tidy one is a
+        // parameter object, which would hide the same dependencies from Dagger
+        // and from the next reader while the class kept doing the same amount.
+        // Splitting the class is the real answer and it is NOT PR-17's: the
+        // meter's three (`storageProbe`, `dispatchers`, and the `appScope` it
+        // shares) arrived with PR-15, and PR-23 rewrites what reads them. The
+        // rev3 ruling's anti-god-VM defence is the thing this comment is here to
+        // keep visible — one more parameter and it stops being a threshold and
+        // starts being a finding.
         private val languageRepository: LanguageRepository,
         private val clock: AppClock,
         private val modelManager: OfflineModelManager,
         private val downloadGate: DownloadGate,
+        private val downloadPrefs: DownloadPrefsRepository,
         private val translatePrefs: TranslatePrefsRepository,
         private val storageProbe: StorageProbe,
         private val dispatchers: DispatcherProvider,
@@ -278,8 +296,39 @@ class LanguagePickerViewModel
                 LanguageRole.TARGET -> targetRecents
             }
 
-        /** Language id awaiting the mobile-data consent dialog; null = no dialog. */
+        /** Language id awaiting the mobile-data consent sheet; null = no sheet. */
         val pendingConsent: StateFlow<String?> = downloadGate.pendingConsent
+
+        /**
+         * Sheet 19a's checkbox — "Always ask before using mobile data", which is
+         * the stored `allowMobileData` read from the other end ([alwaysAskOf]).
+         *
+         * The initial value is `true`, and that is a FACT rather than an
+         * optimistic guess: the only way the sheet is on screen at all is that
+         * [DownloadGate] found the standing permission off when the row was
+         * tapped. A `false` seed would tick the box the wrong way for one frame
+         * on a consent surface.
+         */
+        val alwaysAsk: StateFlow<Boolean> =
+            downloadPrefs.allowMobileData
+                .map(::alwaysAskOf)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), true)
+
+        /**
+         * The checkbox moved: write the STANDING preference, the same one
+         * Settings writes and [DownloadGate] reads.
+         *
+         * On `appScope`, not `viewModelScope`, for the reason [select] spells
+         * out: unticking the box and tapping "Download now" pops nothing, but
+         * the offline manager's sheet can be answered as the user leaves, and
+         * DataStore's `edit` runs in the CALLER's context — a cancelled caller
+         * drops the write. A consent preference that silently failed to save
+         * would ask again next time, which is the safe direction, but it would
+         * also make the checkbox a lie.
+         */
+        fun onAlwaysAskChange(alwaysAsk: Boolean) {
+            appScope.launch { downloadPrefs.setAllowMobileData(allowMobileDataOf(alwaysAsk)) }
+        }
 
         /**
          * A row tap: the WHOLE selection, in one place and in a fixed order —

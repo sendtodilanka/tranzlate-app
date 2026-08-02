@@ -312,6 +312,15 @@ private const val DIALOG_HOST_SOURCE =
  * when PR-13 wrote the rule, and a rule that lists the doors has to be extended
  * whenever one is cut — which is the honest cost of naming symbols rather than
  * resolving them, and is written down here rather than left to be rediscovered.
+ *
+ * `rememberModalBottomSheetState` is #130 PR-17's, and it is the one on this
+ * list that had to be REFUSED rather than merely avoided. Sheet 19a is hosted
+ * from this screen, and `TranzlateSheetScaffold`'s own KDoc invites the caller to
+ * hoist a `SheetState` "to drive a graceful `hide()`". That helper is
+ * `rememberSaveable` underneath — hoisting one would tie the sheet to whichever
+ * `SaveableStateHolder` is drawing the picker, which is the whole defect PR-13
+ * removed, in exchange for an exit animation. `MobileDataSheet` takes the
+ * scaffold's default instead, and the screen never spells the name.
  */
 private val HOST_SCOPED_STATE =
     listOf(
@@ -319,4 +328,5 @@ private val HOST_SCOPED_STATE =
         "rememberLazyListState",
         "rememberLazyGridState",
         "rememberScrollState",
+        "rememberModalBottomSheetState",
     )

@@ -88,7 +88,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 5 — adaptive
 | PR | Scope | Status |
 |---|---|---|
-| PR-13 | Fold-posture `WindowInfo` extension + host-agnostic saveable contract (query + list position out of `rememberSaveable`, into the picker VM's `SavedStateHandle`) + `pendingConsent` → `SavedStateHandle` behind a storage seam + LeakCanary debug-only rider. **`LanguageSheetRequest` is NOT built here** — it has no members until PR-17; see below | 👁 **PR #192** |
+| PR-13 | Fold-posture `WindowInfo` extension + host-agnostic saveable contract (query + list position out of `rememberSaveable`, into the picker VM's `SavedStateHandle`) + `pendingConsent` → `SavedStateHandle` behind a storage seam + LeakCanary debug-only rider. **`LanguageSheetRequest` is NOT built here** — it has no members until PR-17; see below | ✅ #192, 2026-08-02 |
 | PR-14 | 17a landscape two-pane: a `pickerArrangement()` window gate + a side pane beside the catalog + the catalog on a grid so ONE list position means the same language in both arrangements + the Detect-key settle. **Deviations below** | ✅ #198, 2026-08-02 |
 | PR-15 | 17b foldable two-leaf (24dp crease gutter, 296dp leaf) + the offline-library meter (U-5) with its two honest degrades. **E-S1 ran and passed** — `docs/research/issue-130-e-s1-storage-walk.md`. **Deviations below** | ✅ #200, 2026-08-02 |
 | PR-16 | 17c/17d dialog host + docked "Manage packs" ordering + **E-D1 ran and PASSED at both sizes** + the jank budget **measured and reported unsatisfiable on an emulator** (see below) | ✅ #205, 2026-08-02 |
@@ -96,7 +96,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 6 — sheets, first-run, snackbars
 | PR | Scope | Status |
 |---|---|---|
-| PR-17 | 19a mobile-data sheet (replaces dialogs ×2; E-W1-gated actions per ruling 8) | ⬜ |
+| PR-17 | 19a mobile-data sheet: `MeteredConsentDialog` + Screen B's inline dialog both deleted, their two string sets retired, one `MobileDataSheet` raised by both screens, the standing "Always ask" preference changeable in the sheet. **E-W1 has never been run, so the drawn "Wait for Wi-Fi" is not shipped** — the owner's pre-approved interim "Not now" is (ruling 8). **Deviations below** | ✅ #209, 2026-08-02 |
 | PR-18 | 19d + 19b + failure-cause map ×1 + 15a Retry-pill deviation fix | ⬜ |
 | PR-19 | 19f + 19g (fallback per ruling 3) + saved-count query | ⬜ |
 | PR-20 | 19h + 19m + app-shell sheet host | ⬜ |
@@ -371,6 +371,77 @@ Albanian, which the device says has a voice. **Nothing is copied into code
 either way** — `showsVoiceMark` reads `Language.hasOfflineVoice`, which the
 device answers.
 
+### PR-17 deviations from the ruling's PR-17 row (2026-08-02)
+
+Each checked against the code or the export's markup rather than against the
+ruling text (mandatory rule 11, fourth cause).
+
+1. **E-W1 has never been run, so the sheet's second action is "Not now".** The
+   ruling makes the DRAWN actions conditional on it and the tracker lists it as
+   an outstanding device experiment. There is no research record for it, no
+   issue, no commit; `docs/plan/issue-90-download-lifecycle.md`
+   parks the same probe as *"X6 (v2 only): requireWifi mid-download drop probe —
+   future tail"*. So the owner's pre-approved interim (ruling 8) ships, and no
+   E-W1 result is claimed. **What this PR also removes is a promise that was
+   already live:** both deleted dialogs said *"Wait for Wi-Fi"* while
+   `RealOfflineModelManager` passed a bare `DownloadConditions.Builder().build()`
+   and nothing anywhere queued a download — the exact string the ruling's REJECT
+   §7.8 refuses pre-E-W1, shipping since #90.
+2. **The sheet is not told which language it is about, and the title names
+   none.** The export draws *"Download over mobile data?"* where both dialogs
+   drew *"Download %1$s over mobile data?"*, and the reason is the checkbox
+   underneath: unticking "Always ask" answers for EVERY language, so a title
+   naming one would misdescribe what the user just did. Consequence in code —
+   the sheet takes a `Boolean`, not an id, which is why one composable can serve
+   two screens without either of them handing it a row list to look a name up in.
+3. **`LanguageSheetRequest` is still not created**, and PR-13's deviation 1
+   predicted why. 19a is the app's ONE sheet request, and it is already durable
+   and already typed: `ConsentQuestionStore` holds it in the `SavedStateHandle`.
+   A sealed interface with one member, wrapping a `String` that survives process
+   death today, would be a type to serialize instead of the one that works. The
+   ruling's saveable contract is met by the thing PR-13 built.
+4. **The standing preference is written by the two ViewModels, not by the
+   gate.** `DownloadGate`'s surface is deliberately untouched: #192's lens
+   compiled a bypass out of one extra reachable member, and `consentOnce()` is
+   still the only producer of a `ConsentedDownload` (`DownloadGateTest` reddens
+   if either half is dropped). The checkbox therefore writes
+   `DownloadPrefsRepository` — the same repository Settings writes and the gate
+   reads — on the APPLICATION scope, because a consent preference dropped by a
+   cancelled screen can fail in the direction that keeps a permission the user
+   just revoked.
+5. **The two consent previews are deleted rather than ported.** A
+   `ModalBottomSheet` opens a window and the tooling renders nothing for a
+   window, so `LanguagePickerConsentDialogPreview` would have drawn the resting
+   picker while claiming to show the consent state. The sheet's two meaningful
+   states are previewed where the sheet lives, through a new
+   `TranzlateSheetPreviewFrame` in `:core:designsystem` — PR-8 built the anatomy
+   but left the host-free path `internal`, so `:feature:language` was the first
+   module unable to satisfy rule 7 for a sheet.
+6. **`PickerHostAgnosticTest`'s banned list grows by one.**
+   `rememberModalBottomSheetState` is `rememberSaveable` underneath, and
+   `TranzlateSheetScaffold`'s KDoc invites the caller to hoist one "to drive a
+   graceful `hide()`". Taking that invitation would tie the sheet to whichever
+   `SaveableStateHolder` draws the picker — the defect PR-13 removed — in
+   exchange for an exit animation neither deleted dialog had. The scaffold's
+   default is used, and the ban is written down rather than left as a habit.
+
+**What a mutation found that no test in this PR can close.** Drawing the
+checkbox inverted — `Checkbox(checked = !alwaysAsk)` — survives the whole suite,
+and would survive any rewrite of it. The row carries the `toggleable` and so
+carries the semantics; the box inside is read-only by design (one node for
+TalkBack, not two), so nothing in a semantics tree reads the glyph. It is
+checked on the device screenshot instead, and named in `MobileDataSheetTest`'s
+KDoc so a green suite is not mistaken for a claim about the tick.
+
+**One measurement the copy does not match.** The drawn body says a pack is
+"usually 20–45 MB". The two packs this project has actually measured are
+44,169,505 bytes (E-S1, af↔en) and 45.7 MB (#90 E3, de↔en) — the second is over
+the drawn ceiling. Shipped as drawn, because "usually" carries it and because
+the alternative is inventing copy; recorded because the app now states a pack
+size in three places and the other two (`offline_subtitle`,
+`settings_mobile_data_supporting`) both say `~30 MB`, which the measurements
+contradict by more.
+
 ## Spec of record — rev 5 (2026-08-01)
 
 `docs/design/language-screens/language-screens-spec.html` is **rev 5**, and the
@@ -422,6 +493,13 @@ E-V1 voice enumeration reliability · E-W1 requireWifi observability (gates
 E-S1 models-dir walk (**RAN 2026-08-02, passed** —
 `docs/research/issue-130-e-s1-storage-walk.md`). Results are recorded in
 research docs as they run.
+
+**E-W1 status, stated because PR-17 needed it and could not find it: NOT RUN.**
+No research record, no issue, no commit mentions it; the nearest thing in the
+tree is `docs/plan/issue-90-download-lifecycle.md`, which parks the
+same probe as "X6 (v2 only)". PR-17 therefore shipped the owner's pre-approved
+interim (ruling 8) and claims no E-W1 result. **It still gates snackbar 20a-5
+in PR-22**, and the follow-up issue the ruling asks for is the owner's to file.
 
 ### Re-ruling, 2026-08-01: E-S1 moves from PR-11 to PR-15 (owner-approved)
 

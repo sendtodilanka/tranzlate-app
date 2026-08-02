@@ -73,10 +73,12 @@ and points at what **does** work; it promises no date, because we cannot keep on
 > `cd_lang_back`, `text_lang_sheet_{source,target}_title`,
 > `text_lang_on_device_count` and `text_lang_all_header`. That is deliberate:
 > `:feature:language` already carries TWO divergent sets of the same three
-> failure messages and the same four mobile-data dialog strings
-> (`text_lang_error_*` / `offline_error_*`, `text_lang_data_dialog_*` /
-> `offline_data_dialog_*` — issue #175 open), and the ruling's REJECT §7.8 bounces
-> a third copy at review.
+> failure messages (`text_lang_error_*` / `offline_error_*` — issue #175 open),
+> and the ruling's REJECT §7.8 bounces a third copy at review. It carried a
+> doubled mobile-data set too (`text_lang_data_dialog_*` /
+> `offline_data_dialog_*`); **#130 PR-17 retired both** in favour of one
+> `lang_sheet_data_*` set behind sheet 19a, which is what the same fix looks like
+> when it is in scope.
 
 ## 4. Camera scaffold (`:feature:camera`)
 
