@@ -812,11 +812,22 @@ class KonsistArchitectureTest {
      * repo has no Compose unit-test runtime (#186), so nothing here can prove a
      * snackbar appears. What it makes RED is every regression that compiles and
      * leaves the suite green: the surface deleted, the Retry action dropped, one
-     * of the two messages left unwired, or the consume moved after the retry
-     * (which would clear the failure the retry is about to produce and put the
-     * user back in silence on the second failure).
+     * of the two messages left unwired, the two arms SWAPPED, or the consume
+     * moved after the retry (which would clear the failure the retry is about to
+     * produce and put the user back in silence on the second failure).
      *
-     * **Its two limits, named rather than implied** (#193 asks for exactly this):
+     * The swap is in that list because it was NOT, and a co-verify lens proved
+     * it: swapping the arms so a user un-saving is told "Couldn't save" — the
+     * precise harm the two-message design exists to prevent — left this suite
+     * BUILD SUCCESSFUL and this testcase green. Asserting the arms are distinct
+     * FROM EACH OTHER and that both keys appear SOMEWHERE in the file says
+     * nothing about which arm reaches which key, and the swap changes neither
+     * property. The arms are now resolved to the string key each one actually
+     * names, through the local `val` that binds it. (The rename-resistance
+     * claimed for M13 was never the thing that failed here; that claim stands,
+     * and this was a different hole beside it.)
+     *
+     * **Its limits, named rather than implied** (#193 asks for exactly this):
      *
      *  1. It reads the FILE minus its previews, not one function, so a legitimate
      *     extraction into a private helper or a file-level constant still passes —
@@ -829,6 +840,12 @@ class KonsistArchitectureTest {
      *     mapping as an `if` empties the match and this FAILS rather than passing
      *     silently — fail-closed on a shape change, so the next author has to say
      *     out loud that both messages are still wired.
+     *  3. The arm-to-key resolution follows ONE hop: the arm either names
+     *     `R.string.…` itself, or names a `val` in the same file that does. An arm
+     *     routed through a second variable, a `when`, or a function call this gate
+     *     cannot read resolves to nothing and FAILS — fail-closed again, and for
+     *     the same reason: a gate that cannot see the mapping must not report that
+     *     the mapping is right.
      *
      * Comments and string literals are stripped first, so a KDoc that explains
      * the surface cannot stand in for having one.
@@ -865,11 +882,42 @@ class KonsistArchitectureTest {
         assertThat(arms.keys).containsExactly("SAVE", "REMOVE")
         assertThat(arms.values.toSet()).hasSize(STAR_FAILURE_STRINGS.size)
 
+        // …and each direction gets THE RIGHT one. Distinctness alone survives a
+        // swap — proven, not supposed: with the arms exchanged, so that un-saving
+        // reports "Couldn't save", this testcase stayed green. Both arms are still
+        // distinct and both keys are still in the file; only the mapping is wrong,
+        // so only the mapping catches it.
+        STAR_ARM_KEYS.forEach { (intent, key) ->
+            assertThat(keyBehindArm(surface, arms.getValue(intent))).isEqualTo(key)
+        }
+
         // The order is load-bearing, not stylistic.
         val consumed = surface.indexOf(STAR_CONSUME)
         val retried = surface.indexOf("viewModel.retryStar(")
         assertThat(consumed).isGreaterThan(-1)
         assertThat(consumed).isLessThan(retried)    }
+
+    /**
+     * The string key one `when` arm ultimately names, or null when this gate
+     * cannot see it (issue #195 co-verify, F4).
+     *
+     * Two shapes, because both are honest Compose: the arm may hold the
+     * `R.string.…` lookup itself, or — as the composer does, since
+     * `stringResource` may not be called from inside a `LaunchedEffect` — it may
+     * name a `val` hoisted above the effect. One hop, then it gives up and
+     * returns null, which fails the assertion rather than excusing it.
+     *
+     * @param surface the composer file with comments and string literals already
+     *   stripped, so a key mentioned in prose cannot resolve an arm.
+     */
+    private fun keyBehindArm(
+        surface: String,
+        rhs: String,
+    ): String? {
+        STRING_KEY.find(rhs)?.let { return it.groupValues[1] }
+        val bindings = STRING_BINDING.findAll(surface).associate { it.groupValues[1] to it.groupValues[2] }
+        return bindings[rhs.trim().trimEnd(',')]
+    }
 
     /** Every start index of [token] — the state-branch walk needs positions, not counts. */
     private fun String.indicesOf(token: String): List<Int> =
@@ -1029,12 +1077,31 @@ class KonsistArchitectureTest {
         /** The held failure the screen must read — the gate's vacuous-pass guard. */
         const val STAR_FAILURE = "starFailure"
 
-        /** One per direction of the toggle — "couldn't save" is untrue for an un-save. */
-        val STAR_FAILURE_STRINGS =
-            listOf(
-                "R.string.text_star_save_failed",
-                "R.string.text_star_remove_failed",
+        /**
+         * Which key each direction of the toggle must reach — the MAPPING, which
+         * is what the swap defeated, not merely the pair of keys. "Couldn't save"
+         * is untrue for an un-save, and it is untrue in exactly the way a gate
+         * that only counts distinct arms cannot see.
+         */
+        val STAR_ARM_KEYS =
+            mapOf(
+                "SAVE" to "text_star_save_failed",
+                "REMOVE" to "text_star_remove_failed",
             )
+
+        /** One per direction of the toggle — derived, so the two lists cannot drift apart. */
+        val STAR_FAILURE_STRINGS = STAR_ARM_KEYS.values.map { "R.string.$it" }
+
+        /** An `R.string.…` lookup wherever it sits — inside an arm, or inside the `val` it names. */
+        val STRING_KEY = Regex("""R\.string\.(\w+)""")
+
+        /**
+         * `val label = stringResource(R.string.key)` — the one hop from an arm's
+         * identifier to the key behind it. The right-hand side is read to the end
+         * of the line rather than as a call, so a wrapper around `stringResource`
+         * still resolves.
+         */
+        val STRING_BINDING = Regex("""val\s+(\w+)[^\n=]*=\s*[^\n]*R\.string\.(\w+)""")
 
         /** Must run BEFORE the retry, or the retry's own failure is cleared unread. */
         const val STAR_CONSUME = "viewModel.onStarFailureShown("

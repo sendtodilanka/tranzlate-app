@@ -564,7 +564,14 @@ class TextViewModel
                 return
             }
             viewModelScope.launch {
-                _resultFavourite.value = readFavourite(result, src)
+                val stored = readFavourite(result, src)
+                // Answers ONE result, so it may only paint that result (#195
+                // co-verify). A slow lookup outlives the translation it was made
+                // for — the user re-opens a saved row, the disk takes its time,
+                // they translate something else — and publishing then would put
+                // the OLD translation's bookmark on the new one, which is the
+                // same lie the write half was caught telling.
+                if (state == result) _resultFavourite.value = stored
             }
         }
 
@@ -677,18 +684,51 @@ class TextViewModel
         }
 
         /**
+         * The star write in flight, if any (issue #195 co-verify, F3).
+         *
+         * Held for the same reason [translateJob] and [speakJob] are: a control
+         * whose work outlives the tap needs a handle on that work. Here the
+         * handle is read rather than cancelled — see [onToggleFavourite] for why
+         * a star write is never cancelled once it has started.
+         */
+        private var starJob: Job? = null
+
+        /**
          * Star on the composer result: flips the history row's `favourite`; a
          * row the history write skipped (rare undetected-auto) is SAVED as a
          * favourite directly — the star always does something (no dead end).
+         *
+         * ONE write at a time (issue #195 co-verify, F3). A second tap while the
+         * first write is still open used to start a second write from the same
+         * unmoved icon: both read "not saved", both asked to SAVE, and the
+         * second insert lost the C-8 tuple race and got `-1` back — so the star
+         * reported UNFILLED for a row that was, in the database, saved and
+         * favourited. Icon and row disagreed and nothing was said, which is the
+         * silent misreport #179 closed and #189 closed again.
+         *
+         * The second tap is dropped rather than queued. On a slow disk the icon
+         * has not moved yet, so both taps meant the same thing, and running the
+         * pair would undo the save the user could see themselves asking for. It
+         * is not a dead end either: the first write still finishes visibly — a
+         * filled star, or a failure with Retry — and the star stays live.
+         *
+         * The write itself is NOT cancelled when the composer moves on, and that
+         * is deliberate. A star is a durable ask, not a superseded one: abandon
+         * it mid-flight and the row the user starred is silently never saved,
+         * which is the harm this whole issue is about, one level down. Staleness
+         * is handled where it actually bites — at the moment of publishing (see
+         * [writeFavourite]) — because cancellation is cooperative and cannot
+         * stop a coroutine that is already past its last suspension point.
          */
         fun onToggleFavourite() {
             val result = state as? TextUiState.Result ?: return
             val src = result.resolvedSourceLang ?: return
+            if (starJob?.isActive == true) return
             // Read from the icon the user actually pressed, so the message names
             // what THEY were doing rather than which statement the database
             // happened to be on when it gave up.
             val asked = if (_resultFavourite.value) StarIntent.REMOVE else StarIntent.SAVE
-            viewModelScope.launch { writeFavourite(result, src, asked) }
+            starJob = viewModelScope.launch { writeFavourite(result, src, asked) }
         }
 
         /**
@@ -755,6 +795,21 @@ class TextViewModel
          * - the UPDATE fails → nothing was written, and the lookup gave us the
          *   row's stored flag, so the star shows THAT and the flip is undone.
          *
+         * That table is about WHAT is published; the re-check below the `try` is
+         * about WHETHER anything may be (issue #195 co-verify). All three rows
+         * are correct only for the result the write was asked for, and the write
+         * outlives it whenever the disk is slow — which is the condition the
+         * whole issue is about.
+         *
+         * RESIDUAL, named rather than hidden: a write that fails for a result the
+         * user has already left says nothing at all. The alternative is a message
+         * about a translation that is no longer on screen with a Retry that
+         * cannot act, which is the dead end EDGE_CASES §94 forbids — and it is
+         * the same ruling the `state` setter already makes when it retires a
+         * failure the transition overtook. The star for that translation still
+         * tells the truth the next time it is opened, because the row was never
+         * written.
+         *
          * KNOWN LIMIT, deliberately unchanged here: [TranslationRepository.save]
          * answers -1 when the C-8 tuple was taken between the lookup and the
          * insert, and that leaves the star unfilled with nothing said. It is not
@@ -768,44 +823,67 @@ class TextViewModel
             asked: StarIntent,
         ) {
             var verified = _resultFavourite.value
-            try {
-                val row =
-                    translationRepository.cached(
-                        result.request.text,
-                        src,
-                        result.request.targetLang,
-                        result.engine,
-                    )
-                // The lookup answered, so the stored truth is known from here on.
-                verified = row?.favourite == true
-                if (row == null) {
-                    val id =
-                        translationRepository.save(
-                            Translation(
-                                sourceLang = src,
-                                sourceText = result.request.text,
-                                targetLang = result.request.targetLang,
-                                targetText = result.translatedText,
-                                engine = result.engine,
-                                favourite = true,
-                                createdAt = clock.nowMillis(),
-                            ),
+            var failed = false
+            val stored =
+                try {
+                    val row =
+                        translationRepository.cached(
+                            result.request.text,
+                            src,
+                            result.request.targetLang,
+                            result.engine,
                         )
-                    _resultFavourite.value = id > 0
-                } else {
-                    translationRepository.setFavourite(row.id, !row.favourite)
-                    _resultFavourite.value = !row.favourite
+                    // The lookup answered, so the stored truth is known from here on.
+                    verified = row?.favourite == true
+                    if (row == null) {
+                        val id =
+                            translationRepository.save(
+                                Translation(
+                                    sourceLang = src,
+                                    sourceText = result.request.text,
+                                    targetLang = result.request.targetLang,
+                                    targetText = result.translatedText,
+                                    engine = result.engine,
+                                    favourite = true,
+                                    createdAt = clock.nowMillis(),
+                                ),
+                            )
+                        id > 0
+                    } else {
+                        translationRepository.setFavourite(row.id, !row.favourite)
+                        !row.favourite
+                    }
+                } catch (rethrown: CancellationException) {
+                    // Leaving the composer cancels the write. Nobody is left to tell,
+                    // so no message is invented and no snackbar is queued against a
+                    // screen that has gone.
+                    throw rethrown // never break structured cancellation
+                } catch (unused: Throwable) {
+                    failed = true
+                    verified
                 }
-            } catch (rethrown: CancellationException) {
-                // Leaving the composer cancels the write. Nobody is left to tell,
-                // so no message is invented and no snackbar is queued against a
-                // screen that has gone.
-                throw rethrown // never break structured cancellation
-            } catch (unused: Throwable) {
+            // ONE re-check, and it stands between the database and BOTH things
+            // the user can see (issue #195 co-verify, F1 + F2). The check at the
+            // top of the tap is not enough: a slow disk is exactly the condition
+            // this issue exists to survive, so the composer routinely moves on
+            // while a write is still open, and this answer is about the result
+            // that was on screen when the star was tapped — not the one on screen
+            // now.
+            //
+            // Unguarded, the icon flipped to filled for a translation with no row
+            // at all, and the failure message named a translation the user could
+            // no longer see, carrying a Retry that `retryStar`'s own staleness
+            // guard then refused without a word.
+            //
+            // Both publishes sit behind the SAME check on purpose: they were
+            // three separate assignments, and a guard repeated three times is a
+            // guard that gets applied twice.
+            if (state != result) return
+            _resultFavourite.value = stored
+            if (failed) {
                 // The cause is deliberately not shown: "database disk image is
                 // malformed (code 11)" is not a sentence for a user. What they
                 // get is which action failed, and a way to run it again.
-                _resultFavourite.value = verified
                 _starFailure.value = StarFailure(starFailureIds.incrementAndGet(), asked, result)
             }
         }
