@@ -114,7 +114,17 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.
 - ⬜ **#173** (rows for #173/#174/#175 added by **PR #176**) `verifyStringKeyDocs` has two coverage holes: module discovery is
   a hardcoded path shape a new ring escapes silently, and the reverse direction
-  is #152's own unimplemented second ask. Follows #172.
+  is #152's own unimplemented second ask. Follows #172. **Split in two.**
+  *Hole 2 (module discovery)* — branch `fix/issue-173-module-discovery`, plan
+  `docs/plan/issue-173-module-discovery.md`: the scan is derived from
+  `subprojects` instead of four ring globs, so a new ring or a deeper module can
+  no longer escape it in silence. Both escapes were reproduced green on the
+  unfixed gate first, then turned red by name. `Refs:`, not `Fixes:` — closing
+  #173 would lose the other half, which is the accident #173 was filed early to
+  avoid. *Hole 1 (the reverse direction)* stays open and keeps #173 open: it
+  needs a parseable planned/shipped/retired status in every `STRINGS_*.md`,
+  which is the file every feature PR touches, and its first run today is ~60
+  findings that are nearly all deliberate.
 - ⬜ **#179** History's Undo restored nothing when the row's C-8 tuple had been
   retaken — the insert is `IGNORE`-on-conflict, the -1 was discarded, and the
   star and the original `created_at` were gone while the snackbar had already
