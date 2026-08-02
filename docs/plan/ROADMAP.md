@@ -131,7 +131,7 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   needs a parseable planned/shipped/retired status in every `STRINGS_*.md`,
   which is the file every feature PR touches, and its first run today is ~60
   findings that are nearly all deliberate.
-- ⬜ **#201** — **PR #211**. The other three gates in the root `build.gradle.kts` — `detekt`'s
+- ✅ **#201** — **PR #211**, merged 2026-08-02. The other three gates in the root `build.gradle.kts` — `detekt`'s
   `source` and both `spotless` targets — named the same four rings
   `verifyStringKeyDocs` used to, so a module at a new top-level prefix was
   linted and formatted by nobody, and CI's `./gradlew detekt spotlessCheck`
