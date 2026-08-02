@@ -211,11 +211,11 @@ class PickerArrangementTest {
      * picker drew the portrait layout at full landscape width.
      *
      * A source rule rather than a behaviour test for the reason this whole file
-     * is a pure function: there is no Compose test runtime in this module (#186)
-     * and CI compiles instrumented tests without running them (#40), so a test
-     * that mounted the screen and rotated it would be a test nobody ever sees
-     * fail. Reading the one call site is the check that can actually run — and it
-     * is the exact line a later PR would "simplify" back.
+     * is a pure function. Written when this module had no Compose test runtime;
+     * #186 has since added one, and CI still compiles instrumented tests without
+     * running them (#40). The extraction is still right — reading the one call
+     * site is cheaper to exhaust than mounting the screen, and it is the exact
+     * line a later PR would "simplify" back.
      */
     @Test
     fun `the screen measures both sizes against the same constraints`() {

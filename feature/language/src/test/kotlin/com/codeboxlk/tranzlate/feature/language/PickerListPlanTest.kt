@@ -11,10 +11,11 @@ import java.util.Locale
  * header, and the index the A–Z rail scrolls into.
  *
  * These live in a pure function rather than inside the composable precisely so
- * they can be asserted here: this module has no Robolectric and no Compose test
- * rule, and the central claim ("empty recents → the section is ABSENT") is a
- * claim about something that is NOT on screen. A test that only counted rows
- * could not tell an absent section from an empty one.
+ * they can be asserted here. The central claim ("empty recents → the section is
+ * ABSENT") is a claim about something that is NOT on screen, which a pure function
+ * states directly; #186 has since added a Compose runtime to this module, and that
+ * does not change the argument. A test that only counted rows could not tell an
+ * absent section from an empty one.
  */
 class PickerListPlanTest {
     private fun plan(

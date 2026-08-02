@@ -104,7 +104,12 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
 - 👁 **#195** — **PR #197** — the composer crashed the moment a translation
   landed, not when the star was tapped: enumerating the star rather than the
   issue's line range found a **fourth** unguarded write, on the read path that
-  runs for every result. Sibling of #190/#194.- ⬜ **#178** `guard-pr.sh` failed CLOSED on any body it could not read from the
+  runs for every result. Sibling of #190/#194.- 👁 **#186** — **PR #199** — there was no Compose unit-test runtime anywhere, so
+  a decision inside a `@Composable` was a decision no test could reach. Three of
+  2026-08-02's five blocking co-verify findings were device-only because of it.
+  Robolectric + `createComposeRule` via `tranzlate.compose-test`; the acceptance
+  test catches #198's shipped bug in the form the whole existing suite missed.
+- ⬜ **#178** `guard-pr.sh` failed CLOSED on any body it could not read from the
   command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.
 - ⬜ **#173** (rows for #173/#174/#175 added by **PR #176**) `verifyStringKeyDocs` has two coverage holes: module discovery is

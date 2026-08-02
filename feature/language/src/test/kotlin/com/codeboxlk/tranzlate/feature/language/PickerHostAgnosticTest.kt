@@ -14,10 +14,9 @@ import java.io.File
  * owns, which is where the state was before this PR and where it would silently
  * return to.
  *
- * **A rule about source, and honest about being one.** It cannot run a host swap:
- * this repo has no Compose unit-test runtime (#186) and CI compiles instrumented
- * tests without running them (#40), so a test that mounted the picker in two
- * hosts would be a test nobody ever sees fail. What it does make impossible is
+ * **A rule about source, and honest about being one.** It does not run a host
+ * swap. #186 has added a Compose unit-test runtime to this module, so one is now
+ * conceivable; it is not written here, and until it is, this rule is what stands. What it does make impossible is
  * the regression that is actually likely — a later PR reaching for
  * `rememberSaveable` inside the picker because that is the obvious thing to reach
  * for, re-tying the state to whichever host is composing it and undoing this PR
