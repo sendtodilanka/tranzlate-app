@@ -66,10 +66,24 @@ in the existing `Blocked` vocabulary with a present-tense action, while
 open/render/page/zoom still work. Availability is decided per capability, never
 by deleting the entry point.
 
-The Home card is **added**, not renamed over Offline mode, unless the same PR
-ships an Offline entry elsewhere (`SettingsScreen.kt:135-136` records Home as
-Offline's deliberate sole entry). **Call sites: 2 found** —
-`feature/text/.../HomeScreen.kt:401`, `app/src/androidTestProd/.../NavShellSmokeTest.kt:40`.
+**The Home card is RENAMED over "Offline mode".** The debate ruled "added, not
+renamed, *unless the same PR ships an Offline entry elsewhere*" and cited
+`SettingsScreen.kt:135-136` for Home being Offline's "deliberate sole entry".
+Co-verify (PR #225) refuted the citation and the premise, and both corrections
+are adopted here:
+
+- The comment says the **opposite**: *"History lives HERE — the design has no
+  drawer, and Offline languages already has its **Home entries**."* Plural, and
+  it is the reason History was routed to Settings **because** Home already has
+  redundant Offline access — not a claim of exclusivity.
+- The debate's own escape condition is therefore **already satisfied**:
+  `HomeScreen.kt:446` (the "Download languages" `ListRowCard`) calls the same
+  `onOpenLanguages` as the tool card at `:400`, so the offline manager keeps a
+  Home entry after the rename. The rename is the owner's decision and it stands.
+
+Enumerated below rather than asserted, because the "2 found" this paragraph
+originally carried was the count for **one symbol in code only**, and the rename
+touches four reference classes. See §Risks R5.
 
 ### D2 — Module graph
 
@@ -235,19 +249,45 @@ standalone English model to restore).
   re-run. Any number added later is re-grepped before it appears in a PR body,
   per rule 11.
 
-  **And the corrected figure was itself incomplete.** `git grep -n
-  "tt_home_tool_offline"` returns **5**, not 2: two in code
-  (`HomeScreen.kt:401` declaration, `NavShellSmokeTest.kt:40` assertion) and
-  **three in documents** — `DECISIONS.md:77` (the C-1 testTag registry, which is
-  authoritative for tag names), `docs/specs/01-text-translation.md:69` (the Home
-  surface tag list) and this plan. "2" is the code count; the rename PR owes the
-  registry and the spec as well, or C-1's authority silently goes stale. The
-  second enumeration — `git grep -n "onOpenLanguages"`, by destination rather
-  than by tag — is what independently confirms the rename is safe: **two**
-  `onClick = onOpenLanguages` sites, `HomeScreen.kt:400` (the tool card) and
-  `HomeScreen.kt:446` (the download row), so the offline manager keeps a Home
-  entry after the card is renamed. Neither search could have found both facts;
-  that is the point of naming two.
+  **The corrected figure was itself incomplete, twice.** A co-verify lens re-ran
+  both greps literally and found each returns MORE than claimed — and the cause
+  is this document: once committed, the prose describing a search becomes a hit
+  for that search. So a raw hit count is the wrong unit. The rename is
+  enumerated **by reference class**, each re-run against the tree with this plan
+  excluded:
+
+  | class | count | where |
+  |---|---|---|
+  | Kotlin (`feature/text/.../HomeScreen.kt`) | **5 lines, 2 sites** | `:396` `:397` `:401` the live card · **`:920` `:921` the `@PreviewLightDark` sample**, which carries its own `tt_preview_tool_offline` and no search for the tag would have found |
+  | string resources | **6 lines, 3 locales** | `values/strings.xml:37,42` · `values-fil:32,33` · `values-pt-rBR:32,33` |
+  | test | **1** | `NavShellSmokeTest.kt:40` |
+  | documents | **7** | `DECISIONS.md:77` (C-1 tag registry, **authoritative**) · `STRINGS_text-translation.md:242` (string registry, **authoritative**) · `specs/01-text-translation.md:69` · `docs/design/UI_SPEC.md:40` (design table, plain prose — invisible to both searches) · `VerifyStringKeyDocsTask.kt:42-43` (KDoc example) · `launch-blockers.md:87` · `launch-readiness.md:172` |
+
+  Two consequences the "2" hid. **`STRINGS_text-translation.md:242` is a build
+  gate, not a note** — `VerifyStringKeyDocsTask` checks resource keys against
+  those docs, so renaming the key without the doc row fails the build rather
+  than merely going stale. And the **preview** at `HomeScreen.kt:920-921` renders
+  the same strings under a different tag, so a rename that misses it ships a
+  preview contradicting the screen, which is exactly what rule 7's previews exist
+  to prevent.
+
+  The second search — `git grep -n "onOpenLanguages"`, by destination rather than
+  by symbol — is what independently clears the rename: **two** `onClick =
+  onOpenLanguages` sites in code, `HomeScreen.kt:400` (the tool card) and `:446`
+  (the download row). Neither search could have found both facts, and neither
+  found the string key, the locales, the design table or the STRINGS gate. Three
+  searches were needed and two were named. **The rule that failed here is not
+  "re-grep" — it was followed — it is "enumerate by reference class, not by
+  symbol".**
+- **R7 — D3's accept-condition names a mapping that does not exist** (co-verify,
+  PR #225). The rule is *"accept iff the identifier returns non-null AND the
+  identified script matches the recogniser"*. But `MlKitLanguageIdentifier.kt:21-25`
+  returns a **BCP-47 language tag** or `null` — never a script. Comparing `"hi"`
+  against the Devanagari recogniser needs a language→script-family table, and a
+  repo-wide search finds none. This is the same shape of gap D4 is explicit
+  about and this ruling was not: **flagged open, owed before phase 4 starts**,
+  with its acceptance criteria written before the table is. It does not affect
+  phases 1-3.
 - **R6 — edge cases owed by every phase, from the corpus above:**
   password-protected PDFs, Uri grant lifetime after process death,
   cloud-provider Uris with no seekable descriptor, fold/rotation invalidating the
