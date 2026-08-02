@@ -23,12 +23,14 @@ class PickerListPlanTest {
         recentCount: Int = 3,
         anyVoiceMark: Boolean = true,
         railed: Boolean = true,
+        twoPane: Boolean = false,
     ) = pickerListPlan(
         role = role,
         detectRowPresent = detect,
         recentCount = recentCount,
         anyVoiceMark = anyVoiceMark,
         railed = railed,
+        twoPane = twoPane,
     )
 
     // ---- recents: absent, not empty -----------------------------------------
@@ -46,7 +48,7 @@ class PickerListPlanTest {
         // …and the list closes over the gap: nothing above the alphabet except
         // the "All languages" header. The legend is not an item of this list —
         // see `theVoiceAnswerAddsNoItemToTheAnchoredList`.
-        assertThat(empty.railOffset).isEqualTo(1)
+        assertThat(empty.catalogOffset).isEqualTo(1)
     }
 
     @Test
@@ -114,8 +116,8 @@ class PickerListPlanTest {
         val afterTheDeviceAnswers = plan(anyVoiceMark = true, recentCount = 3)
 
         // (header + 3 rows) + "All languages" — on both sides of the answer.
-        assertThat(beforeTheDeviceAnswers.railOffset).isEqualTo(5)
-        assertThat(afterTheDeviceAnswers.railOffset).isEqualTo(beforeTheDeviceAnswers.railOffset)
+        assertThat(beforeTheDeviceAnswers.catalogOffset).isEqualTo(5)
+        assertThat(afterTheDeviceAnswers.catalogOffset).isEqualTo(beforeTheDeviceAnswers.catalogOffset)
         // …and the legend itself is still the thing that changed, so this is not
         // passing because nothing happened.
         assertThat(beforeTheDeviceAnswers.showVoiceLegend).isFalse()
@@ -128,7 +130,7 @@ class PickerListPlanTest {
 
         // detect(1) + header(1) + 2 rows + "All languages"(1); no legend on this side.
         assertThat(source.showVoiceLegend).isFalse()
-        assertThat(source.railOffset).isEqualTo(5)
+        assertThat(source.catalogOffset).isEqualTo(5)
     }
 
     /** A filtered list has no rail, so nothing above it needs counting. */
@@ -139,7 +141,7 @@ class PickerListPlanTest {
         assertThat(searching.showAllHeader).isFalse()
         // Nothing above the results at all. The legend still STANDS while a
         // search runs — it just stands above the list rather than in it.
-        assertThat(searching.railOffset).isEqualTo(0)
+        assertThat(searching.catalogOffset).isEqualTo(0)
         assertThat(searching.showVoiceLegend).isTrue()
     }
 
@@ -188,10 +190,122 @@ class PickerListPlanTest {
 
         assertThat(built.showVoiceLegend).isTrue()
         assertThat(built.recentHeader).isEqualTo(RecentHeader.TARGET)
-        assertThat(built.railOffset).isEqualTo(5)
+        assertThat(built.catalogOffset).isEqualTo(5)
         // Afrikaans is on device and has NO voice — the row that proves the two
         // are independent, and it is the first row the rail's 'A' points at.
         assertThat(rows.first().displayName).isEqualTo("Afrikaans")
         assertThat(rows.first().showsVoiceMark(LanguageRole.TARGET)).isFalse()
+    }
+
+    // ---- 17a: the same plan, with three of its items moved out of the list ---
+
+    /**
+     * THE arithmetic 17a can break silently.
+     *
+     * In two-pane the detect row, the recents header and the recents rows are
+     * drawn in the SIDE pane, which is not the catalog's scroller. Counting them
+     * anyway makes every A–Z letter land that many rows short — deterministic,
+     * never an exception, and invisible to any test that only looks at rows. It
+     * is the same defect the single-pane `catalogOffset` was written to prevent,
+     * arriving from the opposite direction.
+     *
+     * Asserted as a PAIR: the identical inputs give 5 in one arrangement and 1 in
+     * the other, so this cannot pass by the offset being right for the wrong
+     * reason.
+     */
+    @Test
+    fun `two-pane stops counting what the side pane holds`() {
+        val stacked = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3, twoPane = false)
+        val split = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3, twoPane = true)
+
+        // detect(1) + header(1) + 3 rows + "All languages"(1)
+        assertThat(stacked.catalogOffset).isEqualTo(6)
+        // …and in the catalog pane, only "All languages" stands above the alphabet.
+        assertThat(split.catalogOffset).isEqualTo(1)
+        // The sections themselves have NOT gone away — they moved.
+        assertThat(split.recentHeader).isEqualTo(RecentHeader.GENERIC)
+        assertThat(split.sidePane).isTrue()
+    }
+
+    /** No rail, nothing above the alphabet to count, in either arrangement. */
+    @Test
+    fun `an unrailed two-pane catalog has no offset at all`() {
+        assertThat(plan(twoPane = true, railed = false, recentCount = 0).catalogOffset).isEqualTo(0)
+    }
+
+    // ---- 17a: the side pane, and the role-specific slot at its foot ----------
+
+    /**
+     * The side pane's foot is the role's own affordance — "Detect language" on
+     * the source side, the offline-voice legend on the target side, exactly as
+     * the two landscape frames draw them. Giving both panes the same role's slot
+     * is the mistake this pins: a source pane with a legend explains a mark the
+     * source side never draws, and a target pane with a Detect row offers to
+     * detect the language you are translating INTO.
+     */
+    @Test
+    fun `each side of the picker gets its own slot at the foot of the pane`() {
+        val source = plan(role = LanguageRole.SOURCE, detect = true, anyVoiceMark = true, twoPane = true)
+        val target = plan(role = LanguageRole.TARGET, detect = false, anyVoiceMark = true, twoPane = true)
+
+        assertThat(source.showVoiceLegend).isFalse()
+        assertThat(target.showVoiceLegend).isTrue()
+        assertThat(source.recentHeader).isEqualTo(RecentHeader.GENERIC)
+        assertThat(target.recentHeader).isEqualTo(RecentHeader.TARGET)
+    }
+
+    /**
+     * A pane with nothing in it is 272dp of empty surface next to the results,
+     * and it is reachable: a search on the source side clears the recents and
+     * filters the Detect row out. EDGE_CASES' no-dead-end rule cuts the same way
+     * for furniture as it does for errors — the pane goes and the catalog takes
+     * the width back.
+     */
+    @Test
+    fun `an empty side pane is not drawn`() {
+        val searching =
+            plan(
+                role = LanguageRole.SOURCE,
+                detect = false,
+                recentCount = 0,
+                anyVoiceMark = true,
+                railed = false,
+                twoPane = true,
+            )
+
+        assertThat(searching.sidePane).isFalse()
+    }
+
+    /** Any ONE of the three is enough to keep it. */
+    @Test
+    fun `one thing is enough to keep the side pane`() {
+        val recentsOnly = plan(role = LanguageRole.SOURCE, detect = false, recentCount = 1, twoPane = true)
+        val detectOnly = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 0, twoPane = true)
+        val legendOnly =
+            plan(role = LanguageRole.TARGET, detect = false, recentCount = 0, anyVoiceMark = true, twoPane = true)
+
+        assertThat(recentsOnly.sidePane).isTrue()
+        assertThat(detectOnly.sidePane).isTrue()
+        assertThat(legendOnly.sidePane).isTrue()
+    }
+
+    /** There is no side pane in the single-pane arrangement, whatever it would hold. */
+    @Test
+    fun `single pane never reports a side pane`() {
+        assertThat(plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3).sidePane).isFalse()
+    }
+
+    // ---- 17a: where the on-device counter goes ------------------------------
+
+    /**
+     * The counter states a fact about the whole catalog. In two-pane the "All
+     * languages" header heads only the catalog PANE, so the counter moves to the
+     * bar; in one pane the header IS the whole list and it stays there. Either
+     * way it is drawn once — two copies would be two `tt_lang_counter` tags.
+     */
+    @Test
+    fun `the counter moves to the bar only in two-pane`() {
+        assertThat(plan(twoPane = true).counterInTopBar).isTrue()
+        assertThat(plan(twoPane = false).counterInTopBar).isFalse()
     }
 }

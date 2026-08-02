@@ -2,12 +2,14 @@ package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
+import com.codeboxlk.tranzlate.core.ui.FoldPosture
 import com.codeboxlk.tranzlate.core.ui.languageAvatarCode
 import com.codeboxlk.tranzlate.core.ui.languageDisplayName
 import com.codeboxlk.tranzlate.core.ui.languageEndonym
@@ -19,25 +21,210 @@ import java.util.Locale
 const val RECENT_LIMIT = 5
 
 /**
- * Where the picker's list is standing: the first row still on screen and how far
- * it is pushed off the top edge.
+ * Where the picker's list is standing: **which language is at the top of the
+ * catalog**, and how far its row is pushed off the top edge.
  *
- * The two numbers `LazyListState` can be built from and restored to, named as one
- * thing so they cannot be persisted or passed half-way. Kept OUT of the
- * composable that owns the list for the reason #130 PR-13 exists: a
- * `rememberLazyListState()` is addressed through whichever `SaveableStateHolder`
- * is drawing the picker, so it is lost the moment the picker is drawn from
- * somewhere else. [LanguagePickerViewModel.listPosition] is the home instead.
+ * Kept OUT of the composable that owns the list for the reason #130 PR-13
+ * exists: a `rememberLazyGridState()` is addressed through whichever
+ * `SaveableStateHolder` is drawing the picker, so it is lost the moment the
+ * picker is drawn from somewhere else. [LanguagePickerViewModel.listPosition] is
+ * the home instead.
+ *
+ * **[anchorId] is a language, not an item index, and that is the whole point.**
+ * PR-14 shipped a raw grid index here, and a raw index means nothing on its own:
+ * the single-pane grid emits `[detect?] [recent header + rows?] [All languages]
+ * …catalog`, while 17a moves the first two into the side pane and emits
+ * `[All languages] …catalog`. The prefix differs by 1 to 7 items, so carrying the
+ * same NUMBER across a rotation carried the user 1 to 7 languages away — measured
+ * on `emulator-5554`: browsing at English in portrait, landscape opened at
+ * Finnish. Naming the language instead makes the restore arrangement-independent
+ * by construction: there is no prefix to know, at save time or at restore time,
+ * and nothing to re-derive when a section appears or disappears for some other
+ * reason (recents arriving late, the "All languages" header going away under a
+ * search).
+ *
+ * null means the top — either the list has not been scrolled, or the row at the
+ * top of the viewport is one of the things that stand ABOVE the catalog, all of
+ * which are at the top of their own scroller in either arrangement.
  */
 @Immutable
 data class PickerListPosition(
-    val index: Int = 0,
+    val anchorId: String? = null,
     val offset: Int = 0,
 ) {
     companion object {
         /** A list that has not been scrolled. */
         val Top = PickerListPosition()
     }
+}
+
+/**
+ * The grid keys for the two sections that draw language rows.
+ *
+ * The same language legitimately appears under Recent AND under All languages, so
+ * the prefix is what keeps the keys unique — duplicate keys are a hard crash. It
+ * is also what [pickerAnchorOf] reads: only a CATALOG row anchors a saved
+ * position, because only the catalog is drawn in both arrangements.
+ */
+const val CATALOG_ROW_KEY_PREFIX = "all_"
+
+/** @see CATALOG_ROW_KEY_PREFIX */
+const val RECENT_ROW_KEY_PREFIX = "rec_"
+
+/** The grid key a catalog row for [id] is emitted under. */
+fun catalogRowKey(id: String): String = CATALOG_ROW_KEY_PREFIX + id
+
+/**
+ * The language a saved position should name, read from the grid's OWN key for
+ * the item at the top of the viewport.
+ *
+ * Read rather than re-derived on purpose. Turning `firstVisibleItemIndex` back
+ * into a language would need the prefix arithmetic a second time, and a second
+ * copy of that arithmetic is exactly the defect this replaces. The key is what
+ * the grid itself anchors its scroll position to, so the two cannot disagree.
+ *
+ * Anything that is not a catalog row — a header, the detect pseudo-row, a recents
+ * row, the loading or no-results placeholder — yields null, which reads as "the
+ * top". All of them stand above the catalog, and in the other arrangement they are
+ * either at the top of the same grid or in the side pane; either way the honest
+ * restore is the top of the catalog.
+ */
+fun pickerAnchorOf(key: Any?): String? =
+    (key as? String)
+        ?.takeIf { it.startsWith(CATALOG_ROW_KEY_PREFIX) }
+        ?.removePrefix(CATALOG_ROW_KEY_PREFIX)
+
+/**
+ * Which grid item has to be at the top of the viewport to put [anchorId] back
+ * there — the ONE place a saved position becomes an index again.
+ *
+ * @param catalogRows the rows the grid is actually emitting right now (the
+ *   filtered results while a search is running, the whole catalog otherwise).
+ * @param catalogOffset [PickerListPlan.catalogOffset] for the arrangement being
+ *   restored INTO, never the one it was captured in.
+ */
+fun pickerAnchorIndex(
+    anchorId: String?,
+    catalogRows: List<LanguagePickerRow>,
+    catalogOffset: Int,
+): Int {
+    if (anchorId == null) return 0
+    val inCatalog = catalogRows.indexOfFirst { it.id == anchorId }
+    // A language that is not on the list any more (a query narrowed past it, a
+    // catalog that has not arrived) has no place to restore to. The top is the
+    // honest answer; guessing an index would put the user somewhere they never were.
+    return if (inCatalog < 0) 0 else catalogOffset + inCatalog
+}
+
+/**
+ * How the picker arranges itself in the window it was handed (17a).
+ *
+ * @property twoPane the side pane is drawn beside the catalog instead of
+ *   scrolling above it.
+ * @property columns how many language columns the catalog grid gets. Always 1 in
+ *   the single-pane arrangement; 1 or 2 in two-pane, depending on what fits.
+ */
+@Immutable
+data class PickerArrangement(
+    val twoPane: Boolean,
+    val columns: Int,
+) {
+    companion object {
+        /** 15a / 16a as shipped: one column, everything in one scroller. */
+        val SinglePane = PickerArrangement(twoPane = false, columns = 1)
+    }
+}
+
+/** The gap between the side pane and the catalog. */
+internal val PANE_GUTTER: Dp = 8.dp
+
+/**
+ * Below this the two-pane arrangement has nowhere to put its second pane:
+ * [Dimensions.pickerSidePaneWidth] + [PANE_GUTTER] + one
+ * [Dimensions.pickerColumnMin] column + the [Dimensions.touchTargetMin] the A–Z
+ * rail overlays on the trailing edge.
+ */
+private val TWO_PANE_MIN_WIDTH: Dp =
+    Dimensions.pickerSidePaneWidth + PANE_GUTTER + Dimensions.pickerColumnMin + Dimensions.touchTargetMin
+
+/**
+ * Below this a window is SHORT: phone landscape rather than phone portrait or a
+ * tablet.
+ *
+ * The number is Material's own medium height breakpoint —
+ * `WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND`, which is what
+ * `WindowInfo.heightCompact` is computed from — restated as a dp so this gate can
+ * measure it against the same constraints it measures the width against. See
+ * [pickerArrangement] for why asking one source rather than two is the fix and
+ * not a shortcut.
+ */
+private val SHORT_WINDOW_MAX_HEIGHT: Dp = 480.dp
+
+/**
+ * Which arrangement 17a's window gets — the whole of PR-14's gate, in one pure
+ * function so a JVM test can drive it (this module has no Compose test runtime,
+ * #186, and CI compiles instrumented tests without running them, #40).
+ *
+ * Three conditions, and each one is a layout this PR must NOT steal:
+ *
+ * - **[posture] must be [FoldPosture.FLAT].** A half-open foldable is 17b's
+ *   two-leaf layout with a crease gutter (PR-15), and a tabletop fold puts a
+ *   dead strip across the middle; neither is a side pane beside a catalog. Note
+ *   this asks POSTURE, not `WindowInfo.hinged` — a dual-screen device held fully
+ *   open is FLAT and still separating, and it is 17a's layout it should get,
+ *   with the hinge handled where content is placed rather than by refusing the
+ *   arrangement outright.
+ * - **[availableHeight] must be under [SHORT_WINDOW_MAX_HEIGHT].** A tall window
+ *   is either phone portrait (15a / 16a) or a tablet, and a tablet is 17c/17d's
+ *   dialog host (PR-16). Height is the axis that separates 892×412 from
+ *   1280×800 — width cannot, because both are at least medium.
+ * - **[availableWidth] must clear [TWO_PANE_MIN_WIDTH].** A dp sum rather than a
+ *   size class, for the reason issue #99 recorded: the owner's OnePlus 7 Pro is
+ *   832dp in landscape, 8dp short of the EXPANDED breakpoint, so a class-gated
+ *   17a would leave a real device in the portrait layout while it has room for
+ *   both panes.
+ *
+ * **Both sizes come from the SAME source, and that is a fix.** PR-14 took the
+ * width from the picker's own constraints and the height from
+ * `WindowInfo.heightCompact`, which reads Compose's window snapshot
+ * (`LocalWindowInfo.containerSize`). Those two are refreshed by different things
+ * and they disagree for a few frames after a rotation. Measured on
+ * `emulator-5554`, four times in a 2.5-minute rotation hammer, always this shape:
+ *
+ * ```
+ * box=914.29x411.43dp   ← the constraints: already landscape
+ * container=1080x2400px ← Compose's window snapshot: still portrait
+ * config=411x914 orient=PORTRAIT
+ * metrics=2400x1080     ← WindowMetricsCalculator, asked in the same frame: landscape
+ * ```
+ *
+ * A wide window that reports itself tall fails the height condition, so the
+ * picker drew the portrait layout at full landscape width — the defect the PR
+ * body recorded as "unexplained, not resolved". Measuring both axes against the
+ * constraints of one layout pass removes the disagreement rather than papering
+ * over it: two numbers from the same measurement cannot be half a rotation apart.
+ *
+ * @param availableWidth the width the picker's own content was handed — the
+ *   `BoxWithConstraints` maximum, not the raw window, so a nav rail or a
+ *   side-by-side host is already subtracted.
+ * @param availableHeight the height from that same `BoxWithConstraints`. An
+ *   unbounded height arrives here as a very large [Dp] and therefore reads as
+ *   "not short", which is the safe side of the gate: an unmeasurable window never
+ *   steals 17a's layout.
+ */
+fun pickerArrangement(
+    availableWidth: Dp,
+    availableHeight: Dp,
+    posture: FoldPosture,
+): PickerArrangement {
+    val twoPane =
+        posture == FoldPosture.FLAT &&
+            availableHeight < SHORT_WINDOW_MAX_HEIGHT &&
+            availableWidth >= TWO_PANE_MIN_WIDTH
+    if (!twoPane) return PickerArrangement.SinglePane
+    val catalogWidth = availableWidth - Dimensions.pickerSidePaneWidth - PANE_GUTTER - Dimensions.touchTargetMin
+    val columns = if (catalogWidth >= Dimensions.pickerColumnMin * 2) 2 else 1
+    return PickerArrangement(twoPane = true, columns = columns)
 }
 
 /**
@@ -330,16 +517,35 @@ enum class RecentHeader {
  *   `LazyColumn` and never inside it — see [pickerListPlan] for why that
  *   placement is load-bearing rather than cosmetic.
  * @property recentHeader null when the recents section is not emitted at all.
- * @property railOffset index of the first alphabetical row inside the same
- *   `LazyColumn`, which is what a rail letter scrolls to. The legend is not one
- *   of those items, so it is not counted here.
+ * @property catalogOffset index of the first CATALOG row inside the grid — how
+ *   many items the grid emits before the alphabet starts. Two things read it and
+ *   they are the same number: a rail letter scrolls to `catalogOffset + n`, and
+ *   [pickerAnchorIndex] restores a saved language to `catalogOffset + n`. The
+ *   legend is not one of those items, so it is not counted here.
+ *
+ *   It is exact whenever a catalog row exists at all. The two items it does not
+ *   count — the loading placeholder and the no-results message — are emitted only
+ *   when the catalog or the filtered results are EMPTY, so in both cases there is
+ *   no row for either reader to land on.
  */
 @Immutable
 data class PickerListPlan(
     val showVoiceLegend: Boolean,
     val recentHeader: RecentHeader?,
     val showAllHeader: Boolean,
-    val railOffset: Int,
+    val catalogOffset: Int,
+    /**
+     * 17a's side pane is drawn. False in the single-pane arrangement, and false
+     * in two-pane when the pane would have nothing in it — see [pickerListPlan].
+     */
+    val sidePane: Boolean = false,
+    /**
+     * The on-device counter sits in the top bar rather than beside the
+     * "All languages" header. 17a moves it there because in two-pane that header
+     * heads only the catalog pane, while the counter is a statement about the
+     * whole screen.
+     */
+    val counterInTopBar: Boolean = false,
 )
 
 /**
@@ -357,11 +563,11 @@ data class PickerListPlan(
  *   screen would carry one, and the explainer would describe an absence. That
  *   is the same dead-affordance rule (§7.6) rev 5 applied to the mark itself,
  *   one level up.
- * - **The rail counts everything above the alphabet.** Every header and
+ * - **The offset counts everything above the alphabet.** Every header and
  *   pseudo-row emitted before the alphabet is a real item in the same list, so
- *   leaving one out of [PickerListPlan.railOffset] makes every letter land a row
- *   short — deterministic, silent, and invisible to any test that only looks at
- *   rows.
+ *   leaving one out of [PickerListPlan.catalogOffset] makes every rail letter —
+ *   and every restored position — land a row short. Deterministic, silent, and
+ *   invisible to any test that only looks at rows.
  * - **The legend is NOT one of those items, and that is a fix, not a detail.**
  *   The device's voice answer arrives after the list has been laid out — binding
  *   `TextToSpeech` is documented at up to 5000ms
@@ -378,11 +584,26 @@ data class PickerListPlan(
  *   loads above it — so the answer is not to fight it but to keep the legend out
  *   of the anchored item set entirely. Drawn above the `LazyColumn` it occupies
  *   the same place in the 16a frame, appears the moment the device answers, and
- *   [railOffset] never has to know it exists.
+ *   [catalogOffset] never has to know it exists.
+ *
+ * **17a moves three of those things out of the list entirely**, and that is the
+ * whole of [twoPane]'s effect here. The detect row, the recents section and the
+ * legend go into the side pane, which is not the catalog's scroller — so
+ * [catalogOffset] must stop counting them, or every rail letter lands as many rows
+ * short as the side pane happens to hold. It is the same class of silent,
+ * deterministic miss the third rule above describes, arriving from the opposite
+ * direction: there, an uncounted item; here, items counted that are no longer
+ * there. **And it is why a saved position may not be an item index** — the two
+ * arrangements number the same list differently, which is what
+ * [PickerListPosition] now names a language to avoid. A bonus the arrangement
+ * gets for free: nothing can be inserted at index
+ * 0 of the anchored catalog any more, because the two things that arrive late —
+ * the device's voice answer and the recents store — both land in the side pane.
  *
  * @param detectRowPresent the source-only "Detect language" pseudo-row.
  * @param anyVoiceMark at least one row would draw the speaker ([showsVoiceMark]).
  * @param railed the A–Z rail is up: a full, unfiltered, non-empty catalog.
+ * @param twoPane the 17a landscape arrangement ([PickerArrangement.twoPane]).
  */
 fun pickerListPlan(
     role: LanguageRole,
@@ -390,6 +611,7 @@ fun pickerListPlan(
     recentCount: Int,
     anyVoiceMark: Boolean,
     railed: Boolean,
+    twoPane: Boolean = false,
 ): PickerListPlan {
     val showVoiceLegend = role == LanguageRole.TARGET && anyVoiceMark
     val recentHeader =
@@ -400,16 +622,27 @@ fun pickerListPlan(
         }
     // Emission order, and therefore counting order: detect row · recents
     // (header + rows) · "All languages" header · the alphabet. The legend is
-    // deliberately absent from both — it is not an item of this list.
-    val railOffset =
-        (if (detectRowPresent) 1 else 0) +
-            (if (recentHeader == null) 0 else recentCount + 1) +
-            (if (railed) 1 else 0)
+    // deliberately absent from both — it is not an item of this list. In
+    // two-pane the first two move to the side pane and stop being counted; only
+    // the "All languages" header is left above the alphabet.
+    val aboveTheAlphabet =
+        if (twoPane) {
+            0
+        } else {
+            (if (detectRowPresent) 1 else 0) + (if (recentHeader == null) 0 else recentCount + 1)
+        }
+    // A side pane with nothing in it is 272dp of empty surface next to the
+    // results — reachable the moment a search clears the recents on the source
+    // side. EDGE_CASES' no-dead-end rule cuts the same way for furniture as it
+    // does for errors: the pane goes, and the catalog takes the width back.
+    val sidePane = twoPane && (recentHeader != null || detectRowPresent || showVoiceLegend)
     return PickerListPlan(
         showVoiceLegend = showVoiceLegend,
         recentHeader = recentHeader,
         showAllHeader = railed,
-        railOffset = railOffset,
+        catalogOffset = aboveTheAlphabet + (if (railed) 1 else 0),
+        sidePane = sidePane,
+        counterInTopBar = twoPane,
     )
 }
 

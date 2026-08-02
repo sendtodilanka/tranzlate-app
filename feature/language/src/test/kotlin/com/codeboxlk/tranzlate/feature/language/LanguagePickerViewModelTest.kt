@@ -598,29 +598,33 @@ class LanguagePickerViewModelTest {
      * `onListPositionChange` a no-op. Rebuilding the screen — which is what a
      * host change, a rotation and a process death all do — then drops the user
      * back at Afrikaans after they had scrolled to Swedish.
+     *
+     * The stored value is the LANGUAGE at the top of the catalog, not an item
+     * index (#198 co-verify F1) — so this also pins that a `String?` travels the
+     * handle as readily as the `Int` it replaced.
      */
     @Test
     fun `the list position survives a rebuild of the screen`() {
         val handle = SavedStateHandle()
-        viewModelWith(appScope, handle).onListPositionChange(PickerListPosition(index = 142, offset = 17))
+        viewModelWith(appScope, handle).onListPositionChange(PickerListPosition(anchorId = "sv", offset = 17))
 
         assertThat(viewModelWith(appScope, handle).listPosition())
-            .isEqualTo(PickerListPosition(142, 17))
+            .isEqualTo(PickerListPosition("sv", 17))
     }
 
     /**
      * Read live, never captured when the ViewModel was built. A rotation keeps
      * this object and destroys the composition, so the seed for the new
-     * `LazyListState` has to be the position as of the last scroll.
+     * `LazyGridState` has to be the position as of the last scroll.
      */
     @Test
     fun `the list position is read live, not captured at construction`() {
         val subject = viewModel()
         assertThat(subject.listPosition()).isEqualTo(PickerListPosition.Top)
 
-        subject.onListPositionChange(PickerListPosition(index = 8, offset = 3))
+        subject.onListPositionChange(PickerListPosition(anchorId = "de", offset = 3))
 
-        assertThat(subject.listPosition()).isEqualTo(PickerListPosition(8, 3))
+        assertThat(subject.listPosition()).isEqualTo(PickerListPosition("de", 3))
     }
 
     /** Independent slots: one may not carry, clobber or resurrect the other. */
@@ -629,11 +633,11 @@ class LanguagePickerViewModelTest {
         val handle = SavedStateHandle()
         val first = viewModelWith(appScope, handle)
         first.onQueryChange("swe")
-        first.onListPositionChange(PickerListPosition(index = 3, offset = 40))
+        first.onListPositionChange(PickerListPosition(anchorId = "pt", offset = 40))
 
         val restored = viewModelWith(appScope, handle)
 
         assertThat(restored.query.value).isEqualTo("swe")
-        assertThat(restored.listPosition()).isEqualTo(PickerListPosition(3, 40))
+        assertThat(restored.listPosition()).isEqualTo(PickerListPosition("pt", 40))
     }
 }

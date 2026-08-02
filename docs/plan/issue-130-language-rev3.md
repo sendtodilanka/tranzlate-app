@@ -89,7 +89,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR | Scope | Status |
 |---|---|---|
 | PR-13 | Fold-posture `WindowInfo` extension + host-agnostic saveable contract (query + list position out of `rememberSaveable`, into the picker VM's `SavedStateHandle`) + `pendingConsent` → `SavedStateHandle` behind a storage seam + LeakCanary debug-only rider. **`LanguageSheetRequest` is NOT built here** — it has no members until PR-17; see below | 👁 **PR #192** |
-| PR-14 | 17a landscape two-pane | ⬜ |
+| PR-14 | 17a landscape two-pane: a `pickerArrangement()` window gate + a side pane beside the catalog + the catalog on a grid so ONE list position means the same language in both arrangements + the Detect-key settle. **Deviations below** | ✅ #198, 2026-08-02 |
 | PR-15 | 17b foldable two-leaf + aggregate meter — **E-S1 is a merge gate here** (re-ruled 2026-08-01) | ⬜ |
 | PR-16 | 17c/17d dialog host + E-D1 + measured jank budget gate | ⬜ |
 
@@ -142,6 +142,127 @@ Three, each verified against the code rather than against the ruling text
    (`FoldPostureTest`), and one named-file source rule for the part no JVM test
    can reach — that the screen keeps no host-scoped saveable state
    (`PickerHostAgnosticTest`, honest about being a source rule).
+
+### PR-14 deviations from the ruling's PR-14 row (2026-08-02)
+
+Five, each checked against the export's markup or the code rather than against
+the ruling text (mandatory rule 11, fourth cause).
+
+1. **17a is ONE picker in one role, not two pickers side by side.** Each
+   landscape frame carries a single title — `from · landscape` says "Translate
+   from", `to · landscape` says "Translate to" — so the two panes are a shortcut
+   pane and a catalog pane serving the same `LanguageRole`. The landscape
+   treatment is therefore a branch inside `LanguagePickerContent`, not a wrapper
+   that composes the picker twice: two pickers would draw a screen the design
+   does not have, and would hand two panes the ONE search query and ONE scroll
+   position `LanguagePickerViewModel` holds. It also keeps the layout inside the
+   file `PickerHostAgnosticTest` reads by path — a separate landscape file would
+   have been outside PR-13's guard.
+2. **The catalog moves from `LazyColumn` to `LazyVerticalGrid` in BOTH
+   arrangements.** A grid indexes ITEMS rather than layout rows, so the column
+   count does not change the numbering; the obvious alternative — a two-column
+   list of paired rows — would have indexed PAIRS and landed every restored
+   position at twice its language. One state type, one emission body, one
+   contract.
+
+   **This deviation originally claimed more than that, and the extra claim was
+   false.** It said item 40 is the 41st language "whether it is drawn in one
+   column or two", and therefore that PR-13's saved position survives the
+   rotation. The first half is true of the COLUMN count and the second half does
+   not follow, because the two arrangements do not emit the same items: the
+   single-pane grid starts `[detect?] [recent header + rows?] [All languages]`,
+   17a moves the first two to the side pane and starts `[All languages]`. The
+   prefix differs by 1 to 7 items, so the same number named a different language
+   after a rotation — reproduced on `emulator-5554` (#198 co-verify F1):
+   browsing at English in portrait, landscape opened at Finnish. **The stored
+   position is now the LANGUAGE at the top of the catalog**
+   (`PickerListPosition.anchorId`), which is arrangement-independent by
+   construction rather than by an arithmetic nobody had checked.
+3. **`PickerHostAgnosticTest`'s banned list grows by two.** The grid and the
+   scrolling side pane cut two new doors to host-scoped state
+   (`rememberLazyGridState`, `rememberScrollState`) that did not exist when
+   PR-13 wrote the rule over `rememberSaveable` / `rememberLazyListState`. A
+   rule that names symbols has to be extended whenever a new one appears; that
+   cost is now written down in the test rather than left to be rediscovered.
+   A new case also pins that the picker builds exactly ONE lazy state — seeding
+   correctly in two branches is still two scroll positions.
+4. **The landscape row keeps its portrait anatomy.** The export compresses each
+   landscape row to a single 48dp line with no supporting text. Adopting that
+   would delete the failure reason ("No connection. Reconnect and try again.")
+   and the progress line from the screen, which EDGE_CASES' no-dead-end rule
+   forbids — and the landscape frames never draw a failed row, so the export is
+   silent on the case rather than deciding it. Only the ARRANGEMENT changes.
+   For the same reason the search field stays at `touchTargetMin` where the
+   export draws 40dp: C-14 makes 48dp the authoritative a11y floor.
+5. **An empty side pane is not drawn.** The export only draws the resting state;
+   a search on the source side clears the recents and filters the Detect row
+   out, which would leave 272dp of empty surface beside a "no results" message.
+   The pane goes and the catalog takes the width back — `pickerListPlan`
+   decides it, and a unit test pins it.
+
+**Two things the device run found that the code review did not.** First, the
+landscape bar is a plain `Row`, and a plain `Row` applies none of the insets an
+M3 `TopAppBar` applies for you: the first run drew the title through the
+status-bar clock and the counter through the signal icons. It now carries
+`TopAppBarDefaults.windowInsets` — systemBars top AND horizontal, which is the
+right pair in landscape, where a display cutout eats the leading edge. Second,
+the "Detect language" row ellipsises to "Detect la…" inside the 272dp side pane,
+because it still carries the shipped `ONLINE ONLY` chip — the chip rev 5 removed
+from every frame and **PR-27** removes from the app under owner ruling 2. The
+narrow pane makes that already-agreed removal visible rather than merely
+untrue; it is not fixed here, because a third place touching the Detect chip is
+what REJECT §7.8 bounces.
+
+**Three more the co-verify lens found on PR #198, all of them only visible on a
+device.**
+
+1. **F1 — rotating while browsing landed on the wrong language.** The saved
+   position was a raw grid index; see deviation 2 above for what replaced it and
+   why. The PR's own device ritual missed it for a sharper reason than
+   carelessness: it typed `ar` into the search box first, and that query
+   suppresses the detect row and empties the recents section in BOTH
+   arrangements, collapsing the prefix difference to exactly zero. The ritual
+   selected the one case where the defect cannot appear. `PickerListPositionTest`
+   now covers the round trip with recents present and absent, in both roles, and
+   **never in search mode**.
+2. **F2 — the picker could draw the portrait layout in a landscape window.**
+   Recorded in the PR body as "unexplained, not resolved". Diagnosed by
+   instrumenting the screen and hammering rotations on `emulator-5554`: **24 of
+   539 picker compositions**, every one with the same fingerprint —
+   `BoxWithConstraints` measuring 914.29×411.43dp (landscape) while Compose's
+   window snapshot still reported 1080×2400px / `orient=PORTRAIT`, with a live
+   `WindowMetricsCalculator` call in the same frame already answering 2400×1080.
+   The gate took its width from the constraints and its height from
+   `WindowInfo.heightCompact`, which reads that snapshot; a wide window reporting
+   itself tall fails the height condition. `pickerArrangement` now takes **both**
+   sizes as `Dp` from the same `BoxWithConstraints`, so the two cannot be half a
+   rotation apart. Every one of the 24 was corrected by the next composition
+   (0.12–0.34s); the PERSISTENT form the lens described — 5+ seconds, surviving
+   eight Activity recreations — was **not** reproduced, and no claim is made that
+   it had the same cause.
+3. **The 420dp cap on the landscape search field never bound.**
+   `Modifier.weight(1f)` measures its child at a FIXED width, and `widthIn(max =)`
+   can only narrow within the incoming range, which at a fixed width is a single
+   point. Measured 1544px ≈ 588dp against a documented 420dp. The field now sits
+   in a `Box` that takes the weighted share, and measures 1103px = 420.2dp.
+
+**What the export actually draws for 17a, read per row** (sliced between one
+language name and the next, never off a flattened token list — the #183 trap):
+`from · landscape` has 17 rows and **zero** speaker marks, confirming the mark is
+target-only. `to · landscape` has 17 rows and **four** marks — English, Arabic,
+Bengali, Bulgarian — and does **not** mark Afrikaans or Spanish. The one stray
+`volume_up` outside any row is the voice legend at the foot of the side pane,
+which sits immediately after the Afrikaans row in document order: that adjacency
+is exactly how a flattened scan mis-reads Afrikaans as marked.
+
+**On #183:** measured device data (`docs/research/issue-130-e-v1-voice-enumeration.md`,
+68 offline voice ids) has `en`, `ar`, `bn`, `bg`, `es`, `sq` all present and `af`
+absent. So `to · landscape` agrees with the device on all four rows it marks and
+on Afrikaans; where it differs from 16a portrait is Spanish, which 16a marks and
+the landscape frame draws with the tick alone — a single-line row has no
+supporting line to carry the mark, and the selected row keeps only its check.
+The app reads the device either way, so nothing here changes behaviour, and 16a
+is not "fixed" to match.
 
 ## Spec of record — rev 5 (2026-08-01)
 

@@ -33,7 +33,7 @@ private const val FALLBACK_TARGET_LANG = "fr"
  * handle belongs to the whole ViewModel, not to any one of its jobs.
  */
 private const val KEY_QUERY = "picker.query"
-private const val KEY_SCROLL_INDEX = "picker.scroll_index"
+private const val KEY_SCROLL_ANCHOR = "picker.scroll_anchor"
 private const val KEY_SCROLL_OFFSET = "picker.scroll_offset"
 
 /**
@@ -104,19 +104,25 @@ class LanguagePickerViewModel
          * Where the list is, read fresh — never captured once at construction.
          *
          * A configuration change destroys the composition and keeps this
-         * ViewModel, so the seed for the new `LazyListState` has to be the
+         * ViewModel, so the seed for the new `LazyGridState` has to be the
          * position as of the LAST scroll, not as of whenever the ViewModel
-         * happened to be built.
+         * happened to be built. A rotation is exactly that: it is what takes the
+         * picker from 15a's one column to 17a's two, and the position has to
+         * survive the trip (#130 PR-14).
+         *
+         * What is stored is a language id, not an item index — see
+         * [PickerListPosition]. A `String?` in the handle, which the bundle takes
+         * as readily as an `Int`, so process death is unaffected.
          */
         fun listPosition(): PickerListPosition =
             PickerListPosition(
-                index = savedStateHandle[KEY_SCROLL_INDEX] ?: 0,
+                anchorId = savedStateHandle[KEY_SCROLL_ANCHOR],
                 offset = savedStateHandle[KEY_SCROLL_OFFSET] ?: 0,
             )
 
         /** The list moved. Cheap on purpose — two map writes, no flow to collect. */
         fun onListPositionChange(position: PickerListPosition) {
-            savedStateHandle[KEY_SCROLL_INDEX] = position.index
+            savedStateHandle[KEY_SCROLL_ANCHOR] = position.anchorId
             savedStateHandle[KEY_SCROLL_OFFSET] = position.offset
         }
 
