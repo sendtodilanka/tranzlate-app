@@ -115,7 +115,7 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
 - ⬜ **#173** (rows for #173/#174/#175 added by **PR #176**) `verifyStringKeyDocs` has two coverage holes: module discovery is
   a hardcoded path shape a new ring escapes silently, and the reverse direction
   is #152's own unimplemented second ask. Follows #172. **Split in two.**
-  *Hole 2 (module discovery)* — branch `fix/issue-173-module-discovery`, plan
+  *Hole 2 (module discovery)* — **PR #202**, plan
   `docs/plan/issue-173-module-discovery.md`: the scan is derived from
   `subprojects` instead of four ring globs, so a new ring or a deeper module can
   no longer escape it in silence. Both escapes were reproduced green on the
