@@ -261,12 +261,31 @@ standalone English model to restore).
   | Kotlin (`feature/text/.../HomeScreen.kt`) | **5 lines, 2 sites** | `:396` `:397` `:401` the live card · **`:920` `:921` the `@PreviewLightDark` sample**, which carries its own `tt_preview_tool_offline` and no search for the tag would have found |
   | string resources | **6 lines, 3 locales** | `values/strings.xml:37,42` · `values-fil:32,33` · `values-pt-rBR:32,33` |
   | test | **1** | `NavShellSmokeTest.kt:40` |
-  | documents | **7** | `DECISIONS.md:77` (C-1 tag registry, **authoritative**) · `STRINGS_text-translation.md:242` (string registry, **authoritative**) · `specs/01-text-translation.md:69` · `docs/design/UI_SPEC.md:40` (design table, plain prose — invisible to both searches) · `VerifyStringKeyDocsTask.kt:42-43` (KDoc example) · `launch-blockers.md:87` · `launch-readiness.md:172` |
+  | documents | **8** | `DECISIONS.md:77` (C-1 tag registry, **authoritative**) · `STRINGS_text-translation.md:242` (string registry, **authoritative**) · `specs/01-text-translation.md:69` · `docs/design/UI_SPEC.md:40` (design table, plain prose) · **`docs/CLEAN_ROOM_UX_REQUIREMENTS.md:13,32,77`** (the navigation contract — names the card three times in live prose) · `VerifyStringKeyDocsTask.kt:42-43` (KDoc example) · `launch-blockers.md:87` · `launch-readiness.md:172` |
+
+  **The table was 7 on the first correction, and co-verify found the eighth** —
+  `CLEAN_ROOM_UX_REQUIREMENTS.md`, the navigation contract, which names the card
+  three times in live prose. Two search bugs hid it, and both are worth naming
+  because they are the same shape as the ones already listed above:
+
+  - a pathspec bug — `git grep -- 'docs/**/*.md'` does **not** match files sitting
+    directly in `docs/`, so a sweep that reads as exhaustive silently skipped the
+    top level. It returned 6 files where `docs/*.md` returns 7.
+  - a substring bug — the human phrase `Offline mode` is a **prefix of
+    `Offline model`**, so a plain grep also matches `CLAUDE.md:83`
+    ("Offline model download") and `docs/audit/…:132` ("Offline models"), neither
+    of which is the card. This is exactly the `overflow` → `TextOverflow`
+    failure the debate's own verifier caught, recurring on a different token.
+    `\b` is not the fix here — see **#221**, where `git grep -E` was found to
+    match nothing for `\b`; the working form was `grep -rnE "Offline mode([^l]|$)"`.
 
   Two consequences the "2" hid. **`STRINGS_text-translation.md:242` is a build
   gate, not a note** — `VerifyStringKeyDocsTask` checks resource keys against
   those docs, so renaming the key without the doc row fails the build rather
-  than merely going stale. And the **preview** at `HomeScreen.kt:920-921` renders
+  than merely going stale. Co-verify **ran** that gate rather than reading it:
+  renaming the key in `strings.xml` with the catalogue untouched fails
+  `./gradlew verifyStringKeyDocs` with *"1 of 216 shipped keys appear in no
+  STRINGS_*.md catalogue"*. And the **preview** at `HomeScreen.kt:920-921` renders
   the same strings under a different tag, so a rename that misses it ships a
   preview contradicting the screen, which is exactly what rule 7's previews exist
   to prevent.
