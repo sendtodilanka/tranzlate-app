@@ -291,6 +291,28 @@ class PickerDialogRenderTest {
     }
 
     /**
+     * The SAME assertion in the landscape card, and it is not redundant.
+     *
+     * Every test in this class runs at the class-level `w800dp-h1280dp`, so
+     * until this one existed the two-column card was rendered by nothing.
+     * #205's co-verify lens proved the gap by coupling the rail to the column
+     * count — `arrangement.rail || arrangement.columns == 2` at
+     * `LanguagePickerScreen.kt:307` — which draws a rail in the landscape card
+     * only, and left the whole 228-test module suite GREEN.
+     *
+     * `PickerArrangementTest` cannot see it: it checks the pure function, and
+     * the bug is in what the screen does with the answer. This is the render
+     * that catches it.
+     */
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp")
+    fun `the landscape card draws no A to Z rail either`() {
+        showCard()
+
+        compose.onNodeWithTag("tt_lang_rail").assertDoesNotExist()
+    }
+
+    /**
      * The control that stops the assertion above being about the fixture.
      *
      * The SAME catalogue in the full-screen host DOES draw the rail, so "no rail
