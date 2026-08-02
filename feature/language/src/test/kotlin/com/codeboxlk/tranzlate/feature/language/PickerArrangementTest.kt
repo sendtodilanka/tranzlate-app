@@ -306,6 +306,97 @@ class PickerArrangementTest {
             .isEqualTo(PickerArrangement.SinglePane)
     }
 
+    // ---- 17c/17d: the card's own arrangement (PR-16) ------------------------
+    // The sizes below are the CARD's, not the window's — `pickerDialogSize` has
+    // already turned 800×1280 into 560×998 and 1280×800 into 720×624 by the time
+    // the picker inside the card measures itself.
+
+    /**
+     * `from|to · tablet portrait`: one column and no rail.
+     *
+     * **The case a width-only rule gets wrong.** 560dp clears two
+     * [Dimensions.pickerColumnMin] columns with 80dp to spare, so "wide enough
+     * for two" would put this card in two columns; the export draws one. What
+     * separates it from 17d is that this card is TALLER than it is wide and has
+     * not lost any rows to buy back.
+     */
+    @Test
+    fun `the portrait card is one column with no rail`() {
+        val arrangement =
+            pickerArrangement(560.dp, 998.dp, posture = FoldPosture.FLAT, host = PickerHost.DIALOG)
+
+        assertThat(arrangement.twoPane).isFalse()
+        assertThat(arrangement.columns).isEqualTo(1)
+        assertThat(arrangement.rail).isFalse()
+    }
+
+    /** `from|to · tablet landscape`: the two-column catalog the export draws. */
+    @Test
+    fun `the landscape card is two columns with no rail`() {
+        val arrangement =
+            pickerArrangement(720.dp, 624.dp, posture = FoldPosture.FLAT, host = PickerHost.DIALOG)
+
+        assertThat(arrangement.twoPane).isFalse()
+        assertThat(arrangement.columns).isEqualTo(2)
+        assertThat(arrangement.rail).isFalse()
+    }
+
+    /**
+     * A card can be landscape and still narrow. At 520dp the second column would
+     * be 260dp of a name that has to share it with an avatar and a trailing
+     * control, which is the arithmetic [Dimensions.pickerColumnMin] is.
+     */
+    @Test
+    fun `a landscape card too narrow for two columns takes one`() {
+        val arrangement =
+            pickerArrangement(460.dp, 400.dp, posture = FoldPosture.FLAT, host = PickerHost.DIALOG)
+
+        assertThat(arrangement.columns).isEqualTo(1)
+    }
+
+    /**
+     * **The card never gets a side pane, whatever it measures.** 720dp clears
+     * 17a's 568dp two-pane floor, so without the host being asked first this
+     * card would be handed a 272dp shortcut pane the export draws in none of the
+     * four tablet frames — and the pane would eat 40% of a card that is already
+     * narrower than the window.
+     */
+    @Test
+    fun `a card wide enough for 17a still gets no side pane`() {
+        assertWithMessage("720dp clears 17a's 568dp floor — the host is what refuses the pane")
+            .that(
+                pickerArrangement(
+                    720.dp,
+                    624.dp,
+                    posture = FoldPosture.FLAT,
+                    host = PickerHost.DIALOG,
+                ).twoPane,
+            ).isFalse()
+    }
+
+    /**
+     * …and the host is asked BEFORE posture, so a fold cannot reach into the
+     * card. It should never happen — [pickerHost] refuses a folded window — but
+     * a gate whose two entrances disagree is the defect PR-14's F2 was.
+     */
+    @Test
+    fun `the card is never given two leaves`() {
+        val arrangement =
+            pickerArrangement(720.dp, 624.dp, posture = FoldPosture.BOOK, host = PickerHost.DIALOG)
+
+        assertThat(arrangement.twoLeaf).isFalse()
+        assertThat(arrangement.twoPane).isFalse()
+    }
+
+    /** Every arrangement that is NOT the card keeps the rail it has always had. */
+    @Test
+    fun `every non-dialog arrangement keeps its rail`() {
+        assertThat(pickerArrangement(412.dp, 892.dp, posture = FoldPosture.FLAT).rail).isTrue()
+        assertThat(pickerArrangement(892.dp, 412.dp, posture = FoldPosture.FLAT).rail).isTrue()
+        assertThat(pickerArrangement(760.dp, 812.dp, posture = FoldPosture.BOOK).rail).isTrue()
+        assertThat(PickerArrangement.SinglePane.rail).isTrue()
+    }
+
     // ---- both sizes must come from ONE measurement (the F2 fix) --------------
 
     /**

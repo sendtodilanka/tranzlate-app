@@ -74,4 +74,8 @@
     <string name="offline_error_storage">Espaço insuficiente — libere armazenamento e tente de novo</string>
     <string name="offline_error_network">Falha no download — verifique a conexão e tente de novo</string>
     <string name="offline_error_generic">Algo deu errado — tente de novo</string>
+    <!-- 17c/17d tablet dialog (#130 PR-16). -->
+    <string name="lang_dialog_manage_packs">Gerenciar pacotes</string>
+    <string name="lang_dialog_cancel">Cancelar</string>
+    <string name="lang_dialog_close">Fechar</string>
 </resources>

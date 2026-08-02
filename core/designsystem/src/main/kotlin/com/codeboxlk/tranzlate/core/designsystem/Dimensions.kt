@@ -169,6 +169,51 @@ object Dimensions {
     /** The offline-library meter's progress track (17b, export: 4px). */
     val pickerMeterBarHeight: Dp = 4.dp
 
+    // ---- Language picker, tablet dialog (17c/17d, issue #130 PR-16) ---------
+    // Measured off the export's four tablet frames: `from|to · tablet portrait`
+    // (800×1280) and `from|to · tablet landscape` (1280×800). Both orientations
+    // draw the same card at two widths and one height rule.
+
+    /**
+     * The dialog's width in a window that is taller than it is wide — the export
+     * draws 560dp inside 800×1280.
+     *
+     * It is also Material 3's own maximum for a basic dialog
+     * (`AlertDialogDefaults`, `DialogMaxWidth = 560.dp`), which is why the
+     * portrait card needs `usePlatformDefaultWidth = false` only to stop the
+     * platform SHRINKING it, not to exceed anything.
+     */
+    val pickerDialogWidthPortrait: Dp = 560.dp
+
+    /**
+     * The dialog's width in a window that is wider than it is tall — the export
+     * draws 720dp inside 1280×800.
+     *
+     * This one is deliberately past M3's 560dp basic-dialog maximum, and the
+     * reason is the content rather than the taste: at 720dp the catalog runs in
+     * TWO columns, which is what buys back the rows a 624dp-tall card loses. A
+     * 560dp card in a landscape window would be a tall list in a short box.
+     */
+    val pickerDialogWidthLandscape: Dp = 720.dp
+
+    /**
+     * How much of the window's height the card may take — the export's
+     * `max-height:78%`, in both orientations.
+     *
+     * A fraction rather than a dp because it is the one number that has to mean
+     * the same thing at 1280dp and at 800dp: enough of the window to be the
+     * subject, with enough left over that the screen behind it is still visibly
+     * there. That visible remainder is the whole difference between this and a
+     * full-screen destination.
+     */
+    const val PICKER_DIALOG_HEIGHT_FRACTION = 0.78f
+
+    /** The dialog's docked action bar (export: 68px, `Manage packs` + `Cancel`). */
+    val pickerDialogActionBar: Dp = 68.dp
+
+    /** The dialog card's own inset from the window edge when the width has to be clamped. */
+    val pickerDialogMargin: Dp = 24.dp
+
     /** ListDetailPaneScaffold: list/input pane minimum (C-13). */
     val paneListMin: Dp = 360.dp
 

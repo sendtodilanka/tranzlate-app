@@ -389,7 +389,7 @@ class PickerListPositionTest {
                     detectRowPresent = detect,
                     recentCount = recentCount,
                     anyVoiceMark = true,
-                    railed = railed,
+                    wholeCatalog = railed,
                     arrangement =
                         PickerArrangement(twoPane = split, columns = 1, twoLeaf = twoLeaf),
                     libraryReady = twoLeaf,

@@ -91,7 +91,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR-13 | Fold-posture `WindowInfo` extension + host-agnostic saveable contract (query + list position out of `rememberSaveable`, into the picker VM's `SavedStateHandle`) + `pendingConsent` → `SavedStateHandle` behind a storage seam + LeakCanary debug-only rider. **`LanguageSheetRequest` is NOT built here** — it has no members until PR-17; see below | 👁 **PR #192** |
 | PR-14 | 17a landscape two-pane: a `pickerArrangement()` window gate + a side pane beside the catalog + the catalog on a grid so ONE list position means the same language in both arrangements + the Detect-key settle. **Deviations below** | ✅ #198, 2026-08-02 |
 | PR-15 | 17b foldable two-leaf (24dp crease gutter, 296dp leaf) + the offline-library meter (U-5) with its two honest degrades. **E-S1 ran and passed** — `docs/research/issue-130-e-s1-storage-walk.md`. **Deviations below** | ✅ #200, 2026-08-02 |
-| PR-16 | 17c/17d dialog host + E-D1 + measured jank budget gate | ⬜ |
+| PR-16 | 17c/17d dialog host + docked "Manage packs" ordering + **E-D1 ran and PASSED at both sizes** + the jank budget **measured and reported unsatisfiable on an emulator** (see below) | ✅ #205, 2026-08-02 |
 
 ### Phase 6 — sheets, first-run, snackbars
 | PR | Scope | Status |
@@ -459,3 +459,78 @@ because ML Kit reports the English pivot as on device, so the free-space line is
 the first card a new user sees rather than a rare degrade (item 8 above).
 E-S1c separately showed the walk counts an interrupted download's leftovers
 forever, not "for a few seconds" as first recorded (item 8b).
+
+### PR-16 deviations from the ruling's PR-16 row (2026-08-02)
+
+Each checked against the export's markup, the androidx source or the running app
+rather than against the ruling text (mandatory rule 11, fourth cause).
+
+1. **The card's ViewModel is scoped to the card, and the ruling does not say
+   how.** The ruling puts the dialog outside `NavDisplay` (§2, and R13: this
+   composition is Nav-external), which is where `hiltViewModel()` stops resolving
+   to a nav entry and starts resolving to the **Activity** — a third
+   screen-outliving scope, which the ruling's own §2 inventory bounces at review.
+   The seam PR-13 left is that `LanguagePickerScreen` takes its ViewModel as a
+   parameter, and what fills it is `rememberViewModelStoreProvider` /
+   `rememberViewModelStoreOwner` (lifecycle-viewmodel-compose 2.11.0, public
+   API). Those build a child `ViewModelStore` INSIDE the Activity's store, and
+   clear it when the composable leaves the composition **unless the parent
+   lifecycle is already destroyed** — cleared when the card closes, kept across a
+   rotation. Verified on the device: typing `ger`, resizing 800×1280 → 1280×800
+   and finding `ger` still in the field; closing and reopening and finding it
+   empty.
+2. **The card is not a fourth ARRANGEMENT, but it is a fourth branch of the
+   gate.** 17c reuses single-pane exactly. 17d does not: the export draws the
+   catalog in **two columns** at 720 × 624 and one column at 560 × 998, and the
+   discriminator cannot be width, because 560dp already clears two
+   `pickerColumnMin` columns with 80dp to spare. What separates them is that the
+   landscape card is wider than it is tall. `PickerArrangement` therefore grows
+   one field (`rail`) and `pickerArrangement` one parameter (`host`), decided
+   before any question of size — the card's constraints are the CARD's, and
+   measuring them as if they were a window's would have offered 17d 17a's side
+   pane, which the export draws in none of the four tablet frames.
+3. **No A–Z rail in the card, counted rather than assumed.** 15a and 17a each
+   draw all twenty-six letters; the four tablet frames draw none. The reason is
+   the geometry: the rail is a drag target pinned to the trailing edge, and in a
+   card that edge has the scrim a few dp beyond it.
+4. **"All languages" and its counter are NOT the rail**, and the device run is
+   what separated them. The first build tied the header to the same boolean as
+   the rail, because until this host existed the two were always equal — and
+   `5 of 59 packs on device`, which the export draws in all four tablet frames,
+   silently disappeared. Two booleans now: `wholeCatalog` (header, counter,
+   `catalogOffset`) and `arrangement.rail`.
+5. **`imePadding()` on the layer the card is measured in — E-D1's actual
+   finding.** The soft keyboard was reported as refusing to appear in phone
+   LANDSCAPE on this AVD. It does **not** at tablet sizes: `mInputShown=true`,
+   `mImeWindowVis=3` at both 800×1280 and 1280×800. What the experiment DID find
+   is that the dialog window does not resize for the IME, so the keyboard covered
+   the bottom of a card that still thought it was 998dp tall, putting the docked
+   "Manage packs" and "Cancel" out of reach until the keyboard was dismissed.
+   Taking the IME inset where the card is MEASURED fixes it in both orientations.
+6. **The jank budget is measured and reported UNSATISFIABLE on an emulator**,
+   which is a finding rather than a skipped gate. The ruling asks for "fling
+   frame-drop clusters zero; fail = PR fail". `dumpsys gfxinfo` on
+   `emulator-5554` (Resizable_Experimental, API 37), same window, same input
+   protocol, same session:
+
+   | surface | frames | janky |
+   |---|---|---|
+   | the new card, 1280×800, two columns, over a composed Home | 61 | 78.7% |
+   | the **shipped, merged** offline list, full screen, same window | 51 | 86.3% |
+
+   Repeats put the card at 75–79% across five runs. **Already-merged code does
+   not clear the budget either**, so a failure here cannot distinguish this PR's
+   work from the harness — `input swipe` is a synthetic three-point gesture and
+   not a fling, and the absolute percentage moved by a factor of two purely with
+   the swipe protocol. The comparative result is the part that means something:
+   **the card is not worse than a list this project has already accepted.** The
+   named escape hatch (`produceState(Default)` + Collator memoize) is therefore
+   NOT taken — the ruling refuses preemptive optimization without measured need,
+   and there is no measured need, only an unusable instrument. A real budget
+   needs a physical device and Macrobenchmark; this repo has neither (#40 — CI
+   compiles instrumented tests and never runs them).
+7. **Two labels for one destination, left un-unified deliberately.** The card's
+   docked action reads "Manage packs", as the export draws it; owner ruling 5
+   relabels the Home row that opens the SAME destination to "Language packs" in
+   PR-23. Unifying here would make that relabel two PRs' work in three locales.
+   Flagged rather than silently changed.

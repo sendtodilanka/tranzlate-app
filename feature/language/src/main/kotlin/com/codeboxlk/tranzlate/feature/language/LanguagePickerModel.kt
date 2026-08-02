@@ -10,6 +10,7 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
 import com.codeboxlk.tranzlate.core.ui.FoldPosture
+import com.codeboxlk.tranzlate.core.ui.WindowWidthClass
 import com.codeboxlk.tranzlate.core.ui.languageAvatarCode
 import com.codeboxlk.tranzlate.core.ui.languageDisplayName
 import com.codeboxlk.tranzlate.core.ui.languageEndonym
@@ -134,6 +135,14 @@ fun pickerAnchorIndex(
  *   crease width, and the shortcut leaf carries the offline-library meter, which
  *   17a's 412dp-tall pane has no room for and the export draws in neither
  *   landscape frame.
+ * @property rail the A–Z rail may be drawn down the trailing edge. True of every
+ *   arrangement the picker has had until 17c/17d, and false there: the export's
+ *   four tablet frames draw the twenty-six letters in neither, where 15a and 17a
+ *   draw all twenty-six in both (counted off the markup, not assumed). The rail
+ *   is a drag target pinned to the trailing edge, and in a dialog that edge is
+ *   the card's own boundary with the scrim a few dp beyond it — a drag that
+ *   starts on the rail and slips off dismisses the thing being scrolled. The
+ *   search field is the same shortcut and is already permanent.
  */
 @Immutable
 data class PickerArrangement(
@@ -142,6 +151,7 @@ data class PickerArrangement(
     val gutter: Dp = PANE_GUTTER,
     val sidePaneWidth: Dp = Dimensions.pickerSidePaneWidth,
     val twoLeaf: Boolean = false,
+    val rail: Boolean = true,
 ) {
     init {
         // The one shape this type must not take, refused the way
@@ -270,13 +280,29 @@ private val SHORT_WINDOW_MAX_HEIGHT: Dp = 480.dp
  *
  * @param hinged a hinge splits this window into two logical areas
  *   (`WindowInfo.hinged`), which is NOT the same as being folded — see above.
+ *
+ * ---
+ *
+ * **17c/17d — the dialog — is decided FIRST and on no question of size at all**
+ * (PR-16). Which host the picker got was settled by [pickerHost] before this
+ * function was reached, and the sizes handed in here are then the CARD's, not
+ * the window's. That ordering is what stops the two gates arguing: a 720×624
+ * card inside a 1280×800 window would otherwise be measured as if it were a
+ * window of that size and offered 17a's side pane, which the export draws in
+ * neither tablet frame.
+ *
+ * @param host which of the two hosts is drawing this picker — a fact about the
+ *   composition, not about the measurement, so it is handed in rather than
+ *   inferred. See [pickerHost] for what decides it.
  */
 fun pickerArrangement(
     availableWidth: Dp,
     availableHeight: Dp,
     posture: FoldPosture,
     hinged: Boolean = false,
+    host: PickerHost = PickerHost.NAV_ENTRY,
 ): PickerArrangement {
+    if (host == PickerHost.DIALOG) return dialogArrangement(availableWidth, availableHeight)
     if (posture == FoldPosture.BOOK) {
         return twoPaneOrSingle(
             availableWidth = availableWidth,
@@ -316,6 +342,150 @@ private fun twoPaneOrSingle(
         sidePaneWidth = sidePaneWidth,
         twoLeaf = twoLeaf,
     )
+}
+
+/**
+ * What the picker looks like INSIDE the dialog card (17c/17d).
+ *
+ * Three answers, and each one is a thing the tablet frames do differently from
+ * every other frame in the export:
+ *
+ * - **No side pane, ever.** The card is 560dp or 720dp wide; 17a's pane alone is
+ *   272dp of that, and the four tablet frames stack the Detect row, the recents
+ *   section and the catalog in one scroller exactly as phone portrait does.
+ * - **No A–Z rail** — see [PickerArrangement.rail].
+ * - **Two columns when the card is LANDSCAPE**, one when it is portrait. The
+ *   export draws one column at 560×998 and two at 720×624, and the discriminator
+ *   cannot be width: 560dp already clears two [Dimensions.pickerColumnMin]
+ *   columns with 80dp to spare, so a width-only rule would put 17c in two
+ *   columns as well. What actually separates them is that the landscape card is
+ *   wider than it is tall — it has lost rows to its height and is buying them
+ *   back with its width, which is the same trade 17a makes and the reason both
+ *   are drawn only where the window is short of height for its width.
+ *
+ * The width condition stays as the second term rather than being dropped,
+ * because a card can be landscape and still narrow — a 520×400 window's card is
+ * wider than tall and has room for exactly one column of languages, and two
+ * would ellipsise every name in the catalog.
+ */
+private fun dialogArrangement(
+    availableWidth: Dp,
+    availableHeight: Dp,
+): PickerArrangement {
+    val landscape = availableWidth > availableHeight
+    val fitsTwo = availableWidth >= Dimensions.pickerColumnMin * 2
+    return PickerArrangement(
+        twoPane = false,
+        columns = if (landscape && fitsTwo) 2 else 1,
+        rail = false,
+    )
+}
+
+/**
+ * Which of the picker's two hosts a window gets (17c/17d, ruling §2 "Adaptive").
+ *
+ * The picker is either a destination on the back stack or a dialog raised over
+ * the screen that asked for it. Both draw the same screen; what differs is what
+ * the user can still see, and that is the whole of the decision. On a phone the
+ * picker IS the screen, so it takes the window. On a tablet a full-screen list
+ * over an 800dp-wide composer throws away the context the user is translating
+ * in, so the card sits over it with the screen still visible around the edges.
+ *
+ * Four conditions, each one naming a layout this host must NOT steal:
+ *
+ * - **[widthClass] must not be [WindowWidthClass.COMPACT].** A dialog inside a
+ *   compact window is a full-screen dialog with a scrim round its edges: the
+ *   same list, the same width, plus a border. 15a/16a own that window.
+ * - **[heightCompact] must be false.** A landscape phone is 412dp tall; a card
+ *   at 78% of that is 321dp — five rows. 17a owns that window and uses the
+ *   height it has.
+ * - **[posture] must be [FoldPosture.FLAT].** A [FoldPosture.BOOK] window is
+ *   17b's two leaves, and a card centred in it lands ON the crease; a
+ *   [FoldPosture.TABLETOP] window has a dead strip across the middle, which is
+ *   where a centred card puts its list.
+ * - **[hinged] must be false.** This is the case posture alone gets wrong, and
+ *   it is the same one PR-15 found: a dual-screen device held fully OPEN reports
+ *   FLAT and still has a physical seam down the middle of the window. 17a's
+ *   layout routes content around that seam with a wider gutter; a centred dialog
+ *   cannot, because the middle is exactly where it goes.
+ *
+ * The ruling names the first three ("compact/compact-height/fold = nav-entry;
+ * medium/expanded no-fold = PickerDialogHost"). The fourth is this PR's, for the
+ * reason above, and is pinned by its own case in `PickerHostTest`.
+ */
+fun pickerHost(
+    widthClass: WindowWidthClass,
+    heightCompact: Boolean,
+    posture: FoldPosture,
+    hinged: Boolean = false,
+): PickerHost {
+    // Two questions, named, because they are not the same question and a reader
+    // of one four-term condition has to work out that they are two.
+    val roomToSpare = widthClass != WindowWidthClass.COMPACT && !heightCompact
+    val oneFlatSurface = posture == FoldPosture.FLAT && !hinged
+    return if (roomToSpare && oneFlatSurface) PickerHost.DIALOG else PickerHost.NAV_ENTRY
+}
+
+/**
+ * How big the dialog card is in the window it was raised in (17c/17d).
+ *
+ * The two widths and the one height rule are measured off the export's tablet
+ * frames ([Dimensions.pickerDialogWidthPortrait],
+ * [Dimensions.pickerDialogWidthLandscape],
+ * [Dimensions.PICKER_DIALOG_HEIGHT_FRACTION]); everything this function adds is
+ * the clamp, and the clamp is the part the export cannot draw.
+ *
+ * **A card may never be wider than the window it is centred in.** The export
+ * measures two windows, 800dp and 1280dp wide, and both leave room to spare. A
+ * freeform or split-screen window on the same tablet does not: at 700dp the
+ * landscape card's 720dp would hang 20dp off both sides, and the two ends the
+ * user would reach for — the close button and the docked actions — are exactly
+ * what falls off. So the preferred width is a preference, and the window has the
+ * last word.
+ *
+ * @param windowWidth the whole window the dialog is raised in, not the card.
+ * @param windowHeight likewise — the fraction is of the window.
+ */
+fun pickerDialogSize(
+    windowWidth: Dp,
+    windowHeight: Dp,
+): PickerDialogSize {
+    val preferred =
+        if (windowWidth > windowHeight) {
+            Dimensions.pickerDialogWidthLandscape
+        } else {
+            Dimensions.pickerDialogWidthPortrait
+        }
+    val available = windowWidth - Dimensions.pickerDialogMargin * 2
+    return PickerDialogSize(
+        width = minOf(preferred, available.coerceAtLeast(0.dp)),
+        maxHeight = windowHeight * Dimensions.PICKER_DIALOG_HEIGHT_FRACTION,
+    )
+}
+
+/** The card's measured box — see [pickerDialogSize]. */
+@Immutable
+data class PickerDialogSize(
+    val width: Dp,
+    val maxHeight: Dp,
+)
+
+/**
+ * Where the picker is being drawn — the 17c/17d discriminator, decided by
+ * [pickerHost] and then carried everywhere the answer matters.
+ *
+ * It is passed down rather than re-derived because the two hosts do not measure
+ * the same box: inside the dialog the picker's constraints are the CARD's, and a
+ * second `rememberWindowInfo()` read at the draw site would answer about the
+ * window instead. One question, asked once, at the point where the composition
+ * actually differs.
+ */
+enum class PickerHost {
+    /** A destination on the back stack — 15a/16a, 17a, 17b. */
+    NAV_ENTRY,
+
+    /** A card raised over the screen that asked for it — 17c/17d. */
+    DIALOG,
 }
 
 /**
@@ -702,7 +872,14 @@ data class PickerListPlan(
  *
  * @param detectRowPresent the source-only "Detect language" pseudo-row.
  * @param anyVoiceMark at least one row would draw the speaker ([showsVoiceMark]).
- * @param railed the A–Z rail is up: a full, unfiltered, non-empty catalog.
+ * @param wholeCatalog the catalog is showing in full — not filtered by a
+ *   search, and not still empty because it has not arrived. It decides the "All
+ *   languages" header, the on-device counter that rides in it, and therefore
+ *   [PickerListPlan.catalogOffset]. It was called `railed` until #130 PR-16,
+ *   which is when it stopped being the same question as whether the A–Z rail is
+ *   drawn: the tablet card wants the header and no rail, and the two sharing one
+ *   boolean silently dropped "5 of 59 packs on device" out of all four tablet
+ *   frames.
  * @param arrangement what [pickerArrangement] decided this window is. Two things
  *   are read from it and they are NOT the same question:
  *   [PickerArrangement.twoPane] — the shortcuts moved into a pane, true of both
@@ -725,7 +902,7 @@ fun pickerListPlan(
     detectRowPresent: Boolean,
     recentCount: Int,
     anyVoiceMark: Boolean,
-    railed: Boolean,
+    wholeCatalog: Boolean,
     arrangement: PickerArrangement = PickerArrangement.SinglePane,
     libraryReady: Boolean = false,
 ): PickerListPlan {
@@ -762,8 +939,8 @@ fun pickerListPlan(
     return PickerListPlan(
         showVoiceLegend = showVoiceLegend,
         recentHeader = recentHeader,
-        showAllHeader = railed,
-        catalogOffset = aboveTheAlphabet + (if (railed) 1 else 0),
+        showAllHeader = wholeCatalog,
+        catalogOffset = aboveTheAlphabet + (if (wholeCatalog) 1 else 0),
         sidePane = sidePane,
         counterInTopBar = twoPane,
         showMeter = showMeter,

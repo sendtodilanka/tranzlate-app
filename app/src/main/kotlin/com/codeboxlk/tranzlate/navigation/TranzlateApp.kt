@@ -6,6 +6,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -20,9 +24,13 @@ import androidx.navigation3.ui.NavDisplay
 import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.model.LanguageRole
+import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
 import com.codeboxlk.tranzlate.feature.language.LanguagePickerScreen
 import com.codeboxlk.tranzlate.feature.language.OfflineLanguagesScreen
+import com.codeboxlk.tranzlate.feature.language.PickerDialogHost
+import com.codeboxlk.tranzlate.feature.language.PickerHost
+import com.codeboxlk.tranzlate.feature.language.pickerHost
 import com.codeboxlk.tranzlate.feature.paywall.PaywallScreen
 import com.codeboxlk.tranzlate.feature.settings.SettingsScreen
 import com.codeboxlk.tranzlate.feature.text.COMPOSER_CARD_SHARED_KEY
@@ -42,6 +50,23 @@ fun TranzlateApp(
 ) {
     val backStack = rememberNavBackStack(TextNavKey)
     val textViewModel: TextViewModel = hiltViewModel()
+
+    // 17c/17d: on a tablet the picker is a card over whatever is on screen, so it
+    // is NOT a back-stack entry — the screen behind it has to stay composed, and
+    // NavDisplay composes the top entry and nothing else. Its presence is this
+    // flag, and the role it was opened for is the flag's value.
+    //
+    // `rememberSaveable` so the card survives process death, which is where the
+    // ruling asks the state to live for this host (§2). It is deliberately NOT
+    // derived from the window: re-asking `pickerHost` every composition would
+    // close the card mid-use the moment the user resized or unfolded, which is
+    // what "keep-host-until-closed" refuses. The host is decided once, when the
+    // chip is tapped, and the card outlives any answer that changes underneath
+    // it.
+    var pickerDialogForSource: Boolean? by rememberSaveable { mutableStateOf(null) }
+    val window = rememberWindowInfo()
+    val hostForNextPicker =
+        pickerHost(window.widthClass, window.heightCompact, window.posture, window.hinged)
 
     // Issue #149 / #159 co-verify: this ViewModel is hoisted OUTSIDE the
     // NavDisplay entries, so it resolves to the Activity's ViewModelStore and
@@ -69,9 +94,83 @@ fun TranzlateApp(
             backStack = backStack,
             textViewModel = textViewModel,
             onNavigate = ::navigateTo,
+            onPickLanguage = { role ->
+                openLanguagePicker(
+                    role = role,
+                    host = hostForNextPicker,
+                    openDialog = { pickerDialogForSource = it == LanguageRole.SOURCE },
+                    navigate = ::navigateTo,
+                )
+            },
             sharedScope = this,
         )
     }
+
+    // Composed AFTER the NavDisplay and outside it — both halves matter. Outside,
+    // because a picker inside the display would replace the screen the card is
+    // supposed to be sitting over; after, because that is what puts the card on
+    // top of it. The ViewModel scoping this host needs is `PickerDialogHost`'s
+    // own problem and is solved there; nothing about the picker is hoisted to
+    // this shell, which is the point.
+    pickerDialogForSource?.let { forSource ->
+        PickerDialogHost(
+            role = if (forSource) LanguageRole.SOURCE else LanguageRole.TARGET,
+            onDismiss = { pickerDialogForSource = null },
+            onManagePacks = {
+                manageLanguagePacks(
+                    dismissDialog = { pickerDialogForSource = null },
+                    navigate = ::navigateTo,
+                )
+            },
+        )
+    }
+}
+
+/**
+ * A language chip was tapped: open the picker in whichever host this window gets.
+ *
+ * A function rather than four lines inside the shell so the branch can be driven
+ * from a JVM test — the same reason [popEntry] is one. What it must never do is
+ * BOTH: pushing the destination as well as raising the card would leave a card
+ * over a picker over the composer, and dismissing the card would reveal the
+ * screen it was meant to replace.
+ */
+internal fun openLanguagePicker(
+    role: LanguageRole,
+    host: PickerHost,
+    openDialog: (LanguageRole) -> Unit,
+    navigate: (NavKey) -> Unit,
+) {
+    when (host) {
+        PickerHost.DIALOG -> {
+            openDialog(role)
+        }
+
+        PickerHost.NAV_ENTRY -> {
+            navigate(LanguagePickerNavKey(forSource = role == LanguageRole.SOURCE))
+        }
+    }
+}
+
+/**
+ * The card's docked "Manage packs" action.
+ *
+ * **The order is the whole function** (ruling §2: `dialogVisible = false` THEN
+ * `push(LanguagesNavKey)`). The card is not on the back stack, so pushing does
+ * not dismiss it: push first and the user arrives at Manage packs with the
+ * language picker still floating over it, and with no way back to the screen the
+ * card belonged to. Dismiss first and the card is gone before the destination
+ * arrives.
+ *
+ * Written as a named function for exactly that reason — an order that only lives
+ * as two adjacent lines inside a lambda is an order no test can name.
+ */
+internal fun manageLanguagePacks(
+    dismissDialog: () -> Unit,
+    navigate: (NavKey) -> Unit,
+) {
+    dismissDialog()
+    navigate(LanguagesNavKey)
 }
 
 /** The one NavDisplay both size classes share (Nav3 — plan §7 risk isolation). */
@@ -80,6 +179,7 @@ private fun AppNavDisplay(
     backStack: androidx.navigation3.runtime.NavBackStack<NavKey>,
     textViewModel: TextViewModel,
     onNavigate: (NavKey) -> Unit,
+    onPickLanguage: (LanguageRole) -> Unit,
     sharedScope: SharedTransitionScope,
 ) {
     // EVERY way out of a destination funnels through here — the system gesture,
@@ -131,11 +231,7 @@ private fun AppNavDisplay(
                     HomeScreen(
                         viewModel = textViewModel,
                         onOpenComposer = { onNavigate(ComposerNavKey) },
-                        onPickLanguage = { target ->
-                            onNavigate(
-                                LanguagePickerNavKey(forSource = target == LanguageRole.SOURCE),
-                            )
-                        },
+                        onPickLanguage = onPickLanguage,
                         onOpenSettings = { onNavigate(SettingsNavKey) },
                         onOpenPaywall = { onNavigate(PaywallNavKey) },
                         onOpenCamera = { onNavigate(CameraNavKey) },
@@ -157,11 +253,7 @@ private fun AppNavDisplay(
                         viewModel = textViewModel,
                         onBack = { pop(ComposerNavKey) },
                         onOpenPaywall = { onNavigate(PaywallNavKey) },
-                        onPickLanguage = { target ->
-                            onNavigate(
-                                LanguagePickerNavKey(forSource = target == LanguageRole.SOURCE),
-                            )
-                        },
+                        onPickLanguage = onPickLanguage,
                         cardModifier =
                             with(sharedScope) {
                                 Modifier.sharedBounds(
