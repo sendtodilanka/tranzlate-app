@@ -32,6 +32,13 @@
             "if": "Bash(gh *)",
             "timeout": 40,
             "statusMessage": "Checking the epic tracker carries this PR"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/device-claim.sh\"",
+            "if": "Bash(adb *)",
+            "timeout": 10,
+            "statusMessage": "Checking whether someone else is driving the device"
           }
         ]
       }

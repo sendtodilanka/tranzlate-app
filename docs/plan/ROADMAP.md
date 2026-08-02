@@ -109,6 +109,12 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   2026-08-02's five blocking co-verify findings were device-only because of it.
   Robolectric + `createComposeRule` via `tranzlate.compose-test`; the acceptance
   test catches #198's shipped bug in the form the whole existing suite missed.
+- 👁 **#206** — **PR #207** — the owner asked for a system that stops me
+  repeating my own mistakes. Rule 11 covers code changes and its hooks check a
+  marker is *present*, not that it is *true* — `Call sites: 4 found, 4 changed`
+  passed in #171 while being wrong. Fourteen of my errors in one session sort
+  into six shapes, all in claims and orchestration. CLAUDE.md rule 12 +
+  `Enumerated by:` in `guard-pr.sh` + `device-claim.sh`.
 - ⬜ **#178** `guard-pr.sh` failed CLOSED on any body it could not read from the
   command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.
