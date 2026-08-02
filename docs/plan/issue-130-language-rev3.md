@@ -96,7 +96,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 ### Phase 6 — sheets, first-run, snackbars
 | PR | Scope | Status |
 |---|---|---|
-| PR-17 | 19a mobile-data sheet: `MeteredConsentDialog` + Screen B's inline dialog both deleted, their two string sets retired, one `MobileDataSheet` raised by both screens, the standing "Always ask" preference changeable in the sheet. **E-W1 has never been run, so the drawn "Wait for Wi-Fi" is not shipped** — the owner's pre-approved interim "Not now" is (ruling 8). **Deviations below** | 🔨 |
+| PR-17 | 19a mobile-data sheet: `MeteredConsentDialog` + Screen B's inline dialog both deleted, their two string sets retired, one `MobileDataSheet` raised by both screens, the standing "Always ask" preference changeable in the sheet. **E-W1 has never been run, so the drawn "Wait for Wi-Fi" is not shipped** — the owner's pre-approved interim "Not now" is (ruling 8). **Deviations below** | ✅ #209, 2026-08-02 |
 | PR-18 | 19d + 19b + failure-cause map ×1 + 15a Retry-pill deviation fix | ⬜ |
 | PR-19 | 19f + 19g (fallback per ruling 3) + saved-count query | ⬜ |
 | PR-20 | 19h + 19m + app-shell sheet host | ⬜ |
