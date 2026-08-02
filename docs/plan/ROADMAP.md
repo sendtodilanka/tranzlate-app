@@ -115,6 +115,26 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   passed in #171 while being wrong. Fourteen of my errors in one session sort
   into six shapes, all in claims and orchestration. CLAUDE.md rule 12 +
   `Enumerated by:` in `guard-pr.sh` + `device-claim.sh`.
+- 👁 **#213** — **PR #214** — `device-claim.sh`, shipped in #207 above as rule
+  12's answer to shape D, **had never fired and could not have.** It returned
+  silently unless `.claude/device-claim` existed, and the claim protocol was
+  written in exactly one place: a comment inside the hook, which no agent reads.
+  First agent never claims → file never exists → second agent never warned. It
+  passed review because it was tested by piping a payload at it with a claim
+  file the test itself planted; nobody asked what had to be true in the real
+  repo to reach that branch. **A presence check standing in for a behaviour
+  check, committed while building the mechanism against exactly that.** Also
+  gave `adb shell` and `adb -s … shell` byte-identical output, so the rule
+  protecting the owner's own handset was the one thing the device hook did not
+  check. Fix: an unclaimed device gets a nudge naming the claim command;
+  `-s`/`--serial`/`ANDROID_SERIAL` detected with an untargeted `adb` warned
+  louder, parsed only from the text between `adb` and its subcommand.
+  **Co-verify BLOCKED it** on a false "`guard-restore.sh` is sound" claim in the
+  body — I had tested the forms I already knew. Three real bypasses: `git
+  checkout <path>` without `--` (git's own documented idiom), `git restore
+  --source=<X> <path>` (still writes the worktree), `git -C <dir> checkout --`.
+  Filed **#222**. On re-attack the lens found the same error one clause over,
+  in the sentence I had just fixed. **Residuals: #222, #223.**
 - ✅ **#178** (PR #182, merged) `guard-pr.sh` failed CLOSED on any body it could not read from the
   command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.
