@@ -115,10 +115,37 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   passed in #171 while being wrong. Fourteen of my errors in one session sort
   into six shapes, all in claims and orchestration. CLAUDE.md rule 12 +
   `Enumerated by:` in `guard-pr.sh` + `device-claim.sh`.
-- ⬜ **#178** `guard-pr.sh` failed CLOSED on any body it could not read from the
+- 👁 **#213** — **PR #214** — `device-claim.sh`, shipped in #207 above as rule
+  12's answer to shape D, **had never fired and could not have.** It returned
+  silently unless `.claude/device-claim` existed, and the claim protocol was
+  written in exactly one place: a comment inside the hook, which no agent reads.
+  First agent never claims → file never exists → second agent never warned. It
+  passed review because it was tested by piping a payload at it with a claim
+  file the test itself planted; nobody asked what had to be true in the real
+  repo to reach that branch. **A presence check standing in for a behaviour
+  check, committed while building the mechanism against exactly that.** Also
+  gave `adb shell` and `adb -s … shell` byte-identical output, so the rule
+  protecting the owner's own handset was the one thing the device hook did not
+  check. Fix: an unclaimed device gets a nudge naming the claim command;
+  `-s`/`--serial`/`ANDROID_SERIAL` detected with an untargeted `adb` warned
+  louder, parsed only from the text between `adb` and its subcommand.
+  **Co-verify BLOCKED it** on a false "`guard-restore.sh` is sound" claim in the
+  body — I had tested the forms I already knew. Three real bypasses: `git
+  checkout <path>` without `--` (git's own documented idiom), `git restore
+  --source=<X> <path>` (still writes the worktree), `git -C <dir> checkout --`.
+  Filed **#222**. On re-attack the lens found the same error one clause over,
+  in the sentence I had just fixed. **Residuals: #222, #223.**
+- ✅ **#178** (PR #182, merged) `guard-pr.sh` failed CLOSED on any body it could not read from the
   command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.
-- ⬜ **#173** (rows for #173/#174/#175 added by **PR #176**) `verifyStringKeyDocs` has two coverage holes: module discovery is
+- ⬜ **#173** — **DO NOT TICK. This row is the safety net that caught #217.**
+  GitHub closed #173 on 2026-08-02 because PR #202's body said "auto-close
+  #173" while arguing *against* auto-closing it; the commit trailer correctly
+  said `Refs:`. For a few hours Hole 1 survived only in this row, and the
+  obvious repair — ticking a ⬜ whose issue reads CLOSED — would have erased
+  it. #173 is reopened; a mismatch here means *check which side is wrong*, not
+  *tick the box*.
+  (rows for #173/#174/#175 added by **PR #176**) `verifyStringKeyDocs` has two coverage holes: module discovery is
   a hardcoded path shape a new ring escapes silently, and the reverse direction
   is #152's own unimplemented second ask. Follows #172. **Split in two.**
   *Hole 2 (module discovery)* — **PR #202**, plan
@@ -131,7 +158,7 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   needs a parseable planned/shipped/retired status in every `STRINGS_*.md`,
   which is the file every feature PR touches, and its first run today is ~60
   findings that are nearly all deliberate.
-- ⬜ **#201** — **PR #211**. The other three gates in the root `build.gradle.kts` — `detekt`'s
+- ✅ **#201** — **PR #211**, merged 2026-08-02. The other three gates in the root `build.gradle.kts` — `detekt`'s
   `source` and both `spotless` targets — named the same four rings
   `verifyStringKeyDocs` used to, so a module at a new top-level prefix was
   linted and formatted by nobody, and CI's `./gradlew detekt spotlessCheck`
@@ -150,7 +177,7 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   The accidental exclusion of `.claude/worktrees/` becomes structural
   rather than a side effect of the ring names. **Residual, separate issue:**
   `build-logic`'s 15 Kotlin files are analysed by neither gate and never were.
-- ⬜ **#179** History's Undo restored nothing when the row's C-8 tuple had been
+- ✅ **#179** (PR #189, merged) History's Undo restored nothing when the row's C-8 tuple had been
   retaken — the insert is `IGNORE`-on-conflict, the -1 was discarded, and the
   star and the original `created_at` were gone while the snackbar had already
   said the delete was reversible. Fixed by MERGING rather than fighting for the
@@ -158,9 +185,9 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   one in either direction, as `MigrationOneToTwo` already does) and keeps the
   earlier stamp. #177 widened the reach — delete-then-retranslate-the-other-way
   now collides for the nine `LanguageTagResolver` legacy aliases.
-- ⬜ **#151** history rows store raw detector tags while the prefs seam
+- ✅ **#151** (PR #177, merged) history rows store raw detector tags while the prefs seam
   canonicalises. Self-contained, `core:domain`.
-- ⬜ **#152** the STRINGS gate — **PR #172**. Scope grew on contact: the gate's
+- ✅ **#152** (PR #172, merged) the STRINGS gate — **PR #172**. Scope grew on contact: the gate's
   first run found **129 of 205** keys documented nowhere, so the PR also carries
   four new `STRINGS_*.md` and refreshes two. The `feature/text` dead keys still
   ride with Wave 3 — 22 remain there by decision, several marked *keep* in §7.
