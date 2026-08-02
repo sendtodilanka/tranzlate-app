@@ -5,6 +5,7 @@ import com.codeboxlk.tranzlate.core.common.AppResult
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.common.DefaultDispatcherProvider
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
+import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.config.RemoteConfigSource
 import com.codeboxlk.tranzlate.core.model.Entitlement
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
@@ -15,6 +16,7 @@ import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeFeatureAccess
 import com.codeboxlk.tranzlate.core.testing.FakeOfflineVoiceCatalog
 import com.codeboxlk.tranzlate.core.testing.FakeRemoteConfig
+import com.codeboxlk.tranzlate.core.testing.FakeStorageProbe
 import com.codeboxlk.tranzlate.core.testing.FakeTranslator
 import com.codeboxlk.tranzlate.core.testing.FakeUsagePolicy
 import com.codeboxlk.tranzlate.di.TranslateModule
@@ -85,6 +87,22 @@ object FakeTranslateModule {
     @Provides
     @Singleton
     fun connectivity(): ConnectivityMonitor = FakeConnectivityMonitor()
+
+    /**
+     * Same story as `remoteConfig` and `connectivity` above: `replaces` takes
+     * `TranslateModule` away wholesale, and `StorageProbe` is bound there
+     * (#130 PR-11), so the instrumented graph has to re-supply it.
+     *
+     * A UI test must not read the runner's real disk either. The offline-library
+     * meter (#130 PR-15) prints a size, and the real probe would print whatever
+     * the emulator image happens to hold — a different string on every runner.
+     * `FakeStorageProbe`'s defaults model a fresh install: room to spare, and
+     * `packs = null` because ML Kit's model store does not exist until the first
+     * download (verified on `emulator-5554`, E-S1).
+     */
+    @Provides
+    @Singleton
+    fun storageProbe(): StorageProbe = FakeStorageProbe()
 
     /**
      * PRE-EXISTING GAP, found while adding the voice binding below and fixed

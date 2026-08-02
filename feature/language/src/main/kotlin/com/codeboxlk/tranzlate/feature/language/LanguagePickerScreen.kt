@@ -158,6 +158,7 @@ fun LanguagePickerScreen(
     val selectedId by viewModel.selection(target).collectAsStateWithLifecycle()
     val recents by viewModel.recents(target).collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
+    val library by viewModel.library.collectAsStateWithLifecycle()
     LanguagePickerContent(
         target = target,
         languages = languages,
@@ -182,6 +183,7 @@ fun LanguagePickerScreen(
         // as of the last scroll.
         listPosition = viewModel.listPosition(),
         onListPositionChange = viewModel::onListPositionChange,
+        library = library,
     )
 }
 
@@ -243,6 +245,7 @@ fun LanguagePickerContent(
     onDismissConsent: () -> Unit = {},
     listPosition: PickerListPosition = PickerListPosition.Top,
     onListPositionChange: (PickerListPosition) -> Unit = {},
+    library: OfflineLibraryMeter? = null,
     arrangementOverride: PickerArrangement? = null,
 ) {
     val title =
@@ -279,17 +282,18 @@ fun LanguagePickerContent(
         val window = rememberWindowInfo()
         val arrangement =
             arrangementOverride
-                ?: pickerArrangement(maxWidth, maxHeight, window.posture)
+                ?: pickerArrangement(maxWidth, maxHeight, window.posture, window.hinged)
         val railed = !sections.searching && !sections.catalogEmpty
         val plan =
-            remember(target, sections.detect, sections.recent, sections.anyVoiceMark, railed, arrangement) {
+            remember(target, sections.detect, sections.recent, sections.anyVoiceMark, railed, arrangement, library) {
                 pickerListPlan(
                     role = target,
                     detectRowPresent = sections.detect != null,
                     recentCount = sections.recent.size,
                     anyVoiceMark = sections.anyVoiceMark,
                     railed = railed,
-                    twoPane = arrangement.twoPane,
+                    arrangement = arrangement,
+                    libraryReady = library != null,
                 )
             }
         PickerScaffold(
@@ -308,6 +312,7 @@ fun LanguagePickerContent(
             onStop = onStop,
             listPosition = listPosition,
             onListPositionChange = onListPositionChange,
+            library = library,
         )
     }
 }
@@ -335,6 +340,7 @@ private fun PickerScaffold(
     onStop: (String) -> Unit,
     listPosition: PickerListPosition,
     onListPositionChange: (PickerListPosition) -> Unit,
+    library: OfflineLibraryMeter?,
 ) {
     val spacing = LocalSpacing.current
     Scaffold(
@@ -390,6 +396,7 @@ private fun PickerScaffold(
                 onClearQuery = { onQueryChange("") },
                 listPosition = listPosition,
                 onListPositionChange = onListPositionChange,
+                library = library,
             )
         }
     }
@@ -496,6 +503,7 @@ private fun PickerBody(
     onClearQuery: () -> Unit,
     listPosition: PickerListPosition,
     onListPositionChange: (PickerListPosition) -> Unit,
+    library: OfflineLibraryMeter?,
 ) {
     val spacing = LocalSpacing.current
     // The saved language, turned into an index against THIS arrangement's grid —
@@ -551,11 +559,18 @@ private fun PickerBody(
                     target = target,
                     sections = sections,
                     plan = plan,
+                    width = arrangement.sidePaneWidth,
+                    library = library,
                     onSelect = onSelect,
                     onDownload = onDownload,
                     onStop = onStop,
                 )
-                Spacer(Modifier.width(PANE_GUTTER))
+                // 17a: 8dp, a gap. 17b: 24dp, the strip of window the crease
+                // runs down — content on either side of it, nothing in it. The
+                // gate that decided the arrangement is what carries the number,
+                // so there is no second place that has to know which layout this
+                // is (`PickerArrangement.gutter`).
+                Spacer(Modifier.width(arrangement.gutter).testTag("tt_lang_pane_gutter"))
             }
             PickerCatalog(
                 target = target,
@@ -612,22 +627,38 @@ private fun PickerBody(
 }
 
 /**
- * 17a's shortcut pane: the recents section, then the role's own extra — the
- * "Detect language" row on the source side, the offline-voice legend on the
- * target side. Both landscape frames put that extra at the FOOT of the pane,
- * which is where the export draws it; portrait keeps it at the top, where the
- * export draws it there.
+ * The shortcut pane, in both two-pane arrangements: the recents section, then
+ * the role's own extra — the "Detect language" row on the source side, the
+ * offline-voice legend on the target side — and, on a foldable leaf, the
+ * offline-library meter at the very bottom. Both landscape frames put the role's
+ * extra at the FOOT of the pane, which is where the export draws it; portrait
+ * keeps it at the top, where the export draws it there.
+ *
+ * **One pane, two widths, and the order is the same in both.** The foldable
+ * frames draw the same sequence as the landscape ones with the meter card added
+ * under it, so this is 17a's pane with one more tenant rather than a second pane
+ * — which is the "every big job has ONE home" rule applied at the level below a
+ * screen.
  *
  * It scrolls with a plain [ScrollState] rather than `rememberScrollState()` for
  * the same reason the grid does not use `rememberLazyGridState()`: that helper
  * is `rememberSaveable` underneath, and every saveable in this file would be
  * addressed through whichever host is drawing the picker.
+ *
+ * @param width [PickerArrangement.sidePaneWidth] — 272dp in landscape, 296dp on
+ *   a leaf, both measured off the export.
+ * @param library the meter's data, or null while the storage snapshot is still
+ *   being taken. Null draws NO card rather than an empty one: the walk runs on
+ *   IO and a card that appeared saying "0 packs" and then corrected itself would
+ *   have told the user something false in between.
  */
 @Composable
 private fun PickerSidePane(
     target: LanguageRole,
     sections: PickerSections,
     plan: PickerListPlan,
+    width: Dp,
+    library: OfflineLibraryMeter?,
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
@@ -636,7 +667,7 @@ private fun PickerSidePane(
     Column(
         modifier =
             Modifier
-                .width(Dimensions.pickerSidePaneWidth)
+                .width(width)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.extraLarge)
                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
@@ -656,6 +687,119 @@ private fun PickerSidePane(
         if (plan.showVoiceLegend) {
             VoiceLegend(modifier = Modifier.padding(top = spacing.sm8))
         }
+        // `plan.showMeter` already knows the snapshot arrived — it is the same
+        // fact `plan.sidePane` had to weigh, so it is answered once, there.
+        if (plan.showMeter && library != null) {
+            OfflineLibraryMeterCard(
+                meter = library,
+                modifier = Modifier.padding(top = spacing.md16, start = spacing.xs4, end = spacing.xs4),
+            )
+        }
+    }
+}
+
+/**
+ * The "Offline library" card (U-5): how many packs are on this device, out of
+ * how many could be, and — when the disk can be read — how much room they take.
+ *
+ * **Every sentence it can print is a fact it can support.** Which one it prints
+ * is decided in [offlineLibraryMeter], away from Compose so a plain unit test
+ * can drive all three; this composable only spells the chosen one. The
+ * degrade case is the reason for the split: `packsBytes` returns null when ML
+ * Kit's model store is not where issue #90's research measured it, and the
+ * tempting thing to draw there is `0 MB`, which is a claim about the disk that
+ * nothing has checked. Experiment E-S1 is what tells us which case a real device
+ * is in — see `docs/research/issue-130-e-s1-storage-walk.md`.
+ *
+ * The bar is `LinearProgressIndicator` rather than a hand-drawn box: it is a
+ * determinate progress bar, it is what M3 draws for one, and it carries the
+ * platform's own reduced-motion and theming behaviour for free. Its semantics
+ * are cleared because the three lines above it already say the whole thing in
+ * words — a screen reader announcing "4 percent" after "5 of 59 packs, 110 MB
+ * used" is repeating the least useful version of the fact.
+ */
+@Composable
+private fun OfflineLibraryMeterCard(
+    meter: OfflineLibraryMeter,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    val context = LocalContext.current
+    val detail =
+        when (meter) {
+            is OfflineLibraryMeter.Empty -> {
+                pluralStringResource(R.plurals.text_lang_library_none, meter.capable, meter.capable)
+            }
+
+            is OfflineLibraryMeter.Sized -> {
+                pluralStringResource(
+                    R.plurals.text_lang_library_used,
+                    meter.capable,
+                    meter.capable,
+                    Formatter.formatShortFileSize(context, meter.usedBytes),
+                )
+            }
+
+            is OfflineLibraryMeter.Unsized -> {
+                pluralStringResource(
+                    R.plurals.text_lang_library_free,
+                    meter.capable,
+                    meter.capable,
+                    Formatter.formatShortFileSize(context, meter.freeBytes),
+                )
+            }
+        }
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(horizontal = spacing.md16, vertical = spacing.md16 - spacing.xs4)
+                // One announcement in reading order — "Offline library, 5, of 59
+                // packs · 110 MB used" — instead of three separate stops on a
+                // card that is one statement.
+                .semantics(mergeDescendants = true) {}
+                .testTag("tt_lang_library_meter"),
+    ) {
+        Text(
+            text = stringResource(R.string.text_lang_library_title),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
+            modifier = Modifier.padding(top = spacing.sm8),
+        ) {
+            Text(
+                text = stringResource(R.string.text_lang_library_downloaded, meter.downloaded),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = spacing.xs4 / 2),
+            )
+        }
+        LinearProgressIndicator(
+            progress = { meter.fraction },
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            // No gap and no stop indicator: at 4dp the M3 default stop dot is
+            // wider than the fill it sits beside on a nearly-empty library, and
+            // it would read as a second, contradictory mark.
+            gapSize = 0.dp,
+            drawStopIndicator = {},
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = spacing.sm8 + spacing.xs4 / 2)
+                    .height(Dimensions.pickerMeterBarHeight)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .clearAndSetSemantics {},
+        )
     }
 }
 
@@ -2058,6 +2202,166 @@ private fun PickerLandscapeSingleColumnPreview() {
 /** What [pickerArrangement] returns for the two frames above — stated, not assumed. */
 private val previewTwoPaneWide = PickerArrangement(twoPane = true, columns = 2)
 private val previewTwoPaneNarrow = PickerArrangement(twoPane = true, columns = 1)
+
+// ---- 17b foldable two-leaf (issue #130 PR-15) -------------------------------
+// The export's foldable frames are 760×812 — a window that is BOTH wider than
+// 17a's gate needs and three hundred dp taller than it allows, which is exactly
+// why 17b is a separate branch and not a wider 17a.
+
+private val previewFoldableWidth: Dp = 760.dp
+private val previewFoldableHeight: Dp = 812.dp
+
+/** What [pickerArrangement] returns at 760×812 in [FoldPosture.BOOK] — one column. */
+private val previewTwoLeaf =
+    PickerArrangement(
+        twoPane = true,
+        columns = 1,
+        gutter = Dimensions.pickerCreaseGutter,
+        sidePaneWidth = Dimensions.pickerLeafPaneWidth,
+        twoLeaf = true,
+    )
+
+@Composable
+private fun FoldablePreviewFrame(content: @Composable () -> Unit) {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Box(
+                modifier = Modifier.size(width = previewFoldableWidth, height = previewFoldableHeight),
+            ) { content() }
+        }
+    }
+}
+
+/**
+ * `from · foldable`: the shortcut leaf on the left with Recent, the "Detect
+ * language" row and the offline-library meter at its foot; 24dp of crease; the
+ * catalog on the right.
+ *
+ * The gutter is the whole reason this preview is not just a taller
+ * `PickerLandscapeFromPreview` — it is the strip the fold runs down, and the
+ * owner reviews it from here.
+ */
+@PreviewLightDark
+@Composable
+private fun PickerFoldablePreview() {
+    FoldablePreviewFrame {
+        LanguagePickerContent(
+            target = LanguageRole.SOURCE,
+            languages = previewLanguages,
+            selectedId = "af",
+            query = "",
+            onQueryChange = {},
+            onSelect = {},
+            onBack = {},
+            recents = previewRecents,
+            offlineStates = previewStates,
+            library = previewMeterPacks,
+            arrangementOverride = previewTwoLeaf,
+        )
+    }
+}
+
+/**
+ * `to · foldable`: the same leaf carrying "Recently used as target" and the
+ * voice legend instead of the Detect row, with speaker marks in the catalog.
+ */
+@PreviewLightDark
+@Composable
+private fun PickerFoldableTargetPreview() {
+    FoldablePreviewFrame {
+        LanguagePickerContent(
+            target = LanguageRole.TARGET,
+            languages = previewLanguages,
+            selectedId = "es",
+            query = "",
+            onQueryChange = {},
+            onSelect = {},
+            onBack = {},
+            recents = previewRecents,
+            offlineStates = previewStates,
+            library = previewMeterPacks,
+            arrangementOverride = previewTwoLeaf,
+        )
+    }
+}
+
+/**
+ * The meter card, one preview per state it can be in — which is the whole of
+ * what [offlineLibraryMeter] can return, so a fourth sentence cannot appear on
+ * this card without a fourth preview here.
+ *
+ * They are shown together rather than one per function because the point of
+ * three states is the CONTRAST: the degraded card must not be mistakable for the
+ * sized one at a glance, and that is only reviewable side by side.
+ */
+@PreviewLightDark
+@Composable
+private fun OfflineLibraryMeterZeroPreview() {
+    MeterPreviewSurface { OfflineLibraryMeterCard(meter = OfflineLibraryMeter.Empty(capable = 59)) }
+}
+
+@PreviewLightDark
+@Composable
+private fun OfflineLibraryMeterPacksPreview() {
+    MeterPreviewSurface { OfflineLibraryMeterCard(meter = previewMeterPacks) }
+}
+
+/**
+ * The R8 case: packs are installed, the model store is not where issue #90's
+ * research measured it, so the size is unknown and free space is reported
+ * instead. The bar is an empty track — a fraction of the disk is precisely what
+ * is not known here.
+ */
+@PreviewLightDark
+@Composable
+private fun OfflineLibraryMeterDegradedPreview() {
+    MeterPreviewSurface {
+        OfflineLibraryMeterCard(
+            meter = OfflineLibraryMeter.Unsized(downloaded = 5, capable = 59, freeBytes = 8_651_702_272L),
+        )
+    }
+}
+
+/** A library that fills the volume — the top end of the bar, drawn once. */
+@PreviewLightDark
+@Composable
+private fun OfflineLibraryMeterFullPreview() {
+    MeterPreviewSurface {
+        OfflineLibraryMeterCard(
+            meter =
+                OfflineLibraryMeter.Sized(
+                    downloaded = 59,
+                    capable = 59,
+                    usedBytes = 9_100_000_000L,
+                    volumeBytes = 10_411_143_168L,
+                ),
+        )
+    }
+}
+
+@Composable
+private fun MeterPreviewSurface(content: @Composable () -> Unit) {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
+            Box(modifier = Modifier.width(Dimensions.pickerLeafPaneWidth).padding(LocalSpacing.current.sm8)) {
+                content()
+            }
+        }
+    }
+}
+
+/**
+ * The E-S1 numbers, so the card is reviewed against a real device rather than a
+ * round one: one af↔en pack measured 44,169,505 bytes on `emulator-5554`, on a
+ * volume `df` reported as 10,411,143,168 bytes.
+ */
+private val previewMeterPacks =
+    OfflineLibraryMeter.Sized(
+        downloaded = 5,
+        capable = 59,
+        usedBytes = 220_847_525L,
+        volumeBytes = 10_411_143_168L,
+    )
 
 /** The landscape bar on its own: with the counter, and before the catalog arrives. */
 @PreviewLightDark

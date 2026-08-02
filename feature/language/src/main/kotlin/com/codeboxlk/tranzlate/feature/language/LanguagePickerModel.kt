@@ -117,35 +117,63 @@ fun pickerAnchorIndex(
 }
 
 /**
- * How the picker arranges itself in the window it was handed (17a).
+ * How the picker arranges itself in the window it was handed (17a and 17b).
  *
  * @property twoPane the side pane is drawn beside the catalog instead of
  *   scrolling above it.
  * @property columns how many language columns the catalog grid gets. Always 1 in
  *   the single-pane arrangement; 1 or 2 in two-pane, depending on what fits.
+ * @property gutter the gap between the two panes — [PANE_GUTTER] on one flat
+ *   surface, [Dimensions.pickerCreaseGutter] where a fold runs between them.
+ * @property sidePaneWidth how wide the shortcut pane is. 17a and 17b draw it
+ *   differently and the export measures both, so the gate that decided the
+ *   arrangement is also what carries the number — the alternative is a second
+ *   `if` at the draw site, reading a fact the gate has already established.
+ * @property twoLeaf the window is FOLDED between the panes (17b), rather than
+ *   merely wide enough for two of them (17a). What it changes: the gutter is the
+ *   crease width, and the shortcut leaf carries the offline-library meter, which
+ *   17a's 412dp-tall pane has no room for and the export draws in neither
+ *   landscape frame.
  */
 @Immutable
 data class PickerArrangement(
     val twoPane: Boolean,
     val columns: Int,
+    val gutter: Dp = PANE_GUTTER,
+    val sidePaneWidth: Dp = Dimensions.pickerSidePaneWidth,
+    val twoLeaf: Boolean = false,
 ) {
+    init {
+        // The one shape this type must not take, refused the way
+        // `LanguageRowState.Selected` refuses a double wrap: a "leaf" layout
+        // with nothing beside it would draw a crease gutter down a single
+        // column and hang the meter off a pane that is not there.
+        require(!twoLeaf || twoPane) { "A two-leaf arrangement is a two-pane arrangement" }
+    }
+
     companion object {
         /** 15a / 16a as shipped: one column, everything in one scroller. */
         val SinglePane = PickerArrangement(twoPane = false, columns = 1)
     }
 }
 
-/** The gap between the side pane and the catalog. */
+/** The gap between the side pane and the catalog on ONE flat surface (17a). */
 internal val PANE_GUTTER: Dp = 8.dp
 
 /**
- * Below this the two-pane arrangement has nowhere to put its second pane:
- * [Dimensions.pickerSidePaneWidth] + [PANE_GUTTER] + one
- * [Dimensions.pickerColumnMin] column + the [Dimensions.touchTargetMin] the A–Z
- * rail overlays on the trailing edge.
+ * Below this a two-pane arrangement has nowhere to put its second pane: the
+ * shortcut pane + the gutter between them + one [Dimensions.pickerColumnMin]
+ * column + the [Dimensions.touchTargetMin] the A–Z rail overlays on the trailing
+ * edge.
+ *
+ * A function rather than a constant because 17a and 17b measure differently —
+ * 272 + 8 = 568dp for the landscape pane, 296 + 24 = 608dp for the leaf — and a
+ * single number would have to be one of the two, silently wrong for the other.
  */
-private val TWO_PANE_MIN_WIDTH: Dp =
-    Dimensions.pickerSidePaneWidth + PANE_GUTTER + Dimensions.pickerColumnMin + Dimensions.touchTargetMin
+private fun twoPaneMinWidth(
+    sidePaneWidth: Dp,
+    gutter: Dp,
+): Dp = sidePaneWidth + gutter + Dimensions.pickerColumnMin + Dimensions.touchTargetMin
 
 /**
  * Below this a window is SHORT: phone landscape rather than phone portrait or a
@@ -170,12 +198,13 @@ private val SHORT_WINDOW_MAX_HEIGHT: Dp = 480.dp
  * Three conditions, and each one is a layout this PR must NOT steal:
  *
  * - **[posture] must be [FoldPosture.FLAT].** A half-open foldable is 17b's
- *   two-leaf layout with a crease gutter (PR-15), and a tabletop fold puts a
- *   dead strip across the middle; neither is a side pane beside a catalog. Note
- *   this asks POSTURE, not `WindowInfo.hinged` — a dual-screen device held fully
- *   open is FLAT and still separating, and it is 17a's layout it should get,
- *   with the hinge handled where content is placed rather than by refusing the
- *   arrangement outright.
+ *   two-leaf layout with a crease gutter, handled in its own branch above this
+ *   one, and a tabletop fold puts a dead strip across the middle; neither is a
+ *   side pane beside a catalog. Note this asks POSTURE, not [hinged] — a
+ *   dual-screen device held fully open is FLAT and still separating, and it is
+ *   17a's layout it should get, with the hinge handled where content is placed
+ *   ([hinged] widens the gutter) rather than by refusing the arrangement
+ *   outright.
  * - **[availableHeight] must be under [SHORT_WINDOW_MAX_HEIGHT].** A tall window
  *   is either phone portrait (15a / 16a) or a tablet, and a tablet is 17c/17d's
  *   dialog host (PR-16). Height is the axis that separates 892×412 from
@@ -213,20 +242,80 @@ private val SHORT_WINDOW_MAX_HEIGHT: Dp = 480.dp
  *   unbounded height arrives here as a very large [Dp] and therefore reads as
  *   "not short", which is the safe side of the gate: an unmeasurable window never
  *   steals 17a's layout.
+ *
+ * ---
+ *
+ * **17b — the two-leaf branch (PR-15) — is decided first, and on a different
+ * question.**
+ *
+ * [FoldPosture.BOOK] means the window is folded down the middle around a
+ * VERTICAL crease: two leaves, side by side, with a physical ridge between them.
+ * That is a reason to split regardless of how tall the window is — the export's
+ * foldable frames are 760×812, three hundred dp taller than the height gate 17a
+ * would fail them on — because the split is not being done to use up spare
+ * width. It is being done because the device is already in two halves and
+ * content that ignores that lands on the fold.
+ *
+ * [FoldPosture.TABLETOP] gets no split at all: its crease is HORIZONTAL, so two
+ * side-by-side panes would each be cut across the middle by it, which is worse
+ * than one scroller that the user can simply push past the fold.
+ *
+ * **[hinged] is a third, separate question and it only moves the gutter.** It
+ * asks whether a hinge SEPARATES the window, which a fully-open dual-screen
+ * device answers yes to while its posture is FLAT (see `WindowInfo.hinged`). Such
+ * a device gets 17a's arrangement — it is flat and it is wide — but the gap
+ * between its panes has a physical seam running down it, so it is drawn at the
+ * crease width instead of the flat one. A [FoldPosture.BOOK] window always
+ * separates by definition and does not need to ask.
+ *
+ * @param hinged a hinge splits this window into two logical areas
+ *   (`WindowInfo.hinged`), which is NOT the same as being folded — see above.
  */
 fun pickerArrangement(
     availableWidth: Dp,
     availableHeight: Dp,
     posture: FoldPosture,
+    hinged: Boolean = false,
 ): PickerArrangement {
-    val twoPane =
-        posture == FoldPosture.FLAT &&
-            availableHeight < SHORT_WINDOW_MAX_HEIGHT &&
-            availableWidth >= TWO_PANE_MIN_WIDTH
-    if (!twoPane) return PickerArrangement.SinglePane
-    val catalogWidth = availableWidth - Dimensions.pickerSidePaneWidth - PANE_GUTTER - Dimensions.touchTargetMin
-    val columns = if (catalogWidth >= Dimensions.pickerColumnMin * 2) 2 else 1
-    return PickerArrangement(twoPane = true, columns = columns)
+    if (posture == FoldPosture.BOOK) {
+        return twoPaneOrSingle(
+            availableWidth = availableWidth,
+            sidePaneWidth = Dimensions.pickerLeafPaneWidth,
+            gutter = Dimensions.pickerCreaseGutter,
+            twoLeaf = true,
+        )
+    }
+    val short = availableHeight < SHORT_WINDOW_MAX_HEIGHT
+    if (posture != FoldPosture.FLAT || !short) return PickerArrangement.SinglePane
+    return twoPaneOrSingle(
+        availableWidth = availableWidth,
+        sidePaneWidth = Dimensions.pickerSidePaneWidth,
+        gutter = if (hinged) Dimensions.pickerCreaseGutter else PANE_GUTTER,
+        twoLeaf = false,
+    )
+}
+
+/**
+ * The half of [pickerArrangement] that is the same for both arrangements: does
+ * the width clear the minimum, and if it does, how many language columns are
+ * left over once the pane, the gutter and the A–Z rail's touch strip are taken
+ * out.
+ */
+private fun twoPaneOrSingle(
+    availableWidth: Dp,
+    sidePaneWidth: Dp,
+    gutter: Dp,
+    twoLeaf: Boolean,
+): PickerArrangement {
+    if (availableWidth < twoPaneMinWidth(sidePaneWidth, gutter)) return PickerArrangement.SinglePane
+    val catalogWidth = availableWidth - sidePaneWidth - gutter - Dimensions.touchTargetMin
+    return PickerArrangement(
+        twoPane = true,
+        columns = if (catalogWidth >= Dimensions.pickerColumnMin * 2) 2 else 1,
+        gutter = gutter,
+        sidePaneWidth = sidePaneWidth,
+        twoLeaf = twoLeaf,
+    )
 }
 
 /**
@@ -550,6 +639,13 @@ data class PickerListPlan(
      * whole screen.
      */
     val counterInTopBar: Boolean = false,
+    /**
+     * The offline-library meter card sits at the foot of the shortcut leaf
+     * (17b, U-5). 17a does not draw it and the export shows why: at 412dp of
+     * window height its pane is already full, and the card would push the
+     * recents section — the reason the pane exists — off the bottom.
+     */
+    val showMeter: Boolean = false,
 )
 
 /**
@@ -607,7 +703,22 @@ data class PickerListPlan(
  * @param detectRowPresent the source-only "Detect language" pseudo-row.
  * @param anyVoiceMark at least one row would draw the speaker ([showsVoiceMark]).
  * @param railed the A–Z rail is up: a full, unfiltered, non-empty catalog.
- * @param twoPane the 17a landscape arrangement ([PickerArrangement.twoPane]).
+ * @param arrangement what [pickerArrangement] decided this window is. Two things
+ *   are read from it and they are NOT the same question:
+ *   [PickerArrangement.twoPane] — the shortcuts moved into a pane, true of both
+ *   17a and 17b, and the only thing [PickerListPlan.catalogOffset] cares about;
+ *   and [PickerArrangement.twoLeaf] — the window is folded, which decides the
+ *   meter and nothing else. Passed whole rather than as two booleans, for the
+ *   reason the gutter is: the gate has already established which layout this is,
+ *   and a caller unpacking it into flags is a second place that can disagree.
+ * @param libraryReady the storage snapshot has arrived
+ *   ([OfflineLibraryMeter] is non-null). Asked HERE rather than at the draw
+ *   site, because it is the same question [PickerListPlan.sidePane] has to
+ *   answer: while the disk is still being read the meter is not a tenant of the
+ *   leaf yet, and a search that has cleared the recents would leave the pane
+ *   genuinely empty. A `showMeter && library != null` test where the card is
+ *   drawn would be a second source for one fact, and `sidePane` would be reading
+ *   the wrong one.
  */
 fun pickerListPlan(
     role: LanguageRole,
@@ -615,8 +726,11 @@ fun pickerListPlan(
     recentCount: Int,
     anyVoiceMark: Boolean,
     railed: Boolean,
-    twoPane: Boolean = false,
+    arrangement: PickerArrangement = PickerArrangement.SinglePane,
+    libraryReady: Boolean = false,
 ): PickerListPlan {
+    val twoPane = arrangement.twoPane
+    val twoLeaf = arrangement.twoLeaf
     val showVoiceLegend = role == LanguageRole.TARGET && anyVoiceMark
     val recentHeader =
         when {
@@ -635,11 +749,16 @@ fun pickerListPlan(
         } else {
             (if (detectRowPresent) 1 else 0) + (if (recentHeader == null) 0 else recentCount + 1)
         }
+    // Once the disk has answered, the meter is a permanent tenant of the leaf,
+    // so 17b's pane is never empty — which is why it is one of the terms below
+    // rather than an afterthought. Before it answers there is nothing to draw,
+    // and the pane has to be able to go.
+    val showMeter = twoLeaf && libraryReady
     // A side pane with nothing in it is 272dp of empty surface next to the
     // results — reachable the moment a search clears the recents on the source
     // side. EDGE_CASES' no-dead-end rule cuts the same way for furniture as it
     // does for errors: the pane goes, and the catalog takes the width back.
-    val sidePane = twoPane && (recentHeader != null || detectRowPresent || showVoiceLegend)
+    val sidePane = twoPane && (recentHeader != null || detectRowPresent || showVoiceLegend || showMeter)
     return PickerListPlan(
         showVoiceLegend = showVoiceLegend,
         recentHeader = recentHeader,
@@ -647,8 +766,135 @@ fun pickerListPlan(
         catalogOffset = aboveTheAlphabet + (if (railed) 1 else 0),
         sidePane = sidePane,
         counterInTopBar = twoPane,
+        showMeter = showMeter,
     )
 }
+
+// ---- U-5: the offline-library meter (17b) -------------------------------
+
+/**
+ * What the "Offline library" card is entitled to SAY — a closed set of three,
+ * because the interesting part of this feature is the two things it must refuse
+ * to claim.
+ *
+ * The card states a count and, when it can, a size. The count comes from the
+ * catalogue and is always knowable. The size comes from walking ML Kit's model
+ * store on disk ([com.codeboxlk.tranzlate.core.common.StorageProbe.packsBytes]),
+ * and that walk can fail to find the store at all — ML Kit has never promised
+ * the directory name, and this project only knows it because issue #90's
+ * research measured it. So:
+ *
+ * - **`null` bytes may never render as `0 MB`.** Zero is a factual claim ("the
+ *   packs occupy no space") that a missing directory cannot support. That is
+ *   risk R8 in the ruling's register, and [Unsized] is the honest answer to it:
+ *   say how much room is left instead, which is the number the user would have
+ *   wanted the size for.
+ * - **A count of zero outranks both.** A device that has never downloaded
+ *   anything has no model store either — verified on `emulator-5554`, where
+ *   `no_backup/com.google.mlkit.translate.models` did not exist until the first
+ *   pack landed (E-S1). So the commonest reason for a null walk is simply that
+ *   there is nothing to walk, and the card must say "nothing downloaded", which
+ *   is what the export's `from · foldable first run` frame draws.
+ */
+@Immutable
+sealed interface OfflineLibraryMeter {
+    /** Packs on this device. */
+    val downloaded: Int
+
+    /** Languages that COULD be downloaded — 59 of our 194, the counter's denominator (C-11). */
+    val capable: Int
+
+    /** How full the bar is drawn, 0..1. */
+    val fraction: Float
+
+    /** Nothing downloaded yet. The bar is an empty track, not a zero-width fill. */
+    data class Empty(
+        override val capable: Int,
+    ) : OfflineLibraryMeter {
+        override val downloaded: Int get() = 0
+        override val fraction: Float get() = 0f
+    }
+
+    /**
+     * Packs on disk and the walk found them.
+     *
+     * @property usedBytes the measured sum, never an estimate (R3).
+     * @property volumeBytes the whole volume the store sits on — the same disk
+     *   [usedBytes] was measured from, so the bar is one fraction of one thing.
+     */
+    data class Sized(
+        override val downloaded: Int,
+        override val capable: Int,
+        val usedBytes: Long,
+        val volumeBytes: Long,
+    ) : OfflineLibraryMeter {
+        /**
+         * Deliberately NOT floored at a visible minimum. On the E-S1 device one
+         * pack was 42.1 MB of a 9.7 GB volume — 0.4%, which draws as very nearly
+         * nothing, and that is the true statement. A floor would draw a bar
+         * bigger than the fact it reports, and the count beside it already says
+         * the packs are there.
+         */
+        override val fraction: Float
+            get() = if (volumeBytes <= 0L) 0f else (usedBytes.toFloat() / volumeBytes).coerceIn(0f, 1f)
+    }
+
+    /**
+     * Packs are installed but their size is unknown — the store directory is
+     * absent, renamed, or empty. Free space is reported instead and the bar has
+     * no fill, because a fraction of the disk is exactly what is not known.
+     */
+    data class Unsized(
+        override val downloaded: Int,
+        override val capable: Int,
+        val freeBytes: Long,
+    ) : OfflineLibraryMeter {
+        override val fraction: Float get() = 0f
+    }
+}
+
+/**
+ * The one place a storage snapshot plus a pack count becomes a meter (U-5).
+ *
+ * Precedence, and why each step is above the next:
+ * 1. **Nothing downloaded → [OfflineLibraryMeter.Empty].** The COUNT decides
+ *    this, never the bytes, and it has to: a first run has no model store, so
+ *    the byte answer there is `null` for the most ordinary reason there is.
+ *    Routing that to a degrade would replace the drawn "nothing downloaded" with
+ *    a free-space number on the one screen where the user has nothing to be told
+ *    about.
+ * 2. **Packs, and a byte answer above zero → [OfflineLibraryMeter.Sized].**
+ * 3. **Everything else → [OfflineLibraryMeter.Unsized].** Two cases arrive here
+ *    and they are the same finding: `null` (the directory is not where issue
+ *    #90's research measured it) and `0` while packs are installed (it is there
+ *    but it is not the store any more). Both mean ML Kit moved, and neither
+ *    supports the sentence "your packs take up no space".
+ */
+fun offlineLibraryMeter(
+    downloaded: Int,
+    capable: Int,
+    packsBytes: Long?,
+    volumeBytes: Long,
+    freeBytes: Long,
+): OfflineLibraryMeter =
+    when {
+        downloaded <= 0 -> {
+            OfflineLibraryMeter.Empty(capable = capable)
+        }
+
+        packsBytes != null && packsBytes > 0L -> {
+            OfflineLibraryMeter.Sized(
+                downloaded = downloaded,
+                capable = capable,
+                usedBytes = packsBytes,
+                volumeBytes = volumeBytes,
+            )
+        }
+
+        else -> {
+            OfflineLibraryMeter.Unsized(downloaded = downloaded, capable = capable, freeBytes = freeBytes)
+        }
+    }
 
 /**
  * How short a picker row is allowed to be.

@@ -220,6 +220,150 @@ class PickerListPositionTest {
         }
     }
 
+    /**
+     * **Both split arrangements go through ONE `PickerCatalog` call**, and that
+     * call is told the shortcuts are not its business.
+     *
+     * The alternative shape — a second call for the leaf, or the same call with
+     * `shortcutsInGrid = true` — is what "the two leaves are given the same
+     * content" looks like in this file, and it fails in two ways at once. The
+     * loud one is a crash: the detect row and the recents rows would be emitted
+     * under keys that already exist in the pane, and duplicate keys in a lazy
+     * grid are a hard failure, not a warning. The quiet one is worse and would
+     * arrive first — `catalogOffset` is 0 in both split arrangements, so a grid
+     * that emitted a prefix anyway would land every rail letter and every
+     * restored anchor as many rows short as the pane happens to hold.
+     *
+     * A source rule for the reason this whole module's UI rules are source
+     * rules: there is no Compose test runtime here (#186) and CI compiles
+     * instrumented tests without running them (#40).
+     */
+    @Test
+    fun `the split arrangements never emit the shortcuts twice`() {
+        val body = pickerBodySource()
+        val flags = Regex("""shortcutsInGrid = (true|false)""").findAll(body).map { it.groupValues[1] }.toList()
+
+        // Never vacuous: a renamed parameter or a moved body reports nothing and
+        // would satisfy "exactly one false" by having no flags at all.
+        assertWithMessage("PickerBody passes shortcutsInGrid $flags")
+            .that(flags)
+            .containsExactly("false", "true")
+            .inOrder()
+    }
+
+    /**
+     * The gutter between the panes comes from the ARRANGEMENT, not from an `if`
+     * at the draw site.
+     *
+     * Two numbers live here — 8dp between two things on one surface, 24dp across
+     * a physical fold — and the gate has already established which window this
+     * is. A second decision at the draw site is a second place that has to be
+     * kept in step, which is the shape of the defect PR-14's co-verify found
+     * when width and height were measured from two sources.
+     */
+    @Test
+    fun `the gutter is whatever the arrangement said it was`() {
+        val body = pickerBodySource()
+
+        assertThat(body).contains("Modifier.width(arrangement.gutter)")
+        // …and the two constants are NOT spelled at the draw site.
+        assertThat(body).doesNotContain("PANE_GUTTER")
+        assertThat(body).doesNotContain("pickerCreaseGutter")
+    }
+
+    // ---- 17b: the fold (PR-15) ----------------------------------------------
+
+    /**
+     * **The regression this PR is most likely to cause**, and the reason it is
+     * written as a round trip rather than as an assertion about an index.
+     *
+     * A fold is a configuration change: the composition is destroyed and the
+     * ViewModel is kept, exactly as on a rotation. PR-14 discovered what that
+     * costs when the saved position is an item INDEX — the single-pane grid
+     * emits `[detect] [recents…] [All languages] …catalog` and a split one emits
+     * `[All languages] …catalog`, so the same number named a language one to
+     * seven rows away. Measured then: browsing at English in portrait, landscape
+     * opened at Finnish.
+     *
+     * PR-15 adds a third arrangement to that set, so the same question has to be
+     * asked again — and now in both directions, because a foldable is the one
+     * device where the user genuinely goes back and forth.
+     */
+    @Test
+    fun `a language anchored in portrait comes back as the same language after a fold`() {
+        val catalog = catalog()
+        val recents = catalog.recentRows()
+        val portrait = arrangement(twoPane = false, recentCount = recents.size)
+        val folded = arrangement(twoPane = false, twoLeaf = true, recentCount = recents.size)
+
+        assertRestoresTo("ca", from = portrait, to = folded, recents = recents, catalog = catalog)
+        assertRestoresTo("ca", from = folded, to = portrait, recents = recents, catalog = catalog)
+    }
+
+    /**
+     * …and unfolding into 17a's landscape, which is the trip a Fold makes when
+     * it is opened and then turned. Two arrangements that both drop the same
+     * prefix must number the catalog identically, so this pair would survive a
+     * mistake in either — which is why the portrait leg above is the one that
+     * carries the proof, and this one pins that they have not silently drifted
+     * apart from each other.
+     */
+    @Test
+    fun `folding and unfolding between the two split arrangements keeps the language`() {
+        val catalog = catalog()
+        val recents = catalog.recentRows()
+        val landscape = arrangement(twoPane = true, recentCount = recents.size)
+        val folded = arrangement(twoPane = false, twoLeaf = true, recentCount = recents.size)
+
+        assertThat(folded.plan.catalogOffset).isEqualTo(landscape.plan.catalogOffset)
+        assertRestoresTo("ca", from = landscape, to = folded, recents = recents, catalog = catalog)
+        assertRestoresTo("ca", from = folded, to = landscape, recents = recents, catalog = catalog)
+    }
+
+    /**
+     * The target side too, because its prefix is a different size: 16a's
+     * "Recently used as target" header and rows sit above the alphabet where the
+     * source side also has the Detect row. A fold that was only ever checked on
+     * one side would pass with the other still off by one.
+     */
+    @Test
+    fun `the target side survives a fold as well`() {
+        val catalog = catalog()
+        val recents = catalog.recentRows()
+        val portrait = arrangement(twoPane = false, role = LanguageRole.TARGET, recentCount = recents.size)
+        val folded =
+            arrangement(twoPane = false, twoLeaf = true, role = LanguageRole.TARGET, recentCount = recents.size)
+
+        assertThat(portrait.plan.catalogOffset).isGreaterThan(folded.plan.catalogOffset)
+        assertRestoresTo("ca", from = portrait, to = folded, recents = recents, catalog = catalog)
+        assertRestoresTo("ca", from = folded, to = portrait, recents = recents, catalog = catalog)
+    }
+
+    /**
+     * A language the fold cannot restore to — one filtered out of the catalog
+     * being restored INTO — lands at the top rather than at a guessed index.
+     * The top is honest; an index would put the user somewhere they never were.
+     *
+     * **Asserted against the PORTRAIT offset, and that is not incidental.** The
+     * folded arrangement's offset is 1 (just the "All languages" header), so a
+     * `catalogOffset + (-1)` fallback would come out at 0 there and this test
+     * would pass on the broken code — which is what the mutation run found when
+     * it was written the other way round. Portrait's offset is the detect row
+     * plus the recents section plus that header, so the two answers differ.
+     */
+    @Test
+    fun `a fold into a filtered catalog restores to the top`() {
+        val catalog = catalog()
+        val recents = catalog.recentRows()
+        val folded = arrangement(twoPane = false, twoLeaf = true, recentCount = recents.size)
+        val portrait = arrangement(twoPane = false, recentCount = recents.size)
+        val filtered = catalog.filter { it.id != "ca" }
+
+        assertThat(portrait.plan.catalogOffset).isGreaterThan(1)
+        assertThat(pickerAnchorIndex("ca", filtered, portrait.plan.catalogOffset)).isEqualTo(0)
+        assertThat(pickerAnchorIndex("ca", filtered, folded.plan.catalogOffset)).isEqualTo(0)
+    }
+
     // ---- helpers -------------------------------------------------------------
 
     /** A plan plus the two inputs [emittedKeys] needs and [PickerListPlan] does not carry. */
@@ -234,8 +378,10 @@ class PickerListPositionTest {
         role: LanguageRole = LanguageRole.SOURCE,
         recentCount: Int = 0,
         railed: Boolean = true,
+        twoLeaf: Boolean = false,
     ): TestArrangement {
         val detect = role == LanguageRole.SOURCE
+        val split = twoPane || twoLeaf
         return TestArrangement(
             plan =
                 pickerListPlan(
@@ -244,9 +390,11 @@ class PickerListPositionTest {
                     recentCount = recentCount,
                     anyVoiceMark = true,
                     railed = railed,
-                    twoPane = twoPane,
+                    arrangement =
+                        PickerArrangement(twoPane = split, columns = 1, twoLeaf = twoLeaf),
+                    libraryReady = twoLeaf,
                 ),
-            twoPane = twoPane,
+            twoPane = split,
             detect = detect,
         )
     }
@@ -343,6 +491,9 @@ private fun emittedKeys(
         catalog.forEach { add(catalogRowKey(it.id)) }
     }
 
+/** The body of `PickerBody`, from its declaration to the next top-level one. */
+private fun pickerBodySource(): String = sourceBetween("private fun PickerBody(", "private fun PickerSidePane(")
+
 /** The body of `PickerCatalog`, from its declaration to the next top-level one. */
 private fun pickerCatalogSource(): String {
     val checkoutRoot =
@@ -354,6 +505,21 @@ private fun pickerCatalogSource(): String {
 
     check(from in 0 until to) { "PickerCatalog is not where this test reads it from ($from..$to)" }
     return source.substring(from, to)
+}
+
+private fun sourceBetween(
+    from: String,
+    to: String,
+): String {
+    val checkoutRoot =
+        generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
+            .first { File(it, "settings.gradle.kts").isFile }
+    val source = checkoutRoot.resolve(PICKER_SCREEN).readText()
+    val start = source.indexOf(from)
+    val end = source.indexOf(to)
+
+    check(start in 0 until end) { "LanguagePickerScreen.kt no longer has $from before $to ($start..$end)" }
+    return source.substring(start, end)
 }
 
 private const val PICKER_SCREEN =

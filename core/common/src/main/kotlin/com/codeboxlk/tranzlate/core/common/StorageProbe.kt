@@ -20,19 +20,24 @@ import java.io.File
  * substitute `0` for "couldn't find the store": zero is a factual claim
  * ("no packs installed") that a missing dir cannot support.
  *
- * ### Experiment status
- * **The on-device directory fact is NOT yet re-verified, deliberately.**
+ * ### Experiment status — E-S1 RAN AND PASSED (2026-08-02, PR-15)
  * [packsBytes] walks the path research E3 measured on 2026-07-30
- * (`docs/research/issue-90-offline-download-lifecycle.md`). If ML Kit has
- * renamed or moved that store since, every device returns null and the meter
- * degrades to free-space-only — which is the honest outcome, not a wrong one.
+ * (`docs/research/issue-90-offline-download-lifecycle.md`), and experiment E-S1
+ * re-measured it on `emulator-5554` the day the meter was built: downloading one
+ * af↔en pack created exactly that directory and put 30 files totalling
+ * 44,169,505 bytes in it, and renaming the store made the walk find nothing
+ * rather than zero. Full record in
+ * `docs/research/issue-130-e-s1-storage-walk.md`.
  *
- * Experiment E-S1 (download a pack, walk, assert the sum exceeds zero; then
- * simulate the directory absent) is what settles it, and it is a **merge gate
- * on PR-15**, not on this PR — re-ruled by the owner on 2026-08-01 and recorded
- * in `docs/plan/issue-130-language-rev3.md`. The reasoning: this file defines a
- * function nothing calls, while PR-15 draws the number a user reads. An
- * experiment protects a claim, and the claim is the meter's.
+ * ML Kit still does not document the name, so the degrade above is not
+ * hypothetical insurance — it is what a future rename would land on, and it is
+ * unit-tested (`StorageProbeWalkTest`) and consumer-tested
+ * (`OfflineLibraryMeterTest`) rather than reasoned about.
+ *
+ * **One finding worth carrying:** a fresh install has no model store either — it
+ * does not exist until the first download — so `null` on first run is ordinary
+ * rather than a fault. The meter therefore decides on the pack COUNT first and
+ * only reaches the degrade with packs installed. See `offlineLibraryMeter`.
  *
  * Platform-backed implementation is prod-side wiring, like
  * [ConnectivityMonitor].

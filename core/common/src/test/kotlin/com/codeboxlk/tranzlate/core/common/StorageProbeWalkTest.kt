@@ -12,8 +12,13 @@ import java.io.File
  * non-directory store → `null`, never 0-as-fact.
  *
  * E-S1 (ruling risk R8) — the on-device pin (real pack download → sum > 0;
- * dir-rename simulation) — is PENDING; it is an emulator experiment and is
- * deliberately not faked here.
+ * dir-rename simulation) — RAN on 2026-08-02 and passed both halves, on
+ * `emulator-5554` under PR-15: 30 files, 44,169,505 bytes for one af↔en pack,
+ * and a renamed store yielding nothing rather than zero
+ * (`docs/research/issue-130-e-s1-storage-walk.md`). It stays an emulator
+ * experiment and is deliberately not faked here — the cases below are the
+ * CONTRACT, and the experiment is what says the contract is pointed at the
+ * right directory.
  */
 class StorageProbeWalkTest {
     @get:Rule

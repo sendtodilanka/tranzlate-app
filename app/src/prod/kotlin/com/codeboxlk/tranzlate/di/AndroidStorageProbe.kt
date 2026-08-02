@@ -33,12 +33,18 @@ class AndroidStorageProbe(
 
     private companion object {
         /**
-         * MLKit's translate-model store, relative to `noBackupFilesDir` —
-         * device-verified in research E3 (issue #90). An MLKit update renaming
-         * The directory this walks is the one research E3 measured; experiment
-         * E-S1 re-verifies it on a device and gates PR-15, where the number is
-         * actually shown (re-ruled 2026-08-01, see the epic plan doc).
-         * pins that on a real device.
+         * MLKit's translate-model store, relative to `noBackupFilesDir`.
+         *
+         * First measured by research E3 (issue #90, 2026-07-30) and
+         * **re-verified on a device by experiment E-S1** (2026-08-02,
+         * `emulator-5554`): downloading one af↔en pack created exactly this
+         * directory and put 30 files totalling 44,169,505 bytes in it. Full
+         * record in `docs/research/issue-130-e-s1-storage-walk.md`.
+         *
+         * MLKit has never documented the name, so an update could still move it.
+         * That is why [StorageProbe.packsBytes] degrades to `null` rather than to
+         * `0` — E-S1 confirmed the absent-directory half too, by renaming the
+         * store while 44 MB of models were still on disk under the new name.
          */
         const val MLKIT_TRANSLATE_MODELS_DIR = "com.google.mlkit.translate.models"
     }

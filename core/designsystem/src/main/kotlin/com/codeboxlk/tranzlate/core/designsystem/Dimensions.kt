@@ -139,6 +139,36 @@ object Dimensions {
     /** 17a's inline search field stops here rather than stretching to the counter. */
     val pickerSearchMaxWidth: Dp = 420.dp
 
+    // ---- Language picker, foldable two-leaf (17b, issue #130 PR-15) ---------
+    // Measured off the export's `from · foldable` / `to · foldable` frames
+    // (760×812).
+
+    /**
+     * The gap between the two leaves of a half-open foldable — the strip of
+     * window the crease runs down.
+     *
+     * Three times its flat-window sibling (`PANE_GUTTER`, 8dp), and that is the
+     * whole point of the token: 17a's gutter separates two
+     * things on ONE surface, so it only has to be legible, while this one has
+     * to keep content off a physical fold. Material's own foldable guidance
+     * ("Support different screen sizes → fold-aware layouts") puts the hinge in
+     * its own region rather than under content for exactly that reason, and the
+     * export draws 24dp between the leaves in both foldable frames.
+     */
+    val pickerCreaseGutter: Dp = 24.dp
+
+    /**
+     * The 17b leaf that holds the shortcuts — the same role as
+     * [pickerSidePaneWidth] in 17a, 24dp wider because the export draws it that
+     * way: an unfolded inner display is a much taller window, so the leaf has
+     * the recents section AND the offline-library meter card in it, and the
+     * card's "of 59 packs · 110 MB used" line is what sets the floor.
+     */
+    val pickerLeafPaneWidth: Dp = 296.dp
+
+    /** The offline-library meter's progress track (17b, export: 4px). */
+    val pickerMeterBarHeight: Dp = 4.dp
+
     /** ListDetailPaneScaffold: list/input pane minimum (C-13). */
     val paneListMin: Dp = 360.dp
 

@@ -37,6 +37,30 @@
         <item quantity="one">%1$d of %2$d on device</item>
         <item quantity="other">%1$d of %2$d on device</item>
     </plurals>
+    <!-- Offline-library meter, foldable two-leaf (17b / U-5). The big numeral is
+         its own key so locales with their own digits shape it; the line beside it
+         carries the denominator (offline-CAPABLE, as above) and the size.
+         THREE detail lines, not one with a blank: each says something the app has
+         actually established. `_used` needs a measured walk of ML Kit's model
+         store; `_free` is what it says instead when that store is not where issue
+         #90's research measured it, because "0 MB used" would be a claim about the
+         disk that nothing checked; `_none` outranks both, because a device with no
+         packs has no store to walk and "nothing downloaded" is the honest reading
+         of that (verified on emulator-5554, E-S1). -->
+    <string name="text_lang_library_title">Offline library</string>
+    <string name="text_lang_library_downloaded">%1$d</string>
+    <plurals name="text_lang_library_used">
+        <item quantity="one">of %1$d pack · %2$s used</item>
+        <item quantity="other">of %1$d packs · %2$s used</item>
+    </plurals>
+    <plurals name="text_lang_library_free">
+        <item quantity="one">of %1$d pack · %2$s free</item>
+        <item quantity="other">of %1$d packs · %2$s free</item>
+    </plurals>
+    <plurals name="text_lang_library_none">
+        <item quantity="one">of %1$d pack · nothing downloaded</item>
+        <item quantity="other">of %1$d packs · nothing downloaded</item>
+    </plurals>
     <!-- Language picker (issue #15: now a full screen, not a sheet — the two
          title keys are REUSED verbatim from the interim sheet, C-3.
          Issue #117 production redesign: permanent search, ISO-code avatars,

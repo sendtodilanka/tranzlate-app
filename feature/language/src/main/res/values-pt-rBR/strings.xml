@@ -29,6 +29,21 @@
         <item quantity="one">%1$d de %2$d no dispositivo</item>
         <item quantity="other">%1$d de %2$d no dispositivo</item>
     </plurals>
+    <!-- Offline-library meter, foldable two-leaf (17b / U-5). -->
+    <string name="text_lang_library_title">Biblioteca off-line</string>
+    <string name="text_lang_library_downloaded">%1$d</string>
+    <plurals name="text_lang_library_used">
+        <item quantity="one">de %1$d pacote · %2$s em uso</item>
+        <item quantity="other">de %1$d pacotes · %2$s em uso</item>
+    </plurals>
+    <plurals name="text_lang_library_free">
+        <item quantity="one">de %1$d pacote · %2$s livres</item>
+        <item quantity="other">de %1$d pacotes · %2$s livres</item>
+    </plurals>
+    <plurals name="text_lang_library_none">
+        <item quantity="one">de %1$d pacote · nada baixado</item>
+        <item quantity="other">de %1$d pacotes · nada baixado</item>
+    </plurals>
     <!-- Language picker (issue #117 redesign) -->
     <string name="cd_text_lang_search">Pesquisar idiomas</string>
     <string name="cd_text_lang_clear">Limpar pesquisa</string>
