@@ -9,6 +9,8 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeDownloadPrefsRepository
+import com.codeboxlk.tranzlate.core.testing.FakeStorageProbe
+import com.codeboxlk.tranzlate.core.testing.TestDispatcherProvider
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
@@ -185,15 +187,25 @@ class LanguagePickerViewModelTest {
 
     private fun viewModel() = viewModelWith(appScope)
 
+    /**
+     * The meter's storage answers. Default = a fresh install: the model store
+     * dir does not exist until the first pack lands, verified on
+     * `emulator-5554` (E-S1), so `packs` is null out of the box.
+     */
+    private val storage = FakeStorageProbe()
+
     private fun viewModelWith(
         appScope: CoroutineScope,
         handle: SavedStateHandle = SavedStateHandle(),
+        probe: com.codeboxlk.tranzlate.core.common.StorageProbe = storage,
     ) = LanguagePickerViewModel(
         languageRepository = repository,
         clock = clock,
         modelManager = manager,
         downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
         translatePrefs = translatePrefs,
+        storageProbe = probe,
+        dispatchers = TestDispatcherProvider(dispatcher),
         savedStateHandle = handle,
         appScope = appScope,
     )
@@ -272,6 +284,8 @@ class LanguagePickerViewModelTest {
                     modelManager = SilentModelManager(),
                     downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
                     translatePrefs = translatePrefs,
+                    storageProbe = storage,
+                    dispatchers = TestDispatcherProvider(dispatcher),
                     savedStateHandle = SavedStateHandle(),
                     appScope = appScope,
                 )
@@ -639,5 +653,229 @@ class LanguagePickerViewModelTest {
 
         assertThat(restored.query.value).isEqualTo("swe")
         assertThat(restored.listPosition()).isEqualTo(PickerListPosition("pt", 40))
+    }
+
+    // ---- the offline-library meter (#130 PR-15, U-5) ------------------------
+
+    /**
+     * The meter is null until the disk has been read once, and the card is not
+     * drawn while it is. A placeholder reading "0 packs" that corrected itself a
+     * frame later would have stated something false in between — the same rule
+     * that stops the first frame labelling 194 rows "Online only".
+     */
+    @Test
+    fun `the meter is absent until the disk has been read`() =
+        runTest(dispatcher) {
+            val subject = viewModel()
+
+            subject.library.test {
+                assertThat(awaitItem()).isNull()
+                advanceUntilIdle()
+                assertThat(awaitItem()).isNotNull()
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /** The ordinary case, wired end to end: counts from the catalogue, bytes from the probe. */
+    @Test
+    fun `the meter reports the catalogue count and the measured size`() =
+        runTest(dispatcher) {
+            repository.catalog.value =
+                listOf(
+                    Language("en", "English", offlineAvailable = true, offlineDownloaded = true),
+                    Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
+                    Language("xx", "Xhosa-ish", offlineAvailable = false, offlineDownloaded = false),
+                )
+            storage.packs = ONE_PACK_BYTES
+            storage.total = VOLUME_BYTES
+            val subject = viewModel()
+
+            subject.library.test {
+                skipItems(1) // the pre-read null
+                advanceUntilIdle()
+                assertThat(awaitItem()).isEqualTo(
+                    OfflineLibraryMeter.Sized(
+                        downloaded = 1,
+                        // 2 offline-capable of 3 rows — the counter's denominator is
+                        // capability, not catalogue size (C-11).
+                        capable = 2,
+                        usedBytes = ONE_PACK_BYTES,
+                        volumeBytes = VOLUME_BYTES,
+                    ),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /**
+     * **The disk is walked when the pack COUNT changes, and at no other time.**
+     *
+     * `packsBytes()` walks the model store file by file — 30 files for a single
+     * pack, measured in E-S1 — so a meter that re-derived from the raw catalogue
+     * would re-walk on every unrelated overlay change the repository publishes
+     * (a `lastUsedAt` stamp, a transient download state). That is risk PP-5.b in
+     * the ruling's register, and the fake counts the calls so the claim is
+     * measured rather than asserted.
+     */
+    @Test
+    fun `an unrelated catalogue change does not re-walk the disk`() =
+        runTest(dispatcher) {
+            val counting = CountingStorageProbe()
+            val subject = viewModelWith(appScope, probe = counting)
+
+            subject.library.test {
+                skipItems(1)
+                advanceUntilIdle()
+                assertThat(awaitItem()).isNotNull()
+                val afterFirst = counting.walks
+
+                // Same two languages, same download state — only the stamp moved.
+                repository.catalog.value =
+                    repository.catalog.value.map { it.copy(lastUsedAt = 99L) }
+                advanceUntilIdle()
+
+                assertThat(counting.walks).isEqualTo(afterFirst)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /** …and it IS re-walked when a pack actually lands, or the number would go stale. */
+    @Test
+    fun `a pack arriving re-walks the disk`() =
+        runTest(dispatcher) {
+            val counting = CountingStorageProbe()
+            val subject = viewModelWith(appScope, probe = counting)
+
+            subject.library.test {
+                skipItems(1)
+                advanceUntilIdle()
+                assertThat(awaitItem()).isNotNull()
+                val afterFirst = counting.walks
+
+                repository.catalog.value =
+                    repository.catalog.value.map {
+                        if (it.id == "en") it.copy(offlineDownloaded = true) else it
+                    }
+                advanceUntilIdle()
+                assertThat(awaitItem().hashCode()).isNotEqualTo(0) // a new snapshot arrived
+
+                assertThat(counting.walks).isEqualTo(afterFirst + 1)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /**
+     * **The staleness window, pinned in both directions (co-verify F2).**
+     *
+     * The card is re-measured when the pack count moves and when a fresh
+     * subscription starts, and NOT in between. Co-verify renamed the model store
+     * under a picker that stayed open and watched it go on reading "2 of 59
+     * packs · 44 MB used" while the directory was already gone. That is a
+     * documented limit rather than a defect — the ViewModel's KDoc enumerates
+     * why nothing a user does can reach it — and a documented limit needs a test
+     * or the document is the only thing holding it.
+     *
+     * Both halves are asserted here: the number HOLDS while the count is
+     * unchanged, and it MOVES the moment a pack lands. A future decision to
+     * re-walk more often, or less, reddens one of the two.
+     */
+    @Test
+    fun `the meter holds its number until a pack arrives or leaves`() =
+        runTest(dispatcher) {
+            repository.catalog.value =
+                listOf(
+                    Language("en", "English", offlineAvailable = true, offlineDownloaded = true),
+                    Language("af", "Afrikaans", offlineAvailable = true, offlineDownloaded = false),
+                )
+            storage.packs = ONE_PACK_BYTES
+            storage.total = VOLUME_BYTES
+            storage.free = FREE_BYTES
+            val subject = viewModel()
+
+            subject.library.test {
+                skipItems(1) // the pre-read null
+                advanceUntilIdle()
+                assertThat(awaitItem()).isEqualTo(
+                    OfflineLibraryMeter.Sized(
+                        downloaded = 1,
+                        capable = 2,
+                        usedBytes = ONE_PACK_BYTES,
+                        volumeBytes = VOLUME_BYTES,
+                    ),
+                )
+
+                // The store is renamed away — the disk's answer changes completely
+                // — but no pack arrived or left, so the count is the same and the
+                // card keeps the number it measured. This is the window.
+                storage.packs = null
+                repository.catalog.value = repository.catalog.value.map { it.copy(lastUsedAt = 7L) }
+                advanceUntilIdle()
+                expectNoEvents()
+                assertThat(subject.library.value).isEqualTo(
+                    OfflineLibraryMeter.Sized(
+                        downloaded = 1,
+                        capable = 2,
+                        usedBytes = ONE_PACK_BYTES,
+                        volumeBytes = VOLUME_BYTES,
+                    ),
+                )
+
+                // …and the next pack to land closes it, because the count moved.
+                repository.catalog.value =
+                    repository.catalog.value.map {
+                        if (it.id == "af") it.copy(offlineDownloaded = true) else it
+                    }
+                advanceUntilIdle()
+                assertThat(awaitItem()).isEqualTo(
+                    OfflineLibraryMeter.Unsized(downloaded = 2, capable = 2, freeBytes = FREE_BYTES),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /**
+     * The R8 degrade, wired end to end: ML Kit's store is not where research
+     * measured it, so the probe answers null and the meter reports free space
+     * rather than "0 B used".
+     */
+    @Test
+    fun `an unreadable model store degrades rather than reporting zero`() =
+        runTest(dispatcher) {
+            repository.catalog.value =
+                listOf(Language("en", "English", offlineAvailable = true, offlineDownloaded = true))
+            storage.packs = null
+            storage.free = FREE_BYTES
+            val subject = viewModel()
+
+            subject.library.test {
+                skipItems(1)
+                advanceUntilIdle()
+                assertThat(awaitItem()).isEqualTo(
+                    OfflineLibraryMeter.Unsized(downloaded = 1, capable = 1, freeBytes = FREE_BYTES),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /** Counts the walks so "walked once per count change" is measured, not asserted. */
+    private inner class CountingStorageProbe : com.codeboxlk.tranzlate.core.common.StorageProbe {
+        var walks = 0
+            private set
+
+        override fun freeBytes(): Long = FREE_BYTES
+
+        override fun totalBytes(): Long = VOLUME_BYTES
+
+        override suspend fun packsBytes(): Long? {
+            walks++
+            return ONE_PACK_BYTES
+        }
+    }
+
+    private companion object {
+        /** E-S1 measurements on `emulator-5554` — one af↔en pack, and the volume it sat on. */
+        const val ONE_PACK_BYTES = 44_169_505L
+        const val VOLUME_BYTES = 10_411_143_168L
+        const val FREE_BYTES = 8_651_702_272L
     }
 }

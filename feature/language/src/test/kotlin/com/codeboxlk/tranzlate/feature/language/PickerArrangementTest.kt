@@ -2,19 +2,25 @@ package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.ui.FoldPosture
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.io.File
 
 /**
- * The 17a window gate (#130 PR-14) — the ruling's "window-gate unit".
+ * The window gate for 17a AND 17b (#130 PR-14, extended by PR-15).
  *
- * Every case here is a layout PR-14 must either claim or leave alone, and the
- * ones it must leave alone are the interesting half: 17b's foldable two-leaf
- * (PR-15) and 17c/17d's tablet dialog (PR-16) both arrive at this function
- * looking wide enough, and both must come back single-pane.
+ * Every case here is a layout the gate must either claim or leave alone, and
+ * the ones it must leave alone are the interesting half: 17c/17d's tablet
+ * dialog (PR-16) arrives at this function looking wide enough and must come
+ * back single-pane, and a tabletop fold arrives looking exactly like a book.
+ *
+ * **PR-15 added a second arrangement behind the same `twoPane` flag**, so the
+ * cases below distinguish three answers, not two: single-pane, 17a's side pane
+ * (8dp gutter, 272dp pane) and 17b's two leaves (24dp crease, 296dp leaf).
  *
  * The window shapes are real ones, not round numbers. 892×412 is the export's
  * own landscape frame; 1280×800 and 800×1280 are the tablet the dialog host is
@@ -125,37 +131,148 @@ class PickerArrangementTest {
     }
 
     /**
-     * The posture cases, which are the ones a reader is most likely to get wrong,
-     * because `WindowInfo` carries `hinged` as well and the two answer different
-     * questions. A half-open BOOK foldable is 17b: two leaves with a 24dp crease
-     * gutter between them (PR-15), not a side pane beside a catalog. Reading
-     * `hinged` here instead would let it through — a fully-open dual screen is
-     * `hinged` and FLAT — and reading neither would let it through as well.
+     * A half-open BOOK foldable gets 17b — two LEAVES — and not 17a's side pane,
+     * which is a different arrangement wearing the same `twoPane` flag.
+     *
+     * PR-14 shipped this case as `SinglePane` with a KDoc saying PR-15 would
+     * claim it; PR-15 claims it.
      */
     @Test
-    fun `a half-open book foldable is not 17a`() {
-        assertThat(pickerArrangement(892.dp, 412.dp, posture = FoldPosture.BOOK))
+    fun `a half-open book foldable is 17b, not 17a`() {
+        val arrangement = pickerArrangement(892.dp, 412.dp, posture = FoldPosture.BOOK)
+
+        assertThat(arrangement.twoPane).isTrue()
+        assertThat(arrangement.twoLeaf).isTrue()
+        assertThat(arrangement.sidePaneWidth).isEqualTo(Dimensions.pickerLeafPaneWidth)
+    }
+
+    /**
+     * **The number the ruling names for this PR.** 24dp, and it must not be
+     * confusable with 17a's 8dp: the first keeps content off a physical fold,
+     * the second is a gap that only has to be legible.
+     */
+    @Test
+    fun `a book posture gets the 24dp crease gutter`() {
+        assertThat(pickerArrangement(760.dp, 812.dp, posture = FoldPosture.BOOK).gutter)
+            .isEqualTo(24.dp)
+        assertThat(pickerArrangement(892.dp, 412.dp, posture = FoldPosture.FLAT).gutter)
+            .isEqualTo(8.dp)
+    }
+
+    /**
+     * The export's own foldable geometry, end to end: 760×812 is BOTH wide
+     * enough for two panes AND far taller than 17a's height gate allows, so a
+     * 17b that had been bolted onto 17a's condition would return single-pane
+     * here — on the exact window the design was drawn for.
+     */
+    @Test
+    fun `the export's 760 by 812 foldable frame splits into two leaves`() {
+        val arrangement = pickerArrangement(760.dp, 812.dp, posture = FoldPosture.BOOK)
+
+        assertThat(arrangement.twoLeaf).isTrue()
+        // 760 − 296 pane − 24 crease − 48 rail = 392dp of catalog: one column,
+        // as the export draws it. Two would need 480.
+        assertThat(arrangement.columns).isEqualTo(1)
+    }
+
+    /** Below 296 + 24 + 240 + 48 the leaf layout has nowhere to put its catalog. */
+    @Test
+    fun `a book window too narrow for a leaf and a column stays single-pane`() {
+        assertThat(pickerArrangement(608.dp, 812.dp, posture = FoldPosture.BOOK).twoLeaf).isTrue()
+        assertThat(pickerArrangement(607.9.dp, 812.dp, posture = FoldPosture.BOOK))
             .isEqualTo(PickerArrangement.SinglePane)
     }
 
-    /** Tabletop puts a dead strip across the middle; a side pane would straddle it. */
+    /** Tabletop puts a dead strip across the middle; two side-by-side panes would each straddle it. */
     @Test
-    fun `a tabletop fold is not 17a`() {
+    fun `a tabletop fold is neither 17a nor 17b`() {
         assertThat(pickerArrangement(892.dp, 412.dp, posture = FoldPosture.TABLETOP))
+            .isEqualTo(PickerArrangement.SinglePane)
+        assertThat(pickerArrangement(760.dp, 812.dp, posture = FoldPosture.TABLETOP))
             .isEqualTo(PickerArrangement.SinglePane)
     }
 
     /**
-     * …and the same window at FLAT posture DOES split, so the three cases above
-     * are failing on posture rather than on something they happen to share.
+     * Each posture gets its OWN arrangement at one window size, so none of the
+     * three cases is passing on something they happen to share.
      */
     @Test
-    fun `posture is the only thing separating those three from 17a`() {
-        val flat = pickerArrangement(892.dp, 412.dp, posture = FoldPosture.FLAT)
+    fun `posture is what separates the three arrangements`() {
+        val at = { p: FoldPosture -> pickerArrangement(892.dp, 412.dp, posture = p) }
 
-        assertThat(flat.twoPane).isTrue()
-        assertThat(FoldPosture.entries.filter { pickerArrangement(892.dp, 412.dp, it).twoPane })
-            .containsExactly(FoldPosture.FLAT)
+        assertThat(at(FoldPosture.FLAT).twoLeaf).isFalse()
+        assertThat(at(FoldPosture.FLAT).twoPane).isTrue()
+        assertThat(FoldPosture.entries.filter { at(it).twoLeaf }).containsExactly(FoldPosture.BOOK)
+        assertThat(FoldPosture.entries.filter { at(it).twoPane })
+            .containsExactly(FoldPosture.FLAT, FoldPosture.BOOK)
+    }
+
+    // ---- posture is not `hinged`, and the difference is load-bearing ---------
+
+    /**
+     * **A fully-open dual screen is not a book**, and this is the pair that says
+     * so. `WindowInfo.hinged` is true for it — a separating vertical hinge — while
+     * its posture is FLAT, because it is one flat plane in two pieces. It gets
+     * 17a's arrangement, which is what it has room for, and NOT the two-leaf one.
+     *
+     * Reading `hinged` where [pickerArrangement] reads posture would flip this
+     * to a leaf layout; reading posture where it reads `hinged` would lose the
+     * wider gutter below. The two fail in opposite directions on purpose.
+     */
+    @Test
+    fun `a fully open dual screen is not a two-leaf book`() {
+        val arrangement = pickerArrangement(892.dp, 412.dp, posture = FoldPosture.FLAT, hinged = true)
+
+        assertThat(arrangement.twoPane).isTrue()
+        assertThat(arrangement.twoLeaf).isFalse()
+        assertThat(arrangement.sidePaneWidth).isEqualTo(Dimensions.pickerSidePaneWidth)
+    }
+
+    /**
+     * …but it still has a seam running down the gap, so the gap is drawn at the
+     * crease width. That is the whole of what `hinged` decides here: content is
+     * routed around the hinge rather than the arrangement being refused (the
+     * reading PR-13's `WindowInfo.hinged` KDoc asks for).
+     */
+    @Test
+    fun `a separating hinge widens 17a's gutter without changing its layout`() {
+        val seamed = pickerArrangement(892.dp, 412.dp, posture = FoldPosture.FLAT, hinged = true)
+        val plain = pickerArrangement(892.dp, 412.dp, posture = FoldPosture.FLAT, hinged = false)
+
+        assertThat(seamed.gutter).isEqualTo(Dimensions.pickerCreaseGutter)
+        assertThat(plain.gutter).isEqualTo(8.dp)
+        // Everything else about them is the same window and the same layout.
+        assertThat(seamed.copy(gutter = plain.gutter)).isEqualTo(plain)
+    }
+
+    /**
+     * The opposite direction: a half-open fold whose hinge does NOT separate —
+     * a crease on one continuous inner display, which is what a Fold actually
+     * reports — still gets two leaves. Posture is the question, and `hinged` has
+     * no vote in it.
+     */
+    @Test
+    fun `a half open book with no separating hinge still gets two leaves`() {
+        val arrangement = pickerArrangement(760.dp, 812.dp, posture = FoldPosture.BOOK, hinged = false)
+
+        assertThat(arrangement.twoLeaf).isTrue()
+        assertThat(arrangement.gutter).isEqualTo(Dimensions.pickerCreaseGutter)
+    }
+
+    /**
+     * A "leaf" with nothing beside it is the one shape [PickerArrangement] must
+     * not take — it would draw a crease gutter down a single column and hang the
+     * meter off a pane that is not there. Refused at construction, the way
+     * `LanguageRowState.Selected` refuses a double wrap.
+     */
+    @Test
+    fun `a two-leaf arrangement cannot be single-pane`() {
+        val thrown =
+            assertThrows(IllegalArgumentException::class.java) {
+                PickerArrangement(twoPane = false, columns = 1, twoLeaf = true)
+            }
+
+        assertThat(thrown).hasMessageThat().contains("two-leaf")
     }
 
     // ---- the height threshold, now that it is a dp and not a boolean ---------

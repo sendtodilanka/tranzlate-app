@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.google.common.truth.Truth.assertThat
@@ -18,20 +19,30 @@ import java.util.Locale
  * absent section from an empty one.
  */
 class PickerListPlanTest {
+    /** 17a: a pane beside the catalog on one flat surface. */
+    private val sidePane = PickerArrangement(twoPane = true, columns = 1)
+
+    /** 17b: the same pane, on the far side of a fold. */
+    private val twoLeaf =
+        PickerArrangement(twoPane = true, columns = 1, twoLeaf = true, gutter = Dimensions.pickerCreaseGutter)
+
     private fun plan(
         role: LanguageRole = LanguageRole.TARGET,
         detect: Boolean = false,
         recentCount: Int = 3,
         anyVoiceMark: Boolean = true,
         railed: Boolean = true,
-        twoPane: Boolean = false,
+        arrangement: PickerArrangement = PickerArrangement.SinglePane,
+        /** The storage snapshot has landed. Default: yes, the resting case. */
+        libraryReady: Boolean = true,
     ) = pickerListPlan(
         role = role,
         detectRowPresent = detect,
         recentCount = recentCount,
         anyVoiceMark = anyVoiceMark,
         railed = railed,
-        twoPane = twoPane,
+        arrangement = arrangement,
+        libraryReady = libraryReady,
     )
 
     // ---- recents: absent, not empty -----------------------------------------
@@ -216,8 +227,9 @@ class PickerListPlanTest {
      */
     @Test
     fun `two-pane stops counting what the side pane holds`() {
-        val stacked = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3, twoPane = false)
-        val split = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3, twoPane = true)
+        val stacked =
+            plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3, arrangement = PickerArrangement.SinglePane)
+        val split = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3, arrangement = sidePane)
 
         // detect(1) + header(1) + 3 rows + "All languages"(1)
         assertThat(stacked.catalogOffset).isEqualTo(6)
@@ -231,7 +243,7 @@ class PickerListPlanTest {
     /** No rail, nothing above the alphabet to count, in either arrangement. */
     @Test
     fun `an unrailed two-pane catalog has no offset at all`() {
-        assertThat(plan(twoPane = true, railed = false, recentCount = 0).catalogOffset).isEqualTo(0)
+        assertThat(plan(arrangement = sidePane, railed = false, recentCount = 0).catalogOffset).isEqualTo(0)
     }
 
     // ---- 17a: the side pane, and the role-specific slot at its foot ----------
@@ -246,8 +258,8 @@ class PickerListPlanTest {
      */
     @Test
     fun `each side of the picker gets its own slot at the foot of the pane`() {
-        val source = plan(role = LanguageRole.SOURCE, detect = true, anyVoiceMark = true, twoPane = true)
-        val target = plan(role = LanguageRole.TARGET, detect = false, anyVoiceMark = true, twoPane = true)
+        val source = plan(role = LanguageRole.SOURCE, detect = true, anyVoiceMark = true, arrangement = sidePane)
+        val target = plan(role = LanguageRole.TARGET, detect = false, anyVoiceMark = true, arrangement = sidePane)
 
         assertThat(source.showVoiceLegend).isFalse()
         assertThat(target.showVoiceLegend).isTrue()
@@ -271,7 +283,7 @@ class PickerListPlanTest {
                 recentCount = 0,
                 anyVoiceMark = true,
                 railed = false,
-                twoPane = true,
+                arrangement = sidePane,
             )
 
         assertThat(searching.sidePane).isFalse()
@@ -280,10 +292,16 @@ class PickerListPlanTest {
     /** Any ONE of the three is enough to keep it. */
     @Test
     fun `one thing is enough to keep the side pane`() {
-        val recentsOnly = plan(role = LanguageRole.SOURCE, detect = false, recentCount = 1, twoPane = true)
-        val detectOnly = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 0, twoPane = true)
+        val recentsOnly = plan(role = LanguageRole.SOURCE, detect = false, recentCount = 1, arrangement = sidePane)
+        val detectOnly = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 0, arrangement = sidePane)
         val legendOnly =
-            plan(role = LanguageRole.TARGET, detect = false, recentCount = 0, anyVoiceMark = true, twoPane = true)
+            plan(
+                role = LanguageRole.TARGET,
+                detect = false,
+                recentCount = 0,
+                anyVoiceMark = true,
+                arrangement = sidePane,
+            )
 
         assertThat(recentsOnly.sidePane).isTrue()
         assertThat(detectOnly.sidePane).isTrue()
@@ -306,7 +324,101 @@ class PickerListPlanTest {
      */
     @Test
     fun `the counter moves to the bar only in two-pane`() {
-        assertThat(plan(twoPane = true).counterInTopBar).isTrue()
-        assertThat(plan(twoPane = false).counterInTopBar).isFalse()
+        assertThat(plan(arrangement = sidePane).counterInTopBar).isTrue()
+        assertThat(plan(arrangement = PickerArrangement.SinglePane).counterInTopBar).isFalse()
+    }
+
+    // ---- 17b: the offline-library meter (PR-15, U-5) ------------------------
+
+    /**
+     * **The meter belongs to the FOLDED window and to nothing else.**
+     *
+     * 17a's pane is 272dp wide inside a 412dp-tall window, and the export draws
+     * no meter in either landscape frame — there is no room for the card without
+     * pushing the recents section, which is the reason the pane exists, off the
+     * bottom. So `twoPane` is the wrong question and `twoLeaf` is the right one;
+     * they are the same value in every other test in this file, which is exactly
+     * why this one has to be written down.
+     */
+    @Test
+    fun `17a landscape draws no library meter`() {
+        assertThat(plan(arrangement = sidePane).showMeter).isFalse()
+        assertThat(plan(arrangement = twoLeaf).showMeter).isTrue()
+        assertThat(plan().showMeter).isFalse()
+    }
+
+    /**
+     * …and it is a permanent tenant of the leaf, so 17b's pane survives the one
+     * thing that empties 17a's: a search that clears the recents and filters the
+     * Detect row away. That pane still has the meter in it, so it stays.
+     */
+    @Test
+    fun `a folded leaf keeps its pane even when the shortcuts are all gone`() {
+        val searching =
+            plan(
+                role = LanguageRole.SOURCE,
+                detect = false,
+                recentCount = 0,
+                anyVoiceMark = true,
+                railed = false,
+                arrangement = twoLeaf,
+            )
+
+        assertThat(searching.sidePane).isTrue()
+        assertThat(searching.showMeter).isTrue()
+    }
+
+    /**
+     * **While the disk is still being read there is no card, and therefore no
+     * tenant** — so the one case that CAN empty a folded leaf is the same one
+     * that empties a landscape pane, arriving a moment earlier.
+     *
+     * `packsBytes()` walks the model store on IO, and a search that has cleared
+     * the recents and filtered the Detect row away can land inside that window.
+     * Drawing 296dp of empty rounded surface beside a "no results" message for a
+     * few hundred milliseconds is the same furniture EDGE_CASES' no-dead-end
+     * rule refuses in the landscape case; it is just briefer.
+     */
+    @Test
+    fun `a folded leaf with nothing in it yet is not drawn`() {
+        val loading =
+            plan(
+                role = LanguageRole.SOURCE,
+                detect = false,
+                recentCount = 0,
+                anyVoiceMark = true,
+                railed = false,
+                arrangement = twoLeaf,
+                libraryReady = false,
+            )
+
+        assertThat(loading.showMeter).isFalse()
+        assertThat(loading.sidePane).isFalse()
+    }
+
+    /** …and the shortcuts alone still keep it, snapshot or no snapshot. */
+    @Test
+    fun `a folded leaf with recents survives the wait for the disk`() {
+        val loading = plan(role = LanguageRole.SOURCE, recentCount = 3, arrangement = twoLeaf, libraryReady = false)
+
+        assertThat(loading.showMeter).isFalse()
+        assertThat(loading.sidePane).isTrue()
+    }
+
+    /**
+     * The offset arithmetic is IDENTICAL in the two arrangements, and that is a
+     * claim worth pinning rather than an accident: both move the same items into
+     * the same pane, so a fold and a rotation must number the catalog the same
+     * way. If they ever diverged, a position captured in one and restored in the
+     * other would land on a different language — the PR-14 defect, arriving from
+     * a new direction.
+     */
+    @Test
+    fun `folding does not renumber the catalog`() {
+        val landscape = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3, arrangement = sidePane)
+        val folded = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3, arrangement = twoLeaf)
+
+        assertThat(folded.catalogOffset).isEqualTo(landscape.catalogOffset)
+        assertThat(folded.copy(showMeter = false)).isEqualTo(landscape)
     }
 }

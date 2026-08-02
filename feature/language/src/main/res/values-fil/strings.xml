@@ -29,6 +29,21 @@
         <item quantity="one">%1$d sa %2$d ang nasa device</item>
         <item quantity="other">%1$d sa %2$d ang nasa device</item>
     </plurals>
+    <!-- Offline-library meter, foldable two-leaf (17b / U-5). -->
+    <string name="text_lang_library_title">Offline library</string>
+    <string name="text_lang_library_downloaded">%1$d</string>
+    <plurals name="text_lang_library_used">
+        <item quantity="one">sa %1$d pack · %2$s ang nagamit</item>
+        <item quantity="other">sa %1$d na pack · %2$s ang nagamit</item>
+    </plurals>
+    <plurals name="text_lang_library_free">
+        <item quantity="one">sa %1$d pack · %2$s ang libre</item>
+        <item quantity="other">sa %1$d na pack · %2$s ang libre</item>
+    </plurals>
+    <plurals name="text_lang_library_none">
+        <item quantity="one">sa %1$d pack · walang na-download</item>
+        <item quantity="other">sa %1$d na pack · walang na-download</item>
+    </plurals>
     <!-- Language picker (issue #117 redesign) -->
     <string name="cd_text_lang_search">Maghanap ng mga wika</string>
     <string name="cd_text_lang_clear">I-clear ang paghahanap</string>

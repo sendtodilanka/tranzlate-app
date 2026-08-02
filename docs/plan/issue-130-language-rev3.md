@@ -90,7 +90,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 |---|---|---|
 | PR-13 | Fold-posture `WindowInfo` extension + host-agnostic saveable contract (query + list position out of `rememberSaveable`, into the picker VM's `SavedStateHandle`) + `pendingConsent` → `SavedStateHandle` behind a storage seam + LeakCanary debug-only rider. **`LanguageSheetRequest` is NOT built here** — it has no members until PR-17; see below | 👁 **PR #192** |
 | PR-14 | 17a landscape two-pane: a `pickerArrangement()` window gate + a side pane beside the catalog + the catalog on a grid so ONE list position means the same language in both arrangements + the Detect-key settle. **Deviations below** | ✅ #198, 2026-08-02 |
-| PR-15 | 17b foldable two-leaf + aggregate meter — **E-S1 is a merge gate here** (re-ruled 2026-08-01) | ⬜ |
+| PR-15 | 17b foldable two-leaf (24dp crease gutter, 296dp leaf) + the offline-library meter (U-5) with its two honest degrades. **E-S1 ran and passed** — `docs/research/issue-130-e-s1-storage-walk.md`. **Deviations below** | ✅ #200, 2026-08-02 |
 | PR-16 | 17c/17d dialog host + E-D1 + measured jank budget gate | ⬜ |
 
 ### Phase 6 — sheets, first-run, snackbars
@@ -264,6 +264,113 @@ supporting line to carry the mark, and the selected row keeps only its check.
 The app reads the device either way, so nothing here changes behaviour, and 16a
 is not "fixed" to match.
 
+### PR-15 deviations from the ruling's PR-15 row (2026-08-02)
+
+Each checked against the export's markup or the running app rather than against
+the ruling text (mandatory rule 11, fourth cause). The frames were parsed per row
+container, walking the row `div`s — never on a flattened token list, which is
+what produced the wrong finding in #183 that had to be retracted.
+
+1. **17b is a THIRD arrangement, not a wider 17a, and the height gate is why.**
+   The export's foldable frames are 760 × 812. That is comfortably wider than
+   17a's 568dp floor and 332dp TALLER than its 480dp short-window ceiling, so
+   `pickerArrangement` would have returned single-pane on the exact window the
+   design was drawn for. The BOOK branch is therefore decided first and does not
+   ask about height at all: the split is not being done to use up spare width,
+   it is being done because the device is already in two halves.
+2. **`PickerArrangement` grew three fields rather than the screen growing an
+   `if`.** `gutter`, `sidePaneWidth` and `twoLeaf` all come from the gate that
+   already established which window this is. The alternative — deciding the
+   gutter at the draw site — is a second place that has to be kept in step, and
+   PR-14's co-verify found exactly that shape of defect when width and height
+   were measured from two sources. `PickerListPositionTest` pins that the draw
+   site spells neither constant.
+3. **The leaf is 296dp where 17a's pane is 272dp**, measured off the frames. It
+   is not a taste choice: the leaf also carries the meter card, whose "of 59
+   packs · 110 MB used" line sets the floor.
+4. **`hinged` finally decides something, and it is not the arrangement.** PR-13
+   shipped `WindowInfo.hinged` as deliberately NOT the same question as posture,
+   and until now nothing in the picker depended on the difference. A fully-open
+   dual screen is `hinged` and FLAT: it gets 17a's layout, because that is what
+   it has room for, but its gutter is drawn at the crease width because there is
+   a physical seam down it. That is the reading PR-13's own KDoc asks for
+   ("handled where content is placed rather than by refusing the arrangement").
+   Two tests fail in opposite directions if the two fields are swapped.
+5. **TABLETOP gets no split at all.** Its crease is horizontal, so two
+   side-by-side panes would each be cut across the middle by it. One scroller the
+   user can push past the fold is better than two that both straddle it.
+6. **The meter is gated on `twoLeaf`, not on `twoPane`.** The export draws no
+   meter in either landscape frame, and the reason is visible in the geometry:
+   272 × 412 has no room for the card without pushing the recents section — the
+   reason the pane exists — off the bottom. Those two booleans are equal in every
+   other case, which is exactly why the distinction had to be written down and
+   tested.
+7. **The meter has THREE sentences, and the one the export never drew is the
+   commonest.** The export draws two — "110 MB used" and "nothing downloaded".
+   The third, "8.6 GB free", was written as the R8 degrade the ruling's risk
+   register asks for, on the reasoning that a designer cannot draw a state that
+   only exists when ML Kit renames a directory. Co-verify's `pm clear` (E-S1b)
+   showed it is also the FIRST card a new user sees, so the export's
+   `from · foldable first run` frame does not match the device. It is drawn from
+   the same card with an empty bar.
+8. **A count of zero outranks the byte answer** — a store that outlived the packs
+   deleted from it can still be walked and can still sum above zero, and a size
+   printed beside a count of nought is a size for something the user does not
+   have. The count also needs no disk.
+   **Corrected by co-verify (E-S1b).** This item first justified the order as
+   protecting the commonest state in the app — the first run — from being
+   degraded to a free-space number. A real `pm clear` disproved that: ML Kit
+   reports the English pivot as on device from the first launch, so `downloaded`
+   is **1, not 0**, and the first card a new user sees is
+   "1 of 59 packs · 8.6 GB free" whichever way the branches are ordered. The
+   order stands on the reason above; it is not a first-run protection.
+   `OfflineLibraryMeter.Empty` is close to unreachable on Play-Services hardware
+   — kept because the alternative for a zero count is a size line under a zero,
+   and because a device that reports no models at all still needs a truthful
+   card. See `docs/research/issue-130-e-s1-storage-walk.md` §E-S1b.
+8b. **`temp/` debris does not count as pack bytes (co-verify F3 / E-S1c).** The
+   walk summed every regular file under the store, and an interrupted download
+   leaves partial models in ML Kit's store-root scratch directory that nothing
+   is documented to remove. One real 14,779,264-byte file dropped into
+   `temp/af_en/` moved the card from 44 MB to 59 MB — a 34% overstatement that
+   survives forever — while the catalogue still correctly read "2 of 59 packs".
+   `packsBytesOf` now refuses to descend into the store-root `temp` only; a
+   `temp` folder inside a pack, and a plain file of that name at the root, are
+   real bytes.
+9. **The meter waits for the catalogue.** Found by a test, not by review: the
+   picker's `languages` flow starts at `emptyList()`, so the meter published
+   "0 of 0 packs · nothing downloaded" for a frame and then corrected itself.
+   Same class as the first frame labelling 194 rows "Online only". The empty
+   catalogue is now filtered out, which is also how the picker itself reads it
+   (`PickerSections.catalogEmpty` → the loading placeholder).
+10. **Row density is left alone.** The foldable frames draw 48dp catalog rows
+    with a 14.5px name, denser than the shipped 56/60dp. Adopting that is the
+    same change PR-14 declined for the same reason (deviation 4 there): the
+    compressed row has no supporting line, which would delete the failure reason
+    and the progress line from the screen. Only the ARRANGEMENT changes.
+
+**On #183, from the foldable frames.** Parsed the same way, per row container:
+
+| language | 16a portrait | `to · landscape` | `to · foldable` | device (E-V1) |
+|---|---|---|---|---|
+| Spanish `es` | mark | **none** (selected row) | **mark** | has a voice |
+| Arabic `ar` | **none** | mark | **mark** | has a voice |
+| English `en` | mark | mark | mark | has a voice |
+| Bengali `bn` | — | mark | mark | has a voice |
+| Bulgarian `bg` | — | mark | mark | has a voice |
+| Albanian `sq` | none | none | **none** | **has a voice** |
+| Afrikaans `af` | none | none | none | has none |
+
+The foldable pair settles both of #183's disagreements in the same direction —
+**it marks Spanish AND Arabic** — and agrees with the measured device data on six
+of the seven rows. `to · foldable` draws Spanish's mark on the selected row's
+supporting line, which is the space `to · landscape`'s single-line row did not
+have; that is the whole of the Spanish disagreement, and it is a consequence of
+row height rather than a claim about Spanish. The one row no frame marks is
+Albanian, which the device says has a voice. **Nothing is copied into code
+either way** — `showsVoiceMark` reads `Language.hasOfflineVoice`, which the
+device answers.
+
 ## Spec of record — rev 5 (2026-08-01)
 
 `docs/design/language-screens/language-screens-spec.html` is **rev 5**, and the
@@ -312,7 +419,9 @@ cross-model) · full gradle gate · strings ×3 locales + #115 ledger line ·
 
 E-V1 voice enumeration reliability · E-W1 requireWifi observability (gates
 19a's drawn actions + snackbar 20a-5) · E-D1 IME inside the tablet dialog ·
-E-S1 models-dir walk. Results are recorded in research docs as they run.
+E-S1 models-dir walk (**RAN 2026-08-02, passed** —
+`docs/research/issue-130-e-s1-storage-walk.md`). Results are recorded in
+research docs as they run.
 
 ### Re-ruling, 2026-08-01: E-S1 moves from PR-11 to PR-15 (owner-approved)
 
@@ -336,3 +445,17 @@ row. PR-15 may not merge on a reasoned path — it needs the device run, its
 result recorded in a research doc, and the outcome in the PR body. Risk R8 in
 the ruling keeps E-S1 as its disconfirming experiment; only the PR it gates
 changed.
+
+**Discharged 2026-08-02.** The run is in
+`docs/research/issue-130-e-s1-storage-walk.md`: the E3 path still holds (30
+files, 44,169,505 bytes for one af↔en pack on `emulator-5554`), the renamed
+store degrades to `null` rather than to zero, and a fresh install has no model
+store at all, so a null byte answer there is ordinary rather than a fault.
+
+**Re-run and corrected the same day (E-S1b, E-S1c, co-verify).** The first run
+was reasoned about rather than measured — the original run never did a
+`pm clear`. Doing one showed the pack COUNT is 1 on a fresh install, not 0,
+because ML Kit reports the English pivot as on device, so the free-space line is
+the first card a new user sees rather than a rare degrade (item 8 above).
+E-S1c separately showed the walk counts an interrupted download's leftovers
+forever, not "for a few seconds" as first recorded (item 8b).

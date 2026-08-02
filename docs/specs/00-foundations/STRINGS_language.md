@@ -47,6 +47,19 @@ The `verifyStringKeyDocs` Gradle task now fails the build if a key ships without
 | `text_lang_downloading` | string | `Downloading…` | — | ML Kit reports no progress, so no `%` is shown |
 | `text_lang_on_device_count` | plurals | `%1$d of %2$d on device` | on-device, offline-capable | ⚠ the denominator is **offline-capable** languages, not the full catalogue row count |
 
+### 3.1 Offline-library meter (17b foldable two-leaf · U-5 · issue #130 PR-15)
+
+Drawn at the foot of the shortcut leaf, and **only** on a folded window — 17a's
+272 × 412 landscape pane has no room for it and the export draws none there.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `text_lang_library_title` | string | `Offline library` | — | card overline |
+| `text_lang_library_downloaded` | string | `%1$d` | packs on device | the big numeral, its own key so locales with their own digits can shape it |
+| `text_lang_library_used` | plurals | `of %1$d packs · %2$s used` | offline-capable, size label | the measured walk of ML Kit's model store succeeded |
+| `text_lang_library_free` | plurals | `of %1$d packs · %2$s free` | offline-capable, size label | the line for **"the size is not knowable"**: the store directory is absent, renamed or empty while packs are counted. `0 MB used` would be a claim about the disk that nothing checked (risk R8). It is **also the first card a new user sees** — a `pm clear` on `emulator-5554` read `1 of 59 packs · 8.6 GB free`, because ML Kit counts the English pivot as on device before anything is downloaded and this app's store does not exist yet (E-S1b, `docs/research/issue-130-e-s1-storage-walk.md`). Not a rare degrade |
+| `text_lang_library_none` | plurals | `of %1$d packs · nothing downloaded` | offline-capable | outranks both of the above whenever the count is zero, however the walk answers: a store can outlive the packs deleted from it, and a size printed under a count of nought is a size for something the user does not have. Close to unreachable on Play-Services hardware for the E-S1b reason above; kept because a zero count still needs a truthful card |
+
 ## 4. Language picker — empty, loading and failure states (EDGE_CASES, no dead ends)
 
 | Key | Type | `en` | Args | Notes |

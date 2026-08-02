@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.ApplicationScope
+import com.codeboxlk.tranzlate.core.common.DispatcherProvider
+import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
@@ -19,9 +21,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /** DECISIONS defaults table (pre-first-emission frame only — DataStore owns the real default). */
@@ -70,6 +76,8 @@ class LanguagePickerViewModel
         private val modelManager: OfflineModelManager,
         private val downloadGate: DownloadGate,
         private val translatePrefs: TranslatePrefsRepository,
+        private val storageProbe: StorageProbe,
+        private val dispatchers: DispatcherProvider,
         private val savedStateHandle: SavedStateHandle,
         @param:ApplicationScope private val appScope: CoroutineScope,
     ) : ViewModel() {
@@ -131,6 +139,80 @@ class LanguagePickerViewModel
             languageRepository
                 .languages()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyList())
+
+        /**
+         * The offline-library meter's data (U-5), or null until the disk has
+         * been read once.
+         *
+         * **Recomputed when the pack COUNT changes, and at no other time.**
+         * `packsBytes()` walks ML Kit's model store file by file — 30 files for
+         * a single pack, measured in E-S1 — so keying on the counts and dropping
+         * repeats is not an optimisation but a deliberate trigger; collecting the
+         * raw catalogue would re-walk the disk on every unrelated overlay change,
+         * which is risk PP-5.b in the ruling's register. A fresh subscription
+         * re-walks too, so leaving the picker and coming back always re-measures.
+         *
+         * ### The staleness window — a named limit (co-verify F2, PR-15)
+         * Between those two triggers the card holds whatever it last measured.
+         * Co-verify renamed the model store out from under a picker that stayed
+         * open, and the card went on reading **"2 of 59 packs · 44 MB used"** for
+         * as long as that picker lived; navigating away and back corrected it. So
+         * the card can state a specific, confident, no-longer-true size, and this
+         * is the disclosure of it rather than a claim it cannot happen.
+         *
+         * What the user could actually see is bounded by what can change the
+         * store's size without changing the count, and inside the app that set is
+         * empty by enumeration:
+         * - a download completing, or a delete — both move the count, so both
+         *   re-walk;
+         * - a download interrupted part-way, which leaves debris under ML Kit's
+         *   scratch directory — excluded from the sum since co-verify F3
+         *   (`MLKIT_SCRATCH_DIR`), so the number does not move and there is
+         *   nothing to go stale;
+         * - ML Kit renaming the store beneath a live process — the co-verify
+         *   reproduction, done with root over `adb`. Nothing the app does causes
+         *   it, and a Play Services module update does not rename another app's
+         *   private directory mid-session.
+         *
+         * A timer or a filesystem observer would close the last of those at the
+         * cost of walking a 30-file tree on a schedule for a state no user path
+         * produces. The trade is recorded here rather than made silently, and
+         * `LanguagePickerViewModelTest.the meter holds its number until a pack
+         * arrives or leaves` pins BOTH halves so a change of mind cannot be a
+         * quiet one.
+         *
+         * `null` while the walk is in flight, and the card is simply not drawn
+         * then. A placeholder saying "0 packs" that corrected itself a moment
+         * later would have stated something false in between — the same rule
+         * that keeps the first frame from labelling 194 rows "Online only".
+         */
+        val library: StateFlow<OfflineLibraryMeter?> =
+            languages
+                // An empty catalogue is the pre-emission frame, not a device with
+                // no languages on it — `languages` starts at `emptyList()` and the
+                // bundled catalogue is static and never empty. Counting it would
+                // publish "0 of 0 packs · nothing downloaded" for a frame and then
+                // correct itself, which is the same false-first-frame the row
+                // states refuse (`rowStateOf`, "Online only"). The picker reads the
+                // same emptiness as "loading" (`PickerSections.catalogEmpty`).
+                .filter(List<Language>::isNotEmpty)
+                .map(::onDeviceCount)
+                .distinctUntilChanged()
+                .mapLatest { counts ->
+                    // `freeBytes`/`totalBytes` are StatFs calls and `packsBytes`
+                    // walks a directory tree: all three are disk reads, so all
+                    // three are taken off the main thread together rather than
+                    // trusting the one that declares itself suspending.
+                    withContext(dispatchers.io) {
+                        offlineLibraryMeter(
+                            downloaded = counts.downloaded,
+                            capable = counts.capable,
+                            packsBytes = storageProbe.packsBytes(),
+                            volumeBytes = storageProbe.totalBytes(),
+                            freeBytes = storageProbe.freeBytes(),
+                        )
+                    }
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), null)
 
         /**
          * Live model state keyed by BCP-47 tag — the TRANSIENT half only
