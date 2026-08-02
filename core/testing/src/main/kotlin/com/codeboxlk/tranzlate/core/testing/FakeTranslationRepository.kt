@@ -21,6 +21,27 @@ class FakeTranslationRepository(
     private val store = MutableStateFlow<List<Translation>>(emptyList())
     private var nextId = 1L
 
+    /**
+     * Per-write fault injection for History's three write paths (issue #190).
+     *
+     * [failWrites] is a blanket switch over the two INSERT paths, which cannot
+     * express what History needs: one path failing while the other two still
+     * work. Without that, a single test proving `delete` surfaces its failure
+     * would say nothing about `undoDelete` and `toggleFavourite` — which is how
+     * the crash survived in all three at once.
+     *
+     * Each hook runs BEFORE its write. A hook that throws makes that write fail;
+     * a hook that suspends holds the write open, which is how a scope cancelled
+     * mid-write (the user navigating away) is reproduced.
+     */
+    var beforeDelete: (suspend () -> Unit)? = null
+
+    /** @see beforeDelete */
+    var beforeRestore: (suspend () -> Unit)? = null
+
+    /** @see beforeDelete */
+    var beforeSetFavourite: (suspend () -> Unit)? = null
+
     val saved: List<Translation> get() = store.value
 
     override fun history(): Flow<List<Translation>> = store.map { it.sortedByDescending(Translation::createdAt) }
@@ -75,6 +96,7 @@ class FakeTranslationRepository(
      * either direction) and the earlier `created_at` wins.
      */
     override suspend fun restore(translation: Translation) {
+        beforeRestore?.invoke()
         check(!failWrites) { "FakeTranslationRepository.failWrites is set" }
         val normalized = translation.copy(sourceText = normalize(translation.sourceText))
         val occupant = store.value.firstOrNull { sameTuple(it, normalized) }
@@ -96,6 +118,7 @@ class FakeTranslationRepository(
     }
 
     override suspend fun delete(id: Long) {
+        beforeDelete?.invoke()
         store.value = store.value.filterNot { it.id == id }
     }
 
@@ -103,6 +126,7 @@ class FakeTranslationRepository(
         id: Long,
         favourite: Boolean,
     ) {
+        beforeSetFavourite?.invoke()
         store.value = store.value.map { if (it.id == id) it.copy(favourite = favourite) else it }
     }
 
