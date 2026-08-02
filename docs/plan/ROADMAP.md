@@ -131,6 +131,19 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   needs a parseable planned/shipped/retired status in every `STRINGS_*.md`,
   which is the file every feature PR touches, and its first run today is ~60
   findings that are nearly all deliberate.
+- ⬜ **#201** the other three gates in the root `build.gradle.kts` — `detekt`'s
+  `source` and both `spotless` targets — named the same four rings
+  `verifyStringKeyDocs` used to, so a module at a new top-level prefix was
+  linted and formatted by nobody, and CI's `./gradlew detekt spotlessCheck`
+  stayed green over a file with a deliberate violation in it. Plan
+  `docs/plan/issue-201-lint-discovery.md`: all three derived from `subprojects`
+  (plus `gradle.includedBuilds` for `build-logic`'s scripts), reproduced green
+  on the unfixed config first and turned red by name after. **Narrower than
+  #173 and the issue overstates it** — these globs carried an extra `**`, so a
+  deeper module under an existing ring was already caught; only a new ring
+  escaped. The accidental exclusion of `.claude/worktrees/` becomes structural
+  rather than a side effect of the ring names. **Residual, separate issue:**
+  `build-logic`'s 15 Kotlin files are analysed by neither gate and never were.
 - ⬜ **#179** History's Undo restored nothing when the row's C-8 tuple had been
   retaken — the insert is `IGNORE`-on-conflict, the -1 was discarded, and the
   star and the original `created_at` were gone while the snackbar had already
