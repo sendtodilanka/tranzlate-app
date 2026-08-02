@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.ApplicationScope
@@ -7,13 +8,20 @@ import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
+import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
+import com.codeboxlk.tranzlate.domain.repository.TranslationRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -25,6 +33,33 @@ data class OfflineLanguageRow(
     val id: String,
     val name: String,
     val state: OfflineModelState,
+)
+
+/** The saved-state key for the open remove question. Namespaced — the handle is shared. */
+internal const val KEY_PENDING_REMOVAL = "offline_languages.pending_removal"
+
+/**
+ * An open "remove this pack?" question, with everything the two sheets need to
+ * draw themselves (#130 PR-19).
+ *
+ * Derived rather than stored: only the language [id] survives process death (a
+ * `String` in the `SavedStateHandle`), and the rest is recomputed from the
+ * preference seam and the database when the question is restored. Storing the
+ * derived fields would freeze a count and a target that the restore is supposed
+ * to re-read.
+ *
+ * @param inUseAsTarget the pack belongs to the language the user is translating
+ *   INTO right now, which is the only sense of "in use" either drawn frame has.
+ *   Removing it changes no selection — see [RemoveInUseSheet] — it just means
+ *   the very next translation is the one that needs a connection.
+ * @param savedCount saved phrases using this language, on either side. Read once
+ *   per question and only when [inUseAsTarget]: 19f does not draw the line, so
+ *   the common removal costs no query at all.
+ */
+data class PendingPackRemoval(
+    val id: String,
+    val inUseAsTarget: Boolean,
+    val savedCount: Int,
 )
 
 /**
@@ -44,6 +79,9 @@ class OfflineLanguagesViewModel
         private val modelManager: OfflineModelManager,
         private val downloadGate: DownloadGate,
         private val downloadPrefs: DownloadPrefsRepository,
+        private val translatePrefs: TranslatePrefsRepository,
+        private val translations: TranslationRepository,
+        private val handle: SavedStateHandle,
         @param:ApplicationScope private val appScope: CoroutineScope,
     ) : ViewModel() {
         val rows: StateFlow<List<OfflineLanguageRow>> =
@@ -111,8 +149,111 @@ class OfflineLanguagesViewModel
         /** Dialog "Wait for Wi-Fi" (or dismiss): the row stays NotDownloaded — no dead end. */
         fun dismissConsent() = downloadGate.dismiss()
 
-        /** Also delete-to-cancel while Downloading (the verified MLKit limit). */
-        fun delete(id: String) {
+        /**
+         * The row ⏹ while Downloading — delete-to-cancel, the verified ML Kit
+         * limit (there is no cancel API, so stopping IS deleting the partial
+         * model).
+         *
+         * **Deliberately NOT routed through the remove sheet** that [requestRemove]
+         * raises. 19f's body — *"Frees space on this device. Spanish will need a
+         * connection to translate until you download it again"* — describes
+         * removing a pack the user HAS. A download still in flight is not that:
+         * nothing is being taken away that they had a moment ago, and the ⏹ has
+         * always been the way out of a download they no longer want. Putting a
+         * confirmation in front of an abort turns an escape hatch into a second
+         * decision. The ruling asks for the unconfirmed 🗑 to become confirmed;
+         * this is the ⏹, and it stays immediate.
+         */
+        fun stopDownload(id: String) {
             viewModelScope.launch { modelManager.delete(id) }
+        }
+
+        /**
+         * The open remove question, or null (#130 PR-19).
+         *
+         * Only the id is durable — a `String` in the `SavedStateHandle`, the same
+         * shape the consent question uses. `inUseAsTarget` and `savedCount` are
+         * DERIVED on every restore, so a question that outlives a process death is
+         * answered against the state that exists now rather than against a
+         * snapshot taken before the app was killed.
+         *
+         * `distinctUntilChanged` on the target keeps an unrelated preference write
+         * from re-running the count query underneath an open sheet — the same
+         * guard `LanguageRepositoryImpl` puts on its own combine, for the same
+         * reason.
+         */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        val pendingRemoval: StateFlow<PendingPackRemoval?> =
+            handle
+                .getStateFlow<String?>(KEY_PENDING_REMOVAL, null)
+                .flatMapLatest { id -> if (id == null) flowOf(null) else removalFor(id) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), null)
+
+        private fun removalFor(id: String): Flow<PendingPackRemoval> =
+            translatePrefs.targetLang
+                .distinctUntilChanged()
+                .map { target ->
+                    val inUse = target == id
+                    PendingPackRemoval(
+                        id = id,
+                        inUseAsTarget = inUse,
+                        // 19f draws no saved line, so the query runs only for the
+                        // sheet that has one to draw.
+                        savedCount = if (inUse) savedCountOf(id) else 0,
+                    )
+                }
+
+        /**
+         * Best-effort count. A database that cannot answer must not stop the user
+         * removing a pack: zero renders as an ABSENT line, which is what a user
+         * who has saved nothing sees anyway — a missing reassurance, never a false
+         * one.
+         */
+        private suspend fun savedCountOf(id: String): Int =
+            try {
+                translations.savedCountUsing(id)
+            } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                throw rethrown
+            } catch (
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
+            ) {
+                0
+            }
+
+        /** Row 🗑: ask first. Nothing is deleted until [confirmRemove]. */
+        fun requestRemove(id: String) {
+            handle[KEY_PENDING_REMOVAL] = id
+        }
+
+        /** Cancel, back, scrim or drag — the row is left exactly as it was (no dead end). */
+        fun dismissRemove() {
+            handle[KEY_PENDING_REMOVAL] = null
+        }
+
+        /**
+         * "Remove" / "Remove anyway" — the one place a downloaded pack is deleted.
+         *
+         * Reads the id from the durable handle rather than taking it as a
+         * parameter, so a confirm can only ever remove the pack the sheet is
+         * currently asking about, and a second tap on an already-answered sheet
+         * finds nothing to do.
+         *
+         * **It writes no language preference, and there is nothing here to fall
+         * back to.** The drawn 19g says the target switches to English; it does
+         * not. `OfflineModelManager.delete` removes the model and the row returns
+         * to `NotDownloaded` — the selection is untouched, and the language keeps
+         * translating through the waterfall's online tiers.
+         *
+         * On [appScope], not `viewModelScope`, for the reason the picker's `select`
+         * gives: this is a write the user explicitly asked for and the screen it
+         * was asked from can go away underneath it. The delete already outlives its
+         * caller inside `RealOfflineModelManager` (its own scope plus a `join`), so
+         * this is the belt rather than the braces — named because no JVM test in
+         * this repo can tell the two scopes apart here.
+         */
+        fun confirmRemove() {
+            val id = handle.get<String>(KEY_PENDING_REMOVAL) ?: return
+            handle[KEY_PENDING_REMOVAL] = null
+            appScope.launch { modelManager.delete(id) }
         }
     }

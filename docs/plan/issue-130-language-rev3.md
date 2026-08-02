@@ -98,7 +98,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 |---|---|---|
 | PR-17 | 19a mobile-data sheet: `MeteredConsentDialog` + Screen B's inline dialog both deleted, their two string sets retired, one `MobileDataSheet` raised by both screens, the standing "Always ask" preference changeable in the sheet. **E-W1 has never been run, so the drawn "Wait for Wi-Fi" is not shipped** — the owner's pre-approved interim "Not now" is (ruling 8). **Deviations below** | ✅ #209, 2026-08-02 |
 | PR-18 | 19d + 19b + failure-cause map ×1 + 15a Retry-pill deviation fix. **Closes #175.** Deviations below | 👁 #216 |
-| PR-19 | 19f + 19g (fallback per ruling 3) + saved-count query | ⬜ |
+| PR-19 | 19f + 19g + U-10 saved-count query + the 🗑 becomes a confirmed remove. **No fallback is built: the drawn 19g and ruling 3 both describe a target switch this app does not have** — deviations below | 👁 #226 |
 | PR-20 | 19h + 19m + app-shell sheet host | ⬜ |
 | PR-21 | 18a/18b first run (LocaleList suggestions + E-K1) | ⬜ |
 | PR-22 | PackEvents + app SnackbarHost + snackbars 20a | ⬜ |
@@ -603,6 +603,97 @@ same thing `MobileDataSheetTest` names: a PIXEL. The sheets' colours — 19d's
 error-container icon slot and cause card against 19b's primary-container one, the
 error-filled Retry pill — are checked on the device screenshots in the PR body
 and nowhere else.
+
+### PR-19 deviations from the ruling's PR-19 row (2026-08-03)
+
+Each checked against the code or the export's markup rather than against the
+ruling text (mandatory rule 11, fourth cause).
+
+1. **The drawn 19g is false about this app, and it is not shipped.** The export
+   draws *"It is your target language. Removing it switches the target to
+   English."* **Nothing switches.** Enumerated two ways: `grep -rn` for
+   `setTargetLang|setSourceLang|setLanguagePair` across every module, and
+   separately every writer of the DataStore keys themselves inside
+   `TranzlatePreferencesDataSource`. The language selection has exactly four
+   production writers — `LanguagePickerViewModel.select` (the user picking a
+   language) and `TextViewModel`'s three `setLanguagePair` calls (swap, restoring
+   the last request, reopening a history row). The remove path is none of them:
+   `OfflineLanguagesViewModel` reaches `OfflineModelManager.delete`, and
+   `RealOfflineModelManager` is constructed from a `ModelStore` and a
+   `StorageProbe` — it cannot reach a preference at all. Removing a pack takes
+   away OFFLINE capability and nothing else; `mergeModelStates` returns the row
+   to `NotDownloaded` and `RealTranslator.waterfall` keeps translating the
+   language through GOT and GCT, naming that exact case in its own trace
+   ("MLKit: fr not downloaded · GOT: offline"). **Verified on the device**: after
+   removing the in-use French pack the composer still reads
+   `Target language, French`.
+
+   The owner said the same thing when the drawn sentence was put to him: *"If you
+   delete a language pack in the app, nothing happens. It just stops working
+   offline. You can download it again and make it offline. Otherwise it can work
+   online."*
+
+2. **Ruling 3 is therefore moot, and no fallback is implemented.** The ruling
+   asks which language becomes the target when an in-use pack is removed, and
+   answers *the device language if catalog-capable, else `en`*. It was approved
+   by the owner on 2026-08-01 along with the other seven — it is a real decision,
+   not an open recommendation — but it answers a question the app never asks.
+   Building it would have required a device-locale seam, a fallback rule and a
+   preference write, all in service of a behaviour nothing else in the app has.
+   **The ruling is not overturned; it is unreachable.** If the owner ever wants
+   removing a pack to change the selection, ruling 3 already says what to change
+   it to.
+
+3. **The saved line's second sentence is corrected the same way.** The export
+   draws *"3 saved phrases use Spanish. They stay saved and will need a
+   connection to reopen."* The first sentence is true and is the useful half —
+   saved rows live in Room's `translation` table and nothing on the delete path
+   can reach it. The second is false: `TextViewModel.onHistoryPick` puts
+   `translation.targetText`, the STORED answer, straight into the result state
+   with no engine call, and even Retry short-circuits on
+   `TranslationRepository.cachedAny`, a database read. Shipped as *"They stay
+   saved and still open without a connection."*
+
+4. **19g survives as its own sheet, and this is the owner's to confirm.** With
+   the switch gone, what 19g adds over 19f is immediacy — this is not a
+   capability the user might miss one day, it is the next translation they make —
+   plus the saved-phrases reassurance, which a user removing "Spanish" may
+   reasonably want. That is a real difference and both frames are drawn, so both
+   are built. But the case for a second sheet is now thinner than the export
+   assumed, and **whether to keep 19g or fold its saved line into 19f is a design
+   call, not an engineering one.** Recorded rather than decided. Its `warning`
+   glyph and `Remove anyway` verb are kept and re-justified: the sheet still
+   states a reason to hesitate, so "anyway" still reads correctly.
+
+5. **The ⏹ on a downloading row is NOT confirm-sheeted.** The ruling asks for the
+   unconfirmed 🗑 to become confirmed. 19f's body describes removing a pack the
+   user HAS; a download still in flight is not that, nothing is being taken away
+   that they had a moment ago, and the ⏹ has always been the way out of a
+   download they no longer want. A confirmation in front of an abort turns an
+   escape hatch into a second decision. `stopDownload` is therefore split from
+   `requestRemove` and stays immediate, with a test that reddens if it is routed
+   through the sheet.
+
+6. **The saved-count query is not the query it looks like it should be.** The
+   obvious spelling —
+   `WHERE favourite = 1 AND (source_lang = ? OR target_lang = ?)` — does **not**
+   use the two indices this PR adds, because SQLite's OR optimization needs
+   `sqlite_stat1` to prefer two index lookups over one and **Room never runs
+   `ANALYZE`**. Measured three ways (empty table, 4000 rows without `ANALYZE`,
+   4000 rows after `ANALYZE`); only the third reaches them. The shipped query is
+   a `UNION` of two single-column lookups, which plans as two COVERING index
+   searches with no statistics at all, and `SavedCountQueryTest` asserts that
+   plan against the SQL Room actually issues (captured through `setQueryCallback`,
+   not retyped). Had the obvious form shipped, both indices would have cost every
+   write and served nothing.
+
+7. **`core:database` gains Robolectric, and `tranzlate.compose-test` gains one
+   line.** The DAO's SQL had no test that ran it — two Kotlin doubles
+   re-implement the count, and neither can be wrong the way the SQL can. Applying
+   the project's one Robolectric wiring to a non-Compose module surfaced a latent
+   bug in it: `ui-test-manifest` was added to `debugImplementation` without the
+   Compose BOM, which resolved only because every previous consumer was also a
+   Compose module. Fixed where it lives rather than worked around.
 
 ## Spec of record — rev 5 (2026-08-01)
 

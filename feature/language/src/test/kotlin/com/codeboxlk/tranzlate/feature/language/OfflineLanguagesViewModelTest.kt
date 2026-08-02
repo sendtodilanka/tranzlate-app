@@ -1,12 +1,18 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import androidx.lifecycle.SavedStateHandle
+import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
+import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeDownloadPrefsRepository
+import com.codeboxlk.tranzlate.core.testing.FakeTranslationRepository
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
+import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
@@ -17,6 +23,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -43,6 +50,16 @@ class OfflineLanguagesViewModelTest {
     private val prefs = FakeDownloadPrefsRepository()
 
     /**
+     * The language SELECTION, read-only from this screen's point of view. It is
+     * here so the remove flow can be asked which pack is the live target — and
+     * the assertions below check that it is never WRITTEN, which is the whole
+     * correction PR-19 makes to the drawn 19g.
+     */
+    private val translatePrefs = RecordingTranslatePrefsRepository(target = "fr")
+    private val translations = FakeTranslationRepository()
+    private val handle = SavedStateHandle()
+
+    /**
      * The standing-preference write runs on the APPLICATION scope, for the
      * reason `LanguagePickerViewModelTest` gives: a preference the user just
      * changed must not be dropped because they walked off the screen. Same shape
@@ -63,6 +80,9 @@ class OfflineLanguagesViewModelTest {
                 modelManager = manager,
                 downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
                 downloadPrefs = prefs,
+                translatePrefs = translatePrefs,
+                translations = translations,
+                handle = handle,
                 appScope = appScope,
             )
     }
@@ -157,6 +177,9 @@ class OfflineLanguagesViewModelTest {
                     modelManager = SilentModelManager(),
                     downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
                     downloadPrefs = prefs,
+                    translatePrefs = translatePrefs,
+                    translations = translations,
+                    handle = SavedStateHandle(),
                     appScope = appScope,
                 )
             viewModel.rows.launchIn(backgroundScope)
@@ -179,6 +202,9 @@ class OfflineLanguagesViewModelTest {
                     modelManager = scripted,
                     downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
                     downloadPrefs = prefs,
+                    translatePrefs = translatePrefs,
+                    translations = translations,
+                    handle = SavedStateHandle(),
                     appScope = appScope,
                 )
             viewModel.rows.launchIn(backgroundScope)
@@ -212,6 +238,9 @@ class OfflineLanguagesViewModelTest {
                     modelManager = SilentModelManager(),
                     downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
                     downloadPrefs = prefs,
+                    translatePrefs = translatePrefs,
+                    translations = translations,
+                    handle = SavedStateHandle(),
                     appScope = appScope,
                 )
             viewModel.rows.launchIn(backgroundScope)
@@ -221,10 +250,376 @@ class OfflineLanguagesViewModelTest {
             // not smuggle online-only rows in while the state map is still empty.
             assertThat(viewModel.rows.value.map(OfflineLanguageRow::id)).containsExactly("de")
         }
+
+    // ---- #130 PR-19: the 🗑 asks first (sheets 19f / 19g) ---------------------------------------
+
+    /** Mutation C1: wire 🗑 straight back to the manager and this reddens. */
+    @Test
+    fun `the bin asks and deletes nothing yet`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("de")
+            runCurrent()
+
+            assertThat(manager.deletes).isEmpty()
+            assertThat(viewModel.pendingRemoval.value?.id).isEqualTo("de")
+        }
+
+    /** Mutation C2: Cancel must not be a delete. */
+    @Test
+    fun `cancelling removes nothing and closes the question`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+            viewModel.requestRemove("de")
+            runCurrent()
+
+            viewModel.dismissRemove()
+            runCurrent()
+
+            assertThat(manager.deletes).isEmpty()
+            assertThat(viewModel.pendingRemoval.value).isNull()
+        }
+
+    /** Mutations C3 + C4: confirm deletes exactly once AND closes the sheet. */
+    @Test
+    fun `confirming removes the pack once and closes the question`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+            viewModel.requestRemove("de")
+            runCurrent()
+
+            viewModel.confirmRemove()
+            runCurrent()
+
+            assertThat(manager.deletes).containsExactly("de")
+            assertThat(viewModel.pendingRemoval.value).isNull()
+        }
+
+    /**
+     * A second confirm on an answered sheet finds nothing to do — the id is read
+     * from the durable handle, not carried in the call.
+     */
+    @Test
+    fun `confirming twice removes the pack once`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+            viewModel.requestRemove("de")
+            runCurrent()
+
+            viewModel.confirmRemove()
+            viewModel.confirmRemove()
+            runCurrent()
+
+            assertThat(manager.deletes).containsExactly("de")
+        }
+
+    /**
+     * Mutation C5. The ⏹ on a DOWNLOADING row is delete-to-cancel and stays
+     * immediate: it is the way out of a download, not the removal of a pack the
+     * user has. Routing it through the confirm sheet reddens here.
+     */
+    @Test
+    fun `stopping a download still happens immediately with no sheet`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.stopDownload("de")
+            runCurrent()
+
+            assertThat(manager.deletes).containsExactly("de")
+            assertThat(viewModel.pendingRemoval.value).isNull()
+        }
+
+    /**
+     * Mutations B2/B3: which sheet gets drawn. `fr` is the target in this
+     * fixture and `de` is not, so a rule stuck at either constant reddens on one
+     * of these two assertions.
+     */
+    @Test
+    fun `only the live target raises the in-use sheet`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("de")
+            runCurrent()
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isFalse()
+
+            viewModel.requestRemove("fr")
+            runCurrent()
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isTrue()
+        }
+
+    /**
+     * Mutation B1: `inUse = (source == id)`. The fixture's source is `en` and is
+     * NOT the target, so a rule that reads the wrong side of the pair reddens.
+     * Removing the pack of the language you translate FROM is an ordinary
+     * removal — 19f, which says everything true about it.
+     */
+    @Test
+    fun `the source language is not in use in the sense 19g means`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("en")
+            runCurrent()
+
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isFalse()
+        }
+
+    /**
+     * Mutation B4: reading the target once at construction. The user can change
+     * their target on another screen while this one is in the back stack, so the
+     * question has to be answered against the live preference.
+     */
+    @Test
+    fun `a target changed after the screen was built still decides the sheet`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+            runCurrent()
+
+            translatePrefs.target.value = "de"
+            viewModel.requestRemove("de")
+            runCurrent()
+
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isTrue()
+        }
+
+    /**
+     * Mutation B4, second form — and the one that found the gap.
+     *
+     * The test above raises its question AFTER the target moves, so a
+     * ViewModel that snapshots the target the first time it is asked and caches
+     * it forever passes it: the first ask already sees the new value. That
+     * mutation SURVIVED until this case was added, which is the whole reason the
+     * mutation is decided before the test rather than after.
+     *
+     * The harm it leaves is a wrong sheet on the SECOND removal of a session:
+     * ask about one pack, cancel, change the target elsewhere, ask about the new
+     * target — and the sheet says the pack is not in use. Asserting across two
+     * questions is what separates a live flow from a cached first answer.
+     */
+    @Test
+    fun `a second question is answered against the target as it is now`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("de")
+            runCurrent()
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isFalse()
+            viewModel.dismissRemove()
+            runCurrent()
+
+            translatePrefs.target.value = "de"
+            viewModel.requestRemove("de")
+            runCurrent()
+
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isTrue()
+        }
+
+    /**
+     * The target can only move from another screen, and if it moves while this
+     * question is open the sheet has to stop saying the old thing. A live flow
+     * gives that for nothing; a snapshot taken when the sheet opened does not.
+     */
+    @Test
+    fun `an open question follows the target if it moves underneath it`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("de")
+            runCurrent()
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isFalse()
+
+            translatePrefs.target.value = "de"
+            runCurrent()
+
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isTrue()
+        }
+
+    /**
+     * **The correction this PR exists for.** The export's 19g says *"Removing it
+     * switches the target to English."* Nothing switches, so nothing may write a
+     * language preference from this flow — not the confirm, not the request, not
+     * the dismiss. The recording repository fails the test if any write arrives,
+     * which is the assertion that would have caught the drawn behaviour being
+     * built to match the drawn copy.
+     */
+    @Test
+    fun `removing the in-use pack changes no language selection`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("fr")
+            runCurrent()
+            viewModel.confirmRemove()
+            runCurrent()
+
+            assertThat(manager.deletes).containsExactly("fr")
+            assertThat(translatePrefs.writes).isEmpty()
+            assertThat(translatePrefs.target.value).isEqualTo("fr")
+        }
+
+    /**
+     * The saved count, and the two mutations around it: dropping the
+     * `favourite` filter, and dropping either side of the language test. The
+     * fixture is deliberately ASYMMETRIC — one row uses `fr` only as a target,
+     * one only as a source, one on both sides, one is unsaved, one is another
+     * language — because a fixture where every row uses the language both ways
+     * lets a source-only or target-only rule pass.
+     */
+    @Test
+    fun `the in-use sheet counts saved phrases on either side of the pair`() =
+        runTest {
+            translations.seed(
+                saved(id = 1, source = "en", target = "fr"),
+                saved(id = 2, source = "fr", target = "en"),
+                saved(id = 3, source = "fr", target = "fr"),
+                saved(id = 4, source = "en", target = "de"),
+                unsaved(id = 5, source = "en", target = "fr"),
+            )
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("fr")
+            runCurrent()
+
+            assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(3)
+        }
+
+    /** 19f draws no saved line, so the ordinary removal must not pay for the query. */
+    @Test
+    fun `an ordinary removal reports no saved count`() =
+        runTest {
+            translations.seed(saved(id = 1, source = "en", target = "de"))
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("de")
+            runCurrent()
+
+            assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(0)
+        }
+
+    /**
+     * Mutation C6. The question is a `String` in the `SavedStateHandle`, so a
+     * ViewModel rebuilt over the SAME handle — which is what a process death
+     * followed by a return looks like — still has it open. The derived halves
+     * are recomputed rather than restored, which this checks by moving the
+     * target while the "dead" ViewModel is gone.
+     */
+    @Test
+    fun `an open question survives the ViewModel and is re-derived`() =
+        runTest {
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+            viewModel.requestRemove("de")
+            runCurrent()
+
+            translatePrefs.target.value = "de"
+            val reborn =
+                OfflineLanguagesViewModel(
+                    languageRepository = StaticLanguageRepository(),
+                    modelManager = manager,
+                    downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+                    downloadPrefs = prefs,
+                    translatePrefs = translatePrefs,
+                    translations = translations,
+                    handle = handle,
+                    appScope = appScope,
+                )
+            reborn.pendingRemoval.launchIn(backgroundScope)
+            runCurrent()
+
+            assertThat(reborn.pendingRemoval.value?.id).isEqualTo("de")
+            assertThat(reborn.pendingRemoval.value?.inUseAsTarget).isTrue()
+        }
+
+    /**
+     * A database that cannot answer must not block a removal. Zero renders as an
+     * absent line, which is what a user with nothing saved sees anyway — a
+     * missing reassurance rather than a false one.
+     */
+    @Test
+    fun `a broken saved-count query still lets the sheet open`() =
+        runTest {
+            translations.beforeSavedCount = { error("database disk image is malformed") }
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("fr")
+            runCurrent()
+
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isTrue()
+            assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(0)
+        }
+
+    private fun saved(
+        id: Long,
+        source: String,
+        target: String,
+    ) = row(id, source, target, favourite = true)
+
+    private fun unsaved(
+        id: Long,
+        source: String,
+        target: String,
+    ) = row(id, source, target, favourite = false)
+
+    private fun row(
+        id: Long,
+        source: String,
+        target: String,
+        favourite: Boolean,
+    ) = Translation(
+        id = id,
+        sourceLang = source,
+        sourceText = "phrase $id",
+        targetLang = target,
+        targetText = "answer $id",
+        engine = Engine.OFFLINE_MLKIT,
+        favourite = favourite,
+        createdAt = id,
+    )
+}
+
+/**
+ * A [TranslatePrefsRepository] that answers reads and RECORDS every write.
+ *
+ * The recording half is the point. PR-19's whole correction is that removing a
+ * pack changes no language selection, and the only way to hold that is to fail
+ * when a write arrives — a fake that silently accepted one would let the drawn
+ * "switches the target to English" be built back in with every test still green.
+ */
+private class RecordingTranslatePrefsRepository(
+    source: String = "en",
+    target: String,
+) : TranslatePrefsRepository {
+    val sourceState = MutableStateFlow(source)
+    val target = MutableStateFlow(target)
+    val writes = mutableListOf<String>()
+
+    override val sourceLang: Flow<String> get() = sourceState
+
+    override val targetLang: Flow<String> get() = target
+
+    override val textMode: Flow<ModeId> = flowOf(ModeId.AUTO)
+
+    override suspend fun setSourceLang(id: String) {
+        writes += "source=$id"
+    }
+
+    override suspend fun setTargetLang(id: String) {
+        writes += "target=$id"
+    }
+
+    override suspend fun setLanguagePair(
+        sourceId: String,
+        targetId: String,
+    ) {
+        writes += "pair=$sourceId/$targetId"
+    }
 }
 
 private class RecordingModelManager : OfflineModelManager {
     val downloads = mutableListOf<String>()
+    val deletes = mutableListOf<String>()
 
     override fun modelStates(): Flow<Map<String, OfflineModelState>> =
         flowOf(
@@ -238,7 +633,9 @@ private class RecordingModelManager : OfflineModelManager {
         downloads += languageTag
     }
 
-    override suspend fun delete(languageTag: String) = Unit
+    override suspend fun delete(languageTag: String) {
+        deletes += languageTag
+    }
 }
 
 /** No Play Services: the ML Kit answer NEVER comes — the flow just hangs. */

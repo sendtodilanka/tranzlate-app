@@ -113,6 +113,46 @@ interface TranslationDao {
         createdAt: Long,
     ): Int
 
+    /**
+     * How many SAVED translations use [languageId] on either side — the count in
+     * the remove-pack sheet's line *"3 saved phrases use Spanish"* (#130 PR-19,
+     * ruling U-10).
+     *
+     * ## Why this is not `WHERE favourite = 1 AND (source_lang = ? OR target_lang = ?)`
+     *
+     * That is the obvious spelling and it does **not** reach the two indices
+     * [TranslationEntity] declares for it, which would make the pair of indices
+     * dead weight in every install. Measured with `EXPLAIN QUERY PLAN` on the
+     * exported v4 schema (sqlite 3.51.0), same table, same rows, three states:
+     *
+     * | query | table state | plan |
+     * |---|---|---|
+     * | `OR` form | empty | `SEARCH … USING INDEX index_translation_favourite (favourite=?)` |
+     * | `OR` form | 4000 rows, no `ANALYZE` | `SEARCH … USING INDEX index_translation_favourite (favourite=?)` |
+     * | `OR` form | 4000 rows, after `ANALYZE` | `MULTI-INDEX OR` over both pairs |
+     * | this form | any of the three | `SEARCH … USING COVERING INDEX …_favourite_source_lang` + `…_favourite_target_lang` |
+     *
+     * SQLite's OR optimization needs `sqlite_stat1` to prefer two index lookups
+     * over one, and **Room never runs `ANALYZE`** — so on a real install the
+     * `OR` form walks every saved row and looks each one up in the table. The
+     * union of two single-column lookups is index-backed with no statistics at
+     * all, which is the property that has to hold on a user's phone rather than
+     * on a bench.
+     *
+     * `UNION` (not `UNION ALL`) is load-bearing: a row whose source and target
+     * are BOTH [languageId] appears in both branches and is one saved phrase,
+     * not two. Deduplicating on `id` is what makes the two-branch form return
+     * exactly what the single-statement `OR` form returns.
+     */
+    @Query(
+        "SELECT COUNT(*) FROM (" +
+            "SELECT id FROM translation WHERE favourite = 1 AND source_lang = :languageId " +
+            "UNION " +
+            "SELECT id FROM translation WHERE favourite = 1 AND target_lang = :languageId" +
+            ")",
+    )
+    suspend fun savedCountUsing(languageId: String): Int
+
     @Query("DELETE FROM translation WHERE id = :id")
     suspend fun delete(id: Long)
 

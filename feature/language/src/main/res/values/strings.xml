@@ -70,6 +70,43 @@
     <string name="lang_sheet_data_always_ask">Always ask before using mobile data</string>
     <string name="lang_sheet_data_download">Download now</string>
     <string name="lang_sheet_data_not_now">Not now</string>
+    <!-- Sheets 19f + 19g — the remove-pack confirm (#130 PR-19). The 🗑 on the
+         offline manager used to delete on the tap; it now asks.
+
+         19f ships EXACTLY as drawn, and every word of it is true of this app:
+         removing a pack takes away offline capability and nothing else, so the
+         language keeps translating through the AUTO waterfall's online tiers
+         (RealTranslator.waterfall — ML Kit, then GOT, then GCT).
+
+         19g does NOT ship as drawn, and the two edits are the point of this PR.
+         The export draws "It is your target language. Removing it switches the
+         target to English." Nothing switches: the language selection has four
+         production writers (LanguagePickerViewModel.select and TextViewModel's
+         three setLanguagePair calls) and the remove path is none of them — the
+         model manager holds a ModelStore and a StorageProbe and cannot reach a
+         preference at all. That also makes rev3 ruling 3 (owner-approved: the
+         device language if catalog-capable, else `en`) an answer to a question
+         the app never asks, so no fallback is implemented.
+         The export also draws "They stay saved and will need a connection to
+         reopen." Reopening a saved phrase needs neither connection nor pack —
+         TextViewModel.onHistoryPick shows the STORED answer without calling an
+         engine. Both sentences say what actually happens instead.
+
+         The saved line is a plural so one phrase does not read "1 saved
+         phrases", and it is drawn only when the count is above zero: an absent
+         line, never a sentence about nothing. -->
+    <string name="lang_sheet_remove_title">Remove %1$s?</string>
+    <string name="lang_sheet_remove_body">Frees space on this device. %1$s will need a connection to translate until you download it again.</string>
+    <string name="lang_sheet_remove_confirm">Remove</string>
+    <!-- Shared by both sheets: one word, one key (the #175 stance on duplicated copy). -->
+    <string name="lang_sheet_remove_cancel">Cancel</string>
+    <string name="lang_sheet_remove_inuse_title">%1$s is in use right now</string>
+    <string name="lang_sheet_remove_inuse_body">It is your target language, and it stays your target. Translations into %1$s will need a connection until you download it again.</string>
+    <string name="lang_sheet_remove_inuse_confirm">Remove anyway</string>
+    <plurals name="lang_sheet_remove_inuse_saved">
+        <item quantity="one">%1$d saved phrase uses %2$s. It stays saved and still opens without a connection.</item>
+        <item quantity="other">%1$d saved phrases use %2$s. They stay saved and still open without a connection.</item>
+    </plurals>
     <!-- The real catalog size, never the design's hardcoded 65 (plan §4). -->
     <plurals name="text_lang_search_hint">
         <item quantity="one">Search %1$d language</item>

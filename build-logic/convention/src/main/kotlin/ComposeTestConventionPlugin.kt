@@ -80,6 +80,16 @@ class ComposeTestConventionPlugin : Plugin<Project> {
                 // this artifact's manifest and nowhere else. `debugImplementation`
                 // because unit tests build against the debug variant, and because a
                 // test-only activity has no business in a release manifest.
+                //
+                // The BOM goes on this configuration too, and it is not redundant.
+                // Every module that applied this plugin until #130 PR-19 was also a
+                // Compose module, so the Compose convention plugin had already put
+                // the BOM on `implementation` and the version resolved by accident.
+                // The first module without Compose failed at dependency resolution
+                // with "Could not find androidx.compose.ui:ui-test-manifest:" — an
+                // unversioned coordinate, which is what this line supplies. Applying
+                // it twice is a no-op for the modules that already had it.
+                "debugImplementation"(platform(bom))
                 "debugImplementation"(libs.findLibrary("androidx-compose-ui-test-manifest").get())
             }
 
