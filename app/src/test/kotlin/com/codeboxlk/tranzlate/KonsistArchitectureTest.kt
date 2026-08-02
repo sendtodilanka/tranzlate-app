@@ -837,7 +837,10 @@ class KonsistArchitectureTest {
      * down from the crash this issue opened for.
      *
      * SOURCE-SHAPE assertions, and the same honesty the gates above owe. This
-     * repo has no Compose unit-test runtime (#186), so nothing here can prove a
+     * repo's Compose runtime (#186) reaches `:feature:text`, so a rendered test now
+     * CAN prove this — see `ComposerAnnouncementTest`. This gate is kept because
+     * it also pins the two message keys and the consume ordering, which no
+     * rendered test covers. Nothing here can prove a
      * snackbar appears. What it makes RED is every regression that compiles and
      * leaves the suite green: the surface deleted, the Retry action dropped, one
      * of the two messages left unwired, the two arms SWAPPED, or the consume

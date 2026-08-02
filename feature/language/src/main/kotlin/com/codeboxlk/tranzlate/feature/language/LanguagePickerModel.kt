@@ -162,8 +162,10 @@ private val SHORT_WINDOW_MAX_HEIGHT: Dp = 480.dp
 
 /**
  * Which arrangement 17a's window gets — the whole of PR-14's gate, in one pure
- * function so a JVM test can drive it (this module has no Compose test runtime,
- * #186, and CI compiles instrumented tests without running them, #40).
+ * function so a JVM test can drive it. Written when this module had no Compose
+ * test runtime; #186 has since added one, and CI still compiles instrumented
+ * tests without running them (#40). The extraction stands on its own — a pure
+ * gate is cheaper to exhaust than a rendered one.
  *
  * Three conditions, and each one is a layout this PR must NOT steal:
  *
