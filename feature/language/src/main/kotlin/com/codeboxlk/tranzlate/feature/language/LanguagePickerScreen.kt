@@ -267,14 +267,19 @@ fun LanguagePickerContent(
         onConfirm = onDownloadAnyway,
         onDismiss = onDismissConsent,
     )
-    // The arrangement is read from the CONSTRAINTS this screen was handed, not
-    // from the raw window: a nav rail, or a host that draws the picker beside
-    // something else, has already been subtracted here and has not been there.
+    // BOTH sizes are read from the CONSTRAINTS this screen was handed, never from
+    // the window: a nav rail, or a host that draws the picker beside something
+    // else, has already been subtracted here and has not been there — and, the
+    // reason the height moved here too, a window snapshot and a layout pass
+    // disagree for a few frames after a rotation. `pickerArrangement` carries the
+    // measurement. Posture has no second source and stays where it is; it is a
+    // question about the hinge, not about size, so it cannot go half a rotation
+    // out of step with the width.
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val window = rememberWindowInfo()
         val arrangement =
             arrangementOverride
-                ?: pickerArrangement(maxWidth, window.heightCompact, window.posture)
+                ?: pickerArrangement(maxWidth, maxHeight, window.posture)
         val railed = !sections.searching && !sections.catalogEmpty
         val plan =
             remember(target, sections.detect, sections.recent, sections.anyVoiceMark, railed, arrangement) {
@@ -404,6 +409,13 @@ private class PickerSections(
 ) {
     /** A fruitless SEARCH — distinct from a catalog that has not arrived yet. */
     val nothingFound: Boolean get() = searching && !catalogEmpty && results.isEmpty() && detect == null
+
+    /**
+     * The catalog rows the grid is emitting right now. ONE definition, because
+     * two readers have to agree on it exactly: the A–Z rail's letter index and
+     * the index a saved [PickerListPosition] restores to.
+     */
+    val visible: List<LanguagePickerRow> get() = if (searching) results else all
 }
 
 /**
@@ -486,6 +498,18 @@ private fun PickerBody(
     onListPositionChange: (PickerListPosition) -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    // The saved language, turned into an index against THIS arrangement's grid —
+    // which is what makes a position captured in the other one still mean the
+    // same language (see `PickerListPosition`).
+    val seedIndex = pickerAnchorIndex(listPosition.anchorId, sections.visible, plan.catalogOffset)
+    // An anchor cannot be resolved against a catalog that has not arrived, and
+    // after process death it has not: the ViewModel comes back with the language,
+    // the repository has not answered yet. So the seed is keyed on the catalog's
+    // arrival — false → true, exactly once — and the grid is rebuilt at the right
+    // place the moment there is a place to be. A rotation never takes that branch:
+    // the catalog is already in the ViewModel's StateFlow, so the seed is right on
+    // the first composition and nothing moves.
+    val catalogArrived = sections.all.isNotEmpty()
     // ONE grid state for both arrangements, and one home for the position that
     // seeds it. `remember`, NOT `rememberLazyGridState()`: the saveable version
     // keeps a SECOND copy inside the host's SaveableStateHolder, and on a host
@@ -493,25 +517,32 @@ private fun PickerBody(
     // the seed passed in here, because a restored saveable ignores its initial
     // arguments. One home for the position, and it is the caller's.
     val gridState =
-        remember { LazyGridState(listPosition.index, listPosition.offset) }
+        remember(catalogArrived) { LazyGridState(seedIndex, listPosition.offset) }
     // The callback is read through `rememberUpdatedState` and is NOT an effect
     // key. A bound method reference is a fresh object on a ViewModel the compiler
     // cannot prove stable, so keying on it would tear down and restart the
     // collection below on every keystroke in the search field.
     val reportPosition by rememberUpdatedState(onListPositionChange)
-    LaunchedEffect(gridState) {
+    LaunchedEffect(gridState, catalogArrived) {
+        // A grid with no languages in it has no position worth reporting, and
+        // reporting one would be worse than useless: the loading placeholder is a
+        // real item with a real key, so the collection below would answer "no
+        // anchor" and overwrite the very language it is about to restore. The old
+        // index-based report leaned on `LazyGridScrollPosition`'s own
+        // `hadFirstNotEmptyLayout` guard for this; a key-based one has to say it.
+        if (!catalogArrived) return@LaunchedEffect
         // Read in a snapshot observer rather than in composition: a fling changes
         // these every frame, and reading them up here would recompose the whole
         // list for each one.
         //
-        // Safe before the catalog arrives: the lazy scroll position refuses to
-        // overwrite itself from a measure of an EMPTY list
-        // (`LazyGridScrollPosition.kt` — `hadFirstNotEmptyLayout`, the same guard
-        // `LazyListScrollPosition.kt:56-57` carries), so the frame between restore
-        // and first emission cannot report the list back to the top and erase
-        // what was restored.
-        snapshotFlow { PickerListPosition(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset) }
-            .collect { reportPosition(it) }
+        // The KEY of the first visible item, not its index: the grid already
+        // anchors its own scroll position to that key, so reading it is reading
+        // the grid's own answer rather than re-deriving one.
+        snapshotFlow {
+            gridState.layoutInfo.visibleItemsInfo.firstOrNull()?.let { first ->
+                PickerListPosition(pickerAnchorOf(first.key), gridState.firstVisibleItemScrollOffset)
+            }
+        }.collect { position -> position?.let(reportPosition) }
     }
     if (arrangement.twoPane) {
         Row(modifier = Modifier.fillMaxSize()) {
@@ -642,7 +673,7 @@ private fun PickerSidePane(
  *
  * @param shortcutsInGrid the detect row and the recents section are emitted here
  *   (portrait). In 17a they live in [PickerSidePane] instead, and
- *   [PickerListPlan.railOffset] stops counting them.
+ *   [PickerListPlan.catalogOffset] stops counting them.
  */
 @Composable
 private fun PickerCatalog(
@@ -661,11 +692,11 @@ private fun PickerCatalog(
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
-    val visibleRows = if (sections.searching) sections.results else sections.all
+    val visibleRows = sections.visible
     val letters =
-        remember(visibleRows, plan.railOffset, railed) {
+        remember(visibleRows, plan.catalogOffset, railed) {
             if (railed) {
-                visibleRows.letterIndex(plan.railOffset).toList().sortedBy { it.second }
+                visibleRows.letterIndex(plan.catalogOffset).toList().sortedBy { it.second }
             } else {
                 emptyList()
             }
@@ -690,7 +721,9 @@ private fun PickerCatalog(
                 ),
             modifier = Modifier.fillMaxSize().testTag("tt_lang_list"),
         ) {
-            // Emission order IS the order pickerListPlan counts in.
+            // Emission order IS the order pickerListPlan counts in, and the order
+            // `PickerListPositionTest` reads back out of this file — it models the
+            // block below, and a model of a moving target has to be pinned to it.
             if (shortcutsInGrid) {
                 sections.detect?.let { detect ->
                     item(key = "detect_${detect.id}", contentType = CONTENT_TYPE_ROW) {
@@ -709,7 +742,7 @@ private fun PickerCatalog(
                     fullSpanItem(key = "header_recent", contentType = CONTENT_TYPE_HEADER) {
                         SectionHeader(recentHeaderRes(header))
                     }
-                    pickerRows(sections.recent, "rec", target, onSelect, onDownload, onStop)
+                    pickerRows(sections.recent, RECENT_ROW_KEY_PREFIX, target, onSelect, onDownload, onStop)
                 }
             }
             // No "All languages" banner over a filtered list: the results ARE
@@ -726,7 +759,7 @@ private fun PickerCatalog(
                     )
                 }
             }
-            pickerRows(visibleRows, "all", target, onSelect, onDownload, onStop)
+            pickerRows(visibleRows, CATALOG_ROW_KEY_PREFIX, target, onSelect, onDownload, onStop)
         }
         if (letters.isNotEmpty()) {
             AlphabetRail(
@@ -744,7 +777,7 @@ private fun PickerCatalog(
  * left column with a language beside it.
  *
  * It is still ONE item either way, which is what keeps
- * [PickerListPlan.railOffset]'s arithmetic true in both arrangements.
+ * [PickerListPlan.catalogOffset]'s arithmetic true in both arrangements.
  */
 private fun LazyGridScope.fullSpanItem(
     key: String,
@@ -756,6 +789,11 @@ private fun LazyGridScope.fullSpanItem(
  * The same language legitimately appears under Recent AND under All languages
  * (GT does the same), so [prefix] is what keeps the grid's keys unique —
  * duplicate keys are a hard crash, not a warning.
+ *
+ * [prefix] carries its own separator ([CATALOG_ROW_KEY_PREFIX] /
+ * [RECENT_ROW_KEY_PREFIX]) rather than having one added here, so
+ * [catalogRowKey] spells the emitted key exactly and a saved position and the
+ * grid cannot drift apart over a punctuation mark.
  */
 private fun LazyGridScope.pickerRows(
     rows: List<LanguagePickerRow>,
@@ -764,7 +802,7 @@ private fun LazyGridScope.pickerRows(
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
-) = items(rows, key = { "${prefix}_${it.id}" }, contentType = { CONTENT_TYPE_ROW }) { row ->
+) = items(rows, key = { prefix + it.id }, contentType = { CONTENT_TYPE_ROW }) { row ->
     LanguageRow(row, target, onSelect, onDownload, onStop)
 }
 
@@ -853,12 +891,25 @@ private fun PickerCompactBar(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.semantics { heading() },
         )
-        PickerSearchField(
-            query = query,
-            onQueryChange = onQueryChange,
-            catalogSize = catalogSize,
-            modifier = Modifier.weight(1f).widthIn(max = Dimensions.pickerSearchMaxWidth),
-        )
+        // The cap needs a Box between it and the weight, and that is not a style
+        // choice. `Modifier.weight(1f)` measures its child with a FIXED width —
+        // min and max both the weighted share — and `widthIn(max = …)` can only
+        // narrow within the incoming range, which at a fixed width is a single
+        // point. Written directly on the weighted child the cap is silently
+        // inert: measured on `emulator-5554` the field came out 1544px ≈ 588dp
+        // at 2.625 px/dp, not the 420dp `pickerSearchMaxWidth` documents. The Box
+        // takes the share, the field takes the cap inside it, and the leftover
+        // stays where it was — between the field and the counter, which is what
+        // the token's own line ("stops here rather than stretching to the
+        // counter") asks for.
+        Box(modifier = Modifier.weight(1f)) {
+            PickerSearchField(
+                query = query,
+                onQueryChange = onQueryChange,
+                catalogSize = catalogSize,
+                modifier = Modifier.widthIn(max = Dimensions.pickerSearchMaxWidth),
+            )
+        }
         if (counts != null) {
             Text(
                 text =

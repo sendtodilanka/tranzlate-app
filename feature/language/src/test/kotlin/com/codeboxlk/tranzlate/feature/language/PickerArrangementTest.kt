@@ -1,9 +1,12 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.codeboxlk.tranzlate.core.ui.FoldPosture
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
+import java.io.File
 
 /**
  * The 17a window gate (#130 PR-14) — the ruling's "window-gate unit".
@@ -25,7 +28,7 @@ class PickerArrangementTest {
     /** `from · landscape` / `to · landscape`, exactly as the export draws them. */
     @Test
     fun `the export's own 892x412 landscape frame is two panes and two columns`() {
-        val arrangement = pickerArrangement(892.dp, heightCompact = true, posture = FoldPosture.FLAT)
+        val arrangement = pickerArrangement(892.dp, 412.dp, posture = FoldPosture.FLAT)
 
         assertThat(arrangement.twoPane).isTrue()
         assertThat(arrangement.columns).isEqualTo(2)
@@ -38,7 +41,7 @@ class PickerArrangementTest {
      */
     @Test
     fun `the OnePlus 7 Pro in landscape gets the two-pane layout`() {
-        val arrangement = pickerArrangement(832.dp, heightCompact = true, posture = FoldPosture.FLAT)
+        val arrangement = pickerArrangement(832.dp, 384.dp, posture = FoldPosture.FLAT)
 
         assertThat(arrangement.twoPane).isTrue()
         assertThat(arrangement.columns).isEqualTo(2)
@@ -54,13 +57,13 @@ class PickerArrangementTest {
      */
     @Test
     fun `exactly the two-pane floor already splits`() {
-        assertThat(pickerArrangement(568.dp, heightCompact = true, posture = FoldPosture.FLAT).twoPane)
+        assertThat(pickerArrangement(568.dp, 412.dp, posture = FoldPosture.FLAT).twoPane)
             .isTrue()
     }
 
     @Test
     fun `just under the two-pane floor stays single pane`() {
-        val arrangement = pickerArrangement(567.9.dp, heightCompact = true, posture = FoldPosture.FLAT)
+        val arrangement = pickerArrangement(567.9.dp, 412.dp, posture = FoldPosture.FLAT)
 
         assertThat(arrangement).isEqualTo(PickerArrangement.SinglePane)
     }
@@ -68,7 +71,7 @@ class PickerArrangementTest {
     /** A phone in portrait is nowhere near it, and must not be, whatever else it reports. */
     @Test
     fun `phone portrait is single pane`() {
-        assertThat(pickerArrangement(412.dp, heightCompact = false, posture = FoldPosture.FLAT))
+        assertThat(pickerArrangement(412.dp, 892.dp, posture = FoldPosture.FLAT))
             .isEqualTo(PickerArrangement.SinglePane)
     }
 
@@ -81,13 +84,13 @@ class PickerArrangementTest {
      */
     @Test
     fun `exactly the second-column floor gives two columns`() {
-        assertThat(pickerArrangement(808.dp, heightCompact = true, posture = FoldPosture.FLAT).columns)
+        assertThat(pickerArrangement(808.dp, 412.dp, posture = FoldPosture.FLAT).columns)
             .isEqualTo(2)
     }
 
     @Test
     fun `just under the second-column floor keeps two panes and one column`() {
-        val arrangement = pickerArrangement(807.9.dp, heightCompact = true, posture = FoldPosture.FLAT)
+        val arrangement = pickerArrangement(807.9.dp, 412.dp, posture = FoldPosture.FLAT)
 
         assertThat(arrangement.twoPane).isTrue()
         assertThat(arrangement.columns).isEqualTo(1)
@@ -97,7 +100,7 @@ class PickerArrangementTest {
     @Test
     fun `single pane is always one column`() {
         assertThat(PickerArrangement.SinglePane.columns).isEqualTo(1)
-        assertThat(pickerArrangement(1280.dp, heightCompact = false, posture = FoldPosture.FLAT).columns)
+        assertThat(pickerArrangement(1280.dp, 800.dp, posture = FoldPosture.FLAT).columns)
             .isEqualTo(1)
     }
 
@@ -111,13 +114,13 @@ class PickerArrangementTest {
      */
     @Test
     fun `a tablet in landscape is not 17a`() {
-        assertThat(pickerArrangement(1280.dp, heightCompact = false, posture = FoldPosture.FLAT))
+        assertThat(pickerArrangement(1280.dp, 800.dp, posture = FoldPosture.FLAT))
             .isEqualTo(PickerArrangement.SinglePane)
     }
 
     @Test
     fun `a tablet in portrait is not 17a either`() {
-        assertThat(pickerArrangement(800.dp, heightCompact = false, posture = FoldPosture.FLAT))
+        assertThat(pickerArrangement(800.dp, 1280.dp, posture = FoldPosture.FLAT))
             .isEqualTo(PickerArrangement.SinglePane)
     }
 
@@ -131,14 +134,14 @@ class PickerArrangementTest {
      */
     @Test
     fun `a half-open book foldable is not 17a`() {
-        assertThat(pickerArrangement(892.dp, heightCompact = true, posture = FoldPosture.BOOK))
+        assertThat(pickerArrangement(892.dp, 412.dp, posture = FoldPosture.BOOK))
             .isEqualTo(PickerArrangement.SinglePane)
     }
 
     /** Tabletop puts a dead strip across the middle; a side pane would straddle it. */
     @Test
     fun `a tabletop fold is not 17a`() {
-        assertThat(pickerArrangement(892.dp, heightCompact = true, posture = FoldPosture.TABLETOP))
+        assertThat(pickerArrangement(892.dp, 412.dp, posture = FoldPosture.TABLETOP))
             .isEqualTo(PickerArrangement.SinglePane)
     }
 
@@ -148,10 +151,102 @@ class PickerArrangementTest {
      */
     @Test
     fun `posture is the only thing separating those three from 17a`() {
-        val flat = pickerArrangement(892.dp, heightCompact = true, posture = FoldPosture.FLAT)
+        val flat = pickerArrangement(892.dp, 412.dp, posture = FoldPosture.FLAT)
 
         assertThat(flat.twoPane).isTrue()
-        assertThat(FoldPosture.entries.filter { pickerArrangement(892.dp, true, it).twoPane })
+        assertThat(FoldPosture.entries.filter { pickerArrangement(892.dp, 412.dp, it).twoPane })
             .containsExactly(FoldPosture.FLAT)
     }
+
+    // ---- the height threshold, now that it is a dp and not a boolean ---------
+
+    /**
+     * 480dp is `WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND` — the same number
+     * `WindowInfo.heightCompact` is computed from, so moving the measurement to
+     * the constraints did not move the line. The pair is what pins that: one dp
+     * either side, same width, opposite answers.
+     */
+    @Test
+    fun `just under the medium height bound is still a short window`() {
+        assertThat(pickerArrangement(892.dp, 479.9.dp, posture = FoldPosture.FLAT).twoPane).isTrue()
+    }
+
+    @Test
+    fun `exactly the medium height bound is no longer short`() {
+        assertThat(pickerArrangement(892.dp, 480.dp, posture = FoldPosture.FLAT))
+            .isEqualTo(PickerArrangement.SinglePane)
+    }
+
+    /**
+     * An unbounded height reaches `BoxWithConstraints.maxHeight` as
+     * `Constraints.Infinity` converted to dp — a very large number. It must land
+     * on the SAFE side: a window whose height cannot be measured never takes
+     * 17a's layout away from the arrangement that works everywhere.
+     */
+    @Test
+    fun `an unmeasurable height never claims the two-pane layout`() {
+        assertThat(pickerArrangement(892.dp, Dp.Infinity, posture = FoldPosture.FLAT))
+            .isEqualTo(PickerArrangement.SinglePane)
+    }
+
+    // ---- both sizes must come from ONE measurement (the F2 fix) --------------
+
+    /**
+     * The rule this gate's two dp arguments exist for, held where a JVM test can
+     * reach it: **the screen must measure the height the same way it measures the
+     * width**, against the constraints of one layout pass.
+     *
+     * PR-14 passed `maxWidth` from `BoxWithConstraints` and `heightCompact` from
+     * `rememberWindowInfo()`. Those two are refreshed by different things and they
+     * disagree for a few frames after a rotation — measured on `emulator-5554`,
+     * four times in a 2.5-minute rotation hammer:
+     *
+     * ```
+     * box=914.29x411.43dp   ← the constraints: already landscape
+     * container=1080x2400px ← Compose's window snapshot: still portrait
+     * metrics=2400x1080     ← WindowMetricsCalculator, same frame: landscape
+     * ```
+     *
+     * A wide window reporting itself tall fails the height condition, and the
+     * picker drew the portrait layout at full landscape width.
+     *
+     * A source rule rather than a behaviour test for the reason this whole file
+     * is a pure function: there is no Compose test runtime in this module (#186)
+     * and CI compiles instrumented tests without running them (#40), so a test
+     * that mounted the screen and rotated it would be a test nobody ever sees
+     * fail. Reading the one call site is the check that can actually run — and it
+     * is the exact line a later PR would "simplify" back.
+     */
+    @Test
+    fun `the screen measures both sizes against the same constraints`() {
+        val call = pickerArrangementCall()
+
+        assertWithMessage(
+            "LanguagePickerScreen.kt calls pickerArrangement($call). Both sizes must come from " +
+                "the BoxWithConstraints measurement — a window snapshot and a layout pass are " +
+                "half a rotation apart after a rotate (see this test's KDoc).",
+        ).that(call)
+            .startsWith("maxWidth, maxHeight")
+        // …and the source it must NOT go back to is gone from the call.
+        assertThat(call).doesNotContain("heightCompact")
+    }
+
+    /** The arguments of the one production `pickerArrangement(` call, as written. */
+    private fun pickerArrangementCall(): String {
+        val checkoutRoot =
+            generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
+                .first { File(it, "settings.gradle.kts").isFile }
+        val source = checkoutRoot.resolve(PICKER_SCREEN_SOURCE).readText()
+        val calls = Regex("""pickerArrangement\(([^)]*)\)""").findAll(source).map { it.groupValues[1] }.toList()
+
+        // Never vacuous: a moved file, or a screen that stopped asking at all,
+        // fails here rather than passing by having nothing to read.
+        assertWithMessage("LanguagePickerScreen.kt makes ${calls.size} pickerArrangement calls")
+            .that(calls)
+            .hasSize(1)
+        return calls.single()
+    }
 }
+
+private const val PICKER_SCREEN_SOURCE =
+    "feature/language/src/main/kotlin/com/codeboxlk/tranzlate/feature/language/LanguagePickerScreen.kt"

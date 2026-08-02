@@ -124,11 +124,20 @@ class PickerHostAgnosticTest {
      * would throw away the scroll position on every rotation and on no other
      * action, which is exactly the shape of defect nobody notices in review.
      * There is one grid, seeded once, for both arrangements.
+     *
+     * **What the seed IS changed in #198's co-verify** and the rule is stronger
+     * for it. Handing the position through was never enough on its own: PR-14
+     * handed through a raw item index, which the two arrangements number
+     * differently, so the position survived the rotation and the LANGUAGE did
+     * not. So the second assertion below pins where the seed comes from — the
+     * handed anchor, resolved against the arrangement being restored INTO.
      */
     @Test
     fun `the list is seeded from the position it was handed`() {
-        assertThat(shippedPickerSource())
-            .contains("LazyGridState(listPosition.index, listPosition.offset)")
+        val code = shippedPickerSource()
+
+        assertThat(code).contains("LazyGridState(seedIndex, listPosition.offset)")
+        assertThat(code).contains("pickerAnchorIndex(listPosition.anchorId,")
     }
 
     /**

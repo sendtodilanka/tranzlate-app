@@ -159,12 +159,25 @@ the ruling text (mandatory rule 11, fourth cause).
    file `PickerHostAgnosticTest` reads by path — a separate landscape file would
    have been outside PR-13's guard.
 2. **The catalog moves from `LazyColumn` to `LazyVerticalGrid` in BOTH
-   arrangements.** A grid indexes ITEMS, so `PickerListPosition(index = 40)` is
-   the 41st language whether it is drawn in one column or two, and PR-13's saved
-   position survives the rotation that changes the arrangement. The obvious
-   alternative — a two-column list of paired rows — would have indexed PAIRS and
-   landed every restored position at twice its language. One state type, one
-   emission body, one contract.
+   arrangements.** A grid indexes ITEMS rather than layout rows, so the column
+   count does not change the numbering; the obvious alternative — a two-column
+   list of paired rows — would have indexed PAIRS and landed every restored
+   position at twice its language. One state type, one emission body, one
+   contract.
+
+   **This deviation originally claimed more than that, and the extra claim was
+   false.** It said item 40 is the 41st language "whether it is drawn in one
+   column or two", and therefore that PR-13's saved position survives the
+   rotation. The first half is true of the COLUMN count and the second half does
+   not follow, because the two arrangements do not emit the same items: the
+   single-pane grid starts `[detect?] [recent header + rows?] [All languages]`,
+   17a moves the first two to the side pane and starts `[All languages]`. The
+   prefix differs by 1 to 7 items, so the same number named a different language
+   after a rotation — reproduced on `emulator-5554` (#198 co-verify F1):
+   browsing at English in portrait, landscape opened at Finnish. **The stored
+   position is now the LANGUAGE at the top of the catalog**
+   (`PickerListPosition.anchorId`), which is arrangement-independent by
+   construction rather than by an arithmetic nobody had checked.
 3. **`PickerHostAgnosticTest`'s banned list grows by two.** The grid and the
    scrolling side pane cut two new doors to host-scoped state
    (`rememberLazyGridState`, `rememberScrollState`) that did not exist when
@@ -199,6 +212,39 @@ from every frame and **PR-27** removes from the app under owner ruling 2. The
 narrow pane makes that already-agreed removal visible rather than merely
 untrue; it is not fixed here, because a third place touching the Detect chip is
 what REJECT §7.8 bounces.
+
+**Three more the co-verify lens found on PR #198, all of them only visible on a
+device.**
+
+1. **F1 — rotating while browsing landed on the wrong language.** The saved
+   position was a raw grid index; see deviation 2 above for what replaced it and
+   why. The PR's own device ritual missed it for a sharper reason than
+   carelessness: it typed `ar` into the search box first, and that query
+   suppresses the detect row and empties the recents section in BOTH
+   arrangements, collapsing the prefix difference to exactly zero. The ritual
+   selected the one case where the defect cannot appear. `PickerListPositionTest`
+   now covers the round trip with recents present and absent, in both roles, and
+   **never in search mode**.
+2. **F2 — the picker could draw the portrait layout in a landscape window.**
+   Recorded in the PR body as "unexplained, not resolved". Diagnosed by
+   instrumenting the screen and hammering rotations on `emulator-5554`: **24 of
+   539 picker compositions**, every one with the same fingerprint —
+   `BoxWithConstraints` measuring 914.29×411.43dp (landscape) while Compose's
+   window snapshot still reported 1080×2400px / `orient=PORTRAIT`, with a live
+   `WindowMetricsCalculator` call in the same frame already answering 2400×1080.
+   The gate took its width from the constraints and its height from
+   `WindowInfo.heightCompact`, which reads that snapshot; a wide window reporting
+   itself tall fails the height condition. `pickerArrangement` now takes **both**
+   sizes as `Dp` from the same `BoxWithConstraints`, so the two cannot be half a
+   rotation apart. Every one of the 24 was corrected by the next composition
+   (0.12–0.34s); the PERSISTENT form the lens described — 5+ seconds, surviving
+   eight Activity recreations — was **not** reproduced, and no claim is made that
+   it had the same cause.
+3. **The 420dp cap on the landscape search field never bound.**
+   `Modifier.weight(1f)` measures its child at a FIXED width, and `widthIn(max =)`
+   can only narrow within the incoming range, which at a fixed width is a single
+   point. Measured 1544px ≈ 588dp against a documented 420dp. The field now sits
+   in a `Box` that takes the weighted share, and measures 1103px = 420.2dp.
 
 **What the export actually draws for 17a, read per row** (sliced between one
 language name and the next, never off a flattened token list — the #183 trap):

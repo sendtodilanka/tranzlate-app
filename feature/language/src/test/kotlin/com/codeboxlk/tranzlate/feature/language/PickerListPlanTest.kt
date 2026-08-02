@@ -48,7 +48,7 @@ class PickerListPlanTest {
         // …and the list closes over the gap: nothing above the alphabet except
         // the "All languages" header. The legend is not an item of this list —
         // see `theVoiceAnswerAddsNoItemToTheAnchoredList`.
-        assertThat(empty.railOffset).isEqualTo(1)
+        assertThat(empty.catalogOffset).isEqualTo(1)
     }
 
     @Test
@@ -116,8 +116,8 @@ class PickerListPlanTest {
         val afterTheDeviceAnswers = plan(anyVoiceMark = true, recentCount = 3)
 
         // (header + 3 rows) + "All languages" — on both sides of the answer.
-        assertThat(beforeTheDeviceAnswers.railOffset).isEqualTo(5)
-        assertThat(afterTheDeviceAnswers.railOffset).isEqualTo(beforeTheDeviceAnswers.railOffset)
+        assertThat(beforeTheDeviceAnswers.catalogOffset).isEqualTo(5)
+        assertThat(afterTheDeviceAnswers.catalogOffset).isEqualTo(beforeTheDeviceAnswers.catalogOffset)
         // …and the legend itself is still the thing that changed, so this is not
         // passing because nothing happened.
         assertThat(beforeTheDeviceAnswers.showVoiceLegend).isFalse()
@@ -130,7 +130,7 @@ class PickerListPlanTest {
 
         // detect(1) + header(1) + 2 rows + "All languages"(1); no legend on this side.
         assertThat(source.showVoiceLegend).isFalse()
-        assertThat(source.railOffset).isEqualTo(5)
+        assertThat(source.catalogOffset).isEqualTo(5)
     }
 
     /** A filtered list has no rail, so nothing above it needs counting. */
@@ -141,7 +141,7 @@ class PickerListPlanTest {
         assertThat(searching.showAllHeader).isFalse()
         // Nothing above the results at all. The legend still STANDS while a
         // search runs — it just stands above the list rather than in it.
-        assertThat(searching.railOffset).isEqualTo(0)
+        assertThat(searching.catalogOffset).isEqualTo(0)
         assertThat(searching.showVoiceLegend).isTrue()
     }
 
@@ -190,7 +190,7 @@ class PickerListPlanTest {
 
         assertThat(built.showVoiceLegend).isTrue()
         assertThat(built.recentHeader).isEqualTo(RecentHeader.TARGET)
-        assertThat(built.railOffset).isEqualTo(5)
+        assertThat(built.catalogOffset).isEqualTo(5)
         // Afrikaans is on device and has NO voice — the row that proves the two
         // are independent, and it is the first row the rail's 'A' points at.
         assertThat(rows.first().displayName).isEqualTo("Afrikaans")
@@ -206,7 +206,7 @@ class PickerListPlanTest {
      * drawn in the SIDE pane, which is not the catalog's scroller. Counting them
      * anyway makes every A–Z letter land that many rows short — deterministic,
      * never an exception, and invisible to any test that only looks at rows. It
-     * is the same defect the single-pane `railOffset` was written to prevent,
+     * is the same defect the single-pane `catalogOffset` was written to prevent,
      * arriving from the opposite direction.
      *
      * Asserted as a PAIR: the identical inputs give 5 in one arrangement and 1 in
@@ -219,9 +219,9 @@ class PickerListPlanTest {
         val split = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 3, twoPane = true)
 
         // detect(1) + header(1) + 3 rows + "All languages"(1)
-        assertThat(stacked.railOffset).isEqualTo(6)
+        assertThat(stacked.catalogOffset).isEqualTo(6)
         // …and in the catalog pane, only "All languages" stands above the alphabet.
-        assertThat(split.railOffset).isEqualTo(1)
+        assertThat(split.catalogOffset).isEqualTo(1)
         // The sections themselves have NOT gone away — they moved.
         assertThat(split.recentHeader).isEqualTo(RecentHeader.GENERIC)
         assertThat(split.sidePane).isTrue()
@@ -230,7 +230,7 @@ class PickerListPlanTest {
     /** No rail, nothing above the alphabet to count, in either arrangement. */
     @Test
     fun `an unrailed two-pane catalog has no offset at all`() {
-        assertThat(plan(twoPane = true, railed = false, recentCount = 0).railOffset).isEqualTo(0)
+        assertThat(plan(twoPane = true, railed = false, recentCount = 0).catalogOffset).isEqualTo(0)
     }
 
     // ---- 17a: the side pane, and the role-specific slot at its foot ----------
