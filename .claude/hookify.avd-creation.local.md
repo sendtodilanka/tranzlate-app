@@ -3,7 +3,7 @@ name: block-avd-creation
 enabled: true
 event: bash
 action: block
-pattern: (^|[;&|]|\s)(\S*/)?avdmanager\s+.*\bcreate\b
+pattern: (^|[;&|]|\s)(\S*/)?avdmanager(\s+-[^\s;&|]+)*\s+create(\s|$)
 ---
 
 🛑 **BLOCKED — never create an AVD. This is a standing owner rule.**

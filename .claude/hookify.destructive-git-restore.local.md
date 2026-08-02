@@ -6,7 +6,7 @@ action: block
 conditions:
   - field: command
     operator: regex_match
-    pattern: (^|[;&|]|\s)git\s+(-C\s+\S+\s+)?(checkout\s+--(\s|$)|restore(\s|$))
+    pattern: (^|[;&|]|\s)git\s+(-C\s+\S+\s+)?(checkout(\s+-[^\s;&|]+)*\s+--(\s|$)|restore(\s|$))
   - field: command
     operator: not_contains
     pattern: --staged

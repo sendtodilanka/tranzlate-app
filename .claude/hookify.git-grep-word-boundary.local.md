@@ -3,7 +3,7 @@ name: block-git-grep-word-boundary
 enabled: true
 event: bash
 action: block
-pattern: git\s+grep[^;&|]*\\b
+pattern: git\s+grep[^;&|\n]*\\b
 ---
 
 🛑 **BLOCKED — `git grep` does not support `\b`, and it will tell you "no match".**
