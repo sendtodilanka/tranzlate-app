@@ -191,6 +191,26 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   first run found **129 of 205** keys documented nowhere, so the PR also carries
   four new `STRINGS_*.md` and refreshes two. The `feature/text` dead keys still
   ride with Wave 3 — 22 remain there by decision, several marked *keep* in §7.
+- ⬜ **#212** **PDF Reader** — **plan doc landed by PR #225**; the vertical itself
+  is not started. A new owner-requested feature, outside the language-screens epic
+  and not competing with its waves. Plan accepted from a 3-architect debate and
+  **four co-verify passes** (two models; passes 1-3 each returned BLOCK, pass 4
+  CLEAN): `docs/plan/issue-212-pdf-reader.md`. Phase 1 (open · render
+  · page · zoom, no translation) ships on the framework `PdfRenderer` —
+  `androidx.pdf` was **rejected** as alpha that would drag `minSdk` 24→28 for the
+  whole app. **Nothing starts before E2′**, the page-text granularity and
+  API-floor sweep, which decides both the viewer choice and whether phase 3
+  (reflowed Reader Mode) is plannable at all. Phase 3 is in the plan as
+  `blocked-on-E2′` with no algorithm and no estimate, on purpose.
+- ⬜ **#224** Offline languages offers **Download and Delete on English**, which
+  is not a pack — all 58 ML Kit models are X↔English pairs, verified in
+  `translate-17.0.3.aar`. Unguarded in three places
+  (`OfflineLanguagesViewModel.kt:62-69`, `OfflineLanguagesScreen.kt:243-247`,
+  `:115-116`). Both branches are shipped-app defects: a no-op control, or a real
+  delete that fails `MlKitEngine.kt:39-42` for **every** pair. Root cause
+  unmeasured → rule 4 research record before any fix; S1/P1 is provisional on the
+  worse branch. Found while scoping #212, ruled out of its scope, independent of
+  it and of the waves.
 
 ---
 
