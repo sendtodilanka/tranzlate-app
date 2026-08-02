@@ -789,12 +789,22 @@ fun pickerListPlan(
  *   risk R8 in the ruling's register, and [Unsized] is the honest answer to it:
  *   say how much room is left instead, which is the number the user would have
  *   wanted the size for.
- * - **A count of zero outranks both.** A device that has never downloaded
- *   anything has no model store either — verified on `emulator-5554`, where
- *   `no_backup/com.google.mlkit.translate.models` did not exist until the first
- *   pack landed (E-S1). So the commonest reason for a null walk is simply that
- *   there is nothing to walk, and the card must say "nothing downloaded", which
- *   is what the export's `from · foldable first run` frame draws.
+ * - **A count of zero outranks both.** With no packs there is nothing for a size
+ *   to be the size OF, so "nothing downloaded" is the sentence even when the
+ *   store is there and readable — a device that downloaded a pack and deleted it
+ *   again keeps the directory.
+ *
+ * **[Empty] is not, however, what a first run looks like** — the thing this PR
+ * first got wrong and co-verify measured (E-S1b, `pm clear` on `emulator-5554`,
+ * 2026-08-02). The store directory really is absent on a fresh install, but the
+ * COUNT is **1**, not 0: ML Kit reports the English pivot as on device before
+ * anything has been downloaded and while this app's store does not exist. The
+ * first card a new user sees is therefore [Unsized] — "1 of 59 packs · 8.6 GB
+ * free" — and the export's `from · foldable first run` frame, which draws
+ * "0 · nothing downloaded", is not what the device does. [Empty] stays because
+ * it is the truthful card for a zero count wherever one occurs (no Play
+ * Services, the fake flavour, a build with no ML Kit), and because the
+ * alternative — letting a zero count print a size line — is the false one.
  */
 @Immutable
 sealed interface OfflineLibraryMeter {
@@ -807,7 +817,14 @@ sealed interface OfflineLibraryMeter {
     /** How full the bar is drawn, 0..1. */
     val fraction: Float
 
-    /** Nothing downloaded yet. The bar is an empty track, not a zero-width fill. */
+    /**
+     * No packs at all. The bar is an empty track, not a zero-width fill.
+     *
+     * NOT the ordinary first-run card on hardware with Play Services — see the
+     * interface KDoc: ML Kit counts the English pivot from the first launch, so
+     * a real `pm clear` lands on [Unsized], and this state is what a build or a
+     * device that reports no models at all gets.
+     */
     data class Empty(
         override val capable: Int,
     ) : OfflineLibraryMeter {
@@ -840,9 +857,18 @@ sealed interface OfflineLibraryMeter {
     }
 
     /**
-     * Packs are installed but their size is unknown — the store directory is
+     * Packs are counted but their size is unknown — the store directory is
      * absent, renamed, or empty. Free space is reported instead and the bar has
      * no fill, because a fraction of the disk is exactly what is not known.
+     *
+     * **This is the ordinary card, not only the broken one.** It was written as
+     * the R8 degrade and is still the answer when ML Kit moves the store, but
+     * E-S1b measured it as the state a first run arrives in as well: the pivot
+     * makes the count 1 while nothing has been written to disk, so there is no
+     * size to report and free space is the honest — and the more useful —
+     * second clause. Nothing here distinguishes the two, and nothing can: the
+     * walk sees an absent directory either way. That is why the card says only
+     * what both readings support.
      */
     data class Unsized(
         override val downloaded: Int,
@@ -857,18 +883,28 @@ sealed interface OfflineLibraryMeter {
  * The one place a storage snapshot plus a pack count becomes a meter (U-5).
  *
  * Precedence, and why each step is above the next:
- * 1. **Nothing downloaded → [OfflineLibraryMeter.Empty].** The COUNT decides
- *    this, never the bytes, and it has to: a first run has no model store, so
- *    the byte answer there is `null` for the most ordinary reason there is.
- *    Routing that to a degrade would replace the drawn "nothing downloaded" with
- *    a free-space number on the one screen where the user has nothing to be told
- *    about.
+ * 1. **No packs → [OfflineLibraryMeter.Empty].** The COUNT decides this, never
+ *    the bytes. A store that survived the packs being deleted can still be
+ *    walked and can still sum above zero, and "12 MB used" beside a count of
+ *    nought is a size for something the user does not have. The count comes from
+ *    the catalogue and needs no disk, so it is also the one number that is
+ *    always available.
  * 2. **Packs, and a byte answer above zero → [OfflineLibraryMeter.Sized].**
- * 3. **Everything else → [OfflineLibraryMeter.Unsized].** Two cases arrive here
- *    and they are the same finding: `null` (the directory is not where issue
- *    #90's research measured it) and `0` while packs are installed (it is there
- *    but it is not the store any more). Both mean ML Kit moved, and neither
- *    supports the sentence "your packs take up no space".
+ * 3. **Everything else → [OfflineLibraryMeter.Unsized].** `null` (no directory
+ *    where issue #90's research measured one) and `0` while packs are counted
+ *    (a directory that is no longer the store) both mean the size is not
+ *    knowable, and neither supports "your packs take up no space".
+ *
+ * **What this order does NOT do, corrected after co-verify (E-S1b).** PR-15
+ * originally justified step 1 as protecting the commonest state in the app —
+ * the first run — from being degraded to a free-space number. A real `pm clear`
+ * on `emulator-5554` disproved that: ML Kit reports the English pivot as on
+ * device from the first launch, so `downloaded` is 1 rather than 0 and a first
+ * run reaches step 3 whatever step 1 does. The order is kept for the reason
+ * above, which is about a count of nought and holds on its own; it is not a
+ * first-run protection and no longer claims to be. `Empty` is close to
+ * unreachable on a Play-Services device, and that is a fact about ML Kit rather
+ * than a branch to delete — the alternative to it is a size line under a zero.
  */
 fun offlineLibraryMeter(
     downloaded: Int,

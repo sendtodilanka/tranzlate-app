@@ -305,17 +305,38 @@ what produced the wrong finding in #183 that had to be retracted.
    reason the pane exists — off the bottom. Those two booleans are equal in every
    other case, which is exactly why the distinction had to be written down and
    tested.
-7. **The meter has THREE sentences, and two of them are the point.** The export
-   draws two — "110 MB used" and "nothing downloaded". The third,
-   "8.6 GB free", is the R8 degrade the ruling's risk register asks for and the
-   export has no frame for, because a designer cannot draw a state that only
-   exists when ML Kit renames a directory. It is drawn from the same card with
-   an empty bar.
-8. **A count of zero outranks the byte answer, and E-S1 is why.** This was not
-   anticipated before the device run: a fresh install has no model store at all,
-   so `packsBytes()` returns `null` there for the most ordinary reason there is.
-   Branching on the bytes first would have degraded the commonest state in the
-   app to a free-space number. See `docs/research/issue-130-e-s1-storage-walk.md`.
+7. **The meter has THREE sentences, and the one the export never drew is the
+   commonest.** The export draws two — "110 MB used" and "nothing downloaded".
+   The third, "8.6 GB free", was written as the R8 degrade the ruling's risk
+   register asks for, on the reasoning that a designer cannot draw a state that
+   only exists when ML Kit renames a directory. Co-verify's `pm clear` (E-S1b)
+   showed it is also the FIRST card a new user sees, so the export's
+   `from · foldable first run` frame does not match the device. It is drawn from
+   the same card with an empty bar.
+8. **A count of zero outranks the byte answer** — a store that outlived the packs
+   deleted from it can still be walked and can still sum above zero, and a size
+   printed beside a count of nought is a size for something the user does not
+   have. The count also needs no disk.
+   **Corrected by co-verify (E-S1b).** This item first justified the order as
+   protecting the commonest state in the app — the first run — from being
+   degraded to a free-space number. A real `pm clear` disproved that: ML Kit
+   reports the English pivot as on device from the first launch, so `downloaded`
+   is **1, not 0**, and the first card a new user sees is
+   "1 of 59 packs · 8.6 GB free" whichever way the branches are ordered. The
+   order stands on the reason above; it is not a first-run protection.
+   `OfflineLibraryMeter.Empty` is close to unreachable on Play-Services hardware
+   — kept because the alternative for a zero count is a size line under a zero,
+   and because a device that reports no models at all still needs a truthful
+   card. See `docs/research/issue-130-e-s1-storage-walk.md` §E-S1b.
+8b. **`temp/` debris does not count as pack bytes (co-verify F3 / E-S1c).** The
+   walk summed every regular file under the store, and an interrupted download
+   leaves partial models in ML Kit's store-root scratch directory that nothing
+   is documented to remove. One real 14,779,264-byte file dropped into
+   `temp/af_en/` moved the card from 44 MB to 59 MB — a 34% overstatement that
+   survives forever — while the catalogue still correctly read "2 of 59 packs".
+   `packsBytesOf` now refuses to descend into the store-root `temp` only; a
+   `temp` folder inside a pack, and a plain file of that name at the root, are
+   real bytes.
 9. **The meter waits for the catalogue.** Found by a test, not by review: the
    picker's `languages` flow starts at `emptyList()`, so the meter published
    "0 of 0 packs · nothing downloaded" for a frame and then corrected itself.
@@ -428,6 +449,13 @@ changed.
 **Discharged 2026-08-02.** The run is in
 `docs/research/issue-130-e-s1-storage-walk.md`: the E3 path still holds (30
 files, 44,169,505 bytes for one af↔en pack on `emulator-5554`), the renamed
-store degrades to `null` rather than to zero, and — the finding that changed the
-meter's design — a fresh install has no model store at all, so a null byte
-answer there is ordinary rather than a fault.
+store degrades to `null` rather than to zero, and a fresh install has no model
+store at all, so a null byte answer there is ordinary rather than a fault.
+
+**Re-run and corrected the same day (E-S1b, E-S1c, co-verify).** The first run
+was reasoned about rather than measured — the original run never did a
+`pm clear`. Doing one showed the pack COUNT is 1 on a fresh install, not 0,
+because ML Kit reports the English pivot as on device, so the free-space line is
+the first card a new user sees rather than a rare degrade (item 8 above).
+E-S1c separately showed the walk counts an interrupted download's leftovers
+forever, not "for a few seconds" as first recorded (item 8b).

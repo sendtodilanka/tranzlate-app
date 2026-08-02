@@ -161,22 +161,19 @@ class OfflineLibraryMeterTest {
     // ---- zero outranks both --------------------------------------------------
 
     /**
-     * **A fresh install says "nothing downloaded", not a free-space number.**
+     * **A zero count says "nothing downloaded", whatever the disk says.**
      *
-     * This is the case a plausible implementation gets wrong, because a device
-     * with no packs has no model store either — verified on `emulator-5554`
-     * during E-S1, where `no_backup/com.google.mlkit.translate.models` did not
-     * exist until the first pack landed. So the byte answer on first run is
-     * `null`, exactly as it is when ML Kit has renamed the store, and a meter
-     * that branched on the bytes first would degrade the commonest state in the
-     * app. The COUNT decides, and the count is knowable from the catalogue
-     * without touching the disk.
+     * The COUNT decides this one, and it is knowable from the catalogue without
+     * touching the disk — which matters because the byte answer beside it can be
+     * anything at all: `null` when there is no store, `0` when there is an empty
+     * one, and a positive number when a deleted pack has left files behind. None
+     * of those is a size of anything the user has.
      *
-     * The export draws this: `from · foldable first run` reads
-     * "0 · of 59 packs · nothing downloaded".
+     * The name this test used to carry was "a fresh install says nothing
+     * downloaded", and that claim was false — see the pivot test below.
      */
     @Test
-    fun `a fresh install says nothing downloaded`() {
+    fun `a zero count says nothing downloaded`() {
         val meter =
             offlineLibraryMeter(
                 downloaded = 0,
@@ -208,6 +205,65 @@ class OfflineLibraryMeterTest {
                 freeBytes = FREE,
             ),
         ).isEqualTo(OfflineLibraryMeter.Empty(capable = 59))
+    }
+
+    /**
+     * The same rule where it actually bites: files left under the store after the
+     * packs were deleted. The walk sums them happily, and a meter that let the
+     * BYTES decide would print a size beside a count of nought — "0 of 59 packs ·
+     * 42.1 MB used", a size for something the user does not have.
+     */
+    @Test
+    fun `zero packs stays empty even when the store still holds bytes`() {
+        assertThat(
+            offlineLibraryMeter(
+                downloaded = 0,
+                capable = 59,
+                packsBytes = ONE_PACK,
+                volumeBytes = VOLUME,
+                freeBytes = FREE,
+            ),
+        ).isEqualTo(OfflineLibraryMeter.Empty(capable = 59))
+    }
+
+    /**
+     * **What a first run actually draws — measured, after PR-15 got it wrong.**
+     *
+     * The PR argued that letting the count decide first kept a fresh install off
+     * the free-space line. Co-verify ran the `pm clear` that claim needed
+     * (E-S1b, `emulator-5554`, 2026-08-02) and the picker's first frame read
+     * **"Offline library · 1 · of 59 packs · 8.6 GB free"**, with "1 of 59 on
+     * device" in the top bar and the English row marked "On device" — while
+     * `no_backup/` held nothing but a Firebase installation file and the model
+     * store did not exist.
+     *
+     * So on hardware with Play Services the first card is [Unsized]: ML Kit
+     * counts the English pivot from launch, and the walk still answers `null`
+     * because nothing has been written. The tempting repair — treat a null walk
+     * as "nothing downloaded" — would print "1 of 59 packs · nothing downloaded",
+     * a card at war with the row three inches from it. Free space is what both
+     * readings of a null walk support, and it is the number a user about to
+     * download something wants.
+     */
+    @Test
+    fun `a first run reports free space because the pivot pack already counts`() {
+        val meter =
+            offlineLibraryMeter(
+                downloaded = 1,
+                capable = 59,
+                packsBytes = null,
+                volumeBytes = VOLUME,
+                freeBytes = FREE,
+            )
+
+        assertThat(meter).isEqualTo(
+            OfflineLibraryMeter.Unsized(downloaded = 1, capable = 59, freeBytes = FREE),
+        )
+        assertWithMessage(
+            "A first run has a pack ML Kit counts and no store to walk. Calling that " +
+                "\"nothing downloaded\" contradicts the English row's own \"On device\" badge.",
+        ).that(meter)
+            .isNotInstanceOf(OfflineLibraryMeter.Empty::class.java)
     }
 
     // ---- arithmetic that must not blow up ------------------------------------

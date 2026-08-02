@@ -19,6 +19,11 @@ import java.io.File
  * experiment and is deliberately not faked here — the cases below are the
  * CONTRACT, and the experiment is what says the contract is pointed at the
  * right directory.
+ *
+ * E-S1c (co-verify, same device, same day) added the scratch-directory cases at
+ * the foot of this file: the walk used to count an interrupted download's
+ * leftovers as pack bytes, forever, and one stray model file overstated the
+ * drawn card by 34%.
  */
 class StorageProbeWalkTest {
     @get:Rule
@@ -65,5 +70,53 @@ class StorageProbeWalkTest {
         val store = tmp.newFolder("com.google.mlkit.translate.models")
 
         assertThat(packsBytesOf(store)).isEqualTo(0L)
+    }
+
+    // ---- the scratch directory (co-verify F3 / E-S1c) -------------------------
+
+    /**
+     * **An interrupted download's leftovers are not pack bytes, and nothing
+     * sweeps them up.**
+     *
+     * E-S1 recorded `temp/af_en/` as an empty sibling of the pack directory once
+     * a download had settled, and filed the mid-download over-report as bounded
+     * to "a few seconds". Co-verify showed it is not bounded at all: copying one
+     * real 14,779,264-byte model file into `temp/af_en/` — the shape an
+     * interrupted download leaves behind — moved the drawn card from 44 MB to
+     * 59 MB, and stayed there, while the catalogue still correctly read "2 of 59
+     * packs". The numbers below are those measurements.
+     */
+    @Test
+    fun `an interrupted download's temp debris is not counted as pack bytes`() {
+        val store = tmp.newFolder("com.google.mlkit.translate.models")
+        File(store, "af_en").mkdirs()
+        File(store, "af_en/merged_dict_af_en_25_from_en.bin").writeBytes(ByteArray(PACK_FILE))
+        File(store, "temp/af_en").mkdirs()
+        File(store, "temp/af_en/merged_dict_af_en_25_from_en.bin").writeBytes(ByteArray(PACK_FILE))
+
+        assertThat(packsBytesOf(store)).isEqualTo(PACK_FILE.toLong())
+    }
+
+    /**
+     * …and ONLY that one directory. The exclusion is the store-root scratch area
+     * ML Kit was observed to use, not the name `temp` wherever it appears: a
+     * folder of that name inside a pack is the pack's own layout and its bytes
+     * are on the disk, and a plain FILE called `temp` at the root is a file.
+     * Both would vanish from the total under a name filter, which is the
+     * plausible way to write this and the wrong one.
+     */
+    @Test
+    fun `only the store-root scratch dir is skipped`() {
+        val store = tmp.newFolder("com.google.mlkit.translate.models")
+        File(store, "af_en/temp").mkdirs()
+        File(store, "af_en/temp/resources.bin").writeBytes(ByteArray(11))
+        File(store, "temp").writeBytes(ByteArray(5))
+
+        assertThat(packsBytesOf(store)).isEqualTo(16L)
+    }
+
+    private companion object {
+        /** E-S1's largest single file — the one co-verify copied into `temp/`. */
+        const val PACK_FILE = 14_779_264
     }
 }

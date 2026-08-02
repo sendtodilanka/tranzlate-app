@@ -16,7 +16,12 @@ import java.io.File
  * and that dir is the one the walk sums.
  *
  * The walk runs on [DispatcherProvider.io]; an absent/renamed store dir yields
- * `null` (the seam's honest-degrade contract — see [StorageProbe]).
+ * `null` (the seam's honest-degrade contract — see [StorageProbe]), and ML Kit's
+ * store-root scratch directory is left out of the sum
+ * ([com.codeboxlk.tranzlate.core.common.MLKIT_SCRATCH_DIR]) because an
+ * interrupted download's leftovers there are not a pack's size — measured in
+ * E-S1c, where one stray model file overstated the card by 34% with nothing to
+ * ever remove it.
  */
 class AndroidStorageProbe(
     private val context: Context,

@@ -146,12 +146,40 @@ class LanguagePickerViewModel
          *
          * **Recomputed when the pack COUNT changes, and at no other time.**
          * `packsBytes()` walks ML Kit's model store file by file — 30 files for
-         * a single pack, measured in E-S1 — and the only thing that can change
-         * its answer is a pack arriving or leaving, which is exactly what
-         * [onDeviceCount] reports. Keying on the counts and dropping repeats is
-         * therefore not an optimisation but the correct trigger; collecting the
-         * raw catalogue would re-walk the disk on every unrelated overlay
-         * change, which is risk PP-5.b in the ruling's register.
+         * a single pack, measured in E-S1 — so keying on the counts and dropping
+         * repeats is not an optimisation but a deliberate trigger; collecting the
+         * raw catalogue would re-walk the disk on every unrelated overlay change,
+         * which is risk PP-5.b in the ruling's register. A fresh subscription
+         * re-walks too, so leaving the picker and coming back always re-measures.
+         *
+         * ### The staleness window — a named limit (co-verify F2, PR-15)
+         * Between those two triggers the card holds whatever it last measured.
+         * Co-verify renamed the model store out from under a picker that stayed
+         * open, and the card went on reading **"2 of 59 packs · 44 MB used"** for
+         * as long as that picker lived; navigating away and back corrected it. So
+         * the card can state a specific, confident, no-longer-true size, and this
+         * is the disclosure of it rather than a claim it cannot happen.
+         *
+         * What the user could actually see is bounded by what can change the
+         * store's size without changing the count, and inside the app that set is
+         * empty by enumeration:
+         * - a download completing, or a delete — both move the count, so both
+         *   re-walk;
+         * - a download interrupted part-way, which leaves debris under ML Kit's
+         *   scratch directory — excluded from the sum since co-verify F3
+         *   (`MLKIT_SCRATCH_DIR`), so the number does not move and there is
+         *   nothing to go stale;
+         * - ML Kit renaming the store beneath a live process — the co-verify
+         *   reproduction, done with root over `adb`. Nothing the app does causes
+         *   it, and a Play Services module update does not rename another app's
+         *   private directory mid-session.
+         *
+         * A timer or a filesystem observer would close the last of those at the
+         * cost of walking a 30-file tree on a schedule for a state no user path
+         * produces. The trade is recorded here rather than made silently, and
+         * `LanguagePickerViewModelTest.the meter holds its number until a pack
+         * arrives or leaves` pins BOTH halves so a change of mind cannot be a
+         * quiet one.
          *
          * `null` while the walk is in flight, and the card is simply not drawn
          * then. A placeholder saying "0 packs" that corrected itself a moment

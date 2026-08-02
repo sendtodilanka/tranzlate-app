@@ -765,6 +765,75 @@ class LanguagePickerViewModelTest {
         }
 
     /**
+     * **The staleness window, pinned in both directions (co-verify F2).**
+     *
+     * The card is re-measured when the pack count moves and when a fresh
+     * subscription starts, and NOT in between. Co-verify renamed the model store
+     * under a picker that stayed open and watched it go on reading "2 of 59
+     * packs · 44 MB used" while the directory was already gone. That is a
+     * documented limit rather than a defect — the ViewModel's KDoc enumerates
+     * why nothing a user does can reach it — and a documented limit needs a test
+     * or the document is the only thing holding it.
+     *
+     * Both halves are asserted here: the number HOLDS while the count is
+     * unchanged, and it MOVES the moment a pack lands. A future decision to
+     * re-walk more often, or less, reddens one of the two.
+     */
+    @Test
+    fun `the meter holds its number until a pack arrives or leaves`() =
+        runTest(dispatcher) {
+            repository.catalog.value =
+                listOf(
+                    Language("en", "English", offlineAvailable = true, offlineDownloaded = true),
+                    Language("af", "Afrikaans", offlineAvailable = true, offlineDownloaded = false),
+                )
+            storage.packs = ONE_PACK_BYTES
+            storage.total = VOLUME_BYTES
+            storage.free = FREE_BYTES
+            val subject = viewModel()
+
+            subject.library.test {
+                skipItems(1) // the pre-read null
+                advanceUntilIdle()
+                assertThat(awaitItem()).isEqualTo(
+                    OfflineLibraryMeter.Sized(
+                        downloaded = 1,
+                        capable = 2,
+                        usedBytes = ONE_PACK_BYTES,
+                        volumeBytes = VOLUME_BYTES,
+                    ),
+                )
+
+                // The store is renamed away — the disk's answer changes completely
+                // — but no pack arrived or left, so the count is the same and the
+                // card keeps the number it measured. This is the window.
+                storage.packs = null
+                repository.catalog.value = repository.catalog.value.map { it.copy(lastUsedAt = 7L) }
+                advanceUntilIdle()
+                expectNoEvents()
+                assertThat(subject.library.value).isEqualTo(
+                    OfflineLibraryMeter.Sized(
+                        downloaded = 1,
+                        capable = 2,
+                        usedBytes = ONE_PACK_BYTES,
+                        volumeBytes = VOLUME_BYTES,
+                    ),
+                )
+
+                // …and the next pack to land closes it, because the count moved.
+                repository.catalog.value =
+                    repository.catalog.value.map {
+                        if (it.id == "af") it.copy(offlineDownloaded = true) else it
+                    }
+                advanceUntilIdle()
+                assertThat(awaitItem()).isEqualTo(
+                    OfflineLibraryMeter.Unsized(downloaded = 2, capable = 2, freeBytes = FREE_BYTES),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /**
      * The R8 degrade, wired end to end: ML Kit's store is not where research
      * measured it, so the probe answers null and the meter reports free space
      * rather than "0 B used".

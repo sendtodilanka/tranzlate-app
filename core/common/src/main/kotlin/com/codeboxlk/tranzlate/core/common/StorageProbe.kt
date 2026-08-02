@@ -34,10 +34,17 @@ import java.io.File
  * unit-tested (`StorageProbeWalkTest`) and consumer-tested
  * (`OfflineLibraryMeterTest`) rather than reasoned about.
  *
- * **One finding worth carrying:** a fresh install has no model store either — it
- * does not exist until the first download — so `null` on first run is ordinary
- * rather than a fault. The meter therefore decides on the pack COUNT first and
- * only reaches the degrade with packs installed. See `offlineLibraryMeter`.
+ * **The finding worth carrying, corrected by E-S1b (2026-08-02, co-verify).** A
+ * fresh install has no model store — it does not exist until the first download
+ * — so `null` on first run is ordinary rather than a fault. That much held. What
+ * did NOT hold is the conclusion drawn from it: that deciding on the pack COUNT
+ * first keeps a first run off the free-space line. A real `pm clear` on
+ * `emulator-5554` showed the count is **1, not 0**, before anything is
+ * downloaded — ML Kit reports the English pivot as on device while this app's
+ * store does not exist — so a first run reaches the free-space answer whichever
+ * way the branches are ordered. Free space is what the card says there, and it
+ * is true there. See `offlineLibraryMeter` for why the order is still count-first
+ * anyway, and `docs/research/issue-130-e-s1-storage-walk.md` §E-S1b.
  *
  * Platform-backed implementation is prod-side wiring, like
  * [ConnectivityMonitor].
@@ -62,6 +69,28 @@ interface StorageProbe {
 }
 
 /**
+ * ML Kit's scratch directory, a sibling of the per-pair pack directories at the
+ * store root — observed as `temp/af_en/` in E-S1, empty once the download had
+ * settled.
+ *
+ * It is excluded from [packsBytesOf] because an interrupted download leaves
+ * partial model files there and nothing is documented to clean them up, so they
+ * would be counted as pack bytes for as long as the install lives. Measured in
+ * co-verify (E-S1c): one real 14,779,264-byte model file dropped into
+ * `temp/af_en/` moved the card from **44 MB to 59 MB** — a 34% overstatement —
+ * while the catalogue still, correctly, said "2 of 59 packs".
+ *
+ * **The limit of this, stated rather than implied:** ML Kit documents neither the
+ * store's name nor this one, so the exclusion is pinned to an observed layout in
+ * exactly the way the store path itself is. If a future ML Kit renames the
+ * scratch directory, its debris starts counting again — silently, because there
+ * is no degrade for "the number is too big", only for "there is no number".
+ * Excluding it is still the better side of that trade: a completed pack's size
+ * is the claim the card makes, and scratch files are not part of it.
+ */
+const val MLKIT_SCRATCH_DIR: String = "temp"
+
+/**
  * Sums every regular file under [storeDir], recursively — the walk behind
  * [StorageProbe.packsBytes], extracted pure so the sum + degrade contract is
  * unit-testable without Android.
@@ -70,11 +99,17 @@ interface StorageProbe {
  *   replaced by a stray file) → `null` — the honest degrade, never 0-as-fact.
  * - Existing but empty store → `0`, a real "no packs occupy disk".
  * - Directories contribute no bytes themselves; only file lengths count.
+ * - The store-root [MLKIT_SCRATCH_DIR] is not descended into. Only that one:
+ *   a `temp` folder nested INSIDE a pack directory is the pack's own business
+ *   and its bytes are real, and a plain file called `temp` at the root is a
+ *   file, not the scratch area.
  */
 fun packsBytesOf(storeDir: File): Long? {
     if (!storeDir.isDirectory) return null
+    val scratch = File(storeDir, MLKIT_SCRATCH_DIR)
     return storeDir
         .walkTopDown()
+        .onEnter { it != scratch }
         .filter(File::isFile)
         .sumOf(File::length)
 }
