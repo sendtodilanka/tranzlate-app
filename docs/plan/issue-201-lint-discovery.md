@@ -34,12 +34,23 @@ listOf( "a","b" )`:
 CI's gate step is that same command (`.github/workflows/ci.yml:105`), so green there meant
 "everything in four named rings is clean", and nothing said so.
 
-**#201's own text overstates the hole, and that was checked rather than repeated.** The issue
-says a module at `bench/perf` **or** `core/data/local` would pass "having been looked at by
-neither". Only the first is true here: these globs carry an extra `**`
+**#201's own text overstates the hole for THREE of the four rings, and the first version of
+this paragraph then overstated the correction.** The issue says a module at `bench/perf`
+**or** `core/data/local` would pass "having been looked at by neither". For `core`,
+`feature` and `lib` only the first is true: those globs carry an extra `**`
 (`core/**/src/**/*.kt`), so they were already depth-tolerant. A damaged
 `core/data/local/src/main/kotlin/probe/NestedProbe.kt` on the **unfixed** config failed
-`detekt` with three findings and `spotlessKotlinCheck` by name. So this hole was strictly
+`detekt` with three findings and `spotlessKotlinCheck` by name.
+
+**`app` is the exception, and this paragraph claimed otherwise until the #211 co-verify lens
+disproved it.** `app`'s old glob was `app/src/**/*.kt` — **one** `**`, anchored at `app/src`
+— so a Kotlin file under `app/` but outside `app/src/` escaped exactly as a brand-new
+top-level ring did. The lens proved it by planting `app/coverifynested/.../NestedAppProbe.kt`
+with the same three violations on the **unfixed** config: **zero findings**, while its
+`core/data/local` twin in the same run was caught. The shipped derivation is depth-agnostic
+per module and closes both, so no code changed — but the reassuring half of the claim was
+wrong, which is the direction rule 12 exists to catch. **The count that matters: the issue was
+right about one ring in four, not zero.** So this hole was strictly
 narrower than #173's, where both escapes were real. It is still a hole: a new top-level ring
 is exactly what `bench/`, `tools/` or a white-label ring would be.
 
@@ -129,7 +140,8 @@ with `rm` / `cp` backups (never `git checkout --`), `git status` clean after eac
 | M3 | `bench/perf/build.gradle.kts` with ktlint damage | before: **green** · after: **red, by name** | before: `BUILD SUCCESSFUL` · after: `spotlessKotlinGradleCheck FAILED` — `bench/perf/build.gradle.kts` |
 | M4 | the same violations at `.claude/worktrees/fake-sibling/` (a nested checkout) | **green, unchanged** | `BUILD SUCCESSFUL`; scope 237 / 237 / 29, `worktrees` hits: **0** |
 | M5 | the untouched tree | green, and the analysed file set identical | `BUILD SUCCESSFUL`; the resolved file list of all three tasks `diff`s **clean** before vs after — same `shasum`, `70ab5db…` |
-| — | (post-hoc, §2) `core/data/local` nested probe on the **unfixed** config | tests #201's claim | **red** — the old globs were already depth-tolerant; the issue overstates the hole |
+| — | (post-hoc, §2) `core/data/local` nested probe on the **unfixed** config | tests #201's claim | **red** — the `core`/`feature`/`lib` globs were already depth-tolerant |
+| — | (#211 lens) `app/coverifynested/…` probe on the **unfixed** config, same run | tests THIS doc's correction | **green — the correction was overstated.** `app/src/**/*.kt` has one `**`, so `app/` outside `app/src/` escaped like a new ring. Both caught after the fix |
 | — | (post-hoc) the same nested probe on the **fixed** config | still red | red, same three findings — no depth regression |
 
 M1 and M3 were run against the **unfixed** config first. A fix verified only against a `find`
