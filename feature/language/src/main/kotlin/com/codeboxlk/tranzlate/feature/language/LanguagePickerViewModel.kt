@@ -641,6 +641,16 @@ class LanguagePickerViewModel
          * removing it. It is gone rather than kept as an optimisation, because a
          * check that cannot fail a test is a check the next reader will mistake
          * for the load-bearing one — and may then "simplify" a real guard against.
+         *
+         * **The counter is global, not scoped to the sheet blocking THIS failure**,
+         * and the co-verify lens demonstrated the consequence: a failure whose read
+         * is slow can be dropped to its row because some *unrelated* sheet was
+         * raised and answered while that read was in flight — even though nothing
+         * was ever blocking this one. Correct against the rule as coded ("no sheet
+         * was answered while this request was being built"), and harmless — the row
+         * is accurate and its Retry works, which is the same fallback this file
+         * already relies on. Named here because the sentence above reads as though
+         * it were scoped to this failure's own blocker, and it is not.
          */
         private suspend fun raise(
             id: String,
