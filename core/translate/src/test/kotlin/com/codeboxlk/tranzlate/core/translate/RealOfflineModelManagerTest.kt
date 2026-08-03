@@ -99,7 +99,7 @@ class RealOfflineModelManagerTest {
             val store = FakeStore()
             val probe = FakeStorageProbe(free = Long.MAX_VALUE)
             probe.freeFailure = IllegalArgumentException("Invalid path: /data/user/0/…/no_backup")
-            val manager = RealOfflineModelManager(store, probe, backgroundScope)
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -114,7 +114,7 @@ class RealOfflineModelManagerTest {
             val store = FakeStore()
             val probe = FakeStorageProbe(free = Long.MAX_VALUE)
             probe.freeFailure = UnsatisfiedLinkError("nativeStatvfs")
-            val manager = RealOfflineModelManager(store, probe, backgroundScope)
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -132,7 +132,7 @@ class RealOfflineModelManagerTest {
         runTest {
             val store = FakeStore()
             val probe = FakeStorageProbe(free = 10L * 1024 * 1024) // 10MB < the 150MB budget
-            val manager = RealOfflineModelManager(store, probe, backgroundScope)
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
 
             manager.download("fr")
             runCurrent()
