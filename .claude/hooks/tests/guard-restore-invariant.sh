@@ -117,7 +117,8 @@ RULE_PRESENT=no
 if [ -r "$RULE" ]; then
   RULE_PRESENT=yes
   python3 - "$RULE" > "$TMP/pattern" <<'PY' || RULE_PRESENT=no
-import re, sys
+import re
+import sys
 txt = open(sys.argv[1], encoding="utf-8").read()
 # The rule has two `pattern:` keys. Take the one paired with regex_match.
 m = re.search(r"operator:\s*regex_match\s*\n\s*pattern:\s*(.+)", txt)
@@ -152,7 +153,30 @@ PY
 }
 
 # ── the corpus, generated from the pattern's own pre-`--` token class ─────────
-gen_tokens() {
+# THE BASH SIDE MUST PROPAGATE THE PYTHON'S REFUSAL. The meta-parse exits 2 when
+# it cannot find hookify's token class — but `done < <(gen_tokens)` discards that
+# status, so the loop simply iterates zero times and the suite reports a smaller
+# green. That is the SAME defect one level up, in the fix built to stop it: found
+# by re-running the #257 lens's non-capturing-group attack against the first
+# version of this guard, which still printed "45 passed, 0 failed, exit 0".
+# THE ABORT MUST HAPPEN IN THE PARENT SHELL. Three levels of the same defect, each
+# in the fix for the last: (1) the hook approximated hookify's regex and drifted;
+# (2) the generator hand-parsed that regex and degraded silently to a smaller green;
+# (3) the first fix exited 2 from the generator — but `done < <(gen_tokens)` runs it
+# in a SUBSHELL, so the message printed and the script still exited 0.
+#
+# So the tokens are captured and the status checked HERE, before any loop consumes
+# them. Verified by re-running the non-capturing-group attack: it now aborts 2.
+require_tokens() {
+  TOKENS=$(gen_tokens_raw) || {
+    printf '\n*** guard-restore-invariant: ABORTING — the token generator could not\n' >&2
+    printf '*** parse the hookify rule. Every invariant case below would silently\n' >&2
+    printf '*** not run, and the suite would report a smaller green.\n' >&2
+    exit 2
+  }
+}
+
+gen_tokens_raw() {
   python3 - "$(cat "$TMP/pattern" 2>/dev/null || echo '')" <<'PY'
 import re, sys
 pat = sys.argv[1]
@@ -167,6 +191,24 @@ if m:
     cls  = re.search(r"\[\^([^\]]*)\]", inner)          # negated set, e.g. \s;&|
     quant= inner[-1] if inner and inner[-1] in "+*?" else ""
     excl = cls.group(1) if cls else ""
+    # THE META-PARSE MUST FAIL LOUD, NOT DEGRADE. Found by the #257 round-3 lens:
+    # rewriting hookify's rule with non-capturing `(?:...)` groups — a purely
+    # stylistic, behaviour-preserving change verified byte-identical on 10 commands
+    # through the real engine — made `lit` come out as `?:` instead of `-`. Every
+    # generated token became a non-flag, the suite reported **72 passed, 0 failed,
+    # exit 0**, and nothing said it had stopped testing anything.
+    #
+    # That is the exact failure this file exists to end, one level up: a hand-rolled
+    # parse of another mechanism's regex, degrading silently. The comment above
+    # already claimed "or the test says it cannot parse it" — it did not, until here.
+    if not lit or not lit.startswith("-"):
+        sys.stderr.write(
+            "guard-restore-invariant: cannot parse hookify's token class.\n"
+            "  literal prefix came out as %r, expected to start with '-'.\n"
+            "  The rule file's structure changed (e.g. capturing -> non-capturing\n"
+            "  groups). Update this parser deliberately; do NOT let it generate\n"
+            "  garbage tokens and report a smaller green.\n" % lit)
+        sys.exit(2)
     # Boundaries of that class, which is where a bash approximation drifts.
     toks.append(lit)                                   # `-`  : fails `+`, passes `-*`
     toks.append(lit + "f")                             # `-f` : the ordinary case
@@ -184,6 +226,7 @@ PY
 
 printf '=== 1. INVARIANT — anything that destroys work is caught by SOMETHING ===\n'
 if [ "$RULE_PRESENT" = yes ]; then
+  require_tokens
   prefixes=( "" "-C $REPO " "--work-tree=$REPO --git-dir=$REPO/.git " "-C $REPO -C $REPO " )
   while IFS= read -r tok; do
     [ -n "$tok" ] || continue
@@ -210,7 +253,7 @@ if [ "$RULE_PRESENT" = yes ]; then
         fi
       done
     done
-  done < <(gen_tokens)
+  done <<< "$TOKENS"
 fi
 
 printf '\n=== 2. NO DEFERRAL INTO A VOID — the hook is silent only if hookify blocks ===\n'
@@ -228,7 +271,7 @@ if [ "$RULE_PRESENT" = yes ]; then
     if hook_warns "$cmd"; then ok
     elif hookify_blocks "$cmd"; then ok
     else bad "deferral into a void: $cmd"; fi
-  done < <(gen_tokens)
+  done <<< "$TOKENS"
 fi
 
 printf '\n=== 3. REGRESSION TABLE — every form #222/#223/#257 has ever turned up ===\n'
