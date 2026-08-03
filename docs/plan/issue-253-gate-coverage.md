@@ -14,7 +14,7 @@ after them: #241 cannot be done honestly until a gate compiles `:core:database`'
 androidTest, and #241's permanent test needs a Robolectric runtime that does not drag
 Compose into the database module.
 
-**File ownership for this PR:** `build-logic/**`, `.github/workflows/ci.yml`,
+**File ownership for this PR:** `build-logic/**`, `.github/workflows/ci.yml`, Also touched, and missing from this list as first written: `gradle/libs.versions.toml` (room-testing) and root `build.gradle.kts` (plugin registration) — neither collides with the live siblings, but an incomplete ownership statement is how a collision goes unnoticed.
 CLAUDE.md's rule 6 gate list, `docs/plan/**`. Sibling agents hold `.claude/hookify.*`
 + `.claude/agents/` (PR #233) and two files under `.claude/hooks/`. Nothing under
 `core/**` or `feature/**` is changed here.
@@ -154,9 +154,26 @@ fails the build, not that a *broken* file there does.
 
 ---
 
+## Known scope limit in the derivation itself
+
+`PreflightConventionPlugin.kt:117,134` registers androidTest coverage inside
+`withId("com.android.application")` / `withId("com.android.library")` only. A module
+applying `com.android.dynamic-feature` or `com.android.test` would get **zero** entries
+and no error — silent absence, which is the #201/#173 shape this task exists to fix one
+level out. **Dormant today**: no `.kts` in this repo applies either id (grepped by the
+#260 lens). Named rather than left, because the next module to use one would inherit
+the gap invisibly.
+
 ## What this change does NOT cover, stated so nobody reads more into the green tick
 
 1. **Instrumentation tests still do not RUN** — #40, and CI has no emulator.
+0. **androidTest is COMPILED, not assembled**, so duplicate-class, AAR-metadata and
+   dex-merge defects outside `:app` still escape. Found by the #260 lens, which diffed
+   `compileDebugAndroidTestSources` against `assembleDebugAndroidTest`:
+   `check*DuplicateClasses`, `check*AarMetadata`, `mergeExtDex*`, `dexBuilder*`,
+   `mergeProjectDex*`, `package*` are all absent from the compile graph. Assembling all
+   19 modules is what OOMs, so this is a deliberate trade — but it belongs in this list
+   beside #40 and #210, not left for a reader to discover.
    `preflight` compiles them.
 2. **`build-logic`'s own 15 Kotlin files are still analysed by neither detekt nor
    spotless** — #210. This PR edits that directory, so its own changes landed

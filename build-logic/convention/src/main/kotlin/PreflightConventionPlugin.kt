@@ -35,8 +35,14 @@ import org.gradle.language.base.plugins.LifecycleBasePlugin
  * ## Why `preflight` and not `verifyAll`
  *
  * #253 suggested `verifyAll`. That name asserts totality and would have been false on
- * the day it shipped — it does not RUN instrumentation tests (#40; no emulator in CI)
- * and does not analyse `build-logic`'s own Kotlin (#210). Naming a gate for coverage it
+ * the day it shipped — it does not RUN instrumentation tests (#40; no emulator in CI),
+ * does not analyse `build-logic`'s own Kotlin (#210), and **compiles** androidTest
+ * rather than assembling it, so duplicate-class, AAR-metadata and dex-merge defects
+ * in a non-`:app` module still escape (found by the #260 lens, which diffed the two
+ * task graphs: `check*DuplicateClasses`, `check*AarMetadata`, `mergeExtDex*`,
+ * `dexBuilder*`, `mergeProjectDex*` and `package*` are all absent from the compile
+ * graph). Assembling is what OOMs, below — so this is a deliberate trade, not an
+ * oversight, and naming it is the difference between the two. Naming a gate for coverage it
  * does not have is the exact failure this task exists to fix, one level out.
  * `preflight` says *when* to run it, which cannot go stale, and [DESCRIPTION] states
  * both exclusions by issue number so a green run is not read as more than it is.
@@ -60,8 +66,14 @@ import org.gradle.language.base.plugins.LifecycleBasePlugin
  * ## Why it COMPILES androidTest instead of assembling it
  *
  * Measured, not preferred. `./gradlew assembleAndroidTest` across all 19 Android
- * modules **fails**: `:core:ui:mergeExtDexDebugAndroidTest` →
+ * modules **fails**: a `mergeExtDexDebugAndroidTest` task →
  * `D8: java.lang.OutOfMemoryError: Java heap space`, at this repo's `-Xmx4g`, after 57s.
+ *
+ * WHICH module trips it is scheduling-dependent, not a fact: `org.gradle.parallel=true`,
+ * so it is whichever dex-merge worker holds memory when the heap fills. This author saw
+ * `:core:ui`; the #260 lens saw `:feature:history` on the same command. The conclusion —
+ * unaffordable at this heap — is what holds; a module name here would be one sample
+ * reported as a constant.
  * Dexing and packaging nineteen test APKs is unaffordable and beside the point — what
  * the gate must catch is that androidTest sources still COMPILE, which is the whole
  * class #148 was filed for (a missing binding, a retired signature, a fake that no
@@ -162,8 +174,10 @@ class PreflightConventionPlugin : Plugin<Project> {
         const val DESCRIPTION =
             "The gate to run before opening a PR: string-key catalogue, detekt, spotless, " +
                 "every module's unit tests, every androidTest source set's COMPILATION, and " +
-                "both debug APKs. Does NOT run instrumentation tests (#40) and does NOT " +
-                "analyse build-logic's own Kotlin (#210)."
+                "both debug APKs. Does NOT run instrumentation tests (#40), does NOT " +
+                "analyse build-logic's own Kotlin (#210), and COMPILES androidTest " +
+                "rather than assembling it, so dex-merge and duplicate-class defects " +
+                "outside :app still escape."
 
         /** `debugAndroidTest` -> `DebugAndroidTest`, for the AGP task-name convention. */
         fun String.taskSuffix(): String = replaceFirstChar(Char::uppercaseChar)
