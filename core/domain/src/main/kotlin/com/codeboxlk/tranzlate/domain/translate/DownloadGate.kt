@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate.domain.translate
 
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 
@@ -75,10 +76,38 @@ class DownloadGate(
      * A row's ⬇ / ↻ tap. Starts the download, unless the connection is
      * metered and no standing permission exists — in which case it raises
      * the question instead and starts NOTHING.
+     *
+     * **An unanswerable decision ASKS (issue #238).** Neither half of it was
+     * guarded before: the standing-preference read is a DataStore read, and
+     * `isMetered()` is a synchronous binder call into `ConnectivityManager`.
+     * A throw from either rode the caller's bare `viewModelScope.launch` to
+     * `Thread.defaultUncaughtExceptionHandler` — the app vanishing on a download
+     * tap, which is the one thing this class exists to make orderly.
+     *
+     * Raising the question is the safe side and not merely the convenient one.
+     * Issue #90's ruling is that a metered download is a CONSENT question; when
+     * the answer cannot be established, spending the user's data plan silently is
+     * the failure that costs them money, and asking costs them one tap. It is not
+     * a dead end either — the sheet carries "Download once" and "Wait for Wi-Fi",
+     * so the row stays reachable whichever way they answer.
+     *
+     * [modelManager] is deliberately OUTSIDE the guard: its own pre-flight owns
+     * its own failures (`RealOfflineModelManager.download`), and swallowing them
+     * here would hide a real download failure behind a consent sheet.
      */
     suspend fun requestDownload(id: String) {
-        val allowed = downloadPrefs.allowMobileData.first()
-        if (connectivity.isMetered() && !allowed) {
+        val mustAsk =
+            try {
+                val allowed = downloadPrefs.allowMobileData.first()
+                connectivity.isMetered() && !allowed
+            } catch (rethrown: CancellationException) {
+                throw rethrown // never break structured cancellation
+            } catch (
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") unanswerable: Throwable,
+            ) {
+                true // cannot tell whether this link is metered — ask, never assume
+            }
+        if (mustAsk) {
             consentQuestion.raise(id)
         } else {
             modelManager.download(id)

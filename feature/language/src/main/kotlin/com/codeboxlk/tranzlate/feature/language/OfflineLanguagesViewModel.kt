@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.codeboxlk.tranzlate.core.common.ApplicationScope
+import com.codeboxlk.tranzlate.core.common.DispatcherProvider
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /** One Screen-B row: a catalog language that MLKit can hold offline. */
@@ -82,6 +84,7 @@ class OfflineLanguagesViewModel
         private val translatePrefs: TranslatePrefsRepository,
         private val translations: TranslationRepository,
         private val handle: SavedStateHandle,
+        private val dispatchers: DispatcherProvider,
         @param:ApplicationScope private val appScope: CoroutineScope,
     ) : ViewModel() {
         val rows: StateFlow<List<OfflineLanguageRow>> =
@@ -135,15 +138,25 @@ class OfflineLanguagesViewModel
             appScope.launch { downloadPrefs.setAllowMobileData(allowMobileDataOf(alwaysAsk)) }
         }
 
-        /** Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts. */
+        /**
+         * Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts.
+         *
+         * Off the main thread (issue #238), for the reason
+         * `LanguagePickerViewModel.download` spells out: `isMetered()` is a
+         * synchronous binder IPC and the manager's free-space pre-flight is a
+         * `statvfs` syscall, and `viewModelScope` is `Dispatchers.Main.immediate`.
+         * Both screens raise the SAME sheet through the SAME gate, so both must
+         * reach it the same way — a second answer here is the drift the one-home
+         * rule exists to stop.
+         */
         fun download(id: String) {
-            viewModelScope.launch { downloadGate.requestDownload(id) }
+            viewModelScope.launch { withContext(dispatchers.io) { downloadGate.requestDownload(id) } }
         }
 
         /** Dialog "Download once": THIS download only — the standing pref is untouched. */
         fun downloadAnyway() {
             val consented = downloadGate.consentOnce() ?: return
-            viewModelScope.launch { downloadGate.downloadConsented(consented) }
+            viewModelScope.launch { withContext(dispatchers.io) { downloadGate.downloadConsented(consented) } }
         }
 
         /** Dialog "Wait for Wi-Fi" (or dismiss): the row stays NotDownloaded — no dead end. */
@@ -208,6 +221,23 @@ class OfflineLanguagesViewModel
          * removing a pack: zero renders as an ABSENT line, which is what a user
          * who has saved nothing sees anyway — a missing reassurance, never a false
          * one.
+         *
+         * `Throwable`, not `Exception` (issue #236). This query is Room, and every
+         * statement Room runs here ends in a `native` method on
+         * `android.database.sqlite.SQLiteConnection`; a JNI link that cannot be
+         * satisfied raises `UnsatisfiedLinkError`, which is a `LinkageError`, so an
+         * `Error`, so NOT an `Exception` — the full reasoning and its citations are
+         * `TextViewModel.kt:768-779` (#195), and this call was simply written on the
+         * un-migrated side of it. It reaches the user through `removalFor`'s `map`,
+         * terminated by `stateIn(viewModelScope, …)`, which installs no
+         * `CoroutineExceptionHandler`: a narrow catch hands the failure back to
+         * `Thread.defaultUncaughtExceptionHandler` and the app disappears on the
+         * trash tap for the pack the user is currently translating INTO.
+         *
+         * `CancellationException` is rethrown FIRST and by name because it is an
+         * `Exception` — widening protects it not at all, and only the rethrow does.
+         * That arm is entered by no test and the fixture cannot express it; the gap
+         * is recorded as #242 and is unchanged by the widening above it.
          */
         private suspend fun savedCountOf(id: String): Int =
             try {
@@ -215,7 +245,7 @@ class OfflineLanguagesViewModel
             } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                 throw rethrown
             } catch (
-                @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Throwable,
             ) {
                 0
             }

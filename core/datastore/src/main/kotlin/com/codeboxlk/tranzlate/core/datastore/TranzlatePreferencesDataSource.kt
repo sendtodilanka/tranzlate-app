@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.core.datastore
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -43,6 +44,35 @@ class TranzlatePreferencesDataSource
                 if (cause is IOException) emit(emptyPreferences()) else throw cause
             }
 
+        /**
+         * The WRITE half of the guard above (issue #238) — every setter in this
+         * class goes through here, for the same reason every read derives from
+         * [preferences].
+         *
+         * Reads were guarded and writes were not, and the asymmetry had no
+         * argument behind it: `DataStore.edit` is documented to throw `IOException`,
+         * and several of these setters are launched fire-and-forget on the
+         * application scope, where an escape used to end the process. **A consent
+         * checkbox that fails to persist should mis-save, not crash** — the user
+         * gets asked about mobile data one more time than they wanted, which is the
+         * cheap side of that trade and the side that keeps their choice reversible.
+         *
+         * The rule is deliberately as narrow as the read guard's: `IOException`
+         * only, because that is what `edit` documents. Anything else is a
+         * programming error and must stay loud. `CancellationException` is not an
+         * `IOException`, so it propagates untouched and structured concurrency is
+         * unaffected.
+         */
+        private suspend fun editSafely(transform: suspend (MutablePreferences) -> Unit) {
+            try {
+                dataStore.edit(transform)
+            } catch (ignored: IOException) {
+                // The value in memory is already what the caller asked for; the
+                // next successful write re-states it. Nothing is owed a message:
+                // every one of these is a preference the user can set again.
+            }
+        }
+
         val sourceLang: Flow<String> = preferences.map { it[KEY_SOURCE_LANG] ?: DEFAULT_SOURCE_LANG }
 
         val targetLang: Flow<String> = preferences.map { it[KEY_TARGET_LANG] ?: DEFAULT_TARGET_LANG }
@@ -57,11 +87,11 @@ class TranzlatePreferencesDataSource
         val dynamicColor: Flow<Boolean> = preferences.map { it[KEY_DYNAMIC_COLOR] ?: DEFAULT_DYNAMIC_COLOR }
 
         suspend fun setSourceLang(value: String) {
-            dataStore.edit { it[KEY_SOURCE_LANG] = value }
+            editSafely { it[KEY_SOURCE_LANG] = value }
         }
 
         suspend fun setTargetLang(value: String) {
-            dataStore.edit { it[KEY_TARGET_LANG] = value }
+            editSafely { it[KEY_TARGET_LANG] = value }
         }
 
         /** Swap-safe: both ids in ONE edit so no observer ever sees a torn pair. */
@@ -69,22 +99,22 @@ class TranzlatePreferencesDataSource
             sourceValue: String,
             targetValue: String,
         ) {
-            dataStore.edit {
+            editSafely {
                 it[KEY_SOURCE_LANG] = sourceValue
                 it[KEY_TARGET_LANG] = targetValue
             }
         }
 
         suspend fun setTextMode(value: String) {
-            dataStore.edit { it[KEY_TEXT_MODE] = value }
+            editSafely { it[KEY_TEXT_MODE] = value }
         }
 
         suspend fun setTheme(value: Int) {
-            dataStore.edit { it[KEY_THEME] = value }
+            editSafely { it[KEY_THEME] = value }
         }
 
         suspend fun setDynamicColor(value: Boolean) {
-            dataStore.edit { it[KEY_DYNAMIC_COLOR] = value }
+            editSafely { it[KEY_DYNAMIC_COLOR] = value }
         }
 
         /**
@@ -95,7 +125,7 @@ class TranzlatePreferencesDataSource
             preferences.map { it[KEY_ALLOW_MOBILE_DATA] ?: defaultValue }
 
         suspend fun setAllowMobileData(value: Boolean) {
-            dataStore.edit { it[KEY_ALLOW_MOBILE_DATA] = value }
+            editSafely { it[KEY_ALLOW_MOBILE_DATA] = value }
         }
 
         /**
@@ -173,7 +203,7 @@ class TranzlatePreferencesDataSource
             atMillis: Long,
         ) {
             if (languageId.isBlank()) return
-            dataStore.edit { prefs ->
+            editSafely { prefs ->
                 val merged = decodeRecents(prefs[key].orEmpty()) + (languageId to atMillis)
                 prefs[key] =
                     merged.entries

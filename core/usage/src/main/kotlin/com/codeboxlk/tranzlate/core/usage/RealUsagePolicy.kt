@@ -92,6 +92,14 @@ class RealUsagePolicy
          * failed read (PR-67 lens OPEN-1): quota protection never blocks or
          * crashes a translation — the in-memory decision stands and the next
          * mutation retries the save.
+         *
+         * `Throwable`, not `Exception` (issue #236) — and, as at [UsagePersistence]'s
+         * DataStore adapter, NOT for `TextViewModel.kt:768-779`'s JNI reason: nothing
+         * here is Room, and that citation is not borrowed. The reason is this
+         * function's own first sentence. A guard whose stated contract is "never
+         * crashes a translation" is not delivering it while a whole failure class
+         * walks past the catch to `Thread.defaultUncaughtExceptionHandler`, and
+         * `trySpend` is on the metered translate path.
          */
         private suspend fun persist() {
             try {
@@ -105,7 +113,7 @@ class RealUsagePolicy
             } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                 throw rethrown
             } catch (
-                @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Throwable,
             ) {
                 // Disk-full / IO error: fail-open, matching the load path.
             }

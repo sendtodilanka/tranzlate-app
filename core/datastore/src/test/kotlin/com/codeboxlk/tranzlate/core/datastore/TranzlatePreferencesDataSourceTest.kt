@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.io.IOException
@@ -74,6 +75,49 @@ class TranzlatePreferencesDataSourceTest {
             TranzlatePreferencesDataSource(FailingDataStore(IllegalStateException("bug")))
                 .theme
                 .first()
+        }
+
+    // ---- issue #238: reads were guarded, writes were not --------------------
+
+    /**
+     * The WRITE half of the guard above.
+     *
+     * `DataStore.edit` is documented to throw `IOException`, and several of these
+     * setters are launched fire-and-forget on the application scope — including
+     * `setAllowMobileData`, the mobile-data consent checkbox. A checkbox that
+     * cannot reach the disk should mis-save, not end the process: the user gets
+     * asked once more than they wanted, which is the cheap side of that trade.
+     *
+     * Every setter is exercised, not only the one the issue named. The guard is
+     * one home, and a test covering a single setter would not notice a new one
+     * added beside it that went straight to `dataStore.edit`.
+     */
+    @Test
+    fun `an IO failure on write is swallowed rather than propagating`() =
+        runTest {
+            val source = TranzlatePreferencesDataSource(WriteFailingDataStore(IOException("disk full")))
+
+            source.setSourceLang("de")
+            source.setTargetLang("es")
+            source.setLanguagePair("de", "es")
+            source.setTextMode("AUTO")
+            source.setTheme(2)
+            source.setDynamicColor(true)
+            source.setAllowMobileData(true)
+            source.recordSourceLanguageUse("de", atMillis = 1L)
+            source.recordTargetLanguageUse("es", atMillis = 1L)
+        }
+
+    /**
+     * Same narrow rule as the read guard: `IOException` only. Anything else is a
+     * programming error and must stay loud rather than be hidden by a catch that
+     * was widened for convenience.
+     */
+    @Test(expected = IllegalStateException::class)
+    fun `a non-IO failure on write still propagates`() =
+        runTest {
+            TranzlatePreferencesDataSource(WriteFailingDataStore(IllegalStateException("bug")))
+                .setTheme(1)
         }
 
     @Test
@@ -260,4 +304,17 @@ private class FailingDataStore(
 
     override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences =
         error("not used by these tests")
+}
+
+/**
+ * The mirror of [FailingDataStore]: reads fine, every WRITE fails with [cause]
+ * (issue #238). A store that fails both halves could not tell a swallowed write
+ * apart from a read that never happened.
+ */
+private class WriteFailingDataStore(
+    private val cause: Throwable,
+) : DataStore<Preferences> {
+    override val data: Flow<Preferences> = flowOf(emptyPreferences())
+
+    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences = throw cause
 }

@@ -78,6 +78,70 @@ class RealOfflineModelManagerTest {
             assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
         }
 
+    // ---- issue #238: the pre-flight probe had no error handling -------------
+
+    /**
+     * The prod probe is `StatFs(context.noBackupFilesDir.absolutePath)`, and
+     * `StatFs` throws `IllegalArgumentException` when the underlying `statvfs`
+     * fails — `android/os/StatFs.java:53`. This call runs on the CALLER's
+     * coroutine, outside the try/catch that wraps the launched transfer, so the
+     * throw went straight to `Thread.defaultUncaughtExceptionHandler` on a
+     * download tap.
+     *
+     * A probe that cannot ANSWER is not a refusal. Refusing on an unknown would
+     * strand a user whose disk is perfectly fine, and `StorageProbe`'s own
+     * contract already says a missing answer means "unknown", never "zero" —
+     * ML Kit reports a genuine out-of-space through the normal failure path.
+     */
+    @Test
+    fun `an unanswerable free-space probe lets the download proceed`() =
+        runTest {
+            val store = FakeStore()
+            val probe = FakeStorageProbe(free = Long.MAX_VALUE)
+            probe.freeFailure = IllegalArgumentException("Invalid path: /data/user/0/…/no_backup")
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
+        }
+
+    /** The same, for the class a narrow catch would have let past (issue #236's shape). */
+    @Test
+    fun `a free-space probe that fails as an Error lets the download proceed`() =
+        runTest {
+            val store = FakeStore()
+            val probe = FakeStorageProbe(free = Long.MAX_VALUE)
+            probe.freeFailure = UnsatisfiedLinkError("nativeStatvfs")
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
+        }
+
+    /**
+     * A REAL low-disk answer must still refuse. Without this, "proceed when the
+     * probe throws" could be implemented by never consulting the probe at all and
+     * every test above would still pass.
+     */
+    @Test
+    fun `the proceed-on-unknown rule does not disarm a real low-disk refusal`() =
+        runTest {
+            val store = FakeStore()
+            val probe = FakeStorageProbe(free = 10L * 1024 * 1024) // 10MB < the 150MB budget
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.stateOf("fr"))
+                .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+            assertThat(store.committed).isEmpty()
+        }
+
     @Test
     fun `stop mid-download cancels the manager's job and the row never ghosts back`() =
         runTest {

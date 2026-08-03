@@ -17,5 +17,18 @@ class FakeConnectivityMonitor(
     /** Tests flip this to simulate a mobile-data network (issue #90 gate). */
     var metered: Boolean = false
 
-    override fun isMetered(): Boolean = metered
+    /**
+     * The failure to throw from [isMetered], or null (issue #238).
+     *
+     * `isMetered()` is a synchronous binder call into `ConnectivityManager` in
+     * production, and a binder call can fail. Until this hook existed the gate's
+     * whole matrix was written against a probe that always answered, so "what
+     * happens when it cannot answer" was not a question any test could ask.
+     */
+    var meteredFailure: Throwable? = null
+
+    override fun isMetered(): Boolean {
+        meteredFailure?.let { throw it }
+        return metered
+    }
 }

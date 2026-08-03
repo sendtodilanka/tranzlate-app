@@ -104,7 +104,33 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
 - 👁 **#195** — **PR #197** — the composer crashed the moment a translation
   landed, not when the star was tapped: enumerating the star rather than the
   issue's line range found a **fourth** unguarded write, on the read path that
-  runs for every result. Sibling of #190/#194.- 👁 **#186** — **PR #199** — there was no Compose unit-test runtime anywhere, so
+  runs for every result. Sibling of #190/#194.- 👁 **#236** + **#238** — **PR #249** — the sibling of #190/#194 and #195/#197, and
+  the half of them that never landed. A co-verify lens had ruled
+  `OfflineLanguagesViewModel.savedCountOf`'s `catch (Exception)` *"the prevailing
+  pattern"*; counting instead of inheriting showed it is **the set of sites nobody
+  revisited** — all four `Throwable` sites were written as fixes for this exact
+  crash class and landed in #197 *before* the language feature's were written.
+  Ruled **WIDEN**, and argued rather than assumed: the premise re-verified here
+  (`UnsatisfiedLinkError → LinkageError → Error`, so `Exception` provably misses
+  it), narrowing has no advocate since every site already carries a written
+  degrade, and the costs are asymmetric — an unnecessary widening is byte-identical
+  at runtime, a wrong narrowing is process death on the star tap, on every
+  translation and on every language selection. **#236's own table was incomplete**:
+  47 catch sites in main source, not 9, and 7 on the concept rather than 5
+  (`UsageDataSource.readUsage` and `RealUsagePolicy.persist` were missing, and their
+  KDoc says plainly that #195's JNI citation does *not* apply to them — DataStore is
+  not Room). #238's three doors turned out to be three *different* fixes, and only
+  one about catch width: `StatFs` throws `IllegalArgumentException`, an `Exception`,
+  so `DownloadGate`'s problem was no catch **of any width**. Plus the backstop three
+  files had been writing KDoc about instead of installing — `@ApplicationScope` now
+  carries a `CoroutineExceptionHandler`, because `SupervisorJob` alone stops sibling
+  cancellation and still lets a child kill the process. **The mutation harness
+  produced a FALSE red before it produced a true one** — `:core:testing` has no
+  `testDebugUnitTest` task, so "BUILD FAILED" meant task-not-found, and a harness
+  that cannot tell that from a failing test reports every mutation as caught: the
+  same presence-for-behaviour substitution rule 12 records against `device-claim.sh`.
+  13 mutations, all RED by name after it was hardened.
+- 👁 **#186** — **PR #199** — there was no Compose unit-test runtime anywhere, so
   a decision inside a `@Composable` was a decision no test could reach. Three of
   2026-08-02's five blocking co-verify findings were device-only because of it.
   Robolectric + `createComposeRule` via `tranzlate.compose-test`; the acceptance
