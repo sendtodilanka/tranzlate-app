@@ -6,7 +6,7 @@ action: block
 conditions:
   - field: command
     operator: regex_match
-    pattern: (^|[;&|]|\s)(\S*/)?adb(?:\s+(?!-s(?:\s|$))(?!--serial)(?!-{0,2}$)[^\s;&|]+)*?\s+(?:shell|install|uninstall|emu|push|pull|logcat|screencap|uiautomator|forward|reverse|root|unroot|reboot|tcpip|sideload|exec-out|bugreport|remount)(\s|$)
+    pattern: (^|[;&|]|\s)(\S*/)?adb(?:\s+(?!(?-i:-s)(?:\s|$))(?!(?-i:--serial))(?!-{0,2}$)[^\s;&|]+)*?\s+(?:shell|install|uninstall|emu|push|pull|logcat|screencap|uiautomator|forward|reverse|root|unroot|reboot|tcpip|sideload|exec-out|bugreport|remount)(\s|$)
   - field: command
     operator: not_contains
     pattern: ANDROID_SERIAL
@@ -63,3 +63,17 @@ Now only the tokens **between `adb` and its subcommand** count. Consequences wor
   handset. It is not a false positive; it is the exact hazard.
 - `--serial` is handled inside the pattern. `ANDROID_SERIAL` stays a whole-command check
   because it is an environment assignment and legitimately appears before the command.
+
+**The lookaheads carry `(?-i:…)`, and that is load-bearing.** `hookify`'s
+`compile_regex()` (`core/rule_engine.py:24`) sets `re.IGNORECASE` **unconditionally**. Without
+turning it off for just these two lookaheads, `-S`, `--Serial` and `--SERIAL` read as
+targeting flags — and **`adb` requires exact case**, so those are shift-key typos that leave
+the command genuinely untargeted.
+
+The first version of this scoped check introduced exactly that regression: the older
+whole-command `not_contains "-s "` was case-**sensitive** and caught the typos by accident,
+and moving the check into the case-insensitive regex removed that accidental protection
+while replacing the mechanism it was meant to fix. Found by the #233 co-verify lens on the
+pass immediately after a commit message claiming "34 cases run before and after" — accurate
+for the 34 it ran, and not exhaustive. Reproduced pre- and post-fix side by side before this
+line was written.
