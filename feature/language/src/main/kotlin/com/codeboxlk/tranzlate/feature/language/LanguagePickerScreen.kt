@@ -381,8 +381,25 @@ fun LanguagePickerContent(
  * It is a `when` over [PackFailureRequest] rather than two `if`s at the call
  * site so that the two sheets cannot both be up: they answer the same question
  * ("your download did not happen") and a user looking at two of them is looking
- * at a bug. The ViewModel already guarantees one request at a time; this makes
- * it a property of the type as well.
+ * at a bug.
+ *
+ * This KDoc used to justify that with *"the ViewModel already guarantees one
+ * request at a time"*, which was true and was **not the property that matters**
+ * (issue #239): one at a time did not mean the one on screen stayed. The
+ * guarantee it now leans on is the stronger one — a raised request holds its slot
+ * until the user answers it, so a second language failing cannot swap the sheet
+ * under a thumb already moving. See `LanguagePickerViewModel.raise`.
+ *
+ * **Every action here dismisses before it does anything else.** Both branches
+ * lead somewhere the sheet must not be waiting when the user arrives or returns
+ * — Retry re-runs the download the sheet is about, and Manage packs leaves the
+ * screen entirely. Manage packs did not (issue #235), and only the tablet
+ * dialog host hid it: that host's shell dismisses the card first, which clears
+ * the picker's ViewModel and the request with it, while the nav host PUSHES and
+ * clears nothing. A user who freed 130 MB came back to a sheet still reporting
+ * the 12 MB they had before. `PackFailureSheetsTest` pins the order in both
+ * branches, because the order is the fix — calling both the other way round
+ * leaves a sheet floating over the destination.
  *
  * @param nameOf the language's display name as the ROW spells it. A `null`
  *   answer draws nothing: the catalogue has not arrived yet (or, impossibly, the
@@ -404,7 +421,10 @@ private fun PackFailureSheetHost(
             NoSpaceSheet(
                 freeBytes = request.freeBytes,
                 volumeBytes = request.volumeBytes,
-                onManagePacks = onManagePacks,
+                onManagePacks = {
+                    onDismiss()
+                    onManagePacks()
+                },
                 onDismiss = onDismiss,
             )
         }

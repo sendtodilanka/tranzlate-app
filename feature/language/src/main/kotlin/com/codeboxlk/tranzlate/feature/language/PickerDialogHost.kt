@@ -142,6 +142,16 @@ fun PickerDialogHost(
             // in this host that means dismissing the card BEFORE pushing —
             // an order the shell owns and `TranzlateApp.manageLanguagePacks`
             // explains. Two ways in, one behaviour.
+            //
+            // That last sentence was ASPIRATIONAL until issue #235, and it was
+            // this host that hid it. Dismissing the card clears the picker's
+            // child ViewModelStore and takes the raised sheet request with it, so
+            // the sheet went away here for a reason that has nothing to do with
+            // the sheet — while the nav host, which pushes and clears nothing,
+            // brought 19b back over the picker still quoting the free space the
+            // user had just changed. The sheet's own action now dismisses first
+            // in `PackFailureSheetHost`, which is what makes the two hosts agree
+            // by construction rather than by coincidence of lifetime.
             onManagePacks = onManagePacks,
             modifier = Modifier.weight(1f),
             host = PickerHost.DIALOG,

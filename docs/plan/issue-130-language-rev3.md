@@ -585,6 +585,23 @@ container, never off a flattened token list — the #183 trap.
    interrupt twice`, with the reasoning in the ViewModel so a change of mind has
    to be a decision. PR-22 can delete the whole watcher.
 
+   > **REVERSED, 2026-08-03 — issue #234** (`docs/plan/issue-234-failure-sheet-state.md`).
+   > The change of mind this paragraph asked to be a decision is now one. Two
+   > things were wrong with it. The smaller: "no second sheet opens" understated
+   > the cost — the row's **enabled, labelled, 48 dp Retry produced nothing at
+   > all**, no spinner and no sheet, and a watcher was left suspended on a shared
+   > flow until the picker closed. Under `EDGE_CASES.md` §7 an enabled control
+   > with no observable effect IS the dead end, and "the row still offers Retry"
+   > establishes that the row still RENDERS one, not that it DOES anything. The
+   > larger: the argument was *"the sheet they dismissed a second ago"* — and a
+   > second ago they were told 12 MB free, and have since had the chance to
+   > change it, which is exactly what #235 found them doing. The refusal is now
+   > reported on every attempt with figures read at raise time, and the pinning
+   > test above is inverted (`…raises the sheet again`). **The watcher stays and
+   > PR-22 can still delete it**: only the SYNCHRONOUS pre-flight answer moved,
+   > onto the return of the call the caller already awaits (`DownloadAttempt`),
+   > which adds no flow, no scope and no second channel for REJECT §7.8 to bounce.
+
 10. **A second divergent pair was found and deliberately NOT folded in.**
     `cd_text_lang_retry` ("Try downloading %1$s again") against
     `offline_cd_retry` ("Retry downloading %1$s") — the same #175 shape, on the

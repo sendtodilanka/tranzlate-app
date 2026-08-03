@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.core.translate
 import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
@@ -241,14 +242,23 @@ class RealOfflineModelManager internal constructor(
     override fun modelStates(): Flow<Map<String, OfflineModelState>> =
         states.onSubscription { refreshRequests.trySend(Unit) }
 
-    override suspend fun download(languageTag: String) {
-        if (!store.isCapable(languageTag)) return
-        if (activeDownloads.containsKey(languageTag)) return // one in-flight per tag
+    /**
+     * The synchronous half runs here and its answer is RETURNED, not left for a
+     * caller to infer from the state map (issue #234). A refusal repeated for the
+     * same reason writes an equal value into a conflating flow and is invisible
+     * there — see [DownloadAttempt] for why that is a property of the channel
+     * rather than of this method. The transfer itself still goes to
+     * [downloadScope] and still reports through `modelStates()`.
+     */
+    override suspend fun download(languageTag: String): DownloadAttempt {
+        if (!store.isCapable(languageTag)) return DownloadAttempt.Ignored
+        if (activeDownloads.containsKey(languageTag)) return DownloadAttempt.Ignored // one in-flight per tag
         // Issue #90 pre-flight: refuse BEFORE enqueue when the disk can't hold
         // a model — a partial download + a generic failure is a dead end.
         if (storageProbe.freeBytes() < REQUIRED_FREE_BYTES) {
-            takeTransient(languageTag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
-            return
+            val cause = OfflineModelFailure.STORAGE
+            takeTransient(languageTag, OfflineModelState.Failed(cause))
+            return DownloadAttempt.Refused(cause)
         }
         takeTransient(languageTag, OfflineModelState.Downloading)
         val job =
@@ -275,6 +285,7 @@ class RealOfflineModelManager internal constructor(
             }
         activeDownloads[languageTag] = job
         job.start() // registered BEFORE it runs — Stop can never miss the window
+        return DownloadAttempt.Started
     }
 
     override suspend fun delete(languageTag: String) {

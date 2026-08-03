@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate.core.translatefake
 
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,11 +22,17 @@ class FakeOfflineModelManager : OfflineModelManager {
 
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = states.asStateFlow()
 
-    override suspend fun download(languageTag: String) {
-        val current = states.value[languageTag] ?: return
-        if (current is OfflineModelState.OnlineOnly || current is OfflineModelState.Downloaded) return
+    override suspend fun download(languageTag: String): DownloadAttempt {
+        val current = states.value[languageTag] ?: return DownloadAttempt.Ignored
+        if (current is OfflineModelState.OnlineOnly || current is OfflineModelState.Downloaded) {
+            return DownloadAttempt.Ignored
+        }
         states.update { it + (languageTag to OfflineModelState.Downloading) }
         states.update { it + (languageTag to OfflineModelState.Downloaded) }
+        // The fake has no disk and therefore no free-space pre-flight to refuse
+        // with — every download it accepts starts and finishes. `Refused` is
+        // reachable only against a real volume (`RealOfflineModelManager`).
+        return DownloadAttempt.Started
     }
 
     override suspend fun delete(languageTag: String) {

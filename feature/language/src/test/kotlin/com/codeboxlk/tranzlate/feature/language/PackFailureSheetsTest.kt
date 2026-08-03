@@ -9,6 +9,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
+import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -224,5 +226,92 @@ class PackFailureSheetsTest {
         showNoSpace()
 
         compose.onNodeWithText("Free up space").assertDoesNotExist()
+    }
+
+    // ---- the HOST, not the sheet (#235) ---------------------------------------
+    //
+    // Everything above drives a sheet in isolation, which is the right subject for
+    // its copy and its tags — and is exactly why #235 survived review. What the
+    // user meets is the sheet AS THE HOST WIRES IT, and the two differed: the
+    // sheet calls what it is handed, and what it was handed did not clear the
+    // request that raised it.
+
+    /**
+     * **Issue #235, reproduced and then closed.**
+     *
+     * `PickerDialogHost.kt:140-145` claims the sheet's Manage packs and the docked
+     * bar's Manage packs are *"Two ways in, one behaviour."* They were not. In the
+     * dialog host the shell dismisses the card first, which clears the child
+     * `ViewModelStore` and takes the raised request with it; in the nav host
+     * Manage packs is a **push**, and a nav entry's ViewModels are cleared on POP.
+     * So the picker's ViewModel survived, and coming back from freeing 130 MB the
+     * user met 19b again — still saying *"12 MB free"*, bar still at 96%, offering
+     * the one action they had just done. **Only the smaller-screen host was
+     * right.**
+     *
+     * The assertion is on the ORDER and not on the pair. Calling both in the other
+     * order is the plausible wrong fix and is just as broken: the shell's own
+     * `manageLanguagePacks` exists because pushing before dismissing leaves a card
+     * floating over the destination (`TranzlateApp.kt:155-174`).
+     */
+    @Test
+    fun `19b's Manage packs clears the sheet before it navigates`() {
+        val events = mutableListOf<String>()
+        compose.setContent {
+            TranzlateTheme {
+                LanguagePickerContent(
+                    target = LanguageRole.SOURCE,
+                    languages = listOf(Language("es", "Spanish", offlineAvailable = true, offlineDownloaded = false)),
+                    selectedId = "zz",
+                    query = "",
+                    onQueryChange = {},
+                    onSelect = {},
+                    onBack = {},
+                    packFailure =
+                        PackFailureRequest.NoSpace(
+                            freeBytes = 12L * 1024 * 1024,
+                            volumeBytes = 64L * 1024 * 1024 * 1024,
+                        ),
+                    onDismissFailure = { events += "dismiss" },
+                    onManagePacks = { events += "manage" },
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag(TT_SHEET_SPACE_MANAGE).performClick()
+
+        assertThat(events).containsExactly("dismiss", "manage").inOrder()
+    }
+
+    /**
+     * The neighbouring branch, asserted here so the two cannot drift apart again:
+     * 19d's Retry has always dismissed first (`LanguagePickerScreen.kt:419-422`),
+     * and that is the shape 19b's action was copied onto.
+     */
+    @Test
+    fun `19d's Retry clears the sheet before it downloads again`() {
+        val events = mutableListOf<String>()
+        compose.setContent {
+            TranzlateTheme {
+                LanguagePickerContent(
+                    target = LanguageRole.SOURCE,
+                    languages = listOf(Language("es", "Spanish", offlineAvailable = true, offlineDownloaded = false)),
+                    selectedId = "zz",
+                    query = "",
+                    onQueryChange = {},
+                    onSelect = {},
+                    onBack = {},
+                    packFailure = PackFailureRequest.Interrupted("es", OfflineModelFailure.NETWORK),
+                    onDismissFailure = { events += "dismiss" },
+                    onDownload = { events += "retry:$it" },
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag(TT_SHEET_FAILED_RETRY).performClick()
+
+        assertThat(events).containsExactly("dismiss", "retry:es").inOrder()
     }
 }

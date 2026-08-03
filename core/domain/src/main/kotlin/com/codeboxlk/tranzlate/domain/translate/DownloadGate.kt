@@ -75,11 +75,18 @@ class DownloadGate(
      * A row's ⬇ / ↻ tap. Starts the download, unless the connection is
      * metered and no standing permission exists — in which case it raises
      * the question instead and starts NOTHING.
+     *
+     * @return the manager's [DownloadAttempt], or **null** when the question was
+     *   raised instead and the manager was never asked. Null is the gate's own
+     *   answer and not one of the manager's: nothing was refused and nothing was
+     *   ignored, because nothing was requested yet. A caller that watches for an
+     *   outcome must not watch for this one — the user may never answer it.
      */
-    suspend fun requestDownload(id: String) {
+    suspend fun requestDownload(id: String): DownloadAttempt? {
         val allowed = downloadPrefs.allowMobileData.first()
-        if (connectivity.isMetered() && !allowed) {
+        return if (connectivity.isMetered() && !allowed) {
             consentQuestion.raise(id)
+            null
         } else {
             modelManager.download(id)
         }
@@ -97,7 +104,7 @@ class DownloadGate(
     fun consentOnce(): ConsentedDownload? = consentQuestion.take()?.let(::ConsentedDownload)
 
     /** The consented download itself — [consentOnce]'s follow-through. */
-    suspend fun downloadConsented(consented: ConsentedDownload) = modelManager.download(consented.id)
+    suspend fun downloadConsented(consented: ConsentedDownload): DownloadAttempt = modelManager.download(consented.id)
 
     /** "Wait for Wi-Fi", or a dismiss: the row is left untouched and re-tappable. */
     fun dismiss() {

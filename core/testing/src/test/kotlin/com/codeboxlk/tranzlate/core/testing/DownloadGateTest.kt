@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.core.testing
 
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
@@ -289,8 +290,9 @@ private class RecordingModelManager : OfflineModelManager {
 
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = flowOf(emptyMap())
 
-    override suspend fun download(languageTag: String) {
+    override suspend fun download(languageTag: String): DownloadAttempt {
         downloads += languageTag
+        return DownloadAttempt.Started
     }
 
     override suspend fun delete(languageTag: String) = Unit
