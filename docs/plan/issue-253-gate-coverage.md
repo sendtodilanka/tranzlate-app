@@ -7,6 +7,8 @@ Refs: **#253** (the local gate never compiles `app/src/androidTestProd`), **#231
 SQL nothing compiles), **#148** (the CI guard this repeats), **#210** (`build-logic`
 is analysed by neither lint gate).
 
+Shipped as **PR #260**.
+
 Wave **1a** of `docs/plan/issue-130-rev5-completion.md`. These two gate everything
 after them: #241 cannot be done honestly until a gate compiles `:core:database`'s
 androidTest, and #241's permanent test needs a Robolectric runtime that does not drag

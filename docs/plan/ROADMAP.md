@@ -302,7 +302,7 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   unmeasured → rule 4 research record before any fix; S1/P1 is provisional on the
   worse branch. Found while scoping #212, ruled out of its scope, independent of
   it and of the waves.
-- 👁 **#253** + **#231** — **PR #258** — wave 1a of the rev5 completion plan, and the
+- 👁 **#253** + **#231** — **PR #260** — wave 1a of the rev5 completion plan, and the
   pair everything after it is verified by. The gate every brief repeats compiled **no**
   `androidTest` source set: with a deliberate `Unresolved reference` in
   `app/src/androidTestProd/` the five-command line was BUILD SUCCESSFUL, exit 0, and
