@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
 /** DECISIONS defaults table (pre-first-emission frame only — DataStore owns the real default). */
@@ -430,9 +431,16 @@ class LanguagePickerViewModel
          */
         val packFailure: StateFlow<PackFailureRequest?> = raisedFailure.asStateFlow()
 
+        /**
+         * How many sheets the user has answered. Read and compared across
+         * [raise]'s suspension point — see the third guard there.
+         */
+        private val sheetsAnswered = AtomicLong(0)
+
         /** "Close" on 19d, a scrim tap, a back press: the row keeps its cause line and its Retry. */
         fun dismissPackFailure() {
             raisedFailure.value = null
+            sheetsAnswered.incrementAndGet()
         }
 
         /** Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts. */
@@ -482,19 +490,30 @@ class LanguagePickerViewModel
          *   exist yet and inventing one here would be the third copy REJECT §7.8
          *   bounces.
          * - **[DownloadAttempt.Ignored]** — not offline-capable, or already
-         *   downloading. Nothing was written and nothing will be, so there is
-         *   nothing to watch. Watching anyway is what used to leave a coroutine
-         *   suspended on a shared flow for the life of the screen.
+         *   downloading. This attempt wrote nothing, so there is nothing of its
+         *   own to watch. The two cases differ and the difference is worth being
+         *   exact about: for a tag ML Kit cannot hold, nothing will EVER move that
+         *   row, so a watcher parks for the life of the screen; for a tag already
+         *   in flight, the row does move — when somebody else's attempt ends — and
+         *   the watcher would have reported that outcome as if it were this tap's.
+         *   A permanent park and a wrong answer, not one fault twice.
          *
          * [before] is the state the row was showing when the user tapped. The
          * shared map is a `StateFlow` fed by a `combine` on another scope, so it
          * can still be one emission behind the write the manager has already made
          * by the time this runs; dropping while the value is unchanged waits for
-         * it to catch up, and everything after that belongs to this attempt. On
-         * the `Started` path the manager has written `Downloading` and [before]
-         * cannot have been `Downloading` — a second tag already in flight answers
-         * `Ignored` — so the map is guaranteed to move and the drop is guaranteed
-         * to end.
+         * it to catch up, and everything after that belongs to this attempt.
+         *
+         * **The drop always ends, and the reason is not the one first written
+         * here** (#246 co-verify). That said [before] could never be `Downloading`
+         * on the `Started` path, and a lens built the interleaving where it can
+         * be: a different, already-finished attempt on the same tag racing the
+         * read of [before]. The conclusion survives the proof: `dropWhile` drops
+         * only while the value EQUALS [before], and the attempt this function is
+         * watching will move that row to `Downloaded` or `Failed` whatever it was
+         * showing before — so the drop ends either way, and skipping the
+         * `Downloading` step costs nothing because the branch below concludes on
+         * `Failed` directly.
          *
          * `Downloaded`, `Deleting` after a Stop, or `NotDownloaded` again all
          * conclude the attempt without a failure.
@@ -540,32 +559,68 @@ class LanguagePickerViewModel
         /**
          * Take the sheet slot, or leave the failure on its row.
          *
-         * **`compareAndSet` and not `if (value == null) value = …`** (issue
-         * **#239**). Two watchers can conclude in the same frame, and
-         * [packFailureRequest] suspends — the 19b branch reads the disk on IO — so
-         * a check-then-assign leaves exactly the window this exists to close: both
-         * pass the check, both build a request, and the second lands on top of the
-         * sheet the user is already reading. The CAS makes taking the slot a
-         * single indivisible act.
+         * ## What is dropped, stated as conditions rather than as a slogan
          *
-         * **A failure that finds the slot held is dropped, and dropped for good.**
-         * The alternative — queueing it behind the open sheet — re-arms the same
-         * harm one beat later: the queued sheet lands in the space the thumb is
-         * already travelling to, and it quotes figures measured before the user
-         * did anything about them, which is issue #235. What the dropped failure
-         * gets instead is its own row: red, naming its cause, offering a Retry
-         * that now works. That is where this class already puts a failure the user
-         * is not owed an interruption about — see [packFailure] — and it satisfies
-         * `EDGE_CASES.md` §7 on the surface the user is actually looking at.
+         * A failure raises the sheet **only if** the slot is free when its request
+         * is ready **and** no sheet was answered while that request was being
+         * built. Otherwise it goes to its row — red, naming its cause, offering a Retry
+         * that now works — and it never comes back. That is where this class
+         * already puts a failure the user is not owed an interruption about (see
+         * [packFailure]), and it satisfies `EDGE_CASES.md` §7 on the surface the
+         * user is actually looking at.
          *
-         * The slot is released only by [dismissPackFailure], so a later failure
-         * raises normally once the user has answered the one in front of them.
+         * The alternative answer to issue #239 — queueing the loser behind the
+         * open sheet — was rejected: it re-arms the same harm one beat later, in
+         * the space the thumb is already travelling to, quoting figures measured
+         * before the user did anything about them, which is issue #235.
+         *
+         * ## Two guards, and why the rule above follows from them
+         *
+         * [packFailureRequest] **suspends** — the 19b branch reads the disk on IO
+         * — so "is the slot free" and "here is the request" are separated by a
+         * real dispatch, and everything hard about this function lives in that
+         * gap. The first version was the CAS alone,
+         * `compareAndSet(null, packFailureRequest(id, cause))`, and **Kotlin
+         * evaluates the argument first**: the read ran, and only then was the slot
+         * inspected. The #246 co-verify lens drove a dismiss through the gap and
+         * got the defect out — Hindi's 19d on screen, Tamil refused for space and
+         * therefore owed nothing but its row, the user taps Close while Tamil's
+         * read is in flight, and Tamil's sheet lands **on the dismiss**. Answer
+         * one interruption, receive another: #239's own harm through this
+         * function's suspension point, and `Dispatchers.IO` contention widens the
+         * window exactly when two downloads are in flight.
+         *
+         * 1. **Nothing was answered while this request was being built.** A sheet
+         *    can only stop holding the slot by being answered, so this is what
+         *    turns "the slot happens to be free now" into "the slot was free for
+         *    this whole attempt". It catches the lens's case, and the narrower one
+         *    where two failures both concluded free and the loser would otherwise
+         *    land on the dismiss that freed the winner.
+         * 2. **The slot is still free.** The CAS, for the case guard 1 cannot see:
+         *    two requests built concurrently with nothing answered, where one
+         *    simply has to lose.
+         *
+         * Between them the user-facing rule holds. If a sheet was up when a
+         * failure concluded, then either it is still up when that failure's
+         * request is ready — guard 2 refuses — or it was answered in the meantime
+         * — guard 1 refuses. There is no third way for it to have gone.
+         *
+         * **A third check stood here and the mutation run deleted it.** "Is the
+         * slot free right now", asked before the read, looks like the natural
+         * first line and is a pure fast path: every case it rejects is rejected
+         * again by one of the two above, so no mutation could redden a test by
+         * removing it. It is gone rather than kept as an optimisation, because a
+         * check that cannot fail a test is a check the next reader will mistake
+         * for the load-bearing one — and may then "simplify" a real guard against.
          */
         private suspend fun raise(
             id: String,
             cause: OfflineModelFailure,
         ) {
-            raisedFailure.compareAndSet(expect = null, update = packFailureRequest(id, cause))
+            val answeredBefore = sheetsAnswered.get()
+            val request = packFailureRequest(id, cause)
+            if (sheetsAnswered.get() != answeredBefore) return
+            raisedFailure.compareAndSet(expect = null, update = request)
         }
 
         /**

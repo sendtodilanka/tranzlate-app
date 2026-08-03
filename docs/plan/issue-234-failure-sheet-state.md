@@ -1,8 +1,9 @@
 # Plan — issues #234, #235, #239: the pack-failure sheet's state is wrong in three ways
 
 status: accepted
-lands as: **PR #246** — 👁 open, awaiting the co-verify lens (rule 5; the author cannot be
-the lens). Tracker row: `ROADMAP.md`, "Any time" section. The number goes in when the PR is
+lands as: **PR #246** — 👁 open. Co-verify **BLOCKED** it once, on a race inside the raise's own
+suspension point (§3.5); fixed and re-pushed, awaiting the next pass (rule 5; the author cannot
+be the lens). Tracker row: `ROADMAP.md`, "Any time" section. The number goes in when the PR is
 opened, not when it merges — deferring the tick is the failure mode that broke the tracker
 three times in one session.
 
@@ -137,10 +138,48 @@ currently reading.
 is held then, it does not come back later. That is what kills #239's mirror case — the user
 closes Hindi's sheet and nothing pops up behind it.
 
-The claim is taken with `MutableStateFlow.compareAndSet(expect = null, …)` and not
-`if (value == null) value = …`. `packFailureRequest` suspends (the NoSpace branch reads the
-disk on IO), so a check-then-assign leaves exactly the window #239 is about, one dispatch
-wide.
+### 3.5 The suspension point inside the raise — co-verify BLOCK on PR #246
+
+The first version of the claim was the CAS alone,
+`raisedFailure.compareAndSet(null, packFailureRequest(id, cause))`. **Kotlin evaluates the
+argument first**, so the suspending disk read ran and the slot was inspected only afterwards —
+the check sat on the wrong side of the gap it was meant to cover.
+
+The lens drove a dismiss through that gap: Hindi's 19d on screen, Tamil refused for space (so
+owed nothing but its row), the user taps Close while Tamil's read is in flight, Tamil's CAS
+finds the slot free **because of the dismiss's timing**, and Tamil's sheet lands on top of it.
+Answer one interruption, receive another — §3.4's harm through a new door. It also inverted
+§3.4's own reasoning *for this hazard*: a plain check placed **before** the read would have
+closed it.
+
+**Why no round-1 test could see it:** `TestDispatcherProvider` puts `io` on the same
+`TestDispatcher` as main, and `withContext` to the dispatcher you are already on does not park.
+In that fixture the disk read is not a suspension point and the window does not exist. The
+reproduction needs `io` on a second scheduler — and the two-failure case needs a scheduler
+**each**, so the reads can be released one at a time.
+
+What ships is two conditions, with the user-facing rule *derived* from them rather than asserted
+beside them:
+
+```kotlin
+val answeredBefore = sheetsAnswered.get()
+val request = packFailureRequest(id, cause)                    // SUSPENDS
+if (sheetsAnswered.get() != answeredBefore) return             // nothing answered meanwhile
+raisedFailure.compareAndSet(expect = null, update = request)   // and the slot is still free
+```
+
+If a sheet was up when a failure concluded, then either it is still up when that failure's
+request is ready (the CAS refuses) or it was answered in the meantime (the counter refuses).
+There is no third way for it to have gone.
+
+**A third check was written and the mutation run deleted it.** "Is the slot free right now",
+asked before the read, looks like the natural first line — and every case it rejects is rejected
+again by one of the two above, so no mutation could redden a test by removing it. It is gone
+rather than demoted to an optimisation: a check that cannot fail a test is one the next reader
+mistakes for the load-bearing one, and may then simplify a real guard against it. It had also
+been **shadowing the CAS** — with it present, reverting the CAS to a plain assignment broke
+nothing — which is why `a request built while another sheet won does not replace it` now exists
+to isolate it.
 
 ## 4. What ships
 
@@ -170,6 +209,12 @@ lambda a host composes and when a request is raised.
   does not swap the sheet being read, and does not come back after it is closed.
 - `PackFailureSheetsTest` — 19b's Manage packs clears the sheet **before** it navigates,
   asserted as an ORDER so that calling both in the wrong order still fails.
+- `PackFailureSheetRaisingTest`, round 2 (§3.5) — four more, three of which need `io` on its
+  own scheduler because the shared-dispatcher fixture cannot express the window at all: the
+  lens's dismiss-through-the-gap; the loser landing on the dismiss that frees the winner; the
+  loser landing while the winner's sheet is still up (the CAS in isolation); and `Ignored`
+  starting no watcher, asserted on the manager's `subscriptionCount` because "no sheet" is
+  true with and without that bug.
 
 **Every failure test in the repo drove one language id** (seven `"hi"` in
 `PackFailureSheetRaisingTest`, four `"fr"` in `LanguagePickerViewModelTest`) and that single

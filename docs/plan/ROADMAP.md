@@ -149,13 +149,23 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   false of the behaviour, and only the tablet host was right — by accident of
   lifetime. **#239:** one slot, one watcher per tap, so a second failure swapped the
   sheet being read and moved the action under a moving thumb; the sheet now holds its
-  slot (`compareAndSet`) and a later failure goes to its row. **Queueing was
-  considered and rejected** — it re-arms the same harm one beat later and hands the
-  queued sheet stale figures, which is #235 by design. Ruling 9 of
-  `issue-130-language-rev3.md` said the opposite and is **reversed in place**, dated.
-  Ten mutations, ten red. **Residual: Screen B's Retry is dead the same way and is
-  deliberately not fixed** — 19b's one action is *Manage packs* and that screen IS
-  Manage packs; ruling 8 already settled it and named PR-23.
+  slot and a later failure goes to its row. **Queueing was considered and rejected**
+  — it re-arms the same harm one beat later and hands the queued sheet stale figures,
+  which is #235 by design. Ruling 9 of `issue-130-language-rev3.md` said the opposite
+  and is **reversed in place**, dated.
+  **Co-verify BLOCKED it**: the claim was `compareAndSet(null, packFailureRequest(…))`,
+  and Kotlin evaluates the argument first — so the suspending disk read ran and the
+  slot was inspected only afterwards. A dismiss driven through that gap put the
+  dropped sheet back on top of the dismiss: #239's own harm, through the raise's own
+  suspension point. **No round-1 test could have seen it** — the fixture runs `io` on
+  the same dispatcher as main, where `withContext` does not park and the window does
+  not exist. Now a generation check plus the CAS, with `io` on its own scheduler in
+  the tests. **The fix's own first draft carried a third check no mutation could
+  kill**, and deleting it was the mutation run's finding, not a lens's. Sixteen
+  mutations across two rounds; the one that killed nothing is why the code is
+  shorter. **Residual: Screen B's Retry is dead the same way and is deliberately not
+  fixed** — 19b's one action is *Manage packs* and that screen IS Manage packs;
+  ruling 8 already settled it and named PR-23.
 - ✅ **#178** (PR #182, merged) `guard-pr.sh` failed CLOSED on any body it could not read from the
   command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.

@@ -13,12 +13,15 @@ import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -63,19 +66,21 @@ class PackFailureSheetRaisingTest {
     @After
     fun stopAppScope() = appScope.cancel()
 
-    private fun viewModel(probe: com.codeboxlk.tranzlate.core.common.StorageProbe = storage) =
-        LanguagePickerViewModel(
-            languageRepository = repository,
-            clock = clock,
-            modelManager = manager,
-            downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
-            downloadPrefs = prefs,
-            translatePrefs = translatePrefs,
-            storageProbe = probe,
-            dispatchers = TestDispatcherProvider(dispatcher),
-            savedStateHandle = SavedStateHandle(),
-            appScope = appScope,
-        )
+    private fun viewModel(
+        probe: com.codeboxlk.tranzlate.core.common.StorageProbe = storage,
+        dispatchers: com.codeboxlk.tranzlate.core.common.DispatcherProvider = TestDispatcherProvider(dispatcher),
+    ) = LanguagePickerViewModel(
+        languageRepository = repository,
+        clock = clock,
+        modelManager = manager,
+        downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+        downloadPrefs = prefs,
+        translatePrefs = translatePrefs,
+        storageProbe = probe,
+        dispatchers = dispatchers,
+        savedStateHandle = SavedStateHandle(),
+        appScope = appScope,
+    )
 
     // ---- Sheets 19d / 19b: which failures earn an interruption (#130 PR-18) ----
     //
@@ -425,6 +430,228 @@ class PackFailureSheetRaisingTest {
             // and its Retry, which is the surface it belongs on.
             assertThat(manager.states.value["ta"])
                 .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+        }
+
+    // ---- the raise's own suspension point (#246 co-verify) --------------------
+    //
+    // Everything above runs `io` on the SAME dispatcher as main, which is what
+    // `TestDispatcherProvider` is for — and it is why none of it could see the
+    // defect below. `withContext` to the dispatcher you are already on does not
+    // park, so in that fixture `packFailureRequest`'s disk read is not a
+    // suspension point at all and the window does not exist. The two tests here
+    // put `io` on a SECOND scheduler, which is the only way the gap is reachable.
+
+    /**
+     * `io` on its own scheduler, so the 19b disk read genuinely parks — and
+     * SETTABLE, so two raises can be parked on two schedulers and released
+     * independently. Without that, a test that advances both reads at once can
+     * only ever see them finish together, which is not the interleaving either
+     * guard below is about. `withContext(dispatchers.io)` reads this property
+     * when it runs, so flipping it between two `download()` calls hands the
+     * second attempt a scheduler of its own.
+     */
+    private class SplitDispatchers(
+        main: TestDispatcher,
+        var ioDispatcher: TestDispatcher,
+    ) : com.codeboxlk.tranzlate.core.common.DispatcherProvider {
+        override val io: CoroutineDispatcher get() = ioDispatcher
+        override val default: CoroutineDispatcher = main
+        override val main: CoroutineDispatcher = main
+        override val unconfined: CoroutineDispatcher = main
+    }
+
+    /**
+     * **The co-verify BLOCK on PR #246, reproduced and then closed.**
+     *
+     * `raise` used to read the disk and *then* ask whether the slot was free,
+     * because `compareAndSet(null, packFailureRequest(…))` evaluates its argument
+     * first. So the question "is a sheet on screen" was answered after a real
+     * dispatch to IO rather than before it.
+     *
+     * Hindi fails and 19d is up. Tamil is refused for space while the user is
+     * reading it — by the rule this class states, Tamil belongs on Tamil's row.
+     * But Tamil's read is still in flight when the user taps Close, so the slot
+     * is free by the time the CAS runs and **Tamil's sheet lands on top of the
+     * dismiss**. The user closes one interruption and is handed a different,
+     * unrelated one: exactly the experience #239 was filed over, arriving through
+     * the raise's own suspension point.
+     *
+     * It also inverted the reasoning that chose the CAS: for THIS hazard a plain
+     * check performed *before* the read is what closes it, and `Dispatchers.IO`
+     * contention widens the window precisely when the threat model applies.
+     */
+    @Test
+    fun `a failure refused while a sheet is open never lands behind it`() =
+        runTest(dispatcher) {
+            val io = StandardTestDispatcher(TestCoroutineScheduler())
+            manager.put("hi", OfflineModelState.NotDownloaded)
+            manager.put("ta", OfflineModelState.NotDownloaded)
+            val subject = viewModel(dispatchers = SplitDispatchers(dispatcher, io))
+            backgroundScope.launch { subject.offlineStates.collect { } }
+            advanceUntilIdle()
+
+            // Hindi's transfer runs and fails: 19d, and no disk read on this path.
+            manager.onDownload = { tag ->
+                manager.put(tag, OfflineModelState.Downloading)
+                DownloadAttempt.Started
+            }
+            subject.download("hi")
+            advanceUntilIdle()
+            manager.put("hi", OfflineModelState.Failed(OfflineModelFailure.NETWORK))
+            advanceUntilIdle()
+            assertThat(subject.packFailure.value)
+                .isEqualTo(PackFailureRequest.Interrupted("hi", OfflineModelFailure.NETWORK))
+
+            // Tamil is refused for space. Its raise parks in the disk read, which
+            // is NOT advanced yet — this is the window.
+            manager.onDownload = { tag ->
+                manager.put(tag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+                DownloadAttempt.Refused(OfflineModelFailure.STORAGE)
+            }
+            subject.download("ta")
+            advanceUntilIdle()
+            assertThat(subject.packFailure.value)
+                .isEqualTo(PackFailureRequest.Interrupted("hi", OfflineModelFailure.NETWORK))
+
+            // The user answers Hindi's sheet while Tamil's read is still parked.
+            subject.dismissPackFailure()
+            advanceUntilIdle()
+            io.scheduler.advanceUntilIdle() // Tamil's read completes now
+            advanceUntilIdle()
+
+            assertThat(subject.packFailure.value).isNull()
+            assertThat(manager.states.value["ta"])
+                .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+        }
+
+    /**
+     * The narrower sibling the first fix alone leaves open, closed by the same
+     * push so the guarantee has no "except".
+     *
+     * Both failures conclude while nothing is on screen, so both are entitled to
+     * interrupt and the first to finish its read wins. What must not happen is
+     * the loser landing on the very dismiss that frees the slot: the user answers
+     * the sheet they were shown and is immediately handed the one that lost.
+     * From where they sit that is indistinguishable from the defect above.
+     */
+    @Test
+    fun `a failure that lost the slot does not land on the dismiss that frees it`() =
+        runTest(dispatcher) {
+            val first = StandardTestDispatcher(TestCoroutineScheduler())
+            val second = StandardTestDispatcher(TestCoroutineScheduler())
+            val dispatchers = SplitDispatchers(dispatcher, first)
+            manager.put("hi", OfflineModelState.NotDownloaded)
+            manager.put("ta", OfflineModelState.NotDownloaded)
+            manager.onDownload = { tag ->
+                manager.put(tag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+                DownloadAttempt.Refused(OfflineModelFailure.STORAGE)
+            }
+            val subject = viewModel(dispatchers = dispatchers)
+            backgroundScope.launch { subject.offlineStates.collect { } }
+            advanceUntilIdle()
+
+            // Both conclude with the slot free, so both are entitled to it — and
+            // both park in a disk read, on a scheduler each, so the test decides
+            // which one comes back first and when.
+            subject.download("hi")
+            advanceUntilIdle()
+            dispatchers.ioDispatcher = second
+            subject.download("ta")
+            advanceUntilIdle()
+            assertThat(subject.packFailure.value).isNull()
+
+            // Hindi's read lands first and takes the slot.
+            first.scheduler.advanceUntilIdle()
+            advanceUntilIdle()
+            assertThat(subject.packFailure.value).isInstanceOf(PackFailureRequest.NoSpace::class.java)
+
+            // The user answers it — and only THEN does Tamil's read come back.
+            subject.dismissPackFailure()
+            advanceUntilIdle()
+            second.scheduler.advanceUntilIdle()
+            advanceUntilIdle()
+
+            assertThat(subject.packFailure.value).isNull()
+        }
+
+    /**
+     * The third guard, isolated — and it needed isolating, which is a finding
+     * about the test suite rather than about the code.
+     *
+     * Once the "free when this failure concluded" check went in, it shadowed
+     * `a second failure does not swap the sheet the user is reading`: that test
+     * runs `io` on the main dispatcher, so the request is built without parking
+     * and the first guard answers before the CAS is ever reached. The CAS would
+     * have survived being deleted. Its real case is this one — **both** failures
+     * concluded while the slot was free, so both passed guard one; nothing was
+     * answered, so both passed guard two; and the loser's request lands while the
+     * winner's sheet is still up.
+     *
+     * The two sheets are made distinguishable by moving the probe between the two
+     * reads, because two `NoSpace` requests measured at the same moment are equal
+     * values and an assertion could not tell a refusal from a replacement.
+     */
+    @Test
+    fun `a request built while another sheet won does not replace it`() =
+        runTest(dispatcher) {
+            val first = StandardTestDispatcher(TestCoroutineScheduler())
+            val second = StandardTestDispatcher(TestCoroutineScheduler())
+            val dispatchers = SplitDispatchers(dispatcher, first)
+            val probe = FakeStorageProbe(free = 12L * MIB, total = 64L * GIB)
+            manager.put("hi", OfflineModelState.NotDownloaded)
+            manager.put("ta", OfflineModelState.NotDownloaded)
+            manager.onDownload = { tag ->
+                manager.put(tag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+                DownloadAttempt.Refused(OfflineModelFailure.STORAGE)
+            }
+            val subject = viewModel(probe = probe, dispatchers = dispatchers)
+            backgroundScope.launch { subject.offlineStates.collect { } }
+            advanceUntilIdle()
+
+            subject.download("hi")
+            advanceUntilIdle()
+            dispatchers.ioDispatcher = second
+            subject.download("ta")
+            advanceUntilIdle()
+
+            // Hindi's read lands first, at 12 MB, and takes the slot.
+            first.scheduler.advanceUntilIdle()
+            advanceUntilIdle()
+            assertThat(subject.packFailure.value)
+                .isEqualTo(PackFailureRequest.NoSpace(freeBytes = 12L * MIB, volumeBytes = 64L * GIB))
+
+            // Tamil's lands after, at a figure that could not be mistaken for it,
+            // with the sheet still up and nothing answered.
+            probe.free = 99L * MIB
+            second.scheduler.advanceUntilIdle()
+            advanceUntilIdle()
+
+            assertThat(subject.packFailure.value)
+                .isEqualTo(PackFailureRequest.NoSpace(freeBytes = 12L * MIB, volumeBytes = 64L * GIB))
+        }
+
+    /**
+     * `Ignored` — not offline-capable, or already downloading — starts no watcher.
+     *
+     * The assertion is on the manager's `subscriptionCount` and that is the point
+     * rather than an implementation detail: an `Ignored` attempt that wrongly
+     * watched would raise **no sheet either**, so `packFailure.value == null`
+     * passes with and without the bug. What the bug actually costs is a coroutine
+     * parked on a flow that will never move — for `!isCapable`, for the life of
+     * the screen.
+     */
+    @Test
+    fun `an ignored attempt watches nothing`() =
+        runTest(dispatcher) {
+            manager.onDownload = { DownloadAttempt.Ignored }
+            val subject = pickerWatchingRows()
+            val watchers = manager.states.subscriptionCount.value
+
+            subject.download("zz")
+            advanceUntilIdle()
+
+            assertThat(manager.states.subscriptionCount.value).isEqualTo(watchers)
+            assertThat(subject.packFailure.value).isNull()
         }
 
     private companion object {
