@@ -230,6 +230,36 @@ class RealUsagePolicyTest {
             assertThat(policy.remaining.first()).isEqualTo(1)
         }
 
+    /**
+     * The same claim against an `Error` (issue #236). The test above throws
+     * `IOException`, which the old `catch (Exception)` already covered, so it
+     * could not tell whether the guard was wide enough to deliver its own stated
+     * contract — *"quota protection never blocks or crashes a translation"*.
+     *
+     * `trySpend` sits on the metered translate path, so a throw that walks past
+     * this catch ends at `Thread.defaultUncaughtExceptionHandler`. Widened for
+     * that reason and not by borrowing #195's JNI citation: nothing here is Room.
+     */
+    @Test
+    fun `a save that fails as an Error still never blocks the gate`() =
+        runTest {
+            val exploding =
+                object : UsagePersistence {
+                    override suspend fun load(): PersistedUsageCounts =
+                        PersistedUsageCounts(0, 0, PersistedUsageCounts.NO_DAY)
+
+                    override suspend fun save(counts: PersistedUsageCounts): Unit =
+                        throw UnsatisfiedLinkError("nativeExecute")
+                }
+            val policy = RealUsagePolicy(FakeClock(), FixedConfig(free = 2), exploding)
+
+            assertThat(policy.trySpend(Tier.FREE)).isEqualTo(SpendResult.SPENT)
+            assertThat(policy.trySpend(Tier.FREE)).isEqualTo(SpendResult.SPENT)
+            assertThat(policy.trySpend(Tier.FREE)).isEqualTo(SpendResult.OVER)
+            policy.refund(Tier.FREE) // must not throw either
+            assertThat(policy.remaining.first()).isEqualTo(1)
+        }
+
     @Test
     fun `meter starts at the full allowance`() =
         runTest {

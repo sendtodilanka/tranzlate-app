@@ -339,7 +339,30 @@ class RealOfflineModelManager internal constructor(
         }
         // Issue #90 pre-flight: refuse BEFORE enqueue when the disk can't hold
         // a model — a partial download + a generic failure is a dead end.
-        if (storageProbe.freeBytes() < REQUIRED_FREE_BYTES) {
+        //
+        // A probe that cannot ANSWER is not a refusal (issue #238). The prod
+        // implementation is `StatFs(noBackupFilesDir)`, and StatFs throws
+        // IllegalArgumentException when the underlying statvfs fails
+        // (android/os/StatFs.java:53, `throw new IllegalArgumentException("Invalid
+        // path: " + path, e)`). Unguarded, that ran on the caller's coroutine —
+        // outside the try/catch below, which only covers the launched transfer —
+        // and killed the process on a download tap.
+        //
+        // Unknown free space PROCEEDS rather than refuses, matching StorageProbe's
+        // own degrade contract that null means "unknown", never "zero": refusing on
+        // an unknown would strand a user whose disk is perfectly fine, and ML Kit
+        // reports a genuine out-of-space itself through the normal failure path.
+        val freeBytes =
+            try {
+                storageProbe.freeBytes()
+            } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                throw rethrown // never break structured cancellation
+            } catch (
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") unanswerable: Throwable,
+            ) {
+                Long.MAX_VALUE // unknown, so it cannot be the thing that blocks
+            }
+        if (freeBytes < REQUIRED_FREE_BYTES) {
             takeTransient(languageTag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
             return
         }

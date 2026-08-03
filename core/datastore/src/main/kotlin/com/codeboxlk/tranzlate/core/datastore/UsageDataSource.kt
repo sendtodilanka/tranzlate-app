@@ -41,6 +41,16 @@ class UsageDataSource
         /**
          * One consistent read of the metered-counter facts (issue #66). Catch
          * mirrors the prefs source idiom: an unreadable store reads as empty.
+         *
+         * `Throwable`, not `Exception` (issue #236). Stated precisely, because the
+         * reason here is NOT the one `TextViewModel.kt:768-779` gives: this store is
+         * DataStore, not Room, so the `UnsatisfiedLinkError`-from-JNI citation does
+         * not apply and is not being borrowed. What does apply is that guard's
+         * general premise — *the point of the guard is that nothing escapes into a
+         * scope with no handler, and `Exception` is not that.* This one is reached
+         * from the quota gate on the metered translate path, and #236's own argument
+         * is that the same failure may not be fatal on one persistence guard and
+         * survivable on the next by accident.
          */
         suspend fun readUsage(): PersistedUsageCounts {
             val prefs =
@@ -49,7 +59,7 @@ class UsageDataSource
                 } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                     throw rethrown
                 } catch (
-                    @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
+                    @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Throwable,
                 ) {
                     emptyPreferences()
                 }

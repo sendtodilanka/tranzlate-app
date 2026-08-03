@@ -387,11 +387,22 @@ class LanguagePickerViewModel
         /**
          * Best-effort Recent stamp. It writes to a different store than the
          * choice above, and a disk error there must not take the choice with
-         * it — nor reach [appScope], which has no `CoroutineExceptionHandler`,
-         * so an escaping throw would take the process down for a missed date.
-         * Same shape as `TranslateTextUseCase.stampSafely`, and for the same
-         * reason: cancellation is rethrown so structured concurrency still
+         * it — nor reach [appScope], whose handler (issue #238) is a backstop
+         * for what nothing guarded, not a substitute for guarding this: a throw
+         * caught up there would still have skipped everything left in the
+         * launch. Same shape as `TranslateTextUseCase.stampSafely`, and for the
+         * same reason: cancellation is rethrown so structured concurrency still
          * works.
+         *
+         * `Throwable`, not `Exception` (issue #236). This ends in a Room write
+         * (`LanguageRepositoryImpl.kt:168`), and Room's statements end in `native`
+         * methods, so the failure class this guard exists for —
+         * `UnsatisfiedLinkError`, a `LinkageError`, so an `Error` — is precisely
+         * the one a narrow catch lets past. Reasoning and citations:
+         * `TextViewModel.kt:768-779` (#195). The KDoc above named the crash it was
+         * preventing while using the catch that does not prevent it: the user taps
+         * a language row, the picker pops, and the app dies a moment later — AFTER
+         * the selection was written, so the harm is invisible in the stored state.
          */
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
         private suspend fun stampSafely(
@@ -402,7 +413,7 @@ class LanguagePickerViewModel
                 languageRepository.setLastUsed(id, role, clock.nowMillis())
             } catch (rethrown: CancellationException) {
                 throw rethrown
-            } catch (ignored: Exception) {
+            } catch (ignored: Throwable) {
                 // Manage packs misses one date; the selection itself is safe.
             }
         }
@@ -427,11 +438,26 @@ class LanguagePickerViewModel
             raisedFailure.value = null
         }
 
-        /** Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts. */
+        /**
+         * Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts.
+         *
+         * The gate call is taken off the main thread (issue #238). Two blocking
+         * calls hide under it — `ConnectivityMonitor.isMetered()` is a synchronous
+         * binder IPC, and the manager's free-space pre-flight is a `statvfs`
+         * syscall — and `viewModelScope` is `Dispatchers.Main.immediate`, so both
+         * ran on the UI thread on every download tap. One `withContext` covers both,
+         * because the whole call tree beneath it inherits the context.
+         *
+         * The wrap is HERE, not inside `DownloadGate`, because the gate's contract
+         * is that it adds no context and no lifetime of its own — the choice stays
+         * visible where the tap is handled (`DownloadGate`'s KDoc, held by
+         * `DownloadGateTest`). It is the same move this file already makes for the
+         * meter's disk reads at [library] and for 19b's at [packFailureRequest].
+         */
         fun download(id: String) {
             val before = offlineStates.value[id]
             viewModelScope.launch {
-                downloadGate.requestDownload(id)
+                withContext(dispatchers.io) { downloadGate.requestDownload(id) }
                 // The gate only ASKED. Nothing started, so there is no outcome to
                 // wait for — and waiting would leave a collector suspended on a
                 // question the user may never answer.
@@ -445,7 +471,9 @@ class LanguagePickerViewModel
             val consented = downloadGate.consentOnce() ?: return
             val before = offlineStates.value[consented.id]
             viewModelScope.launch {
-                downloadGate.downloadConsented(consented)
+                // Off the main thread for [download]'s reason: the free-space
+                // pre-flight is a syscall and this path reaches it too.
+                withContext(dispatchers.io) { downloadGate.downloadConsented(consented) }
                 reportFailure(consented.id, before)
             }
         }

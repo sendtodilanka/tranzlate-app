@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.core.data.di
 
+import android.util.Log
 import com.codeboxlk.tranzlate.core.common.ApplicationScope
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
 import com.codeboxlk.tranzlate.core.data.repository.DownloadPrefsRepositoryImpl
@@ -19,6 +20,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import javax.inject.Singleton
@@ -63,11 +65,43 @@ internal abstract class DataModule {
          * cannot drift. SupervisorJob so one failed write never cancels the
          * scope for every later one; IO because everything launched on it is
          * disk work.
+         *
+         * ### The handler (issue #238), and why `SupervisorJob` alone was not it
+         *
+         * `SupervisorJob` stops one child's failure cancelling its siblings. It
+         * does **not** swallow: the failure is still delivered to the context's
+         * `CoroutineExceptionHandler`, and with none installed that is
+         * `Thread.defaultUncaughtExceptionHandler` — process death, no dialog,
+         * nothing the user can act on. Three files carried KDoc saying "appScope
+         * has no `CoroutineExceptionHandler`, so guard your write", and #236 is
+         * what happens when a write gets added by someone who did not read them.
+         * A rule written down is not a rule enforced (mandatory rule 8's lesson,
+         * paid for twice); this is the enforcement.
+         *
+         * It does **not** replace the local guards. A handler catches the throw
+         * after the launch is already dead, so everything left in that coroutine
+         * is skipped — at `LanguagePickerViewModel.select` a failing language
+         * write would take the Recents stamp below it down too. The local catch
+         * keeps each degrade precise; this keeps the process alive when there is
+         * no local catch at all, including in code not yet written.
+         *
+         * It logs rather than reporting: every user of this scope is by
+         * definition work the user is not waiting on, so there is no screen owed
+         * a message. `Log.e` keeps it visible in logcat and in crash reporting's
+         * breadcrumbs instead of vanishing.
          */
         @Provides
         @Singleton
         @ApplicationScope
         fun applicationScope(dispatchers: DispatcherProvider): CoroutineScope =
-            CoroutineScope(SupervisorJob() + dispatchers.io)
+            CoroutineScope(
+                SupervisorJob() +
+                    dispatchers.io +
+                    CoroutineExceptionHandler { _, thrown ->
+                        Log.e(APP_SCOPE_TAG, "Fire-and-forget work failed on the application scope", thrown)
+                    },
+            )
+
+        private const val APP_SCOPE_TAG = "TranzlateAppScope"
     }
 }

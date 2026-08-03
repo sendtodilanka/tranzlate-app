@@ -3,6 +3,15 @@ plugins {
     alias(libs.plugins.tranzlate.hilt)
 }
 
+android {
+    // The application scope's CoroutineExceptionHandler logs through
+    // android.util.Log, and the default unit-test android.jar throws "Stub!" from
+    // it — a handler that throws while handling is worse than no test. Same
+    // precedent and same reason as lib/subscription: return-default stubs make
+    // the log call inert for logic that never touches a real Context.
+    testOptions.unitTests.isReturnDefaultValues = true
+}
+
 dependencies {
     api(projects.core.common)
     api(projects.core.config)
