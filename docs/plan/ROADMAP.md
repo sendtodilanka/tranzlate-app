@@ -135,6 +135,27 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   --source=<X> <path>` (still writes the worktree), `git -C <dir> checkout --`.
   Filed **#222**. On re-attack the lens found the same error one clause over,
   in the sentence I had just fixed. **Residuals: #222, #223.**
+- 👁 **#234 · #235 · #239** — **PR #246** — three defects on the pack-failure path,
+  landed together because the middle one is what makes the other two a single fix.
+  **#234:** a conflating value channel cannot say *"the same thing happened again"* —
+  `Failed` is a data class, so the free-space pre-flight refusing a Retry wrote an
+  equal map, nothing emitted, and the row's **enabled 48 dp Retry produced nothing
+  at all.** The pre-flight answer is synchronous, so it is now returned
+  (`DownloadAttempt`: `Started`/`Refused`/`Ignored`) — a return value on a call the
+  caller already awaits, not the `PackEvents` channel PR-22 reserves. **#235:** 19b's
+  Manage packs never dismissed, so in the nav host (a push; entries clear on pop) the
+  sheet outlived the trip and re-opened quoting the 12 MB the user had just spent
+  three deletes changing. *"Two ways in, one behaviour"* was true of the lambda and
+  false of the behaviour, and only the tablet host was right — by accident of
+  lifetime. **#239:** one slot, one watcher per tap, so a second failure swapped the
+  sheet being read and moved the action under a moving thumb; the sheet now holds its
+  slot (`compareAndSet`) and a later failure goes to its row. **Queueing was
+  considered and rejected** — it re-arms the same harm one beat later and hands the
+  queued sheet stale figures, which is #235 by design. Ruling 9 of
+  `issue-130-language-rev3.md` said the opposite and is **reversed in place**, dated.
+  Ten mutations, ten red. **Residual: Screen B's Retry is dead the same way and is
+  deliberately not fixed** — 19b's one action is *Manage packs* and that screen IS
+  Manage packs; ruling 8 already settled it and named PR-23.
 - ✅ **#178** (PR #182, merged) `guard-pr.sh` failed CLOSED on any body it could not read from the
   command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.

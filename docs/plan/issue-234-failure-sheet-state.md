@@ -1,6 +1,10 @@
 # Plan — issues #234, #235, #239: the pack-failure sheet's state is wrong in three ways
 
 status: accepted
+lands as: **PR #246** — 👁 open, awaiting the co-verify lens (rule 5; the author cannot be
+the lens). Tracker row: `ROADMAP.md`, "Any time" section. The number goes in when the PR is
+opened, not when it merges — deferring the tick is the failure mode that broke the tracker
+three times in one session.
 
 (accepted basis: all three are owner-filed, all three carry the harm, the file:line and the
 mutation-shaped evidence. #234 and #235 name their own fix direction; #239 names two
