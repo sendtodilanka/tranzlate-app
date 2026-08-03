@@ -16,16 +16,33 @@
 #     (^|[;&|]|\s)git\s+(-C\s+\S+\s+)?(checkout(\s+-[^\s;&|]+)*\s+--(\s|$)|restore(\s|$))
 #
 # so its global-option prefix knows `-C <dir>` and nothing else, and the flags it
-# tolerates before `--` must each be one dash-token with no space in it. Deferring
-# on the presence of `--` ALONE — which is what the first draft of this scoping
-# did — dropped three real forms into the gap between the two mechanisms:
-# `git --work-tree=<d> --git-dir=<d>/.git checkout -- <path>`,
-# `git --git-dir=… --work-tree=… checkout -- <path>` and
-# `git checkout --conflict merge -- <path>`. The single-regex hook this replaced
-# caught all three by accident; the two-part system caught none, and said nothing
-# about it. Found by the #257 co-verify lens, which named the first; the other two
-# came out of reproducing it. **A regression introduced by a fix must not be
-# silent**, so `hookify_sees` below is checked before any deferral.
+# tolerates before `--` must each match its class `-[^\s;&|]+`.
+#
+# ── THE INVARIANT, because the instances are not the lesson ────────────────────
+#
+#   Every judgement this hook makes ABOUT hookify must use hookify's own classes,
+#   not a bash approximation of them. A deferral to a mechanism that cannot match
+#   the command is a silent hole, and it is the only failure mode all of these
+#   share:
+#
+#     1. `git --work-tree=<d> --git-dir=<d>/.git checkout -- <path>`
+#     2. `git checkout --conflict merge -- <path>`
+#     3. `git checkout HEAD -- <path>`      (a tree-ish is not a dash-token)
+#     4. `git checkout - -- <path>`         (`-*` is zero-or-more; hookify's is one-or-more)
+#     5. `git -C <d> checkout - -- <path>`
+#
+# Four rounds of review each found one more, because each fix was aimed at the
+# instance reported. They are one sentence: **the hook said "hookify has this"
+# and hookify did not.** So the check is no longer a human reading two regexes.
+# `.claude/hooks/tests/guard-restore-invariant.sh` reads hookify's pattern out of
+# the rule file, generates the token shapes where the two classifications can
+# diverge, runs each command against a throwaway repo, and fails if anything that
+# actually destroys work is caught by neither mechanism. Instance 5 came out of
+# that generator, not out of anyone noticing it.
+#
+# **If you widen or narrow anything below, run that test.** A fifth instance
+# found by a fifth reviewer is not evidence of care; it is evidence the check was
+# skipped.
 #
 # What is left here is therefore what a regex cannot answer and git can, plus
 # whatever that regex cannot reach:
@@ -168,14 +185,32 @@ while IFS= read -r seg; do
     case "$t" in --pathspec-from-file*) continue 2 ;; esac
   done
 
-  # Locate `--`, and note whether every token before it is a lone dash-token.
-  # hookify's checkout alternation is `checkout(\s+-[^\s;&|]+)*\s+--`, so a flag
-  # taking a SPACE-SEPARATED value (`--conflict merge -- <path>`) breaks it.
+  # Locate `--`, and note whether every token before it is one hookify would
+  # accept. Its checkout alternation is `checkout(\s+-[^\s;&|]+)*\s+--`, so a
+  # flag taking a SPACE-SEPARATED value (`--conflict merge -- <path>`) breaks it.
+  #
+  # THE INVARIANT, and it is the whole reason this hook has been wrong four
+  # times: a token counts as a pre-`--` flag here ONLY if it matches hookify's
+  # own class `-[^\s;&|]+` — dash, then ONE OR MORE characters that are not
+  # whitespace, `;`, `&` or `|`. Not a looser bash approximation of it. The
+  # earlier `-*` was exactly such an approximation: a bash glob means ZERO or
+  # more, so a bare `-` read as a flag here and as nothing at all to hookify,
+  # and `git checkout - -- <path>` was silent under both. `git checkout -` is
+  # git's shorthand for the previous branch, so that is the SYNOPSIS
+  # `<tree-ish> [--] <pathspec>` form and it destroys the file.
+  #
+  # `.claude/hooks/tests/guard-restore-invariant.sh` reads hookify's pattern out
+  # of the rule file and checks this agreement, so the NEXT divergence is a test
+  # failure rather than a fifth round of someone noticing.
   dd=-1; k=0; predash_all_flags=yes
   for t in ${rest+"${rest[@]}"}; do
     if [ "$dd" -lt 0 ]; then
       if [ "$t" = "--" ]; then dd=$k
-      else case "$t" in -*) ;; *) predash_all_flags=no ;; esac
+      else
+        case "$t" in
+          -?*) case "$t" in *[[:space:]\;\&\|]*) predash_all_flags=no ;; esac ;;
+          *)   predash_all_flags=no ;;
+        esac
       fi
     fi
     k=$((k+1))
