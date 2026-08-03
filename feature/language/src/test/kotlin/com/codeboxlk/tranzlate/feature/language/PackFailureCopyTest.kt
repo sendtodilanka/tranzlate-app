@@ -1,6 +1,7 @@
 package com.codeboxlk.tranzlate.feature.language
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -19,6 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.Locale
 
 /**
  * **Issue #175, reproduced and then closed** — rendered on both screens (#130
@@ -189,5 +191,103 @@ class PackFailureCopyTest {
         showPicker(states = emptyMap())
 
         compose.onNodeWithTag("tt_lang_retry_hi").assertDoesNotExist()
+    }
+
+    // ---- #219: the pack size is one figure ------------------------------------------------------
+
+    /**
+     * **Issue #219.** Four user-facing strings state how big a language pack is,
+     * and they disagreed in three wordings: `20–45 MB` on the two sheets,
+     * `~30MB` on the offline manager's subtitle and `about 30 MB` in Settings —
+     * the last two contradicted by every pack this project has measured. 19b
+     * does arithmetic in front of the user with that figure (*"There is 12 MB
+     * free. A language pack usually needs …"*), so the wrong number is wrong
+     * where it is being relied on.
+     *
+     * The assertion is **agreement**, not a literal. A test comparing each
+     * string to a hardcoded `40–65 MB` would go green on a future sweep that
+     * moved three of the four to a new figure and forgot the fourth — which is
+     * the exact defect, one figure later. It extracts whatever range each
+     * sentence states and requires the set to have size one.
+     *
+     * **Declared limit, because a test that quietly covers less than it appears
+     * to is worse than a smaller one.** This covers **3 of the 4** strings.
+     * `settings_mobile_data_supporting` ships from `:feature:settings` and a
+     * Robolectric test here cannot resolve another module's `R`. The fourth is
+     * held by enumeration and by `STRINGS_settings.md` alone.
+     */
+    @Test
+    fun `the pack size is one figure, stated once`() {
+        val stated =
+            mapOf(
+                // The free-space argument is deliberately NOT a size. 19b's
+                // sentence carries two figures — what the device has and what a
+                // pack costs — and only the second is this test's subject; a
+                // realistic "12 MB" here would be the first thing the pattern
+                // found and the assertion would be about the fixture.
+                "lang_sheet_space_body" to context.getString(R.string.lang_sheet_space_body, "«free»"),
+                "lang_sheet_data_body" to context.getString(R.string.lang_sheet_data_body),
+                "offline_subtitle" to context.getString(R.string.offline_subtitle),
+            ).mapValues { (key, sentence) ->
+                requireNotNull(PACK_SIZE.find(sentence)) { "$key states no pack size: $sentence" }.value
+            }
+
+        assertThat(stated.values.toSet()).hasSize(1)
+        assertThat(stated.values.first()).isEqualTo("40–65 MB")
+    }
+
+    // ---- #229: one action, one verb, three locales ----------------------------------------------
+
+    /**
+     * **Issue #229.** The 🗑 on the offline manager said *"Delete %1$s"* to a
+     * screen reader and opened a sheet titled *"Remove %1$s?"* with a *Remove*
+     * button. One action, two verbs, and only the spoken one disagreed — 19f's
+     * own caption is *"The verb in the button matches the verb in the title."*
+     *
+     * Asserted as **agreement** and not as `isEqualTo("Remove %1$s")`. The wrong
+     * fix for this issue is to move the visible copy to "Delete"; a literal
+     * assertion survives that, and this does not.
+     */
+    @Test
+    fun `the bin's spoken verb is the sheet's verb`() {
+        assertVerbAgrees(context)
+    }
+
+    /**
+     * The same agreement in the other two locales, because all three had drifted
+     * separately: `fil` said `Burahin` against a sheet saying `Alisin`, `pt-rBR`
+     * said `Excluir` against `Remover`. A fix to `values/` alone would have left
+     * two thirds of the defect shipping.
+     *
+     * **Each case asserts its own locale's confirm label first.** A locale test
+     * whose configuration does not take effect reads the English resources and
+     * passes — a test that cannot fail, which is what #242 is a list of. The
+     * guard makes the configuration itself the thing under test.
+     */
+    @Test
+    fun `the bin's spoken verb is the sheet's verb in every locale`() {
+        val filipino = context.localized(Locale("fil"))
+        assertThat(filipino.getString(R.string.lang_sheet_remove_confirm)).isEqualTo("Alisin")
+        assertVerbAgrees(filipino)
+
+        val brazilian = context.localized(Locale("pt", "BR"))
+        assertThat(brazilian.getString(R.string.lang_sheet_remove_confirm)).isEqualTo("Remover")
+        assertVerbAgrees(brazilian)
+    }
+
+    private fun assertVerbAgrees(localized: Context) {
+        val spoken = localized.getString(R.string.offline_cd_delete, "Spanish")
+        val onTheButton = localized.getString(R.string.lang_sheet_remove_confirm)
+
+        assertThat(spoken.substringBefore(' ')).isEqualTo(onTheButton)
+        assertThat(spoken).contains("Spanish")
+    }
+
+    private fun Context.localized(locale: Locale): Context =
+        createConfigurationContext(Configuration(resources.configuration).apply { setLocale(locale) })
+
+    private companion object {
+        /** `40–65 MB`, `20–45 MB`, `de 40 a 65 MB`, `~30MB` — whatever the sentence states. */
+        val PACK_SIZE = Regex("""~?\d+\s*(?:[–-]|\ba\b)?\s*\d*\s*MB""")
     }
 }

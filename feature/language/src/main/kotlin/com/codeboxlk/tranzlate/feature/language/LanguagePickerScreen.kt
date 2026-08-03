@@ -2246,6 +2246,16 @@ private fun LanguagePickerLoadingPreview() {
 // same preview would now show the resting screen while claiming to show the
 // consent state — a preview that lies is worse than none. The sheet's two
 // meaningful states are previewed where the sheet lives, in `MobileDataSheet.kt`.
+//
+// `LanguagePickerContent(packFailure = …)` is absent for the SAME reason and had
+// no comment at all, which made two identical omissions look like different ones
+// in the source (#243). 19b and 19d are `ModalBottomSheet`s raised through
+// `PackFailureSheetHost`, so a preview passing a non-null `packFailure` would
+// draw the plain picker and claim to show a failure sheet. Both sheets and all
+// three of their cause variants are previewed in `PackFailureSheets.kt`; what a
+// failure looks like ON the picker is the row, which is
+// `LanguageRowFailedPreview`, `LanguageRowFailedGenericPreview` and
+// `LanguageRowSelectedFailedPreview` below.
 
 // ---- 17a landscape (issue #130 PR-14) ---------------------------------------
 // A preview cannot resize the window it is rendered in, so each frame below
@@ -2626,6 +2636,26 @@ private fun LanguageRowFailedPreview() {
 }
 
 /**
+ * The THIRD failure sentence (#243). `downloadFailureCopy` produces three
+ * distinct lines and this row previewed two of them — `STORAGE` above and
+ * `NETWORK` on the selected-failed row below — so `lang_pack_error_generic`
+ * ("Download didn't finish. Try again.") was drawn in no preview on either
+ * screen. Because PR-18 made both screens read ONE map, a single omission hid
+ * the sentence twice, and rule 7 exists because the owner reviews UI from
+ * previews.
+ *
+ * `WIFI_REQUIRED` deliberately gets none: it folds onto the network line by
+ * design and `DownloadFailureTest` pins the fold in both directions, so a
+ * preview of it would draw a duplicate of `LanguageRowSelectedFailedPreview`
+ * and imply a fourth sentence exists.
+ */
+@PreviewLightDark
+@Composable
+private fun LanguageRowFailedGenericPreview() {
+    RowPreviewSurface(LanguageRowState.Failed(OfflineModelFailure.UNKNOWN))
+}
+
+/**
  * The one row whose size IS measured. Kept separate so the reviewer can see the
  * design's "On device · N MB" line render the moment a truthful source exists —
  * production supplies none today (plan R3).
@@ -2847,6 +2877,39 @@ private fun NoSearchResultsPreview() {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             NoSearchResults(query = "klingon", onShowAll = {})
+        }
+    }
+}
+
+/**
+ * The Retry pill on its own (#243).
+ *
+ * Rule 7 names row action buttons explicitly, and this control is the 15a
+ * deviation the rev3 ruling asked PR-18 to close — icon → labelled pill. It
+ * rendered only inside two row previews, where the row's ink, its avatar and its
+ * red sentence are all competing for the same glance, and the two things a
+ * reviewer has to judge about the pill are its own: that the word reads as an
+ * action rather than a state, and that an error-filled container still passes
+ * contrast on both themes. Drawn against the row's own surface so the pill's
+ * container is the only colour in the frame.
+ */
+@PreviewLightDark
+@Composable
+private fun RetryPillPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Box(modifier = Modifier.padding(LocalSpacing.current.md16)) {
+                RetryPill(
+                    row =
+                        LanguagePickerRow(
+                            id = "hi",
+                            displayName = "Hindi",
+                            avatar = LanguageAvatar.Code("HI"),
+                            state = LanguageRowState.Failed(OfflineModelFailure.NETWORK),
+                        ),
+                    onRetry = {},
+                )
+            }
         }
     }
 }

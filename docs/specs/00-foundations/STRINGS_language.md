@@ -111,7 +111,7 @@ identical sets behind two dialogs (`text_lang_data_dialog_*`, `offline_data_dial
 | Key | Type | `en` | Args | Notes |
 |-----|------|------|------|-------|
 | `lang_sheet_data_title` | string | `Download over mobile data?` | — | **No language name**, and that is the drawing (spec rev 5, 19a). The checkbox below can make the answer STANDING, so a title naming one language would misdescribe what unticking it does; the row that raised the sheet is behind it either way |
-| `lang_sheet_data_body` | string | `A language pack is usually 20–45 MB. Your plan may charge for it.` | — | ⚠ the app states a pack size in three places and this is the third wording — see the `offline_subtitle` note in §7. The two measured packs are 44.2 MB (E-S1, af↔en) and 45.7 MB (#90 E3, de↔en), so `~30MB` is the one that is wrong; consolidating them is #175's neighbour, not this row's job |
+| `lang_sheet_data_body` | string | `A language pack is usually 40–65 MB. Your plan may charge for it.` | — | **ONE of the four strings that state the pack size (#219), and all four now carry the same figure** — this, `lang_sheet_space_body` (§5.3), `offline_subtitle` (§7) and `settings_mobile_data_supporting` (`STRINGS_settings.md`). **40–65 MB is the on-disk size (`SZ`) of all 58 translate models declared in `res/raw/translate_models_metadata.json` inside `translate-17.0.3.aar`** — min 39.5 MB (`be_en`), max 63.4 MB (`en_ja`), median 43.7, 53 of 58 between 40 and 50. Not an estimate and not the two samples the issue refused: `af_en`'s declared `SZ` is 44,169,505 bytes and the E-S1 device walk measured 44,169,505 bytes, so `SZ` is the real footprint. The DOWNLOAD is smaller (`DL_SZ` 31.3–48.0 MB) and none of the four sentences claims to state it. Derivation with the command: `docs/plan/issue-219-copy-sweep.md` §1 |
 | `lang_sheet_data_always_ask` | string | `Always ask before using mobile data` | — | the standing preference, **inverted**: ticked = keep asking = `allowMobileData` is false. The Settings row says the same bit the other way round (`settings_mobile_data_label`, "Always allow mobile data") |
 | `lang_sheet_data_download` | string | `Download now` | — | the filled action (the likely intent, spec §5) |
 | `lang_sheet_data_not_now` | string | `Not now` | — | the text action. The export draws **"Wait for Wi-Fi"**; nothing in this app queues a download for Wi-Fi, experiment **E-W1** has never been run, and the rev3 ruling's REJECT §7.8 refuses that word until it has. This is the owner's pre-approved interim (ruling 8) |
@@ -151,7 +151,7 @@ this constant IS 19b's trigger.
 | Key | Type | `en` | Args | Notes |
 |-----|------|------|------|-------|
 | `lang_sheet_space_title` | string | `Not enough space` | — | no language name: the pre-flight refuses every pack equally |
-| `lang_sheet_space_body` | string | `There is %1$s free on this device. A language pack usually needs 20–45 MB.` | free space | the figure is measured at the moment of refusal, never the drawn `12 MB`. The `20–45 MB` range is copy, and the same range `lang_sheet_data_body` uses — see the note there about the two packs this project has measured |
+| `lang_sheet_space_body` | string | `There is %1$s free on this device. A language pack usually needs 40–65 MB.` | free space | the free-space figure is read at the moment of refusal, never the drawn `12 MB`. The pack figure is the shared one — see `lang_sheet_data_body` (§5.2) for where it comes from. ⚠ **It is not the threshold that raised this sheet.** `REQUIRED_FREE_BYTES` is 150 MiB (157.3 MB), because a download holds the compressed file and the unpacked pack at once — 111.4 MB peak for `en_ja`. So between 65 MB and 157 MB free, this sentence reads as though the user has enough. What 19b should say about that is a design call, residual on **#250** |
 | `lang_sheet_space_used` | string | `Other apps and system` | — | the bar's FILL. Used-against-free on one volume, never packs-against-device: at 110 MB the library cannot be plotted against a whole device without misstating one of the two figures (`docs/design/language-screens/README.md:15`) |
 | `lang_sheet_space_free` | string | `%1$s free` | free space | the bar's track |
 | `lang_sheet_space_manage` | string | `Manage packs` | — | the sole action. The drawn second action, `Free up space`, opens 20e — **PR-25** — so it is omitted rather than wired to nothing (rev3 ruling, PR-18 row). A third wording of "Manage packs" is not introduced: `lang_dialog_manage_packs` is the tablet card's docked action and owner ruling 5 relabels the Home row in PR-23, so this key joins that relabel rather than pre-empting it |
@@ -204,10 +204,24 @@ sentence carries the fact) · `tt_lang_sheet_remove_inuse_cancel`.
 No `cd_*` keys of their own. Both sheets are `TranzlateSheetScaffold`s, which put `paneTitle` on
 the content root and `heading()` on the title, so the title is what a screen reader lands on when
 the sheet opens; both icons are decorative (`contentDescription = null`) because the title carries
-the meaning. The row 🗑 keeps `offline_cd_delete` ("Delete %1$s") — it still names the action the
-user is starting, and re-wording it to "Remove" for the verb agreement above is a copy change in
-three locales that belongs with the `cd_text_lang_retry` / `offline_cd_retry` pair §9 leaves for its own issue —
-the same divergence shape, in the same accessibility layer.
+the meaning.
+
+**The row 🗑 now says "Remove", and it used to say "Delete" (#229).** This section argued the
+divergence was tolerable — that "Delete" *"still names the action the user is starting"* — and
+deferred the re-wording to whenever the `cd_text_lang_retry` / `offline_cd_retry` pair was fixed.
+That was wrong on its own terms: a screen-reader user heard "Delete Spanish", tapped, and was
+asked "Remove Spanish?", while the sighted user beside them met one verb. Frame 19f's own caption
+is the rule — *"The verb in the button matches the verb in the title"* — and a description is not
+exempt from it. The visible copy was the reviewed and drawn half, so the spoken half moved.
+
+Per **locale**, not per key: `fil` said `Burahin` against a sheet saying `Alisin`, and `pt-rBR`
+said `Excluir` against `Remover`. All three had drifted separately, so a fix to `values/` alone
+would have left two of them wrong. Pinned in all three by `PackFailureCopyTest`.
+
+The `cd_text_lang_retry` / `offline_cd_retry` pair below is **still open** and is not folded in
+here — consolidating two keys into one needs the `stringResource` call site in
+`OfflineLanguagesScreen.kt`, which #229's PR owned only the previews of. Recorded as a residual on
+**#250**, the open issue about that same control on that same screen.
 
 ## 6. Language picker — accessibility (C-4)
 
@@ -259,7 +273,7 @@ nothing to a screen reader.
 | Key | Type | `en` | Args | Notes |
 |-----|------|------|------|-------|
 | `offline_title` | string | `Offline translation` | — | screen title |
-| `offline_subtitle` | string | `Download languages to translate without internet (~30MB each)` | — | ⚠ `~30MB` is a fixed estimate in the copy. The picker's own per-row size (`text_lang_on_device_size`) is a **measured** on-disk byte count that falls back to no number when it cannot be measured (plan R3) — so one screen measures and the other guesses, and `settings_mobile_data_supporting` guesses a third time at `about 30 MB`. One real number, stated once |
+| `offline_subtitle` | string | `Download languages to translate without internet (40–65 MB each)` | — | one of the four pack-size strings (#219) — the figure and its derivation are on `lang_sheet_data_body` in §5.2. It said `~30MB` while the picker's own per-row size (`text_lang_on_device_size`) was a **measured** on-disk byte count (plan R3): one screen measured and this one guessed, by 15 MB in the wrong direction |
 | `offline_loading` | string | `Loading languages…` | — | |
 
 > **This screen has no failure copy of its own since #130 PR-18.** Its failed row reads the
@@ -273,7 +287,7 @@ nothing to a screen reader.
 | `offline_cd_back` | string | `Back` | — |
 | `offline_cd_download` | string | `Download %1$s` | language name |
 | `offline_cd_stop` | string | `Stop downloading %1$s` | language name |
-| `offline_cd_delete` | string | `Delete %1$s` | language name |
+| `offline_cd_delete` | string | `Remove %1$s` | language name |
 | `offline_cd_retry` | string | `Retry downloading %1$s` | language name |
 
 ### 7.2 Offline manager — mobile-data consent
@@ -315,12 +329,21 @@ against `offline_cd_back` (both `Back`). Both are identical wording, so neither 
 two different things; they are tidiness, not a defect.
 
 **A third pair this section never listed**, found by the independent enumeration PR-18 ran over
-the concept rather than over remembered key names: `cd_text_lang_retry` (`Try downloading %1$s
-again`) against `offline_cd_retry` (`Retry downloading %1$s`) — the SAME divergence shape as
+the concept rather than over remembered key names: `cd_text_lang_retry` (`Retry download for
+%1$s`) against `offline_cd_retry` (`Retry downloading %1$s`) — the SAME divergence shape as
 #175, on the control that answers the failure #175 was about, in the accessibility layer where
 nobody looks. It is left for its own issue rather than folded in here, because #175's brief
 enumerates six keys and a PR that quietly does eight is a PR whose `Call sites:` line stops
-meaning anything.
+meaning anything. **Now a residual on #250**, which owns that control on that screen for PR-23.
+
+> **This paragraph quoted the wrong value until #219's PR, and the gate could not have caught
+> it.** It said `cd_text_lang_retry` reads `Try downloading %1$s again` — the pre-PR-18 wording,
+> retired two sections above in §6, which documents the change and the WCAG 2.5.3 reason for it.
+> `verifyStringKeyDocs` is **resource→doc only** (#220): it checks that every shipped key appears
+> in a catalogue, never that what the catalogue SAYS about a key is still true. A stale value in
+> doc prose is invisible to it and to an exact-key grep, and this one sat four lines from the
+> §9 heading for the life of PR-18. The other three catalogue rows in this file were checked by
+> hand against `values/strings.xml` at the same time.
 
 ## 10. Translation status (C-12)
 

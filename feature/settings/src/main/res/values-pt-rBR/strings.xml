@@ -15,5 +15,5 @@
     <string name="settings_history_supporting">Toda tradução, e as que você marcou</string>
     <string name="settings_downloads_header">Downloads</string>
     <string name="settings_mobile_data_label">Sempre permitir dados móveis</string>
-    <string name="settings_mobile_data_supporting">Cada pacote de idioma tem cerca de 30 MB. Quando desativado, você é avisado antes de usar dados móveis</string>
+    <string name="settings_mobile_data_supporting">Cada pacote de idioma tem de 40 a 65 MB. Quando desativado, você é avisado antes de usar dados móveis</string>
 </resources>

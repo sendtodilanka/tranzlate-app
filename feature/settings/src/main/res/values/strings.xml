@@ -22,5 +22,5 @@
     <string name="settings_history_supporting">Every translation, and the ones you starred</string>
     <string name="settings_downloads_header">Downloads</string>
     <string name="settings_mobile_data_label">Always allow mobile data</string>
-    <string name="settings_mobile_data_supporting">Language packs are about 30 MB each. When off, you\'re asked before mobile data is used</string>
+    <string name="settings_mobile_data_supporting">Language packs are 40–65 MB each. When off, you\'re asked before mobile data is used</string>
 </resources>

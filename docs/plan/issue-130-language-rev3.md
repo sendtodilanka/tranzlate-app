@@ -442,6 +442,16 @@ size in three places and the other two (`offline_subtitle`,
 `settings_mobile_data_supporting`) both say `~30 MB`, which the measurements
 contradict by more.
 
+> **SUPERSEDED by #219 / PR #262 (wave 1c).** The paragraph above is PR-18's
+> record and stays as written; the figure it describes no longer ships. All four
+> strings now say **`40–65 MB`** — the on-disk range of all 58 ML Kit translate
+> models, read from `res/raw/translate_models_metadata.json` in
+> `translate-17.0.3.aar` rather than extrapolated from two samples. The
+> "alternative is inventing copy" reasoning was right at the time and stopped
+> being right the moment the manifest was opened: `af_en`'s declared size is
+> 44,169,505 bytes, which is E-S1's measurement to the byte, so the manifest is
+> the measurement for all 58. Derivation: `docs/plan/issue-219-copy-sweep.md` §1.
+
 ### PR-18 mutation register — decided BEFORE the tests (2026-08-02)
 
 Rule 11, third cause: a mutation chosen after reading the code gets shaped by it.

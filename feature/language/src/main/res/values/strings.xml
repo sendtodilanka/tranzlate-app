@@ -45,15 +45,37 @@
     <string name="lang_sheet_failed_cause_generic">Cause: not reported. Retrying starts the download again.</string>
     <string name="lang_sheet_failed_close">Close</string>
     <string name="lang_sheet_failed_retry">Retry</string>
+    <!-- THE PACK SIZE, and it is stated in FOUR strings (#219). Change one and
+         you change all four: lang_sheet_space_body and lang_sheet_data_body
+         here, offline_subtitle below, and settings_mobile_data_supporting in
+         :feature:settings. Two of the four said ~30 MB and were contradicted by
+         every measurement this project has.
+
+         40–65 MB is not an estimate and not two samples. It is the on-disk size
+         (SZ) of all 58 translate models declared in
+         res/raw/translate_models_metadata.json inside translate-17.0.3.aar —
+         the version this app builds against — min 39.5 MB (be_en), max 63.4 MB
+         (en_ja), median 43.7. Trusted over the old guess because af_en's
+         declared SZ is 44,169,505 bytes and the E-S1 device walk measured
+         44,169,505 bytes: byte-identical, so SZ is the real footprint.
+
+         The DOWNLOAD is smaller (DL_SZ, 31.3–48.0 MB) and the sentences do not
+         claim otherwise — each states how big a pack IS, and the mobile-data
+         pair carries the charge warning separately. Overstating a data estimate
+         costs a user nothing; understating a size is the harm #219 was filed
+         about. Full derivation: docs/plan/issue-219-copy-sweep.md §1. -->
     <!-- Sheet 19b — the download was refused before it started, because the disk
-         cannot hold a pack (the 150 MB pre-flight in RealOfflineModelManager).
+         cannot hold a pack (the 150 MB pre-flight in RealOfflineModelManager —
+         which is not this figure and is not meant to be: a download holds the
+         compressed file AND the unpacked pack at once, 111.4 MB peak for en_ja.
+         What 19b should SAY about that gap is a design call, residual on #250).
          The bar is used-against-free on ONE volume and never packs-against-
          device: at 110 MB the library cannot be plotted against a whole device
          without misstating one of the two figures (spec rev 5). The drawn second
          action, "Free up space", opens 20e, which is PR-25 — omitted rather than
          wired to nothing, per the rev3 ruling. -->
     <string name="lang_sheet_space_title">Not enough space</string>
-    <string name="lang_sheet_space_body">There is %1$s free on this device. A language pack usually needs 20–45 MB.</string>
+    <string name="lang_sheet_space_body">There is %1$s free on this device. A language pack usually needs 40–65 MB.</string>
     <string name="lang_sheet_space_used">Other apps and system</string>
     <string name="lang_sheet_space_free">%1$s free</string>
     <string name="lang_sheet_space_manage">Manage packs</string>
@@ -66,7 +88,7 @@
          download for Wi-Fi, experiment E-W1 has never been run, and the ruling's
          REJECT §7.8 refuses that word until it is. -->
     <string name="lang_sheet_data_title">Download over mobile data?</string>
-    <string name="lang_sheet_data_body">A language pack is usually 20–45 MB. Your plan may charge for it.</string>
+    <string name="lang_sheet_data_body">A language pack is usually 40–65 MB. Your plan may charge for it.</string>
     <string name="lang_sheet_data_always_ask">Always ask before using mobile data</string>
     <string name="lang_sheet_data_download">Download now</string>
     <string name="lang_sheet_data_not_now">Not now</string>
@@ -174,12 +196,19 @@
          composer, and C-3 gives one key one home rather than two modules one name. -->
     <string name="cd_lang_back">Back</string>
     <string name="offline_title">Offline translation</string>
-    <string name="offline_subtitle">Download languages to translate without internet (~30MB each)</string>
+    <string name="offline_subtitle">Download languages to translate without internet (40–65 MB each)</string>
     <string name="offline_loading">Loading languages…</string>
     <string name="offline_cd_back">Back</string>
     <string name="offline_cd_download">Download %1$s</string>
     <string name="offline_cd_stop">Stop downloading %1$s</string>
-    <string name="offline_cd_delete">Delete %1$s</string>
+    <!-- "Remove", not "Delete" (#229). The sheet this control opens is titled
+         "Remove %1$s?" and its button says "Remove"; a screen-reader user was
+         hearing "Delete Spanish" and then being asked "Remove Spanish?" — one
+         action wearing two verbs, and only the spoken one disagreed. The visible
+         copy was reviewed and drawn, so the description moved. Per LOCALE, not
+         per key: fil said "Burahin" against a sheet saying "Alisin", pt-BR said
+         "Excluir" against "Remover". Pinned by PackFailureCopyTest in all three. -->
+    <string name="offline_cd_delete">Remove %1$s</string>
     <string name="offline_cd_retry">Retry downloading %1$s</string>
     <!-- 17c/17d — the tablet dialog host (#130 PR-16). Three keys, and each one
          exists only in this host: the phone picker is a screen, so its way out is

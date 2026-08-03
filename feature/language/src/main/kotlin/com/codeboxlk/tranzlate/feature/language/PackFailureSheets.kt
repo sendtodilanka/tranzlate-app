@@ -18,6 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,6 +39,7 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetDefaults
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetPreviewFrame
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetScaffold
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetTone
+import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.designsystem.sheetBodyTextStyle
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 
@@ -452,4 +454,79 @@ private fun NoSpaceSheetPreviewBody(
         supportingContent = { StorageBarCard(freeLabel = free, fraction = deviceUsedFraction(freeBytes, volumeBytes)) },
         body = { Text(stringResource(R.string.lang_sheet_space_body, free)) },
     )
+}
+
+// ---- Item-level previews (#243) ---------------------------------------------
+// Rule 7 names "every custom item built from standard M3 parts" and these three
+// are exactly that: a Row on an error container, a bar with a legend under it,
+// and a dot beside its words. Each already renders inside a sheet preview above,
+// so nothing here was invisible — this is rule 7 in LETTER, and the reason to
+// close it anyway is that a sheet preview shows the item at ONE size, in ONE
+// composition, and an item preview is where the owner sees it change.
+
+/**
+ * The cause card, both sentences it can carry, side by side and out of the
+ * sheet. Their whole difference is the words — one names the connection and one
+ * refuses to name anything — which is easiest to judge with nothing else drawn.
+ */
+@PreviewLightDark
+@Composable
+private fun CauseCardNetworkPreview() {
+    CauseCardPreviewSurface(R.string.lang_sheet_failed_cause_network)
+}
+
+@PreviewLightDark
+@Composable
+private fun CauseCardGenericPreview() {
+    CauseCardPreviewSurface(R.string.lang_sheet_failed_cause_generic)
+}
+
+@Composable
+private fun CauseCardPreviewSurface(causeRes: Int) {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Box(modifier = Modifier.padding(LocalSpacing.current.md16)) { CauseCard(causeRes = causeRes) }
+        }
+    }
+}
+
+/**
+ * The storage bar at the fraction the frame draws — nearly full, which is the
+ * only state that raises 19b. The legend under it is the item below, previewed
+ * separately because its swatch colours are the pair a reviewer checks for
+ * contrast and they are easiest to see without a bar over them.
+ */
+@PreviewLightDark
+@Composable
+private fun StorageBarCardPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Box(modifier = Modifier.padding(LocalSpacing.current.md16)) {
+                StorageBarCard(freeLabel = "12 MB free", fraction = 0.96f)
+            }
+        }
+    }
+}
+
+/** Both swatches, the pair as drawn: used against free. */
+@PreviewLightDark
+@Composable
+private fun StorageLegendPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.md16),
+                modifier = Modifier.padding(LocalSpacing.current.md16),
+            ) {
+                StorageLegend(
+                    swatch = MaterialTheme.colorScheme.primaryContainer,
+                    label = stringResource(R.string.lang_sheet_space_used),
+                )
+                StorageLegend(
+                    swatch = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    label = stringResource(R.string.lang_sheet_space_free, "12 MB"),
+                )
+            }
+        }
+    }
 }

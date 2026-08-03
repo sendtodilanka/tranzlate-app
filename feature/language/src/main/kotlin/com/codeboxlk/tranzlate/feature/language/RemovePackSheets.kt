@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -27,6 +28,7 @@ import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetDefaults
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetPreviewFrame
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetScaffold
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetTone
+import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.designsystem.sheetBodyTextStyle
 
 /** Sheet roots + controls — `tt_lang_sheet_*`, the rev3 ruling's sheet namespace (C-1). */
@@ -320,6 +322,41 @@ private fun RemoveInUseSheetOneSavedPreview() {
 @Composable
 private fun RemoveInUseSheetNoSavedPreview() {
     RemoveInUseSheetPreviewBody(savedCount = 0)
+}
+
+// ---- Item-level previews (#243) ---------------------------------------------
+// The line renders inside the three 19g previews above, so nothing was invisible
+// — rule 7's LETTER names items built from standard M3 parts and this is one: a
+// Surface holding a Row holding a glyph and a plural. Previewed alone because
+// its wrap is the thing to look at, and inside a sheet it never gets long enough
+// to wrap. The zero case has no item preview by design: at zero the composable
+// returns before drawing anything, so an item preview of it is a blank frame.
+// `RemoveInUseSheetNoSavedPreview` above shows the absence in the place the
+// absence means something.
+
+/** Several — the plural arm, and the length that decides the wrap. */
+@PreviewLightDark
+@Composable
+private fun SavedPhrasesLineManyPreview() {
+    SavedPhrasesLinePreviewSurface(savedCount = 12)
+}
+
+/** Exactly one — the arm where "1 saved phrases" would show if the plural were a string. */
+@PreviewLightDark
+@Composable
+private fun SavedPhrasesLineOnePreview() {
+    SavedPhrasesLinePreviewSurface(savedCount = 1)
+}
+
+@Composable
+private fun SavedPhrasesLinePreviewSurface(savedCount: Int) {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Box(modifier = Modifier.padding(LocalSpacing.current.md16)) {
+                SavedPhrasesLine(languageName = "Spanish", savedCount = savedCount)
+            }
+        }
+    }
 }
 
 @Composable
