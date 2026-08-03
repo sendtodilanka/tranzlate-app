@@ -4,6 +4,7 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeStorageProbe
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
@@ -300,6 +301,103 @@ class RealOfflineModelManagerTest {
 
             val state = manager.stateOf("fr")
             assertThat(state).isInstanceOf(OfflineModelState.Failed::class.java)
+        }
+
+    // ---- what the call ANSWERS (#234) -----------------------------------------
+    //
+    // The state map above is a conflating channel and cannot carry "the same
+    // refusal happened again": `Failed` is a data class, so a Retry on a disk that
+    // is still full writes an equal value and nothing emits. The pre-flight's
+    // answer is known synchronously, so it is returned. Everything below is that
+    // return value, which is the half of the contract `stateOf` cannot see.
+
+    /**
+     * The heart of #234. `stateOf` says `Failed(STORAGE)` both times, so a test
+     * that only read the map would pass on the shipped code and on the fix alike
+     * — the assertion has to be on the answer.
+     */
+    @Test
+    fun `a download the disk cannot hold answers Refused`() =
+        runTest {
+            val store = FakeStore()
+            val probe = FakeStorageProbe(free = 10L * 1024 * 1024) // 10MB < the 150MB budget
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
+
+            val first = manager.download("fr")
+            runCurrent()
+            val retry = manager.download("fr") // the Retry pill, disk unchanged
+            runCurrent()
+
+            assertThat(first).isEqualTo(DownloadAttempt.Refused(OfflineModelFailure.STORAGE))
+            assertThat(retry).isEqualTo(DownloadAttempt.Refused(OfflineModelFailure.STORAGE))
+            assertThat(store.committed).isEmpty()
+        }
+
+    /**
+     * The in-flight de-duplication answers `Ignored`, not `Started`. A caller told
+     * `Started` would watch the map for an outcome that belongs to somebody else's
+     * attempt — or, when the first attempt has already settled, for one that never
+     * arrives, leaving a coroutine suspended for the life of the screen.
+     */
+    @Test
+    fun `a second tap on a downloading pack answers Ignored`() =
+        runTest {
+            val store = FakeStore()
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
+
+            val first = manager.download("fr")
+            runCurrent()
+            val second = manager.download("fr")
+            runCurrent()
+
+            assertThat(first).isEqualTo(DownloadAttempt.Started)
+            assertThat(second).isEqualTo(DownloadAttempt.Ignored)
+        }
+
+    /**
+     * **The limit #218 shipped carrying, collected here.** That PR's offline
+     * pre-flight wrote `Failed(NETWORK)` before enqueue and its own KDoc named the
+     * cost: a retry made while still offline writes an EQUAL value, the conflating
+     * flow does not emit, and no second sheet opens — *"#234 is filed against this
+     * same conflation on the storage path and its fix covers both."*
+     *
+     * It does, and this is the assertion that says so. `stateOf` reads
+     * `Failed(NETWORK)` on both attempts either way, so only the answer can tell
+     * a first refusal from a repeated one.
+     */
+    @Test
+    fun `a download refused for being offline answers Refused on every attempt`() =
+        runTest {
+            val store = FakeStore()
+            val manager =
+                RealOfflineModelManager(
+                    store,
+                    plentyFree,
+                    FakeConnectivityMonitor(initiallyOnline = false),
+                    backgroundScope,
+                )
+
+            val first = manager.download("fr")
+            runCurrent()
+            val retry = manager.download("fr") // the Retry pill, radio still off
+            runCurrent()
+
+            assertThat(first).isEqualTo(DownloadAttempt.Refused(OfflineModelFailure.NETWORK))
+            assertThat(retry).isEqualTo(DownloadAttempt.Refused(OfflineModelFailure.NETWORK))
+            assertThat(store.committed).isEmpty() // nothing was ever enqueued
+        }
+
+    /** A tag ML Kit cannot hold offline was never a download to begin with. */
+    @Test
+    fun `a tag the store cannot hold answers Ignored`() =
+        runTest {
+            val store =
+                object : ModelStore by FakeStore() {
+                    override fun isCapable(tag: String): Boolean = false
+                }
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
+
+            assertThat(manager.download("zz")).isEqualTo(DownloadAttempt.Ignored)
         }
 }
 

@@ -24,6 +24,7 @@ import com.codeboxlk.tranzlate.domain.access.FeatureAccess
 import com.codeboxlk.tranzlate.domain.access.PurchaseFlow
 import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
 import com.codeboxlk.tranzlate.domain.speech.OfflineVoiceCatalog
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
@@ -144,7 +145,7 @@ object FakeTranslateModule {
         object : OfflineModelManager {
             override fun modelStates() = kotlinx.coroutines.flow.flowOf(emptyMap<String, OfflineModelState>())
 
-            override suspend fun download(languageTag: String) = Unit
+            override suspend fun download(languageTag: String) = DownloadAttempt.Started
 
             override suspend fun delete(languageTag: String) = Unit
         }

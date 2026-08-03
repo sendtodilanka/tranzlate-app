@@ -12,6 +12,7 @@ import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.testing.FakeOfflineVoiceCatalog
 import com.codeboxlk.tranzlate.domain.speech.OfflineVoiceCatalog
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -511,7 +512,7 @@ private class FakeOfflineModelManager(
 ) : OfflineModelManager {
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = MutableStateFlow(states)
 
-    override suspend fun download(languageTag: String) = Unit
+    override suspend fun download(languageTag: String) = DownloadAttempt.Started
 
     override suspend fun delete(languageTag: String) = Unit
 }
@@ -520,7 +521,7 @@ private class FakeOfflineModelManager(
 private class SilentOfflineModelManager : OfflineModelManager {
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = flow { awaitCancellation() }
 
-    override suspend fun download(languageTag: String) = Unit
+    override suspend fun download(languageTag: String) = DownloadAttempt.Started
 
     override suspend fun delete(languageTag: String) = Unit
 }

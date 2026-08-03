@@ -94,8 +94,16 @@ class DownloadGate(
      * [modelManager] is deliberately OUTSIDE the guard: its own pre-flight owns
      * its own failures (`RealOfflineModelManager.download`), and swallowing them
      * here would hide a real download failure behind a consent sheet.
+     *
+     * @return the manager's [DownloadAttempt], or **null** when the question was
+     *   raised instead and the manager was never asked — including when it was
+     *   raised because the metered question could not be answered at all. Null is
+     *   the gate's own answer and not one of the manager's: nothing was refused
+     *   and nothing was ignored, because nothing was requested yet. A caller that
+     *   watches for an outcome must not watch for this one — the user may never
+     *   answer it.
      */
-    suspend fun requestDownload(id: String) {
+    suspend fun requestDownload(id: String): DownloadAttempt? {
         val mustAsk =
             try {
                 val allowed = downloadPrefs.allowMobileData.first()
@@ -107,8 +115,9 @@ class DownloadGate(
             ) {
                 true // cannot tell whether this link is metered — ask, never assume
             }
-        if (mustAsk) {
+        return if (mustAsk) {
             consentQuestion.raise(id)
+            null
         } else {
             modelManager.download(id)
         }
@@ -126,7 +135,7 @@ class DownloadGate(
     fun consentOnce(): ConsentedDownload? = consentQuestion.take()?.let(::ConsentedDownload)
 
     /** The consented download itself — [consentOnce]'s follow-through. */
-    suspend fun downloadConsented(consented: ConsentedDownload) = modelManager.download(consented.id)
+    suspend fun downloadConsented(consented: ConsentedDownload): DownloadAttempt = modelManager.download(consented.id)
 
     /** "Wait for Wi-Fi", or a dismiss: the row is left untouched and re-tappable. */
     fun dismiss() {

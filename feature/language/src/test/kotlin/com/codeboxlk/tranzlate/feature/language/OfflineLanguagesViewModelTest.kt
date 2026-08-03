@@ -14,6 +14,7 @@ import com.codeboxlk.tranzlate.core.testing.TestDispatcherProvider
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
@@ -664,8 +665,9 @@ private class RecordingModelManager : OfflineModelManager {
             ),
         )
 
-    override suspend fun download(languageTag: String) {
+    override suspend fun download(languageTag: String): DownloadAttempt {
         downloads += languageTag
+        return DownloadAttempt.Started
     }
 
     override suspend fun delete(languageTag: String) {
@@ -677,7 +679,7 @@ private class RecordingModelManager : OfflineModelManager {
 private class SilentModelManager : OfflineModelManager {
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = flow { awaitCancellation() }
 
-    override suspend fun download(languageTag: String) = Unit
+    override suspend fun download(languageTag: String) = DownloadAttempt.Started
 
     override suspend fun delete(languageTag: String) = Unit
 }
@@ -688,7 +690,7 @@ private class ScriptedModelManager : OfflineModelManager {
 
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = states
 
-    override suspend fun download(languageTag: String) = Unit
+    override suspend fun download(languageTag: String) = DownloadAttempt.Started
 
     override suspend fun delete(languageTag: String) = Unit
 }

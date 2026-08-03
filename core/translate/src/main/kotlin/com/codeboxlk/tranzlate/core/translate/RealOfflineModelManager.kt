@@ -4,6 +4,7 @@ import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
@@ -293,9 +294,25 @@ class RealOfflineModelManager internal constructor(
     override fun modelStates(): Flow<Map<String, OfflineModelState>> =
         states.onSubscription { refreshRequests.trySend(Unit) }
 
-    override suspend fun download(languageTag: String) {
-        if (!store.isCapable(languageTag)) return
-        if (activeDownloads.containsKey(languageTag)) return // one in-flight per tag
+    /**
+     * The synchronous half runs here and its answer is RETURNED, not left for a
+     * caller to infer from the state map (issue #234). A refusal repeated for the
+     * same reason writes an equal value into a conflating flow and is invisible
+     * there — see [DownloadAttempt] for why that is a property of the channel
+     * rather than of this method. The transfer itself still goes to
+     * [downloadScope] and still reports through `modelStates()`.
+     *
+     * **BOTH pre-flights answer, and the second one is why #218 asked for this.**
+     * That check shipped naming the conflation as its own KNOWN LIMIT — *"a retry
+     * while still offline writes a value EQUAL to the one already on the row… #234
+     * is filed against this same conflation on the storage path and its fix covers
+     * both"*. It does: the offline refusal returns [DownloadAttempt.Refused] on
+     * exactly the same terms as the storage one, so the second tap of a Retry made
+     * in airplane mode is reported instead of swallowed.
+     */
+    override suspend fun download(languageTag: String): DownloadAttempt {
+        if (!store.isCapable(languageTag)) return DownloadAttempt.Ignored
+        if (activeDownloads.containsKey(languageTag)) return DownloadAttempt.Ignored // one in-flight per tag
         // Issue #218 pre-flight, and the higher-value half of that fix: refuse
         // BEFORE enqueue when there is no network.
         //
@@ -327,15 +344,17 @@ class RealOfflineModelManager internal constructor(
         // `LanguagePickerViewModel.reportFailure` watches for to raise sheet 19d
         // — a sheet that exists today and, on this path, could never open.
         //
-        // KNOWN LIMIT, and it is #234's rather than this check's: a retry while
-        // still offline writes a value EQUAL to the one already on the row, and
-        // MutableStateFlow conflates equal values, so no second sheet opens. The
-        // first attempt — the one this fixes — moves NotDownloaded -> Failed and
-        // does raise it. #234 is filed against this same conflation on the
-        // storage path and its fix covers both.
+        // The KNOWN LIMIT this comment used to carry is CLOSED (#234, merged in
+        // here). It read: a retry while still offline writes a value EQUAL to the
+        // one already on the row, MutableStateFlow conflates equal values, so no
+        // second sheet opens — and it named #234's fix as the thing that would
+        // cover it. That fix is the return value below: the refusal no longer
+        // depends on the state map having changed, so the second, third and tenth
+        // taps report exactly as the first one did.
         if (!connectivity.isOnline()) {
-            takeTransient(languageTag, OfflineModelState.Failed(OfflineModelFailure.NETWORK))
-            return
+            val cause = OfflineModelFailure.NETWORK
+            takeTransient(languageTag, OfflineModelState.Failed(cause))
+            return DownloadAttempt.Refused(cause)
         }
         // Issue #90 pre-flight: refuse BEFORE enqueue when the disk can't hold
         // a model — a partial download + a generic failure is a dead end.
@@ -363,8 +382,9 @@ class RealOfflineModelManager internal constructor(
                 Long.MAX_VALUE // unknown, so it cannot be the thing that blocks
             }
         if (freeBytes < REQUIRED_FREE_BYTES) {
-            takeTransient(languageTag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
-            return
+            val cause = OfflineModelFailure.STORAGE
+            takeTransient(languageTag, OfflineModelState.Failed(cause))
+            return DownloadAttempt.Refused(cause)
         }
         takeTransient(languageTag, OfflineModelState.Downloading)
         val job =
@@ -393,6 +413,7 @@ class RealOfflineModelManager internal constructor(
             }
         activeDownloads[languageTag] = job
         job.start() // registered BEFORE it runs — Stop can never miss the window
+        return DownloadAttempt.Started
     }
 
     override suspend fun delete(languageTag: String) {

@@ -6,6 +6,7 @@ import com.codeboxlk.tranzlate.core.model.ModeId
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
@@ -125,10 +126,19 @@ internal class PickerModelManager : OfflineModelManager {
     /**
      * What `download()` does to the state map before it returns — the real
      * manager's synchronous half (`takeTransient`: `Downloading`, or
-     * `Failed(STORAGE)` when the free-space pre-flight refuses). Default is
-     * "nothing", which is what every test written before #130 PR-18 assumed.
+     * `Failed(STORAGE)` when the free-space pre-flight refuses).
+     *
+     * Since issue #234 it also decides what the call ANSWERS, because the real
+     * manager's pre-flight answer travels by return value: a conflating state map
+     * cannot carry "the same refusal happened again". A hook that writes
+     * `Failed(STORAGE)` and answers `Started` would be modelling a manager that
+     * does not exist, so the two are set together on purpose.
+     *
+     * Default: touch nothing and answer `Started` — an enqueued transfer whose
+     * outcome the test then publishes with [put], which is what every test
+     * written before #130 PR-18 assumed.
      */
-    var onDownload: (String) -> Unit = {}
+    var onDownload: (String) -> DownloadAttempt = { DownloadAttempt.Started }
 
     /** Publish a state for one tag, as the manager's own merge would. */
     fun put(
@@ -140,9 +150,9 @@ internal class PickerModelManager : OfflineModelManager {
 
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = states
 
-    override suspend fun download(languageTag: String) {
+    override suspend fun download(languageTag: String): DownloadAttempt {
         downloads += languageTag
-        onDownload(languageTag)
+        return onDownload(languageTag)
     }
 
     override suspend fun delete(languageTag: String) {
@@ -154,7 +164,7 @@ internal class PickerModelManager : OfflineModelManager {
 internal class SilentPickerModelManager : OfflineModelManager {
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = flow { awaitCancellation() }
 
-    override suspend fun download(languageTag: String) = Unit
+    override suspend fun download(languageTag: String) = DownloadAttempt.Started
 
     override suspend fun delete(languageTag: String) = Unit
 }
