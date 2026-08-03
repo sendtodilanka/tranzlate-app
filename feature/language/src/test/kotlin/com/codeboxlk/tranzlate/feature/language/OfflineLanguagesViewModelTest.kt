@@ -10,6 +10,7 @@ import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeDownloadPrefsRepository
 import com.codeboxlk.tranzlate.core.testing.FakeTranslationRepository
+import com.codeboxlk.tranzlate.core.testing.TestDispatcherProvider
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
@@ -84,6 +85,7 @@ class OfflineLanguagesViewModelTest {
                 translatePrefs = translatePrefs,
                 translations = translations,
                 handle = handle,
+                dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
                 appScope = appScope,
             )
     }
@@ -181,6 +183,7 @@ class OfflineLanguagesViewModelTest {
                     translatePrefs = translatePrefs,
                     translations = translations,
                     handle = SavedStateHandle(),
+                    dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
                     appScope = appScope,
                 )
             viewModel.rows.launchIn(backgroundScope)
@@ -206,6 +209,7 @@ class OfflineLanguagesViewModelTest {
                     translatePrefs = translatePrefs,
                     translations = translations,
                     handle = SavedStateHandle(),
+                    dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
                     appScope = appScope,
                 )
             viewModel.rows.launchIn(backgroundScope)
@@ -242,6 +246,7 @@ class OfflineLanguagesViewModelTest {
                     translatePrefs = translatePrefs,
                     translations = translations,
                     handle = SavedStateHandle(),
+                    dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
                     appScope = appScope,
                 )
             viewModel.rows.launchIn(backgroundScope)
@@ -524,6 +529,7 @@ class OfflineLanguagesViewModelTest {
                     translatePrefs = translatePrefs,
                     translations = translations,
                     handle = handle,
+                    dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
                     appScope = appScope,
                 )
             reborn.pendingRemoval.launchIn(backgroundScope)
@@ -542,6 +548,35 @@ class OfflineLanguagesViewModelTest {
     fun `a broken saved-count query still lets the sheet open`() =
         runTest {
             translations.beforeSavedCount = { error("database disk image is malformed") }
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            viewModel.requestRemove("fr")
+            runCurrent()
+
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isTrue()
+            assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(0)
+        }
+
+    /**
+     * The sibling of the test above, and the one that was missing (issue #236).
+     *
+     * That one throws `IllegalStateException` — an `Exception`, which the old
+     * narrow catch already covered — so it passed while the crash class the
+     * guard exists for went straight past it. Room here runs every statement
+     * through a `native` method on `android.database.sqlite.SQLiteConnection`,
+     * and a JNI link that cannot be satisfied raises `UnsatisfiedLinkError`: a
+     * `LinkageError`, so an `Error`, so NOT an `Exception`
+     * (`TextViewModel.kt:768-779`, verified again in this PR).
+     *
+     * The user-visible harm this pins: tap the trash icon on the pack for the
+     * CURRENT target language and the app disappears — no sheet, no message.
+     * `savedCount` is only queried when `inUseAsTarget`, so `fr` is the pack
+     * that reproduces it and any other pack is safe.
+     */
+    @Test
+    fun `a saved-count query that fails to link still lets the sheet open`() =
+        runTest {
+            translations.beforeSavedCount = { throw UnsatisfiedLinkError("nativeExecute") }
             viewModel.pendingRemoval.launchIn(backgroundScope)
 
             viewModel.requestRemove("fr")

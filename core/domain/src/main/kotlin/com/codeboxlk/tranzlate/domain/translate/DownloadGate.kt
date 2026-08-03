@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate.domain.translate
 
 import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 
@@ -76,15 +77,45 @@ class DownloadGate(
      * metered and no standing permission exists — in which case it raises
      * the question instead and starts NOTHING.
      *
+     * **An unanswerable decision ASKS (issue #238).** Neither half of it was
+     * guarded before: the standing-preference read is a DataStore read, and
+     * `isMetered()` is a synchronous binder call into `ConnectivityManager`.
+     * A throw from either rode the caller's bare `viewModelScope.launch` to
+     * `Thread.defaultUncaughtExceptionHandler` — the app vanishing on a download
+     * tap, which is the one thing this class exists to make orderly.
+     *
+     * Raising the question is the safe side and not merely the convenient one.
+     * Issue #90's ruling is that a metered download is a CONSENT question; when
+     * the answer cannot be established, spending the user's data plan silently is
+     * the failure that costs them money, and asking costs them one tap. It is not
+     * a dead end either — the sheet carries "Download once" and "Wait for Wi-Fi",
+     * so the row stays reachable whichever way they answer.
+     *
+     * [modelManager] is deliberately OUTSIDE the guard: its own pre-flight owns
+     * its own failures (`RealOfflineModelManager.download`), and swallowing them
+     * here would hide a real download failure behind a consent sheet.
+     *
      * @return the manager's [DownloadAttempt], or **null** when the question was
-     *   raised instead and the manager was never asked. Null is the gate's own
-     *   answer and not one of the manager's: nothing was refused and nothing was
-     *   ignored, because nothing was requested yet. A caller that watches for an
-     *   outcome must not watch for this one — the user may never answer it.
+     *   raised instead and the manager was never asked — including when it was
+     *   raised because the metered question could not be answered at all. Null is
+     *   the gate's own answer and not one of the manager's: nothing was refused
+     *   and nothing was ignored, because nothing was requested yet. A caller that
+     *   watches for an outcome must not watch for this one — the user may never
+     *   answer it.
      */
     suspend fun requestDownload(id: String): DownloadAttempt? {
-        val allowed = downloadPrefs.allowMobileData.first()
-        return if (connectivity.isMetered() && !allowed) {
+        val mustAsk =
+            try {
+                val allowed = downloadPrefs.allowMobileData.first()
+                connectivity.isMetered() && !allowed
+            } catch (rethrown: CancellationException) {
+                throw rethrown // never break structured cancellation
+            } catch (
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") unanswerable: Throwable,
+            ) {
+                true // cannot tell whether this link is metered — ask, never assume
+            }
+        return if (mustAsk) {
             consentQuestion.raise(id)
             null
         } else {

@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.core.translate
 import app.cash.turbine.testIn
 import app.cash.turbine.turbineScope
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeStorageProbe
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
@@ -39,7 +40,8 @@ class RealOfflineModelManagerSharingTest {
     fun `a burst of subscribers costs ONE ML Kit read`() =
         runTest {
             val store = CountingStore()
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+            val manager =
+                RealOfflineModelManager(store, ampleStorage, online, backgroundScope) { testScheduler.currentTime }
 
             repeat(SUBSCRIBER_BURST) {
                 backgroundScope.launch { manager.modelStates().collect { } }
@@ -60,7 +62,8 @@ class RealOfflineModelManagerSharingTest {
     fun `two collectors read one flow - same sequence, terminal state included`() =
         runTest {
             val store = CountingStore()
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+            val manager =
+                RealOfflineModelManager(store, ampleStorage, online, backgroundScope) { testScheduler.currentTime }
 
             turbineScope {
                 val picker = manager.modelStates().testIn(backgroundScope)
@@ -109,7 +112,8 @@ class RealOfflineModelManagerSharingTest {
     fun `a resubscribe after the idle window re-reads the disk`() =
         runTest {
             val store = CountingStore()
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+            val manager =
+                RealOfflineModelManager(store, ampleStorage, online, backgroundScope) { testScheduler.currentTime }
 
             turbineScope {
                 val screen = manager.modelStates().testIn(backgroundScope)
@@ -148,7 +152,8 @@ class RealOfflineModelManagerSharingTest {
     fun `the capable-tag list is read once, not once per emission`() =
         runTest {
             val store = CountingStore()
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+            val manager =
+                RealOfflineModelManager(store, ampleStorage, online, backgroundScope) { testScheduler.currentTime }
 
             turbineScope {
                 val screen = manager.modelStates().testIn(backgroundScope)
@@ -229,7 +234,8 @@ class RealOfflineModelManagerSharingTest {
     fun `a screen opening later gets a real reading, even while another watches`() =
         runTest {
             val store = CountingStore(initial = setOf("fr"))
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+            val manager =
+                RealOfflineModelManager(store, ampleStorage, online, backgroundScope) { testScheduler.currentTime }
             backgroundScope.launch { manager.modelStates().collect { } } // Home, and it stays
             runCurrent()
             assertThat(store.downloadedTagsCalls).isEqualTo(1)
@@ -258,7 +264,8 @@ class RealOfflineModelManagerSharingTest {
         runTest {
             val store = CountingStore()
             store.failNextWith = kotlinx.coroutines.CancellationException("task cancelled")
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+            val manager =
+                RealOfflineModelManager(store, ampleStorage, online, backgroundScope) { testScheduler.currentTime }
 
             val first = backgroundScope.launch { manager.modelStates().collect { } }
             runCurrent()
@@ -283,7 +290,8 @@ class RealOfflineModelManagerSharingTest {
     fun `a resubscribe after the idle window never replays the old map`() =
         runTest {
             val store = CountingStore(initial = setOf("fr"))
-            val manager = RealOfflineModelManager(store, ampleStorage, backgroundScope) { testScheduler.currentTime }
+            val manager =
+                RealOfflineModelManager(store, ampleStorage, online, backgroundScope) { testScheduler.currentTime }
             val first = backgroundScope.launch { manager.modelStates().collect { } }
             runCurrent()
             first.cancel()
@@ -302,5 +310,8 @@ class RealOfflineModelManagerSharingTest {
 
 private val CAPABLE_TAGS = setOf("en", "es", "fr")
 private val ampleStorage = FakeStorageProbe(free = Long.MAX_VALUE)
+
+/** These suites are about sharing and ownership, never about connectivity. */
+private val online = FakeConnectivityMonitor()
 private const val TEN_MINUTES_MILLIS = 10 * 60 * 1_000L
 private const val SUBSCRIBER_BURST = 5

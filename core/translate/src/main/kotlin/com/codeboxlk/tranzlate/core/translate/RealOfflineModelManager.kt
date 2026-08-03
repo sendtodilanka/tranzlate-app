@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.core.translate
 
+import com.codeboxlk.tranzlate.core.common.ConnectivityMonitor
 import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
@@ -14,6 +15,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -85,6 +88,53 @@ internal class MlKitModelStore
     }
 
 /**
+ * A wait on the store that is guaranteed to end (issues #218, #237).
+ *
+ * **Every** suspending call [RealOfflineModelManager] makes into [ModelStore]
+ * goes through here. All three of them are a Play Services `Task.await()` on the
+ * other side of the seam, and an unbounded one is not a slow path — it is a
+ * coroutine parked forever, which makes every `catch` written below it dead
+ * code. #218 measured that: with the radio off, the transfer is a system
+ * `DownloadManager` job gated on `CONNECTIVITY` and **event-driven, not timed**,
+ * so the Task never settles, the failure handling is never reached, and the row
+ * keeps a `Downloading` it can never leave.
+ *
+ * It bounds the SEAM rather than the ML Kit calls behind it, on purpose. The
+ * store is an interface with more than one implementation, so a bound placed
+ * inside [MlKitModelStore] would hold only for that one and would have to be
+ * remembered again by the next; here it holds for whatever is on the other side.
+ * It also keeps the boundary this file already draws — a thin seam below, pure
+ * coroutine and state logic above — with the timeout on the logic side, where
+ * the tests that drive a fake store can actually reach it.
+ *
+ * **A timeout must NOT surface as a cancellation, and that is why this converts
+ * rather than letting `withTimeout` throw.** `TimeoutCancellationException` IS a
+ * `CancellationException`, and both callers below catch cancellation FIRST and
+ * rethrow it — that catch means "the user pressed Stop", a different fact with a
+ * different owner of the row's state. A bare `withTimeout` would be read as a
+ * Stop: the row would never reach `Failed`, and the bound would look correct in
+ * review while changing nothing at all. Converting to [IOException] lands it in
+ * the failure catch instead, where `toFailure()` already maps it to
+ * [OfflineModelFailure.NETWORK] — the cause that raises sheet 19d.
+ *
+ * What this does not do is stop the platform. Cancelling our wait only stops us
+ * waiting; ML Kit's own work carries on and may still finish later. That is the
+ * contract the rest of this file already lives with — there is no cancel API,
+ * see the class KDoc — and [refreshDownloaded] reads the disk afterwards and
+ * tells the truth about whatever actually landed.
+ */
+private suspend fun <T> bounded(
+    timeoutMillis: Long,
+    what: String,
+    block: suspend () -> T,
+): T =
+    try {
+        withTimeout(timeoutMillis) { block() }
+    } catch (timedOut: TimeoutCancellationException) {
+        throw IOException("ML Kit $what did not settle within $timeoutMillis ms", timedOut)
+    }
+
+/**
  * Offline-model manager impl (spec 02 §3 · §5.2): source of truth =
  * the store's downloaded set; transient Downloading/Deleting/Failed overrides
  * in memory. The VERIFIED MLKit limits are honoured — no progress %, and no
@@ -99,6 +149,7 @@ internal class MlKitModelStore
 class RealOfflineModelManager internal constructor(
     private val store: ModelStore,
     private val storageProbe: StorageProbe,
+    private val connectivity: ConnectivityMonitor,
     scope: CoroutineScope?,
     /**
      * Monotonic milliseconds, for the freshness window below only. Monotonic
@@ -114,7 +165,8 @@ class RealOfflineModelManager internal constructor(
     internal constructor(
         store: MlKitModelStore,
         storageProbe: StorageProbe,
-    ) : this(store as ModelStore, storageProbe, null)
+        connectivity: ConnectivityMonitor,
+    ) : this(store as ModelStore, storageProbe, connectivity, null)
 
     /**
      * Downloads run in the MANAGER's scope (issue #82): the owner's scenario —
@@ -249,13 +301,87 @@ class RealOfflineModelManager internal constructor(
      * there — see [DownloadAttempt] for why that is a property of the channel
      * rather than of this method. The transfer itself still goes to
      * [downloadScope] and still reports through `modelStates()`.
+     *
+     * **BOTH pre-flights answer, and the second one is why #218 asked for this.**
+     * That check shipped naming the conflation as its own KNOWN LIMIT — *"a retry
+     * while still offline writes a value EQUAL to the one already on the row… #234
+     * is filed against this same conflation on the storage path and its fix covers
+     * both"*. It does: the offline refusal returns [DownloadAttempt.Refused] on
+     * exactly the same terms as the storage one, so the second tap of a Retry made
+     * in airplane mode is reported instead of swallowed.
      */
     override suspend fun download(languageTag: String): DownloadAttempt {
         if (!store.isCapable(languageTag)) return DownloadAttempt.Ignored
         if (activeDownloads.containsKey(languageTag)) return DownloadAttempt.Ignored // one in-flight per tag
+        // Issue #218 pre-flight, and the higher-value half of that fix: refuse
+        // BEFORE enqueue when there is no network.
+        //
+        // Measured, twice, on a genuinely offline device: ML Kit hands the
+        // transfer to the system DownloadManager, which schedules a JobScheduler
+        // job gated on CONNECTIVITY. That gate is EVENT-driven, not timed — it
+        // waits for a connectivity broadcast that airplane mode never sends — so
+        // the Task never settles, the catch blocks below are never reached, and
+        // the row sits in Downloading with the ✕ as its only exit. The bounded
+        // wait in [bounded] is the backstop for a connection that exists and
+        // then stalls; THIS is the answer for the case where there was never a
+        // connection at all, and it costs one synchronous read.
+        //
+        // The seam is the one the app already has. `ConnectivityMonitor` is what
+        // the translation waterfall pre-flights its online tiers against and what
+        // `DownloadGate` reads for the #209 metered-consent question; asking it
+        // one layer lower than the gate covers every caller — the gate's
+        // requestDownload, its consented follow-through, and anything later —
+        // instead of adding a second check per screen.
+        //
+        // Before the free-space probe on purpose. An offline device cannot
+        // download whatever its free space is, and of the two refusals this one
+        // is exact while REQUIRED_FREE_BYTES is a 3x headroom estimate that can
+        // refuse a download which would have succeeded. The certain answer goes
+        // first.
+        //
+        // Failed(NETWORK) rather than a bare return, because the state IS the
+        // exit: it turns the row red, names the cause, offers Retry, and is what
+        // `LanguagePickerViewModel.reportFailure` watches for to raise sheet 19d
+        // — a sheet that exists today and, on this path, could never open.
+        //
+        // The KNOWN LIMIT this comment used to carry is CLOSED (#234, merged in
+        // here). It read: a retry while still offline writes a value EQUAL to the
+        // one already on the row, MutableStateFlow conflates equal values, so no
+        // second sheet opens — and it named #234's fix as the thing that would
+        // cover it. That fix is the return value below: the refusal no longer
+        // depends on the state map having changed, so the second, third and tenth
+        // taps report exactly as the first one did.
+        if (!connectivity.isOnline()) {
+            val cause = OfflineModelFailure.NETWORK
+            takeTransient(languageTag, OfflineModelState.Failed(cause))
+            return DownloadAttempt.Refused(cause)
+        }
         // Issue #90 pre-flight: refuse BEFORE enqueue when the disk can't hold
         // a model — a partial download + a generic failure is a dead end.
-        if (storageProbe.freeBytes() < REQUIRED_FREE_BYTES) {
+        //
+        // A probe that cannot ANSWER is not a refusal (issue #238). The prod
+        // implementation is `StatFs(noBackupFilesDir)`, and StatFs throws
+        // IllegalArgumentException when the underlying statvfs fails
+        // (android/os/StatFs.java:53, `throw new IllegalArgumentException("Invalid
+        // path: " + path, e)`). Unguarded, that ran on the caller's coroutine —
+        // outside the try/catch below, which only covers the launched transfer —
+        // and killed the process on a download tap.
+        //
+        // Unknown free space PROCEEDS rather than refuses, matching StorageProbe's
+        // own degrade contract that null means "unknown", never "zero": refusing on
+        // an unknown would strand a user whose disk is perfectly fine, and ML Kit
+        // reports a genuine out-of-space itself through the normal failure path.
+        val freeBytes =
+            try {
+                storageProbe.freeBytes()
+            } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+                throw rethrown // never break structured cancellation
+            } catch (
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") unanswerable: Throwable,
+            ) {
+                Long.MAX_VALUE // unknown, so it cannot be the thing that blocks
+            }
+        if (freeBytes < REQUIRED_FREE_BYTES) {
             val cause = OfflineModelFailure.STORAGE
             takeTransient(languageTag, OfflineModelState.Failed(cause))
             return DownloadAttempt.Refused(cause)
@@ -265,7 +391,9 @@ class RealOfflineModelManager internal constructor(
             downloadScope.launch(start = CoroutineStart.LAZY) {
                 val self = currentCoroutineContext().job
                 try {
-                    store.download(languageTag)
+                    bounded(MODEL_TRANSFER_TIMEOUT_MILLIS, "download of $languageTag") {
+                        store.download(languageTag)
+                    }
                     if (owns(languageTag, self)) {
                         refreshDownloaded()
                         clearTransient(languageTag)
@@ -301,7 +429,9 @@ class RealOfflineModelManager internal constructor(
             downloadScope.launch(start = CoroutineStart.LAZY) {
                 val self = currentCoroutineContext().job
                 try {
-                    store.delete(languageTag)
+                    bounded(MODEL_LOCAL_TIMEOUT_MILLIS, "delete of $languageTag") {
+                        store.delete(languageTag)
+                    }
                 } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                     throw rethrown
                 } catch (
@@ -309,6 +439,16 @@ class RealOfflineModelManager internal constructor(
                 ) {
                     // Deleting something absent (or a cancelled download's partial
                     // state) is success by outcome — the refresh below tells truth.
+                    //
+                    // Since #237 this also catches the bounded wait's timeout, and
+                    // the answer is the same one for the same reason. The row must
+                    // not be left on Deleting, and of the states it could be given
+                    // instead, the truthful one is best: Failed's only control is a
+                    // Retry wired to onDownload, so a failed DELETE would offer the
+                    // user a DOWNLOAD. Falling through to the refresh lands the row
+                    // on Downloaded (🗑 again) or NotDownloaded (⬇) according to what
+                    // is actually on disk — both tappable, which is what EDGE_CASES
+                    // §7 asks of the state an action ENDS on.
                 } finally {
                     // Ownership-checked, exactly like download() (issue #123): a
                     // re-download that started mid-delete revoked this job's claim
@@ -341,10 +481,18 @@ class RealOfflineModelManager internal constructor(
         return last == Long.MIN_VALUE || elapsedMillis() - last >= SHARED_STATE_IDLE_MILLIS
     }
 
+    /**
+     * Bounded since #237 like the other two: this is the call the delete job's
+     * `finally` makes, so an unbounded one here kept `delete()` from returning
+     * even after the delete itself had resolved — a second forever, behind the
+     * first.
+     */
     private suspend fun refreshDownloaded() {
         downloaded.value =
             try {
-                store.downloadedTags()
+                bounded(MODEL_LOCAL_TIMEOUT_MILLIS, "downloaded-models query") {
+                    store.downloadedTags()
+                }
             } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                 throw rethrown
             } catch (
@@ -396,6 +544,64 @@ private const val REQUIRED_FREE_BYTES = 150L * 1024 * 1024
 private const val NANOS_PER_MILLI = 1_000_000L
 
 internal const val SHARED_STATE_IDLE_MILLIS = 5_000L
+
+/**
+ * How long a pack TRANSFER may take before we call it failed (issue #218).
+ *
+ * Derived, not picked. ML Kit reports no progress at all, so "slow" and
+ * "stalled" are indistinguishable to us and this has to be a whole-transfer
+ * budget rather than a stall detector:
+ *
+ *  - the largest pack measured on device is **45.7 MB** (#219 — which also
+ *    records that four user-facing strings state the size and two are wrong, so
+ *    the budget is taken against a rounded-up **50 MB**);
+ *  - the slowest link this is willing to support is **256 kbit/s**, the ITU/OECD
+ *    broadband floor, below every modern mobile bearer;
+ *  - 52,428,800 B / 32,000 B/s = **1638 s ≈ 27.3 min** → 30 minutes.
+ *
+ * Read back the other way it states its own promise: at 30 minutes a 50 MB pack
+ * needs 29.1 kB/s = **233 kbit/s**, so anything at or above that finishes rather
+ * than being cut off.
+ *
+ * Deliberately generous, because this is the BACKSTOP and not the user
+ * experience. The connectivity pre-flight in [RealOfflineModelManager.download]
+ * answers #218's actual scenario in microseconds; this only catches what the
+ * platform's CONNECTIVITY constraint cannot — a connection that exists and then
+ * stalls. The asymmetry decides the rounding: cutting off a real download throws
+ * away work the user waited for, while waiting too long costs a spinner that
+ * always has a ✕ on it.
+ */
+internal const val MODEL_TRANSFER_TIMEOUT_MILLIS = 1_800_000L
+
+/**
+ * How long a LOCAL model operation may take — the downloaded-models query and
+ * the delete (issue #237).
+ *
+ * Separate from [MODEL_TRANSFER_TIMEOUT_MILLIS] because one number is provably
+ * wrong for one of the two. A transfer-sized budget here would leave #237's
+ * exitless `Deleting` spinner pinned for half an hour, which is not a fix; a
+ * local-sized budget on the transfer would kill every genuine slow download.
+ *
+ * Neither of these calls does network work, but neither is free: each is an IPC
+ * round-trip into Play Services, which can be cold-starting or mid-update.
+ *
+ * Measured on device rather than guessed, and the measurement's own limit is
+ * stated with it: a real delete finished inside a SINGLE observation window in
+ * every run — with the radio off, and with Play Services force-stopped
+ * immediately beforehand. The observation method is a `uiautomator` dump whose
+ * round-trip floor is 2.03 s (five samples: 2.07/2.04/2.06/2.07/2.03), so what
+ * this establishes is an upper bound of **~2.1 s**, not a finer figure. Thirty
+ * seconds is roughly fourteen times that bound.
+ *
+ * That is long enough that a busy or cold-starting device is never cut off, and
+ * short enough that a spinner with no control on it stays a spinner rather than
+ * becoming a dead end. For scale, the app already bounds a Play-Services-family
+ * Task at 8 s where a UI tap is waiting on it
+ * (`RemoteConfigDefaults.FIRST_FETCH_TIMEOUT_MS`); nothing waits on these two,
+ * so they can afford to be kinder. The full runs are in
+ * `docs/research/issue-237-delete-hang.md`.
+ */
+internal const val MODEL_LOCAL_TIMEOUT_MILLIS = 30_000L
 
 private fun Exception.toFailure(): OfflineModelFailure =
     when (this) {

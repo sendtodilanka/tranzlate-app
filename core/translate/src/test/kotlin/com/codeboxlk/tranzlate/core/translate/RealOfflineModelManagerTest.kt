@@ -2,6 +2,7 @@ package com.codeboxlk.tranzlate.core.translate
 
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeStorageProbe
 import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
@@ -50,7 +51,7 @@ class RealOfflineModelManagerTest {
         runTest {
             val store = FakeStore()
             val probe = FakeStorageProbe(free = 10L * 1024 * 1024) // 10MB < the 150MB budget
-            val manager = RealOfflineModelManager(store, probe, backgroundScope)
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -65,7 +66,7 @@ class RealOfflineModelManagerTest {
         runTest {
             val store = FakeStore()
             val probe = FakeStorageProbe(free = 0L)
-            val manager = RealOfflineModelManager(store, probe, backgroundScope)
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -78,11 +79,75 @@ class RealOfflineModelManagerTest {
             assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
         }
 
+    // ---- issue #238: the pre-flight probe had no error handling -------------
+
+    /**
+     * The prod probe is `StatFs(context.noBackupFilesDir.absolutePath)`, and
+     * `StatFs` throws `IllegalArgumentException` when the underlying `statvfs`
+     * fails — `android/os/StatFs.java:53`. This call runs on the CALLER's
+     * coroutine, outside the try/catch that wraps the launched transfer, so the
+     * throw went straight to `Thread.defaultUncaughtExceptionHandler` on a
+     * download tap.
+     *
+     * A probe that cannot ANSWER is not a refusal. Refusing on an unknown would
+     * strand a user whose disk is perfectly fine, and `StorageProbe`'s own
+     * contract already says a missing answer means "unknown", never "zero" —
+     * ML Kit reports a genuine out-of-space through the normal failure path.
+     */
+    @Test
+    fun `an unanswerable free-space probe lets the download proceed`() =
+        runTest {
+            val store = FakeStore()
+            val probe = FakeStorageProbe(free = Long.MAX_VALUE)
+            probe.freeFailure = IllegalArgumentException("Invalid path: /data/user/0/…/no_backup")
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
+        }
+
+    /** The same, for the class a narrow catch would have let past (issue #236's shape). */
+    @Test
+    fun `a free-space probe that fails as an Error lets the download proceed`() =
+        runTest {
+            val store = FakeStore()
+            val probe = FakeStorageProbe(free = Long.MAX_VALUE)
+            probe.freeFailure = UnsatisfiedLinkError("nativeStatvfs")
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
+        }
+
+    /**
+     * A REAL low-disk answer must still refuse. Without this, "proceed when the
+     * probe throws" could be implemented by never consulting the probe at all and
+     * every test above would still pass.
+     */
+    @Test
+    fun `the proceed-on-unknown rule does not disarm a real low-disk refusal`() =
+        runTest {
+            val store = FakeStore()
+            val probe = FakeStorageProbe(free = 10L * 1024 * 1024) // 10MB < the 150MB budget
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.stateOf("fr"))
+                .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.STORAGE))
+            assertThat(store.committed).isEmpty()
+        }
+
     @Test
     fun `stop mid-download cancels the manager's job and the row never ghosts back`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
 
             manager.download("fr") // launches internally, returns at once
             runCurrent()
@@ -100,7 +165,7 @@ class RealOfflineModelManagerTest {
     fun `a caller's death never touches the download - the manager owns it`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
 
             // The "screen" launches and immediately dies (nav pop).
             val screenScope = launch { manager.download("fr") }
@@ -130,7 +195,7 @@ class RealOfflineModelManagerTest {
 
                     override fun capableTags(): Set<String> = setOf("fr")
                 }
-            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
 
             val screen = launch { manager.delete("fr") }
             runCurrent()
@@ -164,7 +229,7 @@ class RealOfflineModelManagerTest {
                         base.delete(tag)
                     }
                 }
-            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
 
             // The user deletes the model; the platform delete is slow.
             val screen = launch { manager.delete("fr") }
@@ -193,7 +258,7 @@ class RealOfflineModelManagerTest {
     fun `a second download tap while one is in flight is a no-op`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -210,7 +275,7 @@ class RealOfflineModelManagerTest {
     fun `a completed download publishes Downloaded through its own ownership`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -229,7 +294,7 @@ class RealOfflineModelManagerTest {
 
                     override fun capableTags(): Set<String> = setOf("fr")
                 }
-            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
 
             manager.download("fr")
             runCurrent()
@@ -256,7 +321,7 @@ class RealOfflineModelManagerTest {
         runTest {
             val store = FakeStore()
             val probe = FakeStorageProbe(free = 10L * 1024 * 1024) // 10MB < the 150MB budget
-            val manager = RealOfflineModelManager(store, probe, backgroundScope)
+            val manager = RealOfflineModelManager(store, probe, online, backgroundScope)
 
             val first = manager.download("fr")
             runCurrent()
@@ -278,7 +343,7 @@ class RealOfflineModelManagerTest {
     fun `a second tap on a downloading pack answers Ignored`() =
         runTest {
             val store = FakeStore()
-            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
 
             val first = manager.download("fr")
             runCurrent()
@@ -289,6 +354,39 @@ class RealOfflineModelManagerTest {
             assertThat(second).isEqualTo(DownloadAttempt.Ignored)
         }
 
+    /**
+     * **The limit #218 shipped carrying, collected here.** That PR's offline
+     * pre-flight wrote `Failed(NETWORK)` before enqueue and its own KDoc named the
+     * cost: a retry made while still offline writes an EQUAL value, the conflating
+     * flow does not emit, and no second sheet opens — *"#234 is filed against this
+     * same conflation on the storage path and its fix covers both."*
+     *
+     * It does, and this is the assertion that says so. `stateOf` reads
+     * `Failed(NETWORK)` on both attempts either way, so only the answer can tell
+     * a first refusal from a repeated one.
+     */
+    @Test
+    fun `a download refused for being offline answers Refused on every attempt`() =
+        runTest {
+            val store = FakeStore()
+            val manager =
+                RealOfflineModelManager(
+                    store,
+                    plentyFree,
+                    FakeConnectivityMonitor(initiallyOnline = false),
+                    backgroundScope,
+                )
+
+            val first = manager.download("fr")
+            runCurrent()
+            val retry = manager.download("fr") // the Retry pill, radio still off
+            runCurrent()
+
+            assertThat(first).isEqualTo(DownloadAttempt.Refused(OfflineModelFailure.NETWORK))
+            assertThat(retry).isEqualTo(DownloadAttempt.Refused(OfflineModelFailure.NETWORK))
+            assertThat(store.committed).isEmpty() // nothing was ever enqueued
+        }
+
     /** A tag ML Kit cannot hold offline was never a download to begin with. */
     @Test
     fun `a tag the store cannot hold answers Ignored`() =
@@ -297,13 +395,16 @@ class RealOfflineModelManagerTest {
                 object : ModelStore by FakeStore() {
                     override fun isCapable(tag: String): Boolean = false
                 }
-            val manager = RealOfflineModelManager(store, plentyFree, backgroundScope)
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
 
             assertThat(manager.download("zz")).isEqualTo(DownloadAttempt.Ignored)
         }
 }
 
 private val plentyFree = FakeStorageProbe(free = Long.MAX_VALUE)
+
+/** The default is online: every pre-existing case here predates the #218 gate. */
+private val online = FakeConnectivityMonitor()
 
 /**
  * The manager's states are HOT since issue #130 rev.3 (U-13): a subscriber is

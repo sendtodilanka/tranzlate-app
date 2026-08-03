@@ -278,6 +278,31 @@ class LanguagePickerViewModelTest {
             assertThat(repository.lastUsed).isEmpty() // the stamp really did fail
         }
 
+    /**
+     * The same claim against the failure class the guard was actually widened for
+     * (issue #236). The test above throws `IllegalStateException`, which the old
+     * `catch (Exception)` already covered, so it stayed green while the crash it
+     * describes was still live: `setLastUsed` ends in a Room write, Room's
+     * statements end in `native` methods, and `UnsatisfiedLinkError` is a
+     * `LinkageError` — an `Error`, not an `Exception`
+     * (`TextViewModel.kt:768-779`, #195).
+     *
+     * What the user saw: tap a language row, the picker pops, and the app dies a
+     * moment later — AFTER the selection had been written, so nothing in the
+     * stored state showed anything wrong.
+     */
+    @Test
+    fun `a recents stamp that fails to link costs the date, never the choice`() =
+        runTest(dispatcher) {
+            repository.failWith = UnsatisfiedLinkError("nativeExecute")
+
+            viewModel().select("de", LanguageRole.TARGET)
+            advanceUntilIdle()
+
+            assertThat(translatePrefs.targetLang.first()).isEqualTo("de")
+            assertThat(repository.lastUsed).isEmpty() // the stamp really did fail
+        }
+
     @Test
     fun `selection serves each role its own choice`() =
         runTest(dispatcher) {

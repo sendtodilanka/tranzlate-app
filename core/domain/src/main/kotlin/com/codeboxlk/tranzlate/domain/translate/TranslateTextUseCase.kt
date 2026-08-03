@@ -92,7 +92,12 @@ class TranslateTextUseCase
                     } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                         throw rethrown // never break structured cancellation
                     } catch (
-                        @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Exception,
+                        // Throwable, not Exception (#236): Room's statements end in
+                        // native methods, so the JNI failure class this guard exists
+                        // for is an Error and a narrow catch hands it to the process
+                        // handler — see TextViewModel.kt:768-779 (#195). This one runs
+                        // on EVERY translation with a resolved pair.
+                        @Suppress("TooGenericExceptionCaught", "SwallowedException") ignored: Throwable,
                     ) {
                         null // best-effort: a broken cache must never block a translation
                     }
@@ -222,6 +227,13 @@ class TranslateTextUseCase
             }
         }
 
+        /**
+         * `Throwable`, not `Exception` (issue #236). This runs on [externalScope] —
+         * the application scope — and ends in a Room write, whose statements end in
+         * `native` methods; `UnsatisfiedLinkError` is a `LinkageError`, so an
+         * `Error`, so a narrow catch lets exactly the guarded class past. Full
+         * reasoning and citations: `TextViewModel.kt:768-779` (#195).
+         */
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
         private suspend fun stampSafely(
             languageId: String,
@@ -232,7 +244,7 @@ class TranslateTextUseCase
                 languageUsageRepository.stampUse(languageId, role, atMillis)
             } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                 throw rethrown // never break structured cancellation
-            } catch (ignored: Exception) {
+            } catch (ignored: Throwable) {
                 // Best-effort: Manage packs misses one stamp; nothing else may notice.
             }
         }
@@ -268,10 +280,14 @@ class TranslateTextUseCase
                 }
             } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                 throw rethrown // never break structured cancellation
-            } catch (ignored: Exception) {
+            } catch (ignored: Throwable) {
                 // Best-effort history: a failed write must never fail the
                 // translation the user is reading (EDGE_CASES no-dead-end —
                 // the Success outcome still surfaces; Recents just misses one row).
+                //
+                // Throwable, not Exception (#236): two Room calls, both ending in
+                // native methods, on the path that runs for EVERY successful
+                // translation. TextViewModel.kt:768-779 (#195) carries the citations.
             }
         }
     }

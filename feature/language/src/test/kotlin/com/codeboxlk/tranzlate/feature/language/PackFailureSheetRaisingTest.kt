@@ -461,6 +461,36 @@ class PackFailureSheetRaisingTest {
     }
 
     /**
+     * Tap ⬇, let the attempt past the gate, and leave its raise parked in the 19b
+     * disk read — released later by advancing [read].
+     *
+     * **Two `io` hops, not one,** since #247 put the gate call itself on `io` (its
+     * connectivity and free-space pre-flights are syscalls): first
+     * `requestDownload`, then `packFailureRequest`. Swapping the dispatcher
+     * between them is sound rather than a trick — `withContext` reads
+     * `dispatchers.io` at the moment it runs, and after the gate hop completes the
+     * continuation is queued on MAIN and has not read the property again. Nothing
+     * observes the swap until this function's last `advanceUntilIdle`.
+     *
+     * A 19d (`Interrupted`) raise never reaches the second hop, so [read] is
+     * simply unused on that path.
+     */
+    private fun TestScope.tapAndPark(
+        subject: LanguagePickerViewModel,
+        dispatchers: SplitDispatchers,
+        id: String,
+        read: TestDispatcher,
+    ) {
+        val gate = StandardTestDispatcher(TestCoroutineScheduler())
+        dispatchers.ioDispatcher = gate
+        subject.download(id)
+        advanceUntilIdle()
+        gate.scheduler.advanceUntilIdle()
+        dispatchers.ioDispatcher = read
+        advanceUntilIdle()
+    }
+
+    /**
      * **The co-verify BLOCK on PR #246, reproduced and then closed.**
      *
      * `raise` used to read the disk and *then* ask whether the slot was free,
@@ -483,10 +513,11 @@ class PackFailureSheetRaisingTest {
     @Test
     fun `a failure refused while a sheet is open never lands behind it`() =
         runTest(dispatcher) {
-            val io = StandardTestDispatcher(TestCoroutineScheduler())
+            val taRead = StandardTestDispatcher(TestCoroutineScheduler())
+            val dispatchers = SplitDispatchers(dispatcher, taRead)
             manager.put("hi", OfflineModelState.NotDownloaded)
             manager.put("ta", OfflineModelState.NotDownloaded)
-            val subject = viewModel(dispatchers = SplitDispatchers(dispatcher, io))
+            val subject = viewModel(dispatchers = dispatchers)
             backgroundScope.launch { subject.offlineStates.collect { } }
             advanceUntilIdle()
 
@@ -495,8 +526,7 @@ class PackFailureSheetRaisingTest {
                 manager.put(tag, OfflineModelState.Downloading)
                 DownloadAttempt.Started
             }
-            subject.download("hi")
-            advanceUntilIdle()
+            tapAndPark(subject, dispatchers, "hi", taRead)
             manager.put("hi", OfflineModelState.Failed(OfflineModelFailure.NETWORK))
             advanceUntilIdle()
             assertThat(subject.packFailure.value)
@@ -508,15 +538,14 @@ class PackFailureSheetRaisingTest {
                 manager.put(tag, OfflineModelState.Failed(OfflineModelFailure.STORAGE))
                 DownloadAttempt.Refused(OfflineModelFailure.STORAGE)
             }
-            subject.download("ta")
-            advanceUntilIdle()
+            tapAndPark(subject, dispatchers, "ta", taRead)
             assertThat(subject.packFailure.value)
                 .isEqualTo(PackFailureRequest.Interrupted("hi", OfflineModelFailure.NETWORK))
 
             // The user answers Hindi's sheet while Tamil's read is still parked.
             subject.dismissPackFailure()
             advanceUntilIdle()
-            io.scheduler.advanceUntilIdle() // Tamil's read completes now
+            taRead.scheduler.advanceUntilIdle() // Tamil's read completes now
             advanceUntilIdle()
 
             assertThat(subject.packFailure.value).isNull()
@@ -553,11 +582,8 @@ class PackFailureSheetRaisingTest {
             // Both conclude with the slot free, so both are entitled to it — and
             // both park in a disk read, on a scheduler each, so the test decides
             // which one comes back first and when.
-            subject.download("hi")
-            advanceUntilIdle()
-            dispatchers.ioDispatcher = second
-            subject.download("ta")
-            advanceUntilIdle()
+            tapAndPark(subject, dispatchers, "hi", first)
+            tapAndPark(subject, dispatchers, "ta", second)
             assertThat(subject.packFailure.value).isNull()
 
             // Hindi's read lands first and takes the slot.
@@ -608,11 +634,8 @@ class PackFailureSheetRaisingTest {
             backgroundScope.launch { subject.offlineStates.collect { } }
             advanceUntilIdle()
 
-            subject.download("hi")
-            advanceUntilIdle()
-            dispatchers.ioDispatcher = second
-            subject.download("ta")
-            advanceUntilIdle()
+            tapAndPark(subject, dispatchers, "hi", first)
+            tapAndPark(subject, dispatchers, "ta", second)
 
             // Hindi's read lands first, at 12 MB, and takes the slot.
             first.scheduler.advanceUntilIdle()

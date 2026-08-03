@@ -1,14 +1,17 @@
 package com.codeboxlk.tranzlate.core.testing
 
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -57,6 +60,84 @@ class DownloadGateTest {
 
             assertThat(manager.downloads).isEmpty()
             assertThat(gate.pendingConsent.value).isEqualTo("de")
+        }
+
+    // ---- issue #238: the decision had no error handling at all --------------
+
+    /**
+     * `isMetered()` is a synchronous binder call into `ConnectivityManager` in
+     * production, and a binder call can fail. Unguarded it rode the caller's bare
+     * `viewModelScope.launch` to `Thread.defaultUncaughtExceptionHandler` — the
+     * app vanishing on a download tap.
+     *
+     * It ASKS rather than assuming. Issue #90's ruling is that a metered download
+     * is a consent question; when the answer cannot be established, spending the
+     * user's mobile data silently is the failure that costs them money, and asking
+     * costs them one tap. The sheet carries "Download once" and "Wait for Wi-Fi",
+     * so the row is not stranded either way.
+     */
+    @Test
+    fun `an unanswerable metered check asks rather than spending the data plan`() =
+        runTest {
+            connectivity.meteredFailure = IllegalStateException("binder died")
+            prefs.state.value = false
+
+            gate.requestDownload("de")
+
+            assertThat(manager.downloads).isEmpty()
+            assertThat(gate.pendingConsent.value).isEqualTo("de")
+        }
+
+    /**
+     * The standing-permission read is the other half of the same decision, and it
+     * is a DataStore read. A granted permission that cannot be READ must not be
+     * treated as granted — the gate asks, exactly as when the link is unknown.
+     */
+    @Test
+    fun `an unreadable standing permission asks rather than assuming consent`() =
+        runTest {
+            val unreadable =
+                object : DownloadPrefsRepository {
+                    override val allowMobileData: Flow<Boolean> = flow { throw IllegalStateException("store gone") }
+
+                    override suspend fun setAllowMobileData(value: Boolean) = Unit
+                }
+            val guarded = DownloadGate(connectivity, unreadable, manager, InMemoryConsentQuestionStore())
+
+            guarded.requestDownload("de")
+
+            assertThat(manager.downloads).isEmpty()
+            assertThat(guarded.pendingConsent.value).isEqualTo("de")
+        }
+
+    /**
+     * The guard may not swallow an `Error` INTO a silent success either: an
+     * unanswerable decision still has to land somewhere the user can act.
+     */
+    @Test
+    fun `a decision that fails as an Error still raises the question`() =
+        runTest {
+            connectivity.meteredFailure = UnsatisfiedLinkError("nativeGetActiveNetwork")
+            prefs.state.value = false
+
+            gate.requestDownload("de")
+
+            assertThat(manager.downloads).isEmpty()
+            assertThat(gate.pendingConsent.value).isEqualTo("de")
+        }
+
+    /**
+     * Cancellation is NOT an unanswerable decision — it must propagate, or the
+     * gate breaks structured concurrency. `CancellationException` is an
+     * `Exception`, so the widened catch would have eaten it without the by-name
+     * rethrow above it (#197 was bitten exactly here).
+     */
+    @Test(expected = CancellationException::class)
+    fun `a cancelled decision propagates instead of raising a question`() =
+        runTest {
+            connectivity.meteredFailure = CancellationException("screen left")
+
+            gate.requestDownload("de")
         }
 
     // ---- metered, standing permission ----------------------------------------

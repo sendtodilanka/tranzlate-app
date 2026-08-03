@@ -15,6 +15,19 @@ import kotlinx.coroutines.flow.map
 class FakeLanguageUsageRepository(
     var failStamps: Boolean = false,
 ) : LanguageUsageRepository {
+    /**
+     * The failure to throw from [stampUse], or null. A `Throwable`, not an
+     * `Exception`, and that is the whole reason it exists (issue #236).
+     *
+     * [failStamps] can only ever produce the `IllegalStateException` that `check`
+     * throws, so every test written through it passes under a `catch (Exception)`
+     * as happily as under a `catch (Throwable)` — **the fixture could not express
+     * the failure class the guard was widened for.** Room's statements end in
+     * `native` methods and a JNI link failure raises `UnsatisfiedLinkError`, a
+     * `LinkageError`, so an `Error`: reachable only through a hook typed this wide.
+     */
+    var failWith: Throwable? = null
+
     data class Stamp(
         val languageId: String,
         val role: LanguageRole,
@@ -31,6 +44,7 @@ class FakeLanguageUsageRepository(
         role: LanguageRole,
         atMillis: Long,
     ) {
+        failWith?.let { throw it }
         check(!failStamps) { "stamp write failed (test-forced)" }
         state.value = state.value + Stamp(languageId, role, atMillis)
     }

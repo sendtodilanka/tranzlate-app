@@ -68,6 +68,16 @@ class FakeTranslationRepository(
      */
     var beforeSavedCount: (suspend () -> Unit)? = null
 
+    /**
+     * @see beforeDelete — the C-8 cache read that opens EVERY translation with a
+     *   resolved pair (`TranslateTextUseCase.invoke`).
+     *
+     * It had no hook at all until issue #236, which is why the guard around that
+     * read had no test on either side: the one call the use case makes before
+     * anything else was the one call this fake could not fail.
+     */
+    var beforeCachedAny: (suspend () -> Unit)? = null
+
     val saved: List<Translation> get() = store.value
 
     /**
@@ -113,6 +123,7 @@ class FakeTranslationRepository(
         sourceLang: String,
         targetLang: String,
     ): Translation? {
+        beforeCachedAny?.invoke()
         val normalized = normalize(sourceText)
         return store.value
             .filter { it.sourceText == normalized && it.sourceLang == sourceLang && it.targetLang == targetLang }

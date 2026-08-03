@@ -635,6 +635,78 @@ class TranslateTextUseCaseTest {
             assertThat(languageUsage.stamps).isEmpty()
         }
 
+    // ---- issue #236: the three guards on this path caught Exception, and the
+    // failure class they exist for is an Error ------------------------------
+    //
+    // Every failure test above throws an `Exception` (`failWrites` and
+    // `failStamps` both end in `check`, i.e. IllegalStateException), so all of
+    // them passed just as happily under the old narrow catch. Room runs every
+    // statement through a `native` method on SQLiteConnection and a JNI link
+    // that cannot be satisfied raises UnsatisfiedLinkError — a LinkageError, so
+    // an Error, so NOT an Exception (TextViewModel.kt:768-779, #195). These three
+    // are the same three assertions against that class instead.
+
+    /** The C-8 cache read opens every translation with a resolved pair. */
+    @Test
+    fun `a cache read that fails to link never blocks the translation`() =
+        runTest {
+            val repository = FakeTranslationRepository()
+            repository.beforeCachedAny = { throw UnsatisfiedLinkError("nativePrepareStatement") }
+            val ads = RecordingAdsCoordinator()
+
+            val outcome =
+                useCase(ads = ads, repository = repository)
+                    .invoke("Good morning", "en", "fr", ModeId.ML2_MINI)
+
+            assertThat(outcome).isEqualTo(
+                TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
+            )
+            assertThat(ads.completedCount).isEqualTo(1) // the flow continued past the dead cache
+        }
+
+    /** The history write, on the same translation the user is already reading. */
+    @Test
+    fun `a history write that fails to link never fails the translation`() =
+        runTest {
+            val repository = FakeTranslationRepository()
+            repository.beforeCached = { throw UnsatisfiedLinkError("nativeExecute") }
+            val ads = RecordingAdsCoordinator()
+
+            val outcome =
+                useCase(ads = ads, repository = repository)
+                    .invoke("Good morning", "en", "fr", ModeId.ML2_MINI)
+
+            assertThat(outcome).isEqualTo(
+                TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
+            )
+            assertThat(ads.completedCount).isEqualTo(1)
+            assertThat(repository.saved).isEmpty() // the write really did fail
+        }
+
+    /**
+     * The stamp, which is the one that runs on the APPLICATION scope. Nothing is
+     * left to catch it out there, so an escape here is a process death rather
+     * than a failed test — `advanceUntilIdle` is where it would land.
+     */
+    @Test
+    fun `a stamp that fails to link never fails the translation`() =
+        runTest {
+            val languageUsage = FakeLanguageUsageRepository()
+            languageUsage.failWith = UnsatisfiedLinkError("nativeExecute")
+            val ads = RecordingAdsCoordinator()
+
+            val outcome =
+                useCase(ads = ads, languageUsage = languageUsage)
+                    .invoke("Good morning", "en", "fr", ModeId.ML2_MINI)
+            advanceUntilIdle() // the launched stamp fails HERE, after the outcome returned
+
+            assertThat(outcome).isEqualTo(
+                TranslationOutcome.Success("Bonjour (fake)", Engine.OFFLINE_MLKIT),
+            )
+            assertThat(ads.completedCount).isEqualTo(1)
+            assertThat(languageUsage.stamps).isEmpty() // the stamp really did fail
+        }
+
     /** The outcome must not WAIT on the stamp: it returns before the app scope ever runs. */
     @Test
     fun `the stamp is off the critical path - success returns before the stamp lands`() =

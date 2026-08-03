@@ -104,7 +104,33 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
 - 👁 **#195** — **PR #197** — the composer crashed the moment a translation
   landed, not when the star was tapped: enumerating the star rather than the
   issue's line range found a **fourth** unguarded write, on the read path that
-  runs for every result. Sibling of #190/#194.- 👁 **#186** — **PR #199** — there was no Compose unit-test runtime anywhere, so
+  runs for every result. Sibling of #190/#194.- 👁 **#236** + **#238** — **PR #249** — the sibling of #190/#194 and #195/#197, and
+  the half of them that never landed. A co-verify lens had ruled
+  `OfflineLanguagesViewModel.savedCountOf`'s `catch (Exception)` *"the prevailing
+  pattern"*; counting instead of inheriting showed it is **the set of sites nobody
+  revisited** — all four `Throwable` sites were written as fixes for this exact
+  crash class and landed in #197 *before* the language feature's were written.
+  Ruled **WIDEN**, and argued rather than assumed: the premise re-verified here
+  (`UnsatisfiedLinkError → LinkageError → Error`, so `Exception` provably misses
+  it), narrowing has no advocate since every site already carries a written
+  degrade, and the costs are asymmetric — an unnecessary widening is byte-identical
+  at runtime, a wrong narrowing is process death on the star tap, on every
+  translation and on every language selection. **#236's own table was incomplete**:
+  47 catch sites in main source, not 9, and 7 on the concept rather than 5
+  (`UsageDataSource.readUsage` and `RealUsagePolicy.persist` were missing, and their
+  KDoc says plainly that #195's JNI citation does *not* apply to them — DataStore is
+  not Room). #238's three doors turned out to be three *different* fixes, and only
+  one about catch width: `StatFs` throws `IllegalArgumentException`, an `Exception`,
+  so `DownloadGate`'s problem was no catch **of any width**. Plus the backstop three
+  files had been writing KDoc about instead of installing — `@ApplicationScope` now
+  carries a `CoroutineExceptionHandler`, because `SupervisorJob` alone stops sibling
+  cancellation and still lets a child kill the process. **The mutation harness
+  produced a FALSE red before it produced a true one** — `:core:testing` has no
+  `testDebugUnitTest` task, so "BUILD FAILED" meant task-not-found, and a harness
+  that cannot tell that from a failing test reports every mutation as caught: the
+  same presence-for-behaviour substitution rule 12 records against `device-claim.sh`.
+  13 mutations, all RED by name after it was hardened.
+- 👁 **#186** — **PR #199** — there was no Compose unit-test runtime anywhere, so
   a decision inside a `@Composable` was a decision no test could reach. Three of
   2026-08-02's five blocking co-verify findings were device-only because of it.
   Robolectric + `createComposeRule` via `tranzlate.compose-test`; the acceptance
@@ -135,6 +161,35 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   --source=<X> <path>` (still writes the worktree), `git -C <dir> checkout --`.
   Filed **#222**. On re-attack the lens found the same error one clause over,
   in the sentence I had just fixed. **Residuals: #222, #223.**
+- 👁 **#218 + #237** — **PR #247** — every `Task.await()` this app makes into ML
+  Kit's model store was **unbounded**, which is not a slow path but a coroutine
+  parked forever — so the `catch` blocks under all three were dead code.
+  Reproduced before the fix: **975 s** in `Downloading…` with the radio off,
+  unchanged. The mechanism is a system `DownloadManager` `JobScheduler` job on
+  our uid gated on `CONNECTIVITY`, and **the decisive evidence is the release,
+  not the hang** — 24 s after airplane mode went off, the pack was on disk. It
+  was never slow; it was gated, and event-driven gates do not time out. Two
+  things ship and the pre-flight is the one that matters:
+  `ConnectivityMonitor.isOnline()` — the seam #209/PR-17 already uses — asked
+  one layer BELOW `DownloadGate` so every caller is covered, landing
+  `Failed(NETWORK)`, which **makes sheet 19d reachable on the path that most
+  needed it** (verified on device: *"Afrikaans did not download"*). Then a
+  bounded wait as the backstop for the case the constraint cannot catch. **Two
+  constants, not one**, because one number is provably wrong for one of them —
+  30 min for a transfer (50 MB at the 256 kbit/s ITU floor), 30 s for a local
+  call (~14× its measured bound). The trap it nearly walked into:
+  `TimeoutCancellationException` **is** a `CancellationException`, and both
+  callers rethrow those as "the user pressed Stop", so a bare `withTimeout`
+  would have looked correct and changed nothing — MUT-4 of 8, all killed.
+  **#237's hang is NOT reproduced and the PR does not claim it is**: two
+  disconfirming experiments (radio off; Play Services force-stopped) both came
+  back normal, recorded in `docs/research/issue-237-delete-hang.md`. That half
+  rests on what is readable off the source — nothing bounds the call, and
+  `Deleting` has no exit. **Known limit carried, not hidden:** a retry while
+  still offline writes an equal value and `MutableStateFlow` conflates it, so no
+  second sheet — that is **#234**, on its own branch. Also found: 19a asks
+  *"Download over mobile data?"* with **no radio at all**, because
+  `isActiveNetworkMetered()` best-guesses `true` with no active network.
 - 👁 **#234 · #235 · #239** — **PR #246** — three defects on the pack-failure path,
   landed together because the middle one is what makes the other two a single fix.
   **#234:** a conflating value channel cannot say *"the same thing happened again"* —
@@ -163,9 +218,14 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   the tests. **The fix's own first draft carried a third check no mutation could
   kill**, and deleting it was the mutation run's finding, not a lens's. Sixteen
   mutations across two rounds; the one that killed nothing is why the code is
-  shorter. **Residual: Screen B's Retry is dead the same way and is deliberately not
-  fixed** — 19b's one action is *Manage packs* and that screen IS Manage packs;
-  ruling 8 already settled it and named PR-23.
+  shorter. **It also closes the limit #247 above carried on its own offline
+  refusal** — that check landed writing `Failed(NETWORK)` before enqueue and said
+  in its own KDoc that a retry made while still offline would be conflated away
+  and that #234's fix covered it. Merging main in is where that was collected: the
+  offline pre-flight now answers `Refused(NETWORK)` on the same terms as the
+  storage one. **Residual: Screen B's Retry is dead the same way and is
+  deliberately not fixed** — 19b's one action is *Manage packs* and that screen IS
+  Manage packs; ruling 8 already settled it and named PR-23.
 - ✅ **#178** (PR #182, merged) `guard-pr.sh` failed CLOSED on any body it could not read from the
   command text — `--body-file`, `$(cat f)`, `$VAR` — contradicting its own
   fail-open contract and denying compliant PRs. **PR #182**, ten mutations.

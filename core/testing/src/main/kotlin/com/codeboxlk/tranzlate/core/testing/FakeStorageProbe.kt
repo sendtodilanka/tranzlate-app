@@ -16,7 +16,22 @@ class FakeStorageProbe(
     var total: Long = 64L * GIB,
     var packs: Long? = null,
 ) : StorageProbe {
-    override fun freeBytes(): Long = free
+    /**
+     * The failure to throw from [freeBytes], or null (issue #238).
+     *
+     * The prod probe is `StatFs(context.noBackupFilesDir.absolutePath)`, and
+     * `StatFs` throws `IllegalArgumentException` when the underlying `statvfs`
+     * fails — `android/os/StatFs.java:53`,
+     * `throw new IllegalArgumentException("Invalid path: " + path, e)`. A fake
+     * that can only ever return a number cannot express the pre-flight's real
+     * failure mode, which is why the download tap had no test covering it.
+     */
+    var freeFailure: Throwable? = null
+
+    override fun freeBytes(): Long {
+        freeFailure?.let { throw it }
+        return free
+    }
 
     override fun totalBytes(): Long = total
 
