@@ -15,6 +15,9 @@ plugins {
     alias(libs.plugins.spotless)
     // Whole-repo C-3 gate: a shipped string key with no STRINGS_*.md row fails the build.
     id("tranzlate.string-key-docs")
+    // `./gradlew preflight` — the one gate name (#253). The list of what it runs lives
+    // in PreflightConventionPlugin, not in prose every brief has to copy correctly.
+    id("tranzlate.preflight")
 }
 
 // ---- Quality gates (whole-repo, single home) ----------------------------------------------------

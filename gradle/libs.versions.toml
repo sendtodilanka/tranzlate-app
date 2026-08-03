@@ -116,6 +116,10 @@ javax-inject = { group = "javax.inject", name = "javax.inject", version.ref = "j
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+# MigrationTestHelper — runs a real migration against the committed exported schemas.
+# Added by #231 because #241 needs a PERMANENT migration test and the #191 research
+# probe used a raw coordinate, which is fine for a throwaway and not for a shipped one.
+androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 
 # DataStore / WorkManager
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
@@ -151,9 +155,9 @@ truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 konsist = { group = "com.lemonappdev", name = "konsist", version.ref = "konsist" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
-# Consumed ONLY through the `tranzlate.compose-test` convention plugin (#186) —
-# a module opts into the Compose unit-test runtime with one line and never
-# copies a dependency block.
+# Consumed ONLY through the `tranzlate.robolectric` convention plugin (#186, split
+# out of `tranzlate.compose-test` by #231) — a module opts into the JVM Android
+# unit-test runtime with one line and never copies a dependency block.
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 robolectric-android-all = { group = "org.robolectric", name = "android-all-instrumented", version.ref = "robolectricAndroidAll" }
 
@@ -194,4 +198,6 @@ tranzlate-android-feature = { id = "tranzlate.android.feature" }
 tranzlate-android-room = { id = "tranzlate.android.room" }
 tranzlate-jvm-library = { id = "tranzlate.jvm.library" }
 tranzlate-hilt = { id = "tranzlate.hilt" }
+tranzlate-robolectric = { id = "tranzlate.robolectric" }
 tranzlate-compose-test = { id = "tranzlate.compose-test" }
+tranzlate-preflight = { id = "tranzlate.preflight" }

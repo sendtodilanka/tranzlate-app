@@ -59,9 +59,17 @@ gradlePlugin {
             id = "tranzlate.string-key-docs"
             implementationClass = "StringKeyDocsConventionPlugin"
         }
+        register("robolectric") {
+            id = "tranzlate.robolectric"
+            implementationClass = "RobolectricConventionPlugin"
+        }
         register("composeTest") {
             id = "tranzlate.compose-test"
             implementationClass = "ComposeTestConventionPlugin"
+        }
+        register("preflight") {
+            id = "tranzlate.preflight"
+            implementationClass = "PreflightConventionPlugin"
         }
     }
 }
