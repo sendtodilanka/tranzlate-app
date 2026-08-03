@@ -1,11 +1,7 @@
-import com.android.build.api.dsl.CommonExtension
-import com.codeboxlk.tranzlate.buildlogic.RobolectricSdkArgumentProvider
 import com.codeboxlk.tranzlate.buildlogic.libs
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
-import org.gradle.kotlin.dsl.newInstance
 
 /**
  * `tranzlate.compose-test` — a Compose test rule that runs in the ordinary unit-test
@@ -28,54 +24,38 @@ import org.gradle.kotlin.dsl.newInstance
  * issue open. This plugin deliberately does NOT make the instrumented suite run; that
  * is still #40's job.
  *
- * ## What a module gets
+ * ## What it is now that [RobolectricConventionPlugin] exists (#231)
+ *
+ * **The Compose half, and only the Compose half.** The JVM Android runtime underneath —
+ * the pinned offline SDK image, `unitTests.isIncludeAndroidResources`, the Robolectric
+ * dependency itself — moved to `tranzlate.robolectric`, which this applies. Nothing a
+ * module got from this plugin before has gone away; the difference is that a module
+ * with **no Compose in it** can now take the runtime alone instead of inheriting a
+ * Compose dependency graph it has no use for. `:core:database` was the module that made
+ * that visible, and it is the reason #231 was filed.
+ *
+ * ## What a module gets on top of the runtime
  *
  * One line — `alias(libs.plugins.tranzlate.compose.test)` — and then
  * `createComposeRule()` works in `src/test`. Same shape as `tranzlate.string-key-docs`
  * (#152): a named plugin applied where wanted, never a dependency block copied between
  * feature modules.
  *
- *  - `unitTests.isIncludeAndroidResources` — Robolectric reads the module's MERGED
- *    manifest and resources. Without it every `stringResource(...)` in a composable
- *    under test resolves to nothing, which is fatal for a11y tests whose whole subject
- *    is what a string announces.
  *  - `ui-test-junit4` on the test classpath, `ui-test-manifest` on `debugImplementation`
  *    — the second is not optional and not decorative: `createComposeRule()` launches an
  *    empty `ComponentActivity` that ONLY that artifact's manifest declares, and its
  *    absence surfaces as an activity-not-found at run time rather than as a compile
  *    error.
- *  - Robolectric's Android image pinned as a real dependency — see
- *    [RobolectricSdkArgumentProvider] for why that is about CI honesty and not about
- *    download speed.
- *
- * ## Which SDK the tests run against
- *
- * Nothing is pinned here on purpose. Robolectric takes its level from the merged
- * manifest's `targetSdkVersion`, which `TranzlateSdk.TARGET_SDK` fixes at 36 for every
- * module, so the tests run on the API the app targets rather than on a number a test
- * author picked. The pinned image must therefore keep up with `TARGET_SDK`: Robolectric
- * 4.16.1 supports up to exactly 36, so raising the target without raising Robolectric
- * fails loudly at the first test rather than quietly running on the wrong Android.
- * (`compileSdk` 37 does not enter into it — Robolectric never reads it.)
  */
 class ComposeTestConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            // Declaration and resolution split, per the Gradle 9 configuration roles —
-            // `create` plus `isCanBeResolved` is the deprecated spelling of this.
-            val declared = configurations.dependencyScope(SDK_DECLARATION)
-            val resolvable =
-                configurations.resolvable(SDK_CLASSPATH) {
-                    extendsFrom(declared.get())
-                }
+            pluginManager.apply("tranzlate.robolectric")
 
             dependencies {
-                add(SDK_DECLARATION, libs.findLibrary("robolectric-android-all").get())
-
                 val bom = libs.findLibrary("androidx-compose-bom").get()
                 "testImplementation"(platform(bom))
                 "testImplementation"(libs.findLibrary("androidx-compose-ui-test-junit4").get())
-                "testImplementation"(libs.findLibrary("robolectric").get())
                 // The empty ComponentActivity `createComposeRule()` launches lives in
                 // this artifact's manifest and nowhere else. `debugImplementation`
                 // because unit tests build against the debug variant, and because a
@@ -92,24 +72,6 @@ class ComposeTestConventionPlugin : Plugin<Project> {
                 "debugImplementation"(platform(bom))
                 "debugImplementation"(libs.findLibrary("androidx-compose-ui-test-manifest").get())
             }
-
-            val sdkArgs =
-                objects.newInstance<RobolectricSdkArgumentProvider>().apply {
-                    sdkJars.from(resolvable)
-                }
-
-            extensions.configure<CommonExtension> {
-                testOptions.targetSdk = com.codeboxlk.tranzlate.buildlogic.TranzlateSdk.TARGET_SDK
-                testOptions.unitTests.isIncludeAndroidResources = true
-                testOptions.unitTests.all { test ->
-                    test.jvmArgumentProviders.add(sdkArgs)
-                }
-            }
         }
-    }
-
-    private companion object {
-        const val SDK_DECLARATION = "robolectricSdk"
-        const val SDK_CLASSPATH = "robolectricSdkClasspath"
     }
 }

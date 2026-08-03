@@ -58,6 +58,30 @@ jobs:
       - name: "Guard: instrumentation sources still compile (#148)"
         run: ./gradlew :app:assembleAndroidTest
 
+      # THE SAME TASK NAME AN AGENT RUNS BEFORE OPENING A PR (#253).
+      #
+      # The gate this project hands out used to be a five-command line copied into
+      # every brief, and none of the five compiled an androidTest source set. Measured
+      # on the unfixed tree with a deliberate `Unresolved reference` planted in
+      # app/src/androidTestProd/: BUILD SUCCESSFUL in 20s, exit 0. #246 paid for that
+      # — its author only knew the change compiled because they remembered a sixth
+      # command nothing required.
+      #
+      # The step above is `:app`-scoped and cannot reach a second module, which is why
+      # `./gradlew :core:database:build` was ALSO green over a broken file in that
+      # module's androidTest (#241). `preflight` compiles every androidTest component
+      # AGP reports, on every Android module, derived from the variant graph rather
+      # than from a list someone has to remember to extend.
+      #
+      # It is a superset of the local gate and NOT a superset of `build` above: it
+      # deliberately skips release variants and R8 (too slow to be run before every
+      # PR) and it COMPILES rather than assembles androidTest — assembling all
+      # nineteen test APKs dies with `D8: java.lang.OutOfMemoryError: Java heap space`
+      # at this repo's -Xmx4g. Both steps stay; the earlier ones are up-to-date by the
+      # time this runs, so the cost here is the androidTest compilation alone.
+      - name: "Gate: ./gradlew preflight — the same task an agent runs locally (#253)"
+        run: ./gradlew preflight
+
       # ---- plan §6.6 guards ------------------------------------------------------
 
       - name: "Guard: prod/release runtime classpath excludes fake/test modules"

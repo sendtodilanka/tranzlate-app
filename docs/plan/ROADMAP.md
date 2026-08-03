@@ -302,6 +302,25 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   unmeasured → rule 4 research record before any fix; S1/P1 is provisional on the
   worse branch. Found while scoping #212, ruled out of its scope, independent of
   it and of the waves.
+- 👁 **#253** + **#231** — **PR #258** — wave 1a of the rev5 completion plan, and the
+  pair everything after it is verified by. The gate every brief repeats compiled **no**
+  `androidTest` source set: with a deliberate `Unresolved reference` in
+  `app/src/androidTestProd/` the five-command line was BUILD SUCCESSFUL, exit 0, and
+  `:core:database`'s androidTest was compiled by **nothing** — `./gradlew build`,
+  `:core:database:build` and `:app:assembleAndroidTest` (the `:app`-scoped #148 guard)
+  all three green over a broken file (#241). Replaced by **one** task,
+  `./gradlew preflight`, whose list is derived from the module and variant graph
+  instead of copied into prose. Not `verifyAll`: it does not run instrumentation (#40)
+  or lint `build-logic` (#210), and a name asserting totality is this issue's own
+  failure one level out. androidTest is **compiled, not assembled** — assembling all
+  nineteen dies with `D8: java.lang.OutOfMemoryError` at `-Xmx4g`. #231 splits
+  `tranzlate.robolectric` out of `tranzlate.compose-test`: Compose entries on
+  `:core:database`'s unit-test runtime classpath **184 → 0**, its 11 Robolectric tests
+  still green. **Also measured, and it changes #241:** `MigrationTestHelper` **does**
+  run under Robolectric once the exported schemas reach the unit-test assets, which the
+  Room plugin never copies — and Room's validator does **not** catch an index rename
+  that keeps the `index_` prefix (dropping the index, or renaming without the prefix,
+  is caught). Plan `docs/plan/issue-253-gate-coverage.md`.
 
 ---
 
