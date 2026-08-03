@@ -40,10 +40,22 @@ re-litigated per PR.
 These stay open and untouched. **A defect discovered inside one of them is still
 a defect** — but building the feature is out of scope.
 
-### ⏸ DEFERRED — a different surface, not rev5 (10)
+### ⏸ DEFERRED — not rev5 (10)
 
-`#114` `#115` `#116` `#124` `#125` `#126` `#127` `#128` `#129` — monetization,
-Access and Ads. `#191` — History undo, and owner-ruled but blocked on #241.
+- **Monetization / Access / paywall (7):** `#114` `#124` `#125` `#126` `#127`
+  `#128` `#129`.
+- **`#191`** — History undo. Owner-ruled 2026-08-02, and blocked on #241.
+- **`#115`** — 72 fil/pt-BR strings never natively reviewed. **Not monetization:**
+  a cross-cutting i18n QA task spanning every module, blocked on an external
+  human reviewer.
+- **`#116`** — launch follow-ups parked during 1.1.0. **Not monetization:**
+  Composer/Result-screen hygiene (`ComposerScreen.kt` limit-face styling,
+  landscape error asymmetry, `composerFitFor()` test gap, `StatFs` on Main).
+
+The first draft of this section called all ten "monetization, Access and Ads".
+**The #256 lens checked each and two are neither** — corrected here and in
+CLAUDE.md rule 13. Both are still out of scope, on the honest ground that neither
+is Language-screen work.
 
 **#114 is S1 and means the shipped app earns nothing.** It is deferred by scope,
 not by importance, and he has been told twice. It is not rev5.
