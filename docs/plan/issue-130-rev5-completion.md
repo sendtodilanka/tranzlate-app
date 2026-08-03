@@ -52,7 +52,8 @@ a defect** — but building the feature is out of scope.
   Composer/Result-screen hygiene (`ComposerScreen.kt` limit-face styling,
   landscape error asymmetry, `composerFitFor()` test gap, `StatFs` on Main).
 
-The first draft of this section called all ten "monetization, Access and Ads".
+The first draft of this section called **nine** of these "monetization, Access and
+Ads" (#191 always had its own clause).
 **The #256 lens checked each and two are neither** — corrected here and in
 CLAUDE.md rule 13. Both are still out of scope, on the honest ground that neither
 is Language-screen work.
@@ -112,6 +113,14 @@ passed a co-verify lens each**:
    design-export method — **undeduped, per row**.
 
 Findings go into phase 1's waves, not into a new backlog.
+
+**Where the audit is RECORDED — named, because rule 13's exit condition depends on
+it and the first draft named nothing.** Each of the four passes writes
+`docs/research/issue-130-rev5-audit.md`: what was run, against which commit, what it
+found, and — the half that was missing — **an explicit line when a pass returns
+clean.** A future session checking whether the audit happened opens that one file. If
+it does not exist, the audit did not happen; a clean pass that leaves no trace is
+indistinguishable from one that was never run.
 
 ## Phase 3 — finish rev5
 
