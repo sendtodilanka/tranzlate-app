@@ -36,14 +36,14 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/device-claim.sh\"",
-            "if": "Bash(adb *)",
+            "if": "Bash(*adb *)",
             "timeout": 10,
             "statusMessage": "Checking whether someone else is driving the device"
           },
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-restore.sh\"",
-            "if": "Bash(git *)",
+            "if": "Bash(*git *)",
             "timeout": 10,
             "statusMessage": "Checking whether this restore discards uncommitted work"
           }

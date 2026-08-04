@@ -171,6 +171,56 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   --source=<X> <path>` (still writes the worktree), `git -C <dir> checkout --`.
   Filed **#222**. On re-attack the lens found the same error one clause over,
   in the sentence I had just fixed. **Residuals: #222, #223.**
+- 👁 **#222 + #223** — **PR #257** — the two residuals above, and the same lesson a
+  third time. `guard-restore.sh` warned on `git checkout -- <path>` and was silent
+  on `git checkout <path>` — **git's own documented idiom** (`man git-checkout`
+  EXAMPLES §1), i.e. the form most likely to be typed. Reproduced as real data
+  loss, not just hook silence: `git checkout main~2 Makefile` and `git checkout .`
+  each destroyed uncommitted work with no warning. Its `--source` exclusion was a
+  misreading — `man git-restore` OPTIONS says the working tree is restored unless
+  `--staged` is given ALONE — and the man pages turned up a fourth bypass the
+  issue never listed, `--source=HEAD --staged --worktree`, which `hookify`'s
+  substring exemption also lets through and delegates here in its own text. The
+  test list was re-derived from the two man pages rather than from the forms
+  already known, which is the step whose absence produced #222.
+  **Both hooks are now SCOPED, not merely widened**, per `mechanisms-inventory`:
+  `hookify.destructive-git-restore` is authoritative for every form regex can
+  classify, so this hook keeps only what regex cannot decide — a name that only
+  git can call a branch or a path; `hookify.adb-untargeted` is authoritative for
+  targeting, so `device-claim.sh` retires its untargeted branch and is purely the
+  claim mechanism. **That branch was also hiding a claim:** it returned early, so
+  a bare `adb` on a device someone else held reported "no `-s`" and never said the
+  device was claimed.
+  **#213's lesson, and it bit again in a new place.** The `adb` gate could not see
+  `$ANDROID_SDK_ROOT/platform-tools/adb` because `/` is not a shell-word boundary
+  (#223) — but fixing the regex alone would still have changed nothing, because
+  `.claude/settings.json` gates the hook with `if: "Bash(adb *)"` **before the
+  hook file ever runs**, and that gate rejects the same commands for the same
+  reason. Proved by instrumenting the wired hooks and typing the real commands:
+  a path-qualified `adb` produced **no hook process at all**, and a deliberately
+  broken `if:` proved the gate is what decides. `Bash(*adb *)` and `Bash(*git *)`
+  fix it, verified live in both directions. **A hook is not enforcement until you
+  have shown what makes it fire in the real repo** — and the wiring is part of the
+  hook.
+  **Then co-verify found the same shape of defect in three consecutive rounds**, and
+  the fourth instance is why this row is worth reading. `guard-restore.sh` stands
+  down for commands the hookify rule blocks, and to decide that it re-implements —
+  in bash — a judgement whose authority is a Python regex in another file. That
+  approximation drifted five times: `--work-tree=`/`--git-dir=` prefixes, a
+  space-separated flag value (`--conflict merge --`), a tree-ish (`checkout HEAD
+  --`), and a bare `-` — bash's `-*` is zero-or-more where hookify's class is
+  one-or-more, so `git checkout - -- <path>` was silent under BOTH. Each round
+  fixed the instance reported and the next round found another. **That is not
+  converging, and a fifth round would not have been evidence of anything.** So the
+  patching is replaced by a check: `.claude/hooks/tests/guard-restore-invariant.sh`
+  reads hookify's pattern out of the rule file, generates the token shapes where
+  the two classifications can diverge, runs each command against a throwaway repo,
+  and fails if anything that **actually destroys work** is caught by neither. Its
+  corpus produced a fifth instance nobody had named. Its `--mutate` mode then
+  caught that consolidating the scratchpad suite into one file had **lost two
+  tests** — the fixture could not express a branch/file name collision. Both test
+  files are committed, because three harness defects turned up in this project in
+  two days and a check that lives only in a transcript is not a check.
 - 👁 **#218 + #237** — **PR #247** — every `Task.await()` this app makes into ML
   Kit's model store was **unbounded**, which is not a slow path but a coroutine
   parked forever — so the `catch` blocks under all three were dead code.
