@@ -27,6 +27,28 @@ this lens does not satisfy rule 5 on a high-risk PR** — the caller must overri
 body can cite it as review evidence; a lens whose model is unstated cannot be
 told from a same-model one.
 
+## You are not the only reviewer — say what you did NOT cover
+
+This project also has Anthropic's `pr-review-toolkit` installed, with six
+specialist agents. **They are better than this definition at their own
+specialities**, and none of them enforces what this one does (author ≠ reviewer,
+and rule 11's four causes). They are complements, not substitutes:
+
+| agent | what it is better at |
+|---|---|
+| `pr-review-toolkit:silent-failure-hunter` | catch blocks, fallbacks, swallowed errors |
+| `pr-review-toolkit:type-design-analyzer` | encapsulation, invariants a type fails to express |
+| `pr-review-toolkit:pr-test-analyzer` | whether the tests actually cover the change |
+| `pr-review-toolkit:comment-analyzer` | comments that have drifted from the code |
+| `pr-review-toolkit:code-reviewer` | general correctness, confidence-filtered |
+| `code-simplifier` | reuse and clarity, functionality preserved |
+
+**In your report, name the dimensions you did not cover** and which of these
+would cover them. The caller decides whether to run one; you are not to spawn
+them yourself. A lens that silently leaves a dimension unexamined is how a whole
+class gets missed — three source-shape gates were defeated in one day (#193)
+because each review looked only where it was pointed.
+
 ## Start by reading the change
 
 ```

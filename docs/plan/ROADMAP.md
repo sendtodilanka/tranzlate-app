@@ -141,6 +141,16 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   passed in #171 while being wrong. Fourteen of my errors in one session sort
   into six shapes, all in claims and orchestration. CLAUDE.md rule 12 +
   `Enumerated by:` in `guard-pr.sh` + `device-claim.sh`.
+- 👁 **#232** — **PR #233** — the four `hookify` rules created hours earlier were
+  **gitignored**, so they existed on one machine only. Six shell guards tracked, four
+  rules not. Two of the four encode the OWNER's standing rules — never create an AVD,
+  never drive the physical handset — so a fresh clone got neither. **#213's shape,
+  produced the same day #213's lesson went into rule 12.** Cause: the `hookify`
+  plugin's own skill says to gitignore `.claude/*.local.md`, and I followed it without
+  asking whether it applied — right for a personal rule on a shared repo, wrong for a
+  project's standing constraints on a single-developer one. Also recorded: `action:
+  block` matches the command as TEXT, so writing an issue *about* these rules was
+  itself denied; bodies now go via `--body-file`.
 - 👁 **#213** — **PR #214** — `device-claim.sh`, shipped in #207 above as rule
   12's answer to shape D, **had never fired and could not have.** It returned
   silently unless `.claude/device-claim` existed, and the claim protocol was

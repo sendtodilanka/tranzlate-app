@@ -37,3 +37,10 @@ bugreport-*.zip
 # that survives is the PR body, per rule 11. #178 removed the same file by
 # hand — ignoring it stops the next one leaking in.
 scratchpad/
+
+# hookify rules are COMMITTED, deliberately — see #232.
+# The plugin's writing-rules skill says to gitignore `.claude/*.local.md`, which is
+# right for a personal rule on a shared repo and wrong here: two of these four encode
+# the OWNER's standing rules (never create an AVD, never drive the physical handset).
+# Ignored, they would exist on one machine only — #213's shape. The `.local.md` suffix
+# stays because that is what hookify matches on; the name and the ignore are separate.
