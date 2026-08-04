@@ -305,13 +305,39 @@ rows, because neither was planned: **#162** (`guard-pr`) and **#165**
   `blocked-on-E2′` with no algorithm and no estimate, on purpose.
 - ⬜ **#224** Offline languages offers **Download and Delete on English**, which
   is not a pack — all 58 ML Kit models are X↔English pairs, verified in
-  `translate-17.0.3.aar`. Unguarded in three places
-  (`OfflineLanguagesViewModel.kt:62-69`, `OfflineLanguagesScreen.kt:243-247`,
-  `:115-116`). Both branches are shipped-app defects: a no-op control, or a real
-  delete that fails `MlKitEngine.kt:39-42` for **every** pair. Root cause
-  unmeasured → rule 4 research record before any fix; S1/P1 is provisional on the
-  worse branch. Found while scoping #212, ruled out of its scope, independent of
-  it and of the waves.
+  `translate-17.0.3.aar`. **Re-verified against the code by PR #262 (wave 1c) and
+  still true**; PR-18 and PR-19 changed the SHAPE of the delete path and added no
+  guard. Re-derived, because three of the issue's four citations were stale and
+  one no longer exists: the catalog filter is `OfflineLanguagesViewModel.kt:105`
+  (`.filter(Language::offlineAvailable)`, and `"en"` is in `offlineCapableIds` at
+  `BundledLanguageCatalog.kt:49`), the download button `OfflineLanguagesScreen.kt:245`,
+  the 🗑 `:284`, and `delete(id)` is now `requestRemove` `:254` → `confirmRemove`
+  `:284-288`. `grep -rniE "pivot|isPivot|protected|canDelete|locked"` over
+  `feature/language/src/main/kotlin/` → 5 hits, all KDoc, **0 guards**. Both
+  branches are shipped-app defects: a no-op control, or a real delete that fails
+  `MlKitEngine.kt:39-41` for **every** pair. Root cause unmeasured → rule 4
+  research record before any fix; S1/P1 is provisional on the worse branch. **Wave
+  1d** — the fix needs the ViewModel, the screen's production `when` and
+  `core/data`, none of which wave 1c owned. Two tests assume English is an ordinary
+  pack and will need rewriting with it: `OfflineLanguagesViewModelTest.kt:366-374`
+  and `BundledLanguageCatalogTest.kt:51-52`.
+- 👁 **#219** + **#229** + **#243** (**Refs #230 #224**) — **PR #262** — wave 1c of
+  the rev5 completion plan: the copy sweep. **One pack size, and it is `40–65 MB`**
+  in all four strings across three locales — the on-disk size of all 58 translate
+  models declared in `translate-17.0.3.aar`, not the two device samples #219
+  refused, and trusted because `af_en`'s declared `SZ` and the E-S1 device walk
+  agree at 44,169,505 bytes exactly. Two of the four had said `~30 MB`, which is
+  15 MB under the smallest pack that exists. The 🗑's spoken verb moves
+  `Delete`→`Remove` (and `Burahin`→`Alisin`, `Excluir`→`Remover`) so the screen
+  reader stops naming an action the sheet renames a moment later. **The third
+  failure sentence gets its first preview** — `lang_pack_error_generic` was drawn
+  in none on either screen, and sharing one map since PR-18 meant one omission hid
+  it twice. Plus `RetryPill` and four item-level previews. **#230 is decided, not
+  closed:** 19f gains the saved-phrases line (option 1) because 19f's own body
+  raises the very "needs a connection" worry the line answers, and 19g keeps its
+  separate frame — four of its five visible elements differ, not the one sentence
+  the issue counted. The code is one condition in a ViewModel, which is wave 1d.
+  Plan `docs/plan/issue-219-copy-sweep.md`.
 - 👁 **#253** + **#231** — **PR #260** — wave 1a of the rev5 completion plan, and the
   pair everything after it is verified by. The gate every brief repeats compiled **no**
   `androidTest` source set: with a deliberate `Unresolved reference` in

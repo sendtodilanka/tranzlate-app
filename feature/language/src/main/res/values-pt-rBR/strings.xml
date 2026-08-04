@@ -29,14 +29,14 @@
     <string name="lang_sheet_failed_close">Fechar</string>
     <string name="lang_sheet_failed_retry">Tentar de novo</string>
     <string name="lang_sheet_space_title">Espaço insuficiente</string>
-    <string name="lang_sheet_space_body">Há %1$s livres neste dispositivo. Um pacote de idioma costuma precisar de 20 a 45 MB.</string>
+    <string name="lang_sheet_space_body">Há %1$s livres neste dispositivo. Um pacote de idioma costuma precisar de 40 a 65 MB.</string>
     <string name="lang_sheet_space_used">Outros apps e sistema</string>
     <string name="lang_sheet_space_free">%1$s livres</string>
     <string name="lang_sheet_space_manage">Gerenciar pacotes</string>
     <!-- Sheet 19a — see values/strings.xml for why there is no language name and
          why the second action is not "Wait for Wi-Fi". -->
     <string name="lang_sheet_data_title">Baixar usando dados móveis?</string>
-    <string name="lang_sheet_data_body">Um pacote de idioma costuma ter de 20 a 45 MB. Sua operadora pode cobrar por isso.</string>
+    <string name="lang_sheet_data_body">Um pacote de idioma costuma ter de 40 a 65 MB. Sua operadora pode cobrar por isso.</string>
     <string name="lang_sheet_data_always_ask">Sempre perguntar antes de usar dados móveis</string>
     <string name="lang_sheet_data_download">Baixar agora</string>
     <string name="lang_sheet_data_not_now">Agora não</string>
@@ -92,12 +92,12 @@
          composer, and C-3 gives one key one home rather than two modules one name. -->
     <string name="cd_lang_back">Voltar</string>
     <string name="offline_title">Tradução offline</string>
-    <string name="offline_subtitle">Baixe idiomas para traduzir sem internet (~30MB cada)</string>
+    <string name="offline_subtitle">Baixe idiomas para traduzir sem internet (40 a 65 MB cada)</string>
     <string name="offline_loading">Carregando idiomas…</string>
     <string name="offline_cd_back">Voltar</string>
     <string name="offline_cd_download">Baixar %1$s</string>
     <string name="offline_cd_stop">Parar o download de %1$s</string>
-    <string name="offline_cd_delete">Excluir %1$s</string>
+    <string name="offline_cd_delete">Remover %1$s</string>
     <string name="offline_cd_retry">Tentar baixar %1$s novamente</string>
     <!-- 17c/17d tablet dialog (#130 PR-16). -->
     <string name="lang_dialog_manage_packs">Gerenciar pacotes</string>

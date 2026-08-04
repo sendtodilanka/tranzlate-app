@@ -64,7 +64,7 @@ does. `en` values are transcribed **verbatim from the shipped resource**, not re
 | `settings_history_supporting` | SHIPPED | string | `Every translation, and the ones you starred` | — | supporting line; says what the row contains rather than what it does |
 | `settings_downloads_header` | SHIPPED | string | `Downloads` | — | section header above the offline-language controls |
 | `settings_mobile_data_label` | SHIPPED | string | `Always allow mobile data` | — | switch row title. "Always allow" is deliberate: OFF is the safe default, and the switch grants standing permission rather than turning a feature on |
-| `settings_mobile_data_supporting` | SHIPPED | string | `Language packs are about 30 MB each. When off, you're asked before mobile data is used` | — | states the cost **and** the off-state behaviour, so nobody has to discover by being charged. ⚠ `about 30 MB` is the same unmeasured approximation as `offline_subtitle` in `STRINGS_language.md` — both need one real number |
+| `settings_mobile_data_supporting` | SHIPPED | string | `Language packs are 40–65 MB each. When off, you're asked before mobile data is used` | — | states the cost **and** the off-state behaviour, so nobody has to discover by being charged. **One of the four strings that state the pack size (#219)**, and the only one outside `:feature:language` — which is why the test that pins the other three agreeing cannot see this one (a Robolectric test cannot resolve another module's `R`). It said `about 30 MB`, the same unmeasured approximation `offline_subtitle` carried. Figure and derivation: `lang_sheet_data_body` in `STRINGS_language.md` §5.2 |
 
 > `settings_history_label` renders `&` as `&amp;` in the resource; the row above shows the value as
 > the user sees it.

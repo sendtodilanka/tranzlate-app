@@ -29,14 +29,14 @@
     <string name="lang_sheet_failed_close">Isara</string>
     <string name="lang_sheet_failed_retry">Subukan ulit</string>
     <string name="lang_sheet_space_title">Kulang ang espasyo</string>
-    <string name="lang_sheet_space_body">May %1$s na libre sa device na ito. Karaniwang nangangailangan ng 20–45 MB ang isang language pack.</string>
+    <string name="lang_sheet_space_body">May %1$s na libre sa device na ito. Karaniwang nangangailangan ng 40–65 MB ang isang language pack.</string>
     <string name="lang_sheet_space_used">Ibang app at system</string>
     <string name="lang_sheet_space_free">%1$s na libre</string>
     <string name="lang_sheet_space_manage">Pamahalaan ang mga pack</string>
     <!-- Sheet 19a — see values/strings.xml for why there is no language name and
          why the second action is not "Wait for Wi-Fi". -->
     <string name="lang_sheet_data_title">I-download gamit ang mobile data?</string>
-    <string name="lang_sheet_data_body">Karaniwang 20–45 MB ang isang language pack. Maaaring maningil ang iyong plan para dito.</string>
+    <string name="lang_sheet_data_body">Karaniwang 40–65 MB ang isang language pack. Maaaring maningil ang iyong plan para dito.</string>
     <string name="lang_sheet_data_always_ask">Palaging magtanong bago gumamit ng mobile data</string>
     <string name="lang_sheet_data_download">I-download ngayon</string>
     <string name="lang_sheet_data_not_now">Hindi ngayon</string>
@@ -92,12 +92,12 @@
          composer, and C-3 gives one key one home rather than two modules one name. -->
     <string name="cd_lang_back">Bumalik</string>
     <string name="offline_title">Offline na pagsasalin</string>
-    <string name="offline_subtitle">Mag-download ng mga wika para magsalin nang walang internet (~30MB bawat isa)</string>
+    <string name="offline_subtitle">Mag-download ng mga wika para magsalin nang walang internet (40–65 MB bawat isa)</string>
     <string name="offline_loading">Nilo-load ang mga wika…</string>
     <string name="offline_cd_back">Bumalik</string>
     <string name="offline_cd_download">I-download ang %1$s</string>
     <string name="offline_cd_stop">Itigil ang pag-download ng %1$s</string>
-    <string name="offline_cd_delete">Burahin ang %1$s</string>
+    <string name="offline_cd_delete">Alisin ang %1$s</string>
     <string name="offline_cd_retry">Subukang i-download muli ang %1$s</string>
     <!-- 17c/17d tablet dialog (#130 PR-16). -->
     <string name="lang_dialog_manage_packs">Pamahalaan ang mga pack</string>

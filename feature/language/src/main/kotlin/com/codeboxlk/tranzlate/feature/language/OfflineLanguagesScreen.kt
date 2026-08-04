@@ -352,10 +352,27 @@ private fun OfflineLanguagesScreenPreview() {
     }
 }
 
-// The metered-consent preview that stood here is GONE for the reason given at
-// the foot of `LanguagePickerScreen.kt`: 19a is a `ModalBottomSheet`, the
-// tooling renders no window, so this preview would have drawn the plain list
-// while claiming to show the consent state. Previewed in `MobileDataSheet.kt`.
+// EVERY sheet this screen raises is previewed somewhere else, and none of them
+// can be previewed here. `ModalBottomSheet` opens a window and the preview
+// tooling renders no window, so a preview passing the sheet's state would draw
+// the plain list while claiming to show the sheet — worse than no preview.
+//
+// This note named only the metered-consent sheet (19a) and was never extended
+// when PR-19 added two more, which left the newer omissions looking like
+// oversights beside a documented one (#243). The full list, and where each is
+// drawn:
+//
+//   19a  mobile-data consent   → `MobileDataSheet.kt`
+//   19f  remove pack           → `RemovePackSheets.kt`
+//   19g  remove the in-use pack → `RemovePackSheets.kt`
+//   19b  no space             → `PackFailureSheets.kt`
+//   19d  interrupted          → `PackFailureSheets.kt`
+//
+// Those files draw the sheet ANATOMY through `TranzlateSheetPreviewFrame` rather
+// than calling the real composable, for the same windowing reason — so a change
+// to a real sheet's arguments leaves its preview drawing the old sheet. That is
+// a known, filed limitation, not a thing to fix here: it needs a preview scanner
+// or a screenshot library this repo does not have (#243's closing section, #193).
 
 /** Empty/loading face — the rows have not arrived yet. */
 @PreviewLightDark
@@ -376,6 +393,18 @@ private fun OfflineLanguagesLoadingPreview() {
  * THE ITEM the owner called out: one row per state, so the single trailing
  * control (⬇ / spinner+stop / 🗑 / spinner / ↻ + cause line) is reviewable on
  * both themes without launching the app.
+ *
+ * **All THREE failure sentences, since #243.** `downloadFailureCopy` produces
+ * three distinct lines and this preview drew two — `STORAGE` from
+ * `previewRows` and `NETWORK` appended below — leaving
+ * `lang_pack_error_generic` ("Download didn't finish. Try again.") invisible.
+ * Because PR-18 made this screen and the picker read ONE map, that one omission
+ * hid the sentence on both screens at once, and rule 7 exists because the owner
+ * reviews UI from previews rather than from the app.
+ *
+ * `WIFI_REQUIRED` is deliberately absent: it folds onto the network line by
+ * design (`DownloadFailure.kt`, fold pinned by `DownloadFailureTest`), so a
+ * fourth row would draw a duplicate sentence and imply a fourth cause.
  */
 @PreviewLightDark
 @Composable
@@ -393,6 +422,18 @@ private fun OfflineRowStatesPreview() {
                             "nl",
                             "Dutch",
                             OfflineModelState.Failed(OfflineModelFailure.NETWORK),
+                        ),
+                    onDownload = {},
+                    onStopDownload = {},
+                    onRequestRemove = {},
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                OfflineRow(
+                    row =
+                        OfflinePackRow(
+                            "sv",
+                            "Swedish",
+                            OfflineModelState.Failed(OfflineModelFailure.UNKNOWN),
                         ),
                     onDownload = {},
                     onStopDownload = {},
