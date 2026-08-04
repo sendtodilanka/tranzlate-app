@@ -101,6 +101,8 @@ overlap** — the rule that was absent when #246 and #249 collided.
 
 ### Wave 1f also carries work that is NOT issue-shaped
 
+*(This section added by **PR #261**.)*
+
 **Owner, 2026-08-03:** *"Issues consolidation is good but various issues stacking into
 one issue adds more complexity."* He was right, and #253 was the example — one
 closeable item accumulated three unrelated ones and could no longer close.
