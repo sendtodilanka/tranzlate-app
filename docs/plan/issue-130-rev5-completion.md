@@ -99,6 +99,24 @@ overlap** — the rule that was absent when #246 and #249 collided.
 | **1e** | #183 · #184 · #203 | Frame/spec disagreements. #183 is owner-answered-by-measurement; #203 needs a decision. | `docs/design/`, `docs/plan/` |
 | **1f** | #157 · #163 · #188 · #193 · #196 · #204 · #208 · #210 · #215 · #217 · #220 · #228 · #245 · #251 · #252 · #255 · #40 | Process residue. Batch aggressively — several are one fix. | varies |
 
+### Wave 1f also carries work that is NOT issue-shaped
+
+*(This section added by **PR #261**.)*
+
+**Owner, 2026-08-03:** *"Issues consolidation is good but various issues stacking into
+one issue adds more complexity."* He was right, and #253 was the example — one
+closeable item accumulated three unrelated ones and could no longer close.
+
+**So: an issue is for a defect that needs evidence and argument. A line item that is
+merely "do this next" belongs here.** This list is the work tracker; it needs no issue
+numbers to be actionable.
+
+| Item | Why it is not an issue | Sequenced after |
+|---|---|---|
+| Wire `.claude/hooks/tests/guard-restore-invariant.sh` (112 assertions) and `device-claim-behaviour.sh` (31) into `preflight` | Committed by #257 and runnable, but nothing runs them. No argument needed — it is one line in `PreflightConventionPlugin`. **A loud skip must count as a pass**: the invariant sections skip until #233 lands the hookify rules. | #233, #257 |
+| Fold the man-page-derived regression table into whatever runs above | Same reason. | as above |
+
+
 ## Phase 2 — the audit
 
 **Not a re-read.** A comprehensive pass over rev5 code with the official
