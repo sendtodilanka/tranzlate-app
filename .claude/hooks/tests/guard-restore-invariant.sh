@@ -41,7 +41,12 @@
 #   .claude/hooks/tests/guard-restore-invariant.sh --mutate   # + mutation check
 #   GUARD_RESTORE_RULE=<path> …                               # rule file elsewhere
 #
-# Exit 0 = pass. Exit 1 = a real finding. Needs bash, git, python3, jq.
+# Exit 0 = pass — covers BOTH the full run (rule file present, all 112 assertions)
+#   and the degraded run (rule file absent: a loud "SKIPPED —" banner, 45 assertions).
+#   A caller must read stdout, not just $?, to tell full from degraded.
+# Exit 1 = a real finding. Exit 2 = the generator could not parse hookify's token
+#   class (the rule's structure changed) — it aborts rather than degrade silently.
+# Needs bash, git, python3, jq.
 set -uo pipefail
 
 here=$(cd -- "$(dirname -- "$0")" && pwd)
