@@ -114,6 +114,14 @@ by a cross-model lens; CI green on the rebased commit `d8146a7`; its lens also c
 STRINGS-doc omission, fixed in the same PR). #250 stays deferred to PR-23 by ruling 8,
 carried not fixed. **Wave 1c is complete; 1d is complete but for #250's PR-23 carry.**
 
+**Wave 1f landing note:** **#221** — `git grep -E` silently ignores `\b`, so an enumeration
+written that way reports a false zero and reads as clean — landed in **PR #295**. The command
+vector was already blocked on `main` by the shipped hookify rule `git-grep-word-boundary`; PR #295
+adds the complementary body-side WARN in `guard-pr.sh` for a broken enumeration that reaches a PR
+`--body-file` (which the command-level block cannot see). Co-verify APPROVE (cross-model), which
+proved by mutation that the WARN cannot escalate to a deny and that no broken enumeration ever
+shipped (142 PR bodies + every commit checked). #221 was wave-1a's last open gate.
+
 ### Wave 1f also carries work that is NOT issue-shaped
 
 *(This section added by **PR #261**.)*

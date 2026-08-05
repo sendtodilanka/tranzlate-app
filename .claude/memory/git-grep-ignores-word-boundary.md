@@ -8,9 +8,13 @@ support it, but is not always compiled in; do not rely on it.)
 Measured in this repo (2026-08-05; the issue saw 11 when filed — the codebase
 grew, the defect did not):
 
-    git grep -lE 'OfflineModelFailure\b'   ->   0 files, exit 1   ← the lie
-    git grep -lE 'OfflineModelFailure'     ->  23 files
-    grep  -rlE 'OfflineModelFailure\b' …   ->  23 files           ← POSIX grep honours \b
+    git grep -lE 'OfflineModelFailure\b' -- '*.kt'            ->   0 files, exit 1  ← the false-zero
+    git grep -lE 'OfflineModelFailure'   -- '*.kt'            ->  23 files          ← the truth (git grep, no \b)
+    grep  -rlE 'OfflineModelFailure\b' --include='*.kt' core feature -> 23 files    ← POSIX grep honours \b
+
+(Scope shown on every line on purpose — a bare unscoped `git grep -lE 'OfflineModelFailure'`
+returns 29, matching prose in .md files too; the `*.kt` scope is what makes 23 the number.
+Stating a count without the exact command that produced it is the very trap this file is about.)
 
 ## Why it is dangerous *here*, specifically
 CLAUDE.md rule 11 requires `Call sites: N found, N changed`, and `guard-pr.sh`
