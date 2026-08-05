@@ -160,3 +160,14 @@ seeding. The "nothing selected" render is *all rows in their existing unselected
 state*, which existing row previews already cover; and the preview file
 (`LanguagePickerScreen.kt`) is outside this task's ownership. So no new
 `@PreviewLightDark` is owed here.
+
+## Landed — PR #282
+Co-verify (Sonnet 5, cross-model relative to the author) **APPROVE-WITH-NOTES**: the `""`
+sentinel verified against the full catalog (no collision with any real id or
+`DETECT_LANGUAGE_ID`), proven never to escape into a persisted write / translation call /
+rendered label (exhaustive consumer enumeration), and the `""`→real transition confirmed to
+emit even across a `WhileSubscribed` stop/resubscribe. Mutate-first reproduced exactly. The two
+non-blocking notes (a currently-unreachable seed/corrupt-value collision; the non-blank
+guarantee is enumeration-backed, not type-backed) are the concrete justification for the
+follow-up — filed as **#283** (dedup the second defaults-table copy + widen `selection()` to
+`String?`).
