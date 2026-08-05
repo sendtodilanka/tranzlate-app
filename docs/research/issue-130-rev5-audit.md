@@ -157,12 +157,19 @@ second independent search agreeing with the first:
 | Frame | issue says | parser | match |
 |---|---|---|---|
 | 16a portrait | 3 `volume_up` | 3 (2 row-marks + 1 non-row header speaker) | ✅ |
-| to · landscape | 5 | 5 row-marks | ✅ |
+| to · landscape | 5 | 5 (4 row-marks + 1 non-row legend speaker) | ✅ |
 | from · landscape | 0 | 0 | ✅ |
 
 The "3rd" mark in 16a is a **non-language-row** element — a green avatar whose
 emblem is itself a `volume_up` glyph — so the honest row-mark count is 2. The
 issue's frame total conflated it; per-row it does not touch the es/en/af/ar rows.
+**The same non-row artifact recurs in `to · landscape`** — caught by the #296
+co-verify, not this pass's first draft. A *"Speaker marks languages the device can
+speak offline"* **legend** sits in document order between the Afrikaans and
+Albanian rows, and its `volume_up` glyph was miscounted as an Afrikaans row-mark.
+Afrikaans's own row draws only `cloud_done` — confirmed across all 26 `af`-row
+occurrences in the decoded spec, none draws `volume_up`. So `to · landscape` is
+**4** row-marks, not 5, and carries **no** false mark.
 
 ### Per-frame totals (11 adaptive drawings)
 
@@ -170,7 +177,7 @@ issue's frame total conflated it; per-row it does not touch the es/en/af/ar rows
 |---|---|---|---|---|
 | 16a portrait · light | target | 12 | 2 | es, en |
 | 16a portrait · dark | target | 12 | 2 | es, en |
-| to · landscape | target | 17 | 5 | en, **af**, ar, bn, bg |
+| to · landscape | target | 17 | 4 | en, ar, bn, bg |
 | to · foldable | target | 19 | 5 | es, en, ar, bn, bg |
 | to · tablet portrait | target | 10 | 2 | es, en |
 | to · tablet landscape | target | 17 | 4 | en, ar, bn, bg |
@@ -186,7 +193,7 @@ issue's frame total conflated it; per-row it does not touch the es/en/af/ar rows
 |---|---|---|---|---|---|---|---|
 | es | yes | M | . | M | M | . | **DISAGREE** — 2 of 5 wrongly blank |
 | en | yes | M | M | M | M | M | consistent, correct |
-| af | **NO** | . | **M** | . | . | . | **DISAGREE — false mark** in to·landscape |
+| af | **NO** | . | . | . | . | . | consistent — correctly unmarked (the to·land `volume_up` is the Speaker legend, not af's row; cf. the 16a exclusion above) |
 | ar | yes | . | M | M | . | M | **DISAGREE** — 2 of 5 wrongly blank |
 | sq | yes | . | . | . | . | . | consistent (cast omission — not a contradiction) |
 | bn | yes | - | M | M | - | M | consistent where present |
@@ -194,14 +201,17 @@ issue's frame total conflated it; per-row it does not touch the es/en/af/ar rows
 
 ### Counts
 
-- **Rows drawn inconsistently across the target frames: 3 — `es`, `af`, `ar`.**
-  (The same three rows the issue found comparing only two frames; extended to all
-  five target frames, English is the only contested-looking row that is in fact
-  consistent, and the three culprits are unchanged.)
-- **Affirmatively-false marks (mark on a no-voice id): 1 — `af` in `to · landscape`.**
-  This is the single hard drawing error; every other disagreement is a
-  voice-capable row left blank (omission), which the issue classes as a cast
-  choice rather than a contradiction.
+- **Rows drawn inconsistently across the target frames: 2 — `es`, `ar`.**
+  (The issue named three — `es`/`af`/`ar` — from two frames; extended to all five
+  target frames, `af` drops out: it is correctly blank in every frame, and the
+  apparent `to · landscape` mark is a non-row legend glyph, not a row-mark. `es`
+  and `ar` are each blank in 2 of 5 frames that should carry them.)
+- **Affirmatively-false marks (mark on a no-voice id): 0.** The #296 co-verify
+  caught the earlier "1 — `af` in `to · landscape`": that `volume_up` is the same
+  non-row Speaker-legend artifact already excluded for 16a above — Afrikaans's row
+  draws only `cloud_done` (confirmed across all 26 `af`-row occurrences). Every
+  real disagreement is a voice-capable row left blank (omission), which the issue
+  classes as a cast choice rather than a contradiction.
 - **Source frames marking anything: 0 of 5.** All source pickers are blank, which
   is correct — see the code note in Part D.
 
@@ -240,7 +250,7 @@ right?
   app; every `to ·` (target) frame draws them.
 - Therefore the shipped app marks `es`/`en`/`ar`/`sq` and not `af`, in target
   pickers only, **regardless of what any frame draws.** The `to ·` frames'
-  disagreements (es/af/ar) and the one false `af` mark are inconsistencies in the
+  disagreements (es/ar) are inconsistencies in the
   *reference art*; they never reach the built screen because the mark set is
   computed from device truth, not copied from a drawing.
 - **Verdict: reference-drawing correction. Not design-invalidating. PR-13…PR-16
@@ -291,8 +301,7 @@ authority and it is right.)
   rev6-redraw all target frames to one consistent, device-true cast (mark
   `es`/`en`/`ar` where present, never `af`); or (b) declare **16a portrait
   authoritative** and annotate the landscape/foldable/tablet frames as
-  illustrative. Either way the concrete fixes are: remove the `af` mark from
-  `to · landscape` (the one false mark), add `es` to `to · landscape` and
+  illustrative. Either way the concrete fixes are: add `es` to `to · landscape` and
   `to · tablet landscape`, add `ar` to `16a portrait` and `to · tablet portrait`,
   and state whether `sq` (and the other capable-but-blank rows) are a deliberate
   partial cast. Not pre-empted here (#183 is an owner-decision fork).
