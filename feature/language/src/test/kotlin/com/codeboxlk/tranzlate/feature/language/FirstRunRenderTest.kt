@@ -120,25 +120,28 @@ class FirstRunRenderTest {
         compose.onNodeWithTag("tt_lang_first_run").assertIsDisplayed()
     }
 
+    private val gets = mutableListOf<String>()
+    private var confirms = 0
+    private var dismissals = 0
+
     /**
-     * Get → confirm, at the render level: tapping a suggestion's Get fires
-     * onSuggestionGet, and once the pending id is set the confirm sheet appears
-     * titled with the name the CATALOGUE gives that id.
+     * Renders the source picker with one French suggestion and taps its Get, so
+     * the confirm sheet is open — wired through the REAL call site
+     * (`LanguagePickerContent` → `DownloadConfirmSheet`, the `onConfirm` /
+     * `onDismiss` arguments). [gets] / [confirms] / [dismissals] are what the tests
+     * below read; each JUnit method gets a fresh instance, so they start at zero.
      */
-    @Test
-    fun `tapping Get raises the confirm sheet titled for the language`() {
-        val catalogue =
-            listOf(
-                Language("en", "English", offlineAvailable = true, offlineDownloaded = true),
-                Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
-            )
-        val gets = mutableListOf<String>()
+    private fun openFrenchConfirm() {
         compose.setContent {
             var pending by remember { mutableStateOf<String?>(null) }
             TranzlateTheme {
                 LanguagePickerContent(
                     target = LanguageRole.SOURCE,
-                    languages = catalogue,
+                    languages =
+                        listOf(
+                            Language("en", "English", offlineAvailable = true, offlineDownloaded = true),
+                            Language("fr", "French", offlineAvailable = true, offlineDownloaded = false),
+                        ),
                     selectedId = "en",
                     query = "",
                     onQueryChange = {},
@@ -158,18 +161,70 @@ class FirstRunRenderTest {
                         pending = id
                     },
                     pendingSuggestion = pending,
-                    onSuggestionConfirm = {},
-                    onSuggestionDismiss = { pending = null },
+                    onSuggestionConfirm = {
+                        confirms++
+                        pending = null
+                    },
+                    onSuggestionDismiss = {
+                        dismissals++
+                        pending = null
+                    },
                     arrangementOverride = PickerArrangement.SinglePane,
                 )
             }
         }
-
         compose.onNodeWithTag("tt_lang_suggested_get_fr").performClick()
         compose.waitForIdle()
+    }
+
+    /**
+     * Get → confirm, at the render level: tapping a suggestion's Get fires
+     * onSuggestionGet, and once the pending id is set the confirm sheet appears
+     * titled with the name the CATALOGUE gives that id.
+     */
+    @Test
+    fun `tapping Get raises the confirm sheet titled for the language`() {
+        openFrenchConfirm()
 
         assertThat(gets).containsExactly("fr")
         compose.onNodeWithTag(TT_SHEET_CONFIRM).assertIsDisplayed()
         compose.onNodeWithText("Download French").assertIsDisplayed()
+    }
+
+    /**
+     * The confirm BUTTON must route to the confirm callback, and this test runs
+     * through the REAL host wiring — `onConfirm = onSuggestionConfirm` at the call
+     * site (`LanguagePickerContent` → `DownloadConfirmSheet`). `DownloadConfirmSheetTest`
+     * only sees a swap INSIDE the sheet, one layer down; a copy-paste slip that
+     * swapped these two adjacent call-site arguments would make "Download and use"
+     * silently dismiss, and no other test in the module would redden. Asserted as a
+     * pair (confirm fired AND dismiss did NOT) so an inversion cannot pass on a
+     * count alone.
+     */
+    @Test
+    fun `the confirm button routes through the call site to the confirm callback`() {
+        openFrenchConfirm()
+
+        compose.onNodeWithTag(TT_SHEET_CONFIRM_DOWNLOAD).performClick()
+        compose.waitForIdle()
+
+        assertThat(confirms).isEqualTo(1)
+        assertThat(dismissals).isEqualTo(0)
+    }
+
+    /**
+     * The other half of the same swap: the Not-now control must route through
+     * `onDismiss = onSuggestionDismiss` to the dismiss callback, not confirm. A
+     * swap would make "Not now" silently start a download.
+     */
+    @Test
+    fun `the not-now button routes through the call site to the dismiss callback`() {
+        openFrenchConfirm()
+
+        compose.onNodeWithTag(TT_SHEET_CONFIRM_NOT_NOW).performClick()
+        compose.waitForIdle()
+
+        assertThat(dismissals).isEqualTo(1)
+        assertThat(confirms).isEqualTo(0)
     }
 }
