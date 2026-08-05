@@ -46,7 +46,7 @@ protects.
 3. **Push and wait for CI ON THE REBASED COMMIT — verified by SHA, not by the badge:**
    ```
    git push --force-with-lease
-   sha=$(git rev-parse --short HEAD)
+   sha=$(git rev-parse --short=7 HEAD)   # --short=7 pins the width; bare --short is core.abbrev, not always 7
    rid=$(gh run list --branch <branch> --limit 1 --json databaseId --jq '.[0].databaseId')
    gh run watch "$rid" --exit-status
    # THE CHECK THAT PREVENTS A THIRD main break — the run's SHA must equal the tip:
