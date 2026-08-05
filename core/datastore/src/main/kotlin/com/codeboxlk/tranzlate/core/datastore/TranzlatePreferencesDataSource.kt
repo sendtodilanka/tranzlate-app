@@ -28,20 +28,43 @@ class TranzlatePreferencesDataSource
         private val dataStore: DataStore<Preferences>,
     ) {
         /**
-         * Every read derives from here rather than from `dataStore.data` directly.
+         * Every read derives from here rather than from `dataStore.data` directly,
+         * so this one catch protects all of them (issue #254).
          *
          * DataStore does not recover from a read failure on its own — the exception
          * is delivered to the collector, which for us is a `viewModelScope`, and an
          * unhandled one there takes the app down on launch with no way out but
          * clearing app data. The factory's `corruptionHandler` repairs a corrupt
-         * *file*; this covers the transient I/O failures it does not.
+         * *file*; this covers the transient failures it does not. The eager readers
+         * make it a launch crash specifically: `TextViewModel` collects source /
+         * target / mode through `stateIn(…, Eagerly)`, which starts at construction
+         * with no handler attached, so the first read on a cold start is the one
+         * that would fall over.
          *
-         * Only IOException is swallowed: anything else is a programming error and
-         * must stay loud.
+         * Degrades ANY non-cancellation `Throwable`, not only `IOException` (issue
+         * #254, widening #236's persistence guards to the one read that was missed).
+         * The narrow `IOException`-only form let everything else — a decode bug, a
+         * keystore / JNI `LinkageError`, an `IllegalStateException` from a DataStore
+         * internal — escape into those eager scopes and crash the Text screen before
+         * it drew a frame. A preference read is a best-effort convenience; none of
+         * it is worth the launch. The failure is not hidden from engineers, only
+         * from the user: it still reaches logcat / crash breadcrumbs through the
+         * app-scope `CoroutineExceptionHandler` (issue #238).
+         *
+         * `CancellationException` is rethrown by name FIRST and never degraded: it
+         * is structured concurrency's cancellation signal, not a read failure, and
+         * emitting in its place would keep a cancelled collector alive. Same shape
+         * as [editSafely] and the #236 guards.
+         *
+         * The asymmetry with [editSafely] is deliberate. A failed *read* into an
+         * eager scope degrades so the screen still opens; a failed *write* stays
+         * loud (`IOException`-only) so a preference that did not persist is a
+         * visible mis-save, never a silent lie. Read degrades, write surfaces.
          */
         private val preferences: Flow<Preferences> =
             dataStore.data.catch { cause ->
-                if (cause is IOException) emit(emptyPreferences()) else throw cause
+                if (cause is kotlin.coroutines.cancellation.CancellationException) throw cause
+                emit(emptyPreferences())
             }
 
         /**

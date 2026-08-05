@@ -68,13 +68,50 @@ class TranzlatePreferencesDataSourceTest {
             assertThat(source.sourceLang.first()).isEqualTo("en")
         }
 
-    /** Anything that is not I/O is a programming error and must stay loud. */
-    @Test(expected = IllegalStateException::class)
-    fun `a non-IO failure still propagates`() =
+    /**
+     * The launch-crash guard, widened past I/O (issue #254). A read that fails
+     * for ANY non-cancellation reason — a decode bug, a keystore/JNI linkage
+     * error, an `IllegalStateException` from a DataStore internal — must degrade
+     * to the defaults exactly as an I/O failure does. The eager
+     * `stateIn(…, Eagerly)` readers on the Text screen (source / target / mode)
+     * collect at construction with no handler, so before #254 any non-I/O read
+     * failure crashed the screen on cold start instead of opening it.
+     *
+     * The mutation this locks down: narrowing the source catch back to
+     * `IOException` only makes this test throw `IllegalStateException` from
+     * `.first()` instead of returning a default — red. The write side stays
+     * `IOException`-only on purpose; `a non-IO failure on write still propagates`
+     * below is the twin that must stay green while this one flips.
+     */
+    @Test
+    fun `a non-IO read failure degrades to defaults instead of propagating`() =
         runTest {
-            TranzlatePreferencesDataSource(FailingDataStore(IllegalStateException("bug")))
-                .theme
-                .first()
+            val source = TranzlatePreferencesDataSource(FailingDataStore(IllegalStateException("bug")))
+
+            assertThat(source.theme.first()).isEqualTo(0)
+            assertThat(source.dynamicColor.first()).isFalse()
+            assertThat(source.sourceLang.first()).isEqualTo("en")
+        }
+
+    /**
+     * Cancellation is not a read failure. A `CancellationException` reaching the
+     * source catch must propagate so a cancelled collector actually stops — the
+     * same reason `DownloadGateTest` guards the metered gate. This is the boundary
+     * of the widening above: "degrade any `Throwable`" must still exempt
+     * cancellation, or structured concurrency breaks.
+     *
+     * Mutation: dropping the `is CancellationException` rethrow in the source
+     * catch degrades it to `emptyPreferences()` instead, `.first()` returns 0, and
+     * the `expected` throw never happens — red. (Verified: the `Flow.catch`
+     * operator delivers an upstream `CancellationException` to its lambda, so this
+     * rethrow is load-bearing, not defensive.)
+     */
+    @Test(expected = kotlin.coroutines.cancellation.CancellationException::class)
+    fun `a CancellationException from the read is rethrown, not degraded`() =
+        runTest {
+            TranzlatePreferencesDataSource(
+                FailingDataStore(kotlin.coroutines.cancellation.CancellationException("collector left")),
+            ).theme.first()
         }
 
     // ---- issue #238: reads were guarded, writes were not --------------------
