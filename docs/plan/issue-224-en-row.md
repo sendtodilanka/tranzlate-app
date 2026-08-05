@@ -105,3 +105,13 @@ incl. the Robolectric render tests, androidTest compilation, both debug APKs).
   rather than anything about the model (the online tiers' NETWORK cause wins over
   ML Kit's `MODEL_NOT_DOWNLOADED`).
 - Debug-only second launcher icon (LeakCanary) makes `monkey -c LAUNCHER` ambiguous.
+
+## Landed — PR #292
+Cross-model co-verify (Sonnet 5) **APPROVE-WITH-NOTES**. Attack 1 (the crux) passed by mutation:
+`if (!isPivotLanguage(row.id))` wraps the whole trailing-control `when`, so all five states skip
+the control for the pivot (guard removed → `OfflinePivotRowRenderTest` RED at :65/:98; restored →
+GREEN; `:feature:language:test` 345/0; `preflight` 752/752 fresh). The ML Kit pivot was re-verified
+against the AAR metadata (58 X↔en pairs, no standalone `en`). One finding, **not this PR's diff:**
+the **language picker** also offers Download on the English row (`LanguagePickerModel.rowStateOf` →
+`Downloadable`, unguarded) — a pre-existing sibling filed as **#293**; the PR body's "picker shows
+badges never buttons" claim was corrected.
