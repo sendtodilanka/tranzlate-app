@@ -5,9 +5,11 @@ status: accepted
 owner directed continuing wave 1b, 2026-08-05. Refs: #240.)
 
 ## The gap
-`PackFailureSheetHost` (`feature/language/.../LanguagePickerScreen.kt:~415-422`) has **no
-test**: nothing passes a non-null `packFailure` into `LanguagePickerContent`. Three things
-escape (worst first):
+`PackFailureSheetHost` (`feature/language/.../LanguagePickerScreen.kt:~415-422`) is
+under-tested. **CORRECTION (build finding, rule 12):** the original claim "nothing passes a
+non-null `packFailure` into `LanguagePickerContent`" was **stale** — `PackFailureSheetsTest:257-316`
+already drives it non-null for two cases (19b dismiss, 19d dismiss). So dismiss-order was
+covered; what escapes (worst first) and is genuinely new here:
 1. **Retry wiring** (`:419-422`, `onRetry = { onDismiss(); onRetry(request.id) }`) — drop the
    `onDismiss()` and a stale "did not download" sits over a re-running download; wrong id →
    wrong language retried. Nothing goes red.
