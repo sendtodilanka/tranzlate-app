@@ -149,6 +149,39 @@ class DownloadGateTest {
         }
 
     /**
+     * The THIRD read the metered decision makes, and until #280 the only one with
+     * no committed guard. #248 added `connectivity.isOnline()` to this same
+     * try/catch; it is a synchronous binder call into `ConnectivityManager` just
+     * like `isMetered()`, and a binder call can fail. When the connectivity state
+     * cannot be read, the decision is unanswerable exactly as an unreadable meter
+     * ([an unanswerable metered check asks...]) or an unreadable preference
+     * ([an unreadable standing permission asks...]) is — so it ASKS and starts
+     * nothing. Assuming "offline, proceed" would hand a download to the manager on
+     * a guess; assuming "online, metered" would be the silent spend #90 forbids.
+     * The safe side is the question, and it is the same safe side for all three
+     * reads.
+     *
+     * The #280 cross-model co-verify lens proved this behaviour with a throwaway
+     * experiment and asked for it to be a committed regression instead — a check
+     * that lives only in a transcript is not a check. Mutation, decided before the
+     * test (rule 11): degrade the `catch (Throwable)` arm below from `true` (ask)
+     * to `false` (download). RED there — the `isOnline()` throw then falls through
+     * to `modelManager.download` and the row is charged a guess; GREEN with the
+     * arm intact.
+     */
+    @Test
+    fun `an unreadable connectivity state asks rather than assuming consent`() =
+        runTest {
+            connectivity.onlineFailure = IllegalStateException("connectivity binder died")
+            prefs.state.value = false
+
+            gate.requestDownload("de")
+
+            assertThat(manager.downloads).isEmpty()
+            assertThat(gate.pendingConsent.value).isEqualTo("de")
+        }
+
+    /**
      * The guard may not swallow an `Error` INTO a silent success either: an
      * unanswerable decision still has to land somewhere the user can act.
      */
