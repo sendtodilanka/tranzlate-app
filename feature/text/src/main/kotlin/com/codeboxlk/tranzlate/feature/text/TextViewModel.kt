@@ -59,6 +59,12 @@ private const val KEY_LAST_SRC = "text_last_request_src"
 private const val KEY_LAST_TGT = "text_last_request_tgt"
 private const val KEY_LAST_MODE = "text_last_request_mode"
 
+// The last valid (both real, distinct) selection pair, kept so sheet 19m's Swap
+// can restore what a duplicate selection displaced — even across process death
+// (#130 PR-20). See [TextViewModel.onSwapLanguages]'s degenerate branch.
+private const val KEY_VALID_SRC = "text_valid_pair_src"
+private const val KEY_VALID_TGT = "text_valid_pair_tgt"
+
 /** Which face the read side was showing when the process died (issue #48). */
 private const val STATE_TRANSLATING = "translating"
 private const val STATE_RESULT = "result"
@@ -104,6 +110,38 @@ data class StarFailure(
     val intent: StarIntent,
     val result: TextUiState.Result,
 )
+
+/**
+ * How a degenerate selection (source == target == [duplicated]) resolves when 19m
+ * asks to Swap, or is dismissed — **ALWAYS to a non-degenerate pair**, so 19m is
+ * never a dead end.
+ *
+ * #299 co-verify proved the old `?: return false` WAS a dead end: process death
+ * drops the in-memory-written last-valid pair (the init collector had not re-run)
+ * while DataStore keeps the degenerate selection, so on relaunch Swap and the
+ * scrim/back — both of which call [TextViewModel.onSwapLanguages] — did nothing,
+ * and only "Pick another" escaped. This resolution never fails:
+ *
+ * - With the last valid pair known, it is that pair **swapped**: the duplicated
+ *   language lands on the side the user picked it for (the drawn pre-commit swap).
+ * - Without it, the duplicated language is kept as the **target** (where "already
+ *   the source" put it) and paired with a fallback **source** that differs from it
+ *   — a valid pair to translate with now, or to replace via "Pick another".
+ *
+ * Pure so the process-death case is reproducible without fighting the collector's
+ * timing (`DuplicateSelectionTest`). `@return` (source, target), source != target.
+ */
+internal fun degenerateResolution(
+    duplicated: String,
+    lastValidSource: String?,
+    lastValidTarget: String?,
+): Pair<String, String> =
+    if (lastValidSource != null && lastValidTarget != null && lastValidSource != lastValidTarget) {
+        lastValidTarget to lastValidSource
+    } else {
+        val fallbackSource = if (duplicated != FALLBACK_SOURCE_LANG) FALLBACK_SOURCE_LANG else FALLBACK_TARGET_LANG
+        fallbackSource to duplicated
+    }
 
 /**
  * The Text vertical's ONE state holder (APP_STRUCTURE — the screen ASKS the
@@ -332,6 +370,22 @@ class TextViewModel
         // the assignment, leaving a live coroutine nothing could cancel.
         init {
             restoreState()
+            // Remember the last VALID selection pair (both real, distinct) so sheet
+            // 19m's Swap can restore what a duplicate displaced (#130 PR-20). The
+            // picker writes the selection straight to prefs without calling this VM,
+            // so the only way to know the pre-duplicate pair is to watch the flows.
+            // A pair containing Detect, or an already-degenerate one, is not a pair a
+            // Swap could sensibly restore, so it is not recorded. viewModelScope, so
+            // it dies with the VM — not one of the sanctioned screen-outlivers.
+            viewModelScope.launch {
+                combine(sourceLang, targetLang) { source, target -> source to target }
+                    .collect { (source, target) ->
+                        if (source != AUTO_LANG && target != AUTO_LANG && source != target) {
+                            savedStateHandle[KEY_VALID_SRC] = source
+                            savedStateHandle[KEY_VALID_TGT] = target
+                        }
+                    }
+            }
         }
 
         /**
@@ -432,6 +486,27 @@ class TextViewModel
             }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
         /**
+         * Sheet 19m's trigger (#130 PR-20): the duplicated language id when the
+         * current selection is **degenerate** — source and target the same real
+         * language — else null.
+         *
+         * The picker can reach this state because since the #130 rev.3 decouple
+         * (#123.2) it commits a choice straight to [prefs] and does not itself
+         * refuse the opposite side's language; this app cannot add that refusal in
+         * the picker without colliding with the PR that owns it, so the guard is
+         * here, and the app shell turns a non-null value into the stateless 19m
+         * sheet (`:feature:language`) so `:feature:text` gains no dependency on it.
+         *
+         * The "auto" sentinel is never a real target, so a Detect source can never
+         * equal the target — 19m cannot fire with Detect, which is why [onSwapLanguages]'s
+         * degenerate branch does not have to think about it.
+         */
+        val duplicateSelection: StateFlow<String?> =
+            combine(sourceLang, targetLang) { source, target ->
+                if (source != AUTO_LANG && source == target) source else null
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+        /**
          * UI_SPEC §2.2 swap ⇄ — one atomic pair write. With source = Detect the
          * target must NEVER become "auto" (issue #70): the swap resolves through
          * the shown result's detected language. The false branch is a race
@@ -439,13 +514,35 @@ class TextViewModel
          */
         fun onSwapLanguages(): Boolean {
             val currentSource = sourceLang.value
+            val currentTarget = targetLang.value
+            // Sheet 19m's Swap (#130 PR-20). The selection is degenerate — the user
+            // picked the language already on the other side — so there is nothing to
+            // swap in the CURRENT pair (swapping X with X is a no-op, the dead
+            // affordance EDGE_CASES §7 forbids). [degenerateResolution] ALWAYS
+            // produces a valid pair, so this branch cannot dead-end even when the
+            // remembered pair is gone (process death, #299 co-verify); Swap and the
+            // scrim/back both come through here and both always resolve. The Detect
+            // and plain-pair paths below are untouched, and their existing tests stay
+            // green because they never reach this branch.
+            if (currentSource != AUTO_LANG && currentSource == currentTarget) {
+                val (newSource, newTarget) =
+                    degenerateResolution(
+                        duplicated = currentSource,
+                        lastValidSource = savedStateHandle.get<String>(KEY_VALID_SRC),
+                        lastValidTarget = savedStateHandle.get<String>(KEY_VALID_TGT),
+                    )
+                viewModelScope.launch {
+                    prefs.setLanguagePair(sourceId = newSource, targetId = newTarget)
+                }
+                return true
+            }
             val newTarget =
                 if (currentSource == AUTO_LANG) {
                     (state as? TextUiState.Result)?.resolvedSourceLang ?: return false
                 } else {
                     currentSource
                 }
-            val newSource = targetLang.value
+            val newSource = currentTarget
             viewModelScope.launch {
                 prefs.setLanguagePair(sourceId = newSource, targetId = newTarget)
             }

@@ -226,4 +226,36 @@
     <string name="lang_dialog_manage_packs">Manage packs</string>
     <string name="lang_dialog_cancel">Cancel</string>
     <string name="lang_dialog_close">Close</string>
+
+    <!-- 19h — offline, pack missing (#130 PR-20). The one sheet the export calls
+         "the case the whole app hangs on": raised at the app shell when a Text
+         translation fails offline (AttemptCause.OFFLINE) and the selected target has
+         no pack, it does not just refuse — it offers the packs already on the device
+         so the task can still finish. A TranzlateListSheet: the on-device languages
+         are its rows, each a "Use X" choice, with the same action filled for the
+         first as the export's "Use Spanish". Hosted at the shell, not the composer,
+         because the composer must not gain a dependency on this module (ruling §0 P3,
+         :26). -->
+    <string name="lang_sheet_offline_title">You are offline</string>
+    <string name="lang_sheet_offline_body">%1$s has no pack on this device yet. These are ready to use right now.</string>
+    <!-- Both the filled primary (the first on-device language) and each row's own
+         choice / accessible name. -->
+    <string name="lang_sheet_offline_use">Use %1$s</string>
+    <!-- Identical wording to lang_dialog_close / lang_sheet_failed_close, and that is
+         tidiness rather than drift (STRINGS_language §9): three "Close" controls that
+         cannot tell a user three different things. Its own key so 19h owns its text. -->
+    <string name="lang_sheet_offline_close">Close</string>
+
+    <!-- 19m — already the source (#130 PR-20). The smallest sheet: raised when the
+         current selection is degenerate — source and target are the same real
+         language, which the picker can produce because since the #130 rev.3 decouple
+         it commits a choice straight to prefs and does not refuse the opposite side's
+         language. "Swap" is the likely intent, so it is the filled action; it
+         restores the pair the duplicate displaced (TextViewModel keeps the last valid
+         pair). "Pick another" reopens the target picker. No tonal icon — the export's
+         caption calls it "no icon fanfare". -->
+    <string name="lang_sheet_already_title">%1$s is already the source</string>
+    <string name="lang_sheet_already_body">Pick a different target, or swap the two languages.</string>
+    <string name="lang_sheet_already_swap">Swap</string>
+    <string name="lang_sheet_already_pick">Pick another</string>
 </resources>

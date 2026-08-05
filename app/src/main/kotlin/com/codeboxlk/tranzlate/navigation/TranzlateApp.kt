@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleStartEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -21,13 +22,17 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
+import com.codeboxlk.tranzlate.MainActivityViewModel
 import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.model.LanguageRole
+import com.codeboxlk.tranzlate.core.ui.languageLabel
 import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
+import com.codeboxlk.tranzlate.feature.language.AlreadySourceSheet
 import com.codeboxlk.tranzlate.feature.language.LanguagePickerScreen
 import com.codeboxlk.tranzlate.feature.language.OfflineLanguagesScreen
+import com.codeboxlk.tranzlate.feature.language.OfflinePackMissingSheet
 import com.codeboxlk.tranzlate.feature.language.PickerDialogHost
 import com.codeboxlk.tranzlate.feature.language.PickerHost
 import com.codeboxlk.tranzlate.feature.language.pickerHost
@@ -50,6 +55,10 @@ fun TranzlateApp(
 ) {
     val backStack = rememberNavBackStack(TextNavKey)
     val textViewModel: TextViewModel = hiltViewModel()
+    // The app-shell state VM (theme + the two composer-raised sheets, 19h/19m).
+    // hiltViewModel() at the composition root resolves to the Activity's
+    // ViewModelStore — the SAME instance MainActivity reads for the splash gate.
+    val mainViewModel: MainActivityViewModel = hiltViewModel()
 
     // 17c/17d: on a tablet the picker is a card over whatever is on screen, so it
     // is NOT a back-stack entry — the screen behind it has to stay composed, and
@@ -99,19 +108,28 @@ fun TranzlateApp(
         pushEntry(backStack, from = composedTop, key = key)
     }
 
+    // The ONE place a NEW picker is opened, so the window's host answer is read
+    // exactly ONCE here (`PickerHostRoutingTest` pins the count — a second read
+    // anywhere would gate the OPEN card on the window and close it under a user
+    // who unfolded mid-search). Used by the language chips AND by 19m's "Pick
+    // another", which both open a picker for a role and neither of which decides
+    // an already-open card.
+    fun openPicker(role: LanguageRole) {
+        openLanguagePicker(
+            role = role,
+            host = hostForNextPicker,
+            openDialog = { pickerDialogForSource = it == LanguageRole.SOURCE },
+            navigate = ::navigateTo,
+        )
+    }
+
     SharedTransitionLayout {
         AppNavDisplay(
             backStack = backStack,
             textViewModel = textViewModel,
             onNavigate = ::navigateTo,
-            onPickLanguage = { role ->
-                openLanguagePicker(
-                    role = role,
-                    host = hostForNextPicker,
-                    openDialog = { pickerDialogForSource = it == LanguageRole.SOURCE },
-                    navigate = ::navigateTo,
-                )
-            },
+            onPickLanguage = ::openPicker,
+            onOfflinePackMissing = mainViewModel::onOfflinePackMissing,
             sharedScope = this,
         )
     }
@@ -132,6 +150,43 @@ fun TranzlateApp(
                     navigate = ::navigateTo,
                 )
             },
+        )
+    }
+
+    // Sheet 19h (#130 PR-20) — composed AFTER the NavDisplay and OUTSIDE it, the
+    // reasons PickerDialogHost is: a sheet inside the display would replace the
+    // screen it is meant to sit over. It is raised by the Text composer (which
+    // HOISTS onOfflinePackMissing into `mainViewModel`) but hosted here, because
+    // the composer cannot host a `:feature:language` sheet without `:feature:text`
+    // depending on that module — so the composition root, which already depends on
+    // every feature, does (ruling §0 P3, :26).
+    val offlinePackMissing by mainViewModel.offlinePackMissing.collectAsStateWithLifecycle()
+    offlinePackMissing?.let { request ->
+        OfflinePackMissingSheet(
+            missingLangId = request.missingLangId,
+            onDeviceLangIds = request.onDeviceLangIds,
+            onUse = mainViewModel::useLanguage,
+            onClose = mainViewModel::dismissOfflinePackMissing,
+        )
+    }
+
+    // Sheet 19m (#130 PR-20) — the duplicate-selection guard, hosted the same way.
+    // It reads `textViewModel.duplicateSelection` directly (the VM is already at
+    // this shell), so nothing is hoisted for it. Suppressed while a picker is open
+    // so that "Pick another" — which reopens the target picker — does not leave 19m
+    // floating over it. A degenerate pair has no valid no-op to return to, so every
+    // way out RESOLVES it to a valid pair: Swap and a scrim/back dismiss both call
+    // `onSwapLanguages`, whose degenerate branch never dead-ends even when the
+    // remembered pair is gone (#299 co-verify — process death), and Pick another
+    // reopens the picker. The guard clears itself the instant source ≠ target again.
+    val duplicateSelection by textViewModel.duplicateSelection.collectAsStateWithLifecycle()
+    val pickerOpen = pickerDialogForSource != null || backStack.lastOrNull() is LanguagePickerNavKey
+    duplicateSelection?.takeUnless { pickerOpen }?.let { duplicateId ->
+        AlreadySourceSheet(
+            languageName = languageLabel(duplicateId),
+            onSwap = { textViewModel.onSwapLanguages() },
+            onPickAnother = { openPicker(LanguageRole.TARGET) },
+            onDismiss = { textViewModel.onSwapLanguages() },
         )
     }
 }
@@ -190,6 +245,7 @@ private fun AppNavDisplay(
     textViewModel: TextViewModel,
     onNavigate: (NavKey) -> Unit,
     onPickLanguage: (LanguageRole) -> Unit,
+    onOfflinePackMissing: (String?) -> Unit,
     sharedScope: SharedTransitionScope,
 ) {
     // EVERY way out of a destination funnels through here — the system gesture,
@@ -264,6 +320,7 @@ private fun AppNavDisplay(
                         onBack = { pop(ComposerNavKey) },
                         onOpenPaywall = { onNavigate(PaywallNavKey) },
                         onPickLanguage = onPickLanguage,
+                        onOfflinePackMissing = onOfflinePackMissing,
                         cardModifier =
                             with(sharedScope) {
                                 Modifier.sharedBounds(

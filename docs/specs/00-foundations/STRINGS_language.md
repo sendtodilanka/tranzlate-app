@@ -225,6 +225,72 @@ here — consolidating two keys into one needs the `stringResource` call site in
 `OfflineLanguagesScreen.kt`, which #229's PR owned only the previews of. Recorded as a residual on
 **#250**, the open issue about that same control on that same screen.
 
+## 5.5 Offline, pack missing — sheet 19h (#130 PR-20)
+
+Raised at the **app shell**, not at any screen. The Text composer HOISTS
+`onOfflinePackMissing(langId)` when a translation fails offline
+(`AttemptCause.OFFLINE`, which means every engine was unreachable — so the target
+has no pack AND there is no connection); `MainActivityViewModel` gates it on
+`ConnectivityMonitor.online` (interface in `:core:common`, not `:core:translate`
+as the ruling row says — corrected against the tree) and on there being other
+on-device packs to offer. The sheet lives in `:feature:language` (owns the
+strings), and the composer never depends on that module — the composition root
+hosts a composer-raised cross-feature sheet (ruling §0 P3 falsification, :26).
+
+It is the export's *"case the whole app hangs on… does not just refuse — it
+offers what is already on the device."* A `TranzlateListSheet`: the on-device
+languages are its rows, each a tappable **"Use %1$s"**, and the filled primary
+uses the first (the export's *"Use Spanish"*). Owned by `OfflinePackMissingSheet.kt`.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_sheet_offline_title` | string | `You are offline` | — | no language name — the title states the condition, the body names the pack |
+| `lang_sheet_offline_body` | string | `%1$s has no pack on this device yet. These are ready to use right now.` | missing language name | as drawn |
+| `lang_sheet_offline_use` | string | `Use %1$s` | language name | the filled primary (first on-device language) **and** each row's own choice + accessible name. The offered list EXCLUDES the current source, so no `Use X` can create the same-language pair 19m guards — a no-dead-end refinement of the drawn list |
+| `lang_sheet_offline_close` | string | `Close` | — | the text action. Identical to `lang_dialog_close` / `lang_sheet_failed_close`; three "Close" controls that cannot tell a user three different things (§9 tidiness), each owning its own key |
+
+### 5.5.1 Sheet 19h — testTags (C-1)
+
+`tt_lang_sheet_offline` (root) · `tt_lang_sheet_offline_use` (filled primary) ·
+`tt_lang_sheet_offline_close` (text action) · `tt_lang_sheet_offline_row_<id>`
+(one per offered on-device language row — each a "Use X" choice with the language
+name and state in its own description).
+
+## 5.6 Already the source — sheet 19m (#130 PR-20)
+
+The smallest sheet. Raised at the **app shell** from `TextViewModel.duplicateSelection`
+— non-null when the current selection is **degenerate**: source and target are the
+same real language. The picker can produce this because since the #130 rev.3
+decouple (#123.2) it commits a choice straight to `TranslatePrefsRepository` and
+does not itself refuse the opposite side's language, and this app cannot add that
+refusal in the picker without a cross-PR collision (#297 owns it). So the guard is
+reactive, in `TextViewModel` (the "TextViewModel verify" the ruling names), and the
+stateless sheet is `AlreadySourceSheet.kt` in `:feature:language`.
+
+**"Swap" restores the pair the duplicate displaced.** The export's swap is the
+pre-commit swap (source ⇄ the language the user picked); reproduced post-commit by
+swapping the **last valid pair**, which `TextViewModel` keeps in its
+`SavedStateHandle` so it survives process death. `onSwapLanguages` gained this one
+degenerate branch; every existing swap path is untouched. **"Pick another"** reopens
+the target picker (`onPickLanguage(TARGET)` at the shell). **Icon:** the sheet draws
+the `swap_horiz` glyph the export's `19m` frames actually contain (a 44dp
+`primaryContainer` slot) — the caption's *"no icon fanfare"* contradicts its own
+drawn pixels, and the pixels win (#299 co-verify).
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_sheet_already_title` | string | `%1$s is already the source` | language name | as drawn (redrawn on the actual source in rev 5, #180) |
+| `lang_sheet_already_body` | string | `Pick a different target, or swap the two languages.` | — | as drawn — one sentence, both ways out |
+| `lang_sheet_already_swap` | string | `Swap` | — | the filled action (the likely intent, spec §5) |
+| `lang_sheet_already_pick` | string | `Pick another` | — | the text action — reopens the target picker |
+
+### 5.6.1 Sheet 19m — testTags (C-1)
+
+`tt_lang_sheet_already` (root) · `tt_lang_sheet_already_swap` (filled) ·
+`tt_lang_sheet_already_pick` (text). No `cd_*` of its own — a `TranzlateSheetScaffold`
+puts `paneTitle` on the root and `heading()` on the title, which is what a screen
+reader lands on.
+
 ## 6. Language picker — accessibility (C-4)
 
 Row descriptions carry the language name **and** its state, because the trailing icon alone says
