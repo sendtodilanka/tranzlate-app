@@ -73,3 +73,12 @@ beyond adding tests that call its existing `put`.)
 
 ## Verify
 `./gradlew :feature:language:test` green; mutate-first RED proof recorded; `./gradlew preflight`.
+
+## Landed — PR #288
+Co-verify (Sonnet 5, cross-model) **APPROVE** (no notes). The crux — *can a user-cancel ever
+surface as `Failed`?* — was traced through `RealOfflineModelManager.delete` at every branch
+including two races (cancel racing a same-moment network failure; cancel mid-`refreshDownloaded`),
+and no path to `Failed` exists (the `CancellationException` rethrow wins at each throw site). No
+production change (the lens noted the `..` diff was a false positive from `main` advancing two PRs;
+the merge-base `...` diff is 149/0 — the two tests + this doc only). Mutate-first reproduced
+verbatim; the two endings proven independent (a `Deleting`-only mutation reddens only that test).
