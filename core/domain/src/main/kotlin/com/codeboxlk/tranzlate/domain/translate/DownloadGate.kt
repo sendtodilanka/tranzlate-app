@@ -14,6 +14,10 @@ import kotlinx.coroutines.flow.first
  *
  * The rules, all of them:
  *  - Wi-Fi (or any unmetered link) never asks — [requestDownload] just starts.
+ *  - NO network at all never asks either — a metered answer is meaningless when
+ *    there is nothing to charge (#248). The tap is handed to the manager, whose
+ *    pre-flight refuses it with Failed(NETWORK); 19a is for a metered link that
+ *    EXISTS, not for the absence of one.
  *  - Metered AND no standing permission → [pendingConsent] carries the id the
  *    question is about and the download does NOT start. The screen owns nothing
  *    but the dialog it draws from that one value.
@@ -73,9 +77,11 @@ class DownloadGate(
     val pendingConsent: StateFlow<String?> = consentQuestion.question
 
     /**
-     * A row's ⬇ / ↻ tap. Starts the download, unless the connection is
-     * metered and no standing permission exists — in which case it raises
-     * the question instead and starts NOTHING.
+     * A row's ⬇ / ↻ tap. Starts the download, unless the connection is ONLINE
+     * and metered and no standing permission exists — in which case it raises
+     * the question instead and starts NOTHING. No network at all is not a metered
+     * link (#248): it falls through to the manager, which refuses it rather than
+     * asking the user to accept a charge on a plan that cannot be used.
      *
      * **An unanswerable decision ASKS (issue #238).** Neither half of it was
      * guarded before: the standing-preference read is a DataStore read, and
@@ -107,13 +113,30 @@ class DownloadGate(
         val mustAsk =
             try {
                 val allowed = downloadPrefs.allowMobileData.first()
-                connectivity.isMetered() && !allowed
+                // #248: no radio is not a metered link. isMetered() best-guesses
+                // TRUE when there is NO active network (AOSP falls through to a
+                // documented guess), so without the isOnline() gate the consent
+                // sheet 19a opened in airplane mode — asking the user to accept a
+                // charge on a plan that cannot be used, whose "Download now" then
+                // started nothing. Only a metered link that ACTUALLY EXISTS is a
+                // consent question; no network short-circuits to false and falls
+                // through to modelManager.download, whose #218/#247 pre-flight
+                // refuses it with Failed(NETWORK) → sheet 19d, the settled
+                // no-connection outcome.
+                //
+                // isOnline() is the FIRST conjunct so a positively-offline device
+                // never consults the best-guess at all. The allowed read stays a
+                // statement ABOVE this line, not a fourth conjunct, so it still
+                // throws into the catch below on an unreadable store (the #238
+                // guarantee) instead of being short-circuited past when the link
+                // is unmetered.
+                connectivity.isOnline() && connectivity.isMetered() && !allowed
             } catch (rethrown: CancellationException) {
                 throw rethrown // never break structured cancellation
             } catch (
                 @Suppress("TooGenericExceptionCaught", "SwallowedException") unanswerable: Throwable,
             ) {
-                true // cannot tell whether this link is metered — ask, never assume
+                true // the metered decision could not be established — ask, never assume
             }
         return if (mustAsk) {
             consentQuestion.raise(id)
