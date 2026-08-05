@@ -190,14 +190,16 @@ argued:
 | `lang_sheet_remove_inuse_title` | string | `%1$s is in use right now` | language name | 19g, as drawn |
 | `lang_sheet_remove_inuse_body` | string | `It is your target language, and it stays your target. Translations into %1$s will need a connection until you download it again.` | language name | **NOT as drawn** — see above. What 19g adds over 19f is immediacy: this is not a capability the user might miss one day, it is the next translation they make |
 | `lang_sheet_remove_inuse_confirm` | string | `Remove anyway` | — | as drawn. The word still reads correctly: the sheet does state a reason to hesitate |
-| `lang_sheet_remove_inuse_saved` | plurals | `%1$d saved phrase uses %2$s. It stays saved and still opens without a connection.` / `%1$d saved phrases use %2$s. They stay saved and still open without a connection.` | count, language name | first sentence as drawn and true — saved rows live in Room and nothing on the delete path can reach them; second sentence corrected. A plural because `%1$d` in a plain string renders "1 saved phrases". **Drawn only above zero** — the line is ABSENT at zero, never a sentence about nothing (the same decision an empty recents section already gets) |
+| `lang_sheet_remove_inuse_saved` | plurals | `%1$d saved phrase uses %2$s. It stays saved and still opens without a connection.` / `%1$d saved phrases use %2$s. They stay saved and still open without a connection.` | count, language name | first sentence as drawn and true — saved rows live in Room and nothing on the delete path can reach them; second sentence corrected. A plural because `%1$d` in a plain string renders "1 saved phrases". **Drawn only above zero** — the line is ABSENT at zero, never a sentence about nothing (the same decision an empty recents section already gets). **Reused by 19f too (#230):** removing any pack affects saved phrases the same way, so BOTH sheets draw this line above zero — 19f under `tt_lang_sheet_remove_saved`, 19g under `tt_lang_sheet_remove_inuse_saved` |
 
 ### 5.4.1 Sheets 19f/19g — testTags (C-1)
 
 `tt_lang_sheet_remove` (19f root) · `tt_lang_sheet_remove_confirm` · `tt_lang_sheet_remove_cancel` ·
+`tt_lang_sheet_remove_saved` (19f's saved-phrases ROW — **added #230**, drawn only above zero; its
+glyph is decorative and the sentence carries the fact) ·
 `tt_lang_sheet_remove_inuse` (19g root) · `tt_lang_sheet_remove_inuse_confirm` ·
-`tt_lang_sheet_remove_inuse_saved` (the whole bookmark ROW; its glyph is decorative and the
-sentence carries the fact) · `tt_lang_sheet_remove_inuse_cancel`.
+`tt_lang_sheet_remove_inuse_saved` (19g's equivalent bookmark ROW; decorative glyph) ·
+`tt_lang_sheet_remove_inuse_cancel`.
 
 ### 5.4.2 Accessibility
 
