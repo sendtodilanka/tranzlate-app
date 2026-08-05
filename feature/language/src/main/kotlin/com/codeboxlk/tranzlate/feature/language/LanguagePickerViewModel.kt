@@ -39,9 +39,26 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
-/** DECISIONS defaults table (pre-first-emission frame only — DataStore owns the real default). */
-private const val FALLBACK_SOURCE_LANG = "en"
-private const val FALLBACK_TARGET_LANG = "fr"
+/**
+ * Seed for the two selection flows: an id no row can match, so the picker's
+ * radio group ticks NOTHING until DataStore's first real value arrives (#154).
+ *
+ * `stateIn` emits its seed synchronously, before the preference has been read.
+ * Seeding a real default (`en`/`fr`) meant a `de → ja` user saw English or
+ * French carry the tick for one frame on every open — a control stating a choice
+ * the app had not read yet. The empty id matches no catalog row
+ * (`language.id == ""` is false for every id) and not the Detect sentinel
+ * (`"" != "auto"`), so the honest "no selection read yet" state is drawn until
+ * the real value lands. It can never arrive AS a real value: no language id is
+ * blank, and `select` only ever writes a real id or the `auto` sentinel.
+ *
+ * This is the same honesty the rest of this file already keeps — `library` seeds
+ * `null`, `offlineStates` `emptyMap()` — and it removes what was a THIRD copy of
+ * the DECISIONS defaults table. The real default lives once, in
+ * `TranzlatePreferencesDataSource` (`DEFAULT_SOURCE_LANG`/`DEFAULT_TARGET_LANG`),
+ * which `translatePrefs.sourceLang`/`targetLang` already apply.
+ */
+private const val NO_SELECTION_YET = ""
 
 /**
  * Saved-state keys for the picker's own screen state. Namespaced, because the
@@ -262,16 +279,20 @@ class LanguagePickerViewModel
          * hold a detector spelling ("iw", "zh-CN"), and served raw it would
          * tick NO row while the chip reads "Hebrew" — the #123.2 contradiction.
          * The "auto" sentinel resolves to null and passes through unchanged.
+         *
+         * Seeded with [NO_SELECTION_YET], not a language: until the preference is
+         * read the radio group ticks no row rather than a possibly-wrong one
+         * (#154). The first real emission from `translatePrefs` replaces it.
          */
         private val sourceSelection: StateFlow<String> =
             translatePrefs.sourceLang
                 .map(LanguageTagResolver::canonicalOrSelf)
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), FALLBACK_SOURCE_LANG)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), NO_SELECTION_YET)
 
         private val targetSelection: StateFlow<String> =
             translatePrefs.targetLang
                 .map(LanguageTagResolver::canonicalOrSelf)
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), FALLBACK_TARGET_LANG)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), NO_SELECTION_YET)
 
         /** The id the [role] side's radio should tick right now. */
         fun selection(role: LanguageRole): StateFlow<String> =
