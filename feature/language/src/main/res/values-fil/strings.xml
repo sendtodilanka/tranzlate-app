@@ -135,4 +135,14 @@
     <string name="lang_sheet_already_body">Pumili ng ibang target, o palitan ang dalawang wika.</string>
     <string name="lang_sheet_already_swap">Palitan</string>
     <string name="lang_sheet_already_pick">Pumili ng iba</string>
+
+    <!-- 20a — pack snackbars (#130 PR-22). NEEDS-TRANSLATION review (#115). -->
+    <string name="lang_snackbar_downloading">Dina-download ang %1$s</string>
+    <string name="lang_snackbar_action_view">Tingnan</string>
+    <string name="lang_snackbar_ready">Handa nang gamitin offline ang %1$s</string>
+    <string name="lang_snackbar_action_use">Gamitin</string>
+    <string name="lang_snackbar_removed">Inalis ang %1$s</string>
+    <string name="lang_snackbar_action_download_again">I-download ulit</string>
+    <string name="lang_snackbar_failed">Hindi na-download ang %1$s</string>
+    <string name="lang_snackbar_action_retry">Subukan ulit</string>
 </resources>

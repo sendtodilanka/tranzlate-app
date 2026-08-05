@@ -6,6 +6,7 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
+import com.codeboxlk.tranzlate.domain.translate.PackEvent
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateLanguage
@@ -16,13 +17,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -188,6 +193,42 @@ class RealOfflineModelManager internal constructor(
      * its Downloading wiped by the stale delete landing, and the row lied.
      */
     private val activeDeletes = ConcurrentHashMap<String, Job>()
+
+    /**
+     * The U-1 outcome channel (issue #130 PR-22, rev3 ruling §2). Hot, and
+     * bounded on purpose:
+     *
+     *  - `replay = 0` — a new collector is told nothing about the past. A pack
+     *    that finished while the app was backgrounded raises no snackbar on
+     *    return; [modelStates] shows the truth instead. A `Channel` would have
+     *    queued that finish and replayed it as a stale "ready", which is the exact
+     *    lie this file already refuses on [states] (the `replayExpiration = 0`
+     *    comment there, same reasoning).
+     *  - `extraBufferCapacity = 16` with `DROP_OLDEST` — the emitter is a download
+     *    coroutine, never a UI, so it must never be BLOCKED waiting for a snackbar
+     *    to be read. Under a burst with a slow or absent collector the OLDEST
+     *    notice is dropped and the newest kept; [emit] uses `tryEmit`, which with
+     *    this overflow policy always succeeds without suspending. 16 is the same
+     *    bound the ruling's register fixes for this buffer.
+     */
+    private val packEventsFlow =
+        MutableSharedFlow<PackEvent>(
+            replay = 0,
+            extraBufferCapacity = PACK_EVENTS_BUFFER,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
+
+    override val packEvents: SharedFlow<PackEvent> = packEventsFlow.asSharedFlow()
+
+    /**
+     * Publish a one-shot outcome notice. `tryEmit`, not `emit`, because the caller
+     * is always the download/delete coroutine and the DROP_OLDEST buffer above
+     * guarantees this never blocks it — a snackbar nobody is listening for is
+     * dropped, not backpressured onto the transfer.
+     */
+    private fun emit(event: PackEvent) {
+        packEventsFlow.tryEmit(event)
+    }
 
     /**
      * ML Kit's translatable-tag list is an SDK constant — `TranslateLanguage
@@ -397,6 +438,12 @@ class RealOfflineModelManager internal constructor(
                     if (owns(languageTag, self)) {
                         refreshDownloaded()
                         clearTransient(languageTag)
+                        // Ownership-checked outcome (U-1): only the job that still
+                        // owns the tag announces "ready". A Stopped-then-superseded
+                        // job whose ML Kit transfer landed late reaches here with
+                        // owns() false and stays silent — no 20a-2 for a pack the
+                        // user cancelled.
+                        emit(PackEvent.DownloadSucceeded(languageTag))
                     }
                 } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
                     // Cancelled by Stop: delete() owns the row's state now.
@@ -405,14 +452,47 @@ class RealOfflineModelManager internal constructor(
                     @Suppress("TooGenericExceptionCaught", "SwallowedException") cause: Exception,
                 ) {
                     if (owns(languageTag, self)) {
-                        setTransient(languageTag, OfflineModelState.Failed(cause.toFailure()))
+                        val failure = cause.toFailure()
+                        setTransient(languageTag, OfflineModelState.Failed(failure))
+                        // Ownership-checked outcome (U-1): the ASYNC failure of a
+                        // transfer that started. A pre-flight refusal never reaches
+                        // this catch — it returns Refused above and is reported by
+                        // the row + the call's answer, not doubled as a snackbar.
+                        emit(PackEvent.DownloadFailed(languageTag, failure))
                     }
                 } finally {
                     activeDownloads.remove(languageTag, self)
                 }
             }
-        activeDownloads[languageTag] = job
+        // Atomic claim (co-verify #304): putIfAbsent, not a plain put, so "one
+        // in-flight per tag" is not the non-atomic check-then-act the `containsKey`
+        // fast-path above is. Two threads racing one tag both pass that fast-path;
+        // only ONE wins here. The loser cancels its never-started LAZY job — so
+        // store.download() runs once and downloadScope keeps no leaked child — and
+        // returns Ignored WITHOUT announcing anything, exactly as the synchronous
+        // duplicate above does. Only the winner starts the transfer and emits
+        // Started, so a fast double-tap (row Retry pill + the 20a-4 snackbar Retry,
+        // both dispatched on IO) can no longer produce two "Download started"
+        // snackbars or two real ML Kit transfers of the same pack.
+        //
+        // Measured before this fix (co-verify #304): 2 threads on one tag over
+        // Dispatchers.Default, 500 trials, both callers got Started 47.2% of the
+        // time; a 64-way flood invoked store.download() 64x for one pack. The
+        // OUTCOME emits stayed sound throughout — owns()/activeDeletes.remove(tag,
+        // self) are re-checked atomically at the latest point — so only this
+        // registration, and the DownloadStarted riding on it, ever leaked.
+        // `RealOfflineManagerConcurrencyTest` pins it with REAL threads;
+        // runTest's single-thread scheduler cannot reach the race.
+        if (activeDownloads.putIfAbsent(languageTag, job) != null) {
+            job.cancel()
+            return DownloadAttempt.Ignored
+        }
         job.start() // registered BEFORE it runs — Stop can never miss the window
+        // The single confirmed-start point (U-1, 20a-1): reached only by the caller
+        // that WON the atomic claim above, after every pre-flight passed — so this
+        // notice can never come from a refused, ignored, or duplicate request,
+        // whether that duplicate is a second sequential tap or a concurrent race.
+        emit(PackEvent.DownloadStarted(languageTag))
         return DownloadAttempt.Started
     }
 
@@ -455,6 +535,13 @@ class RealOfflineModelManager internal constructor(
                     // via takeTransient, so a stale delete may not wipe its state.
                     if (activeDeletes.remove(languageTag, self)) {
                         clearTransient(languageTag)
+                        // Ownership-checked delete outcome (U-1, 20a-3). Guarded by
+                        // the SAME claim that clears the transient: a re-download
+                        // that took the tag mid-delete (takeTransient) revoked this
+                        // job's claim, so a stale delete lands here with the claim
+                        // gone and raises no "removed" over a row that is now
+                        // Downloading.
+                        emit(PackEvent.Deleted(languageTag))
                     }
                     // The refresh stays unconditional: whatever raced us, the
                     // platform delete DID run — the downloaded set must tell truth.
@@ -544,6 +631,14 @@ private const val REQUIRED_FREE_BYTES = 150L * 1024 * 1024
 private const val NANOS_PER_MILLI = 1_000_000L
 
 internal const val SHARED_STATE_IDLE_MILLIS = 5_000L
+
+/**
+ * The [RealOfflineModelManager.packEvents] burst buffer (U-1, #130 PR-22). With
+ * `DROP_OLDEST`, the 17th un-collected notice drops the oldest rather than
+ * blocking the download coroutine that emitted it. `internal` so the drop-oldest
+ * test asserts against the production number, not a copy of it.
+ */
+internal const val PACK_EVENTS_BUFFER = 16
 
 /**
  * How long a pack TRANSFER may take before we call it failed (issue #218).

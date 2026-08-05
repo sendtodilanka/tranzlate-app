@@ -303,4 +303,26 @@
     <string name="lang_sheet_already_body">Pick a different target, or swap the two languages.</string>
     <string name="lang_sheet_already_swap">Swap</string>
     <string name="lang_sheet_already_pick">Pick another</string>
+
+    <!-- 20a — pack snackbars (#130 PR-22). One-shot notices the app shell raises
+         from the manager's U-1 PackEvents channel: a transfer starting, finishing,
+         a pack removed, a download failing. Each carries the language name (%1$s)
+         and offers one action. The fifth 20a snackbar, "Waiting for Wi-Fi", is NOT
+         shipped: it depends on experiment E-W1, which has never run (#208), so its
+         strings would state a promise the app cannot verify it keeps. Each action
+         label is its own key even where the word repeats elsewhere (e.g.
+         lang_sheet_failed_retry), so each control owns its own text — the same rule
+         lang_sheet_offline_close follows against lang_dialog_close. -->
+    <string name="lang_snackbar_downloading">Downloading %1$s</string>
+    <!-- 20a-1 action → Manage packs, to watch the transfer. -->
+    <string name="lang_snackbar_action_view">View</string>
+    <string name="lang_snackbar_ready">%1$s is ready to use offline</string>
+    <!-- 20a-2 action → set the just-downloaded pack as the translation target. -->
+    <string name="lang_snackbar_action_use">Use</string>
+    <string name="lang_snackbar_removed">%1$s removed</string>
+    <!-- 20a-3 action → re-request the pack through the mobile-data gate. -->
+    <string name="lang_snackbar_action_download_again">Download again</string>
+    <string name="lang_snackbar_failed">Couldn\'t download %1$s</string>
+    <!-- 20a-4 action → ask the manager to try the same download again. -->
+    <string name="lang_snackbar_action_retry">Retry</string>
 </resources>

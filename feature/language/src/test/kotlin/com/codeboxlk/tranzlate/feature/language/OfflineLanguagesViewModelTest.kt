@@ -18,6 +18,7 @@ import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
+import com.codeboxlk.tranzlate.domain.translate.PackEvent
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +29,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -782,6 +784,8 @@ private class RecordingModelManager : OfflineModelManager {
             ),
         )
 
+    override val packEvents: SharedFlow<PackEvent> = MutableSharedFlow() // never emits in this test
+
     override suspend fun download(languageTag: String): DownloadAttempt {
         downloads += languageTag
         return DownloadAttempt.Started
@@ -796,6 +800,8 @@ private class RecordingModelManager : OfflineModelManager {
 private class SilentModelManager : OfflineModelManager {
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = flow { awaitCancellation() }
 
+    override val packEvents: SharedFlow<PackEvent> = MutableSharedFlow() // never emits in this test
+
     override suspend fun download(languageTag: String) = DownloadAttempt.Started
 
     override suspend fun delete(languageTag: String) = Unit
@@ -806,6 +812,8 @@ private class ScriptedModelManager : OfflineModelManager {
     val states = MutableSharedFlow<Map<String, OfflineModelState>>()
 
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = states
+
+    override val packEvents: SharedFlow<PackEvent> = MutableSharedFlow() // never emits in this test
 
     override suspend fun download(languageTag: String) = DownloadAttempt.Started
 

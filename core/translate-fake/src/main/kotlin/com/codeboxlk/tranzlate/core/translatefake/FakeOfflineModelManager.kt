@@ -4,8 +4,13 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
+import com.codeboxlk.tranzlate.domain.translate.PackEvent
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -20,6 +25,15 @@ import kotlinx.coroutines.flow.update
 class FakeOfflineModelManager : OfflineModelManager {
     private val states = MutableStateFlow(SEED)
 
+    private val packEventsFlow =
+        MutableSharedFlow<PackEvent>(
+            replay = 0,
+            extraBufferCapacity = 16,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
+
+    override val packEvents: SharedFlow<PackEvent> = packEventsFlow.asSharedFlow()
+
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = states.asStateFlow()
 
     override suspend fun download(languageTag: String): DownloadAttempt {
@@ -28,7 +42,9 @@ class FakeOfflineModelManager : OfflineModelManager {
             return DownloadAttempt.Ignored
         }
         states.update { it + (languageTag to OfflineModelState.Downloading) }
+        packEventsFlow.tryEmit(PackEvent.DownloadStarted(languageTag))
         states.update { it + (languageTag to OfflineModelState.Downloaded) }
+        packEventsFlow.tryEmit(PackEvent.DownloadSucceeded(languageTag))
         // The fake has no disk and therefore no free-space pre-flight to refuse
         // with — every download it accepts starts and finishes. `Refused` is
         // reachable only against a real volume (`RealOfflineModelManager`).
@@ -40,11 +56,13 @@ class FakeOfflineModelManager : OfflineModelManager {
             OfflineModelState.Downloaded -> {
                 states.update { it + (languageTag to OfflineModelState.Deleting) }
                 states.update { it + (languageTag to OfflineModelState.NotDownloaded) }
+                packEventsFlow.tryEmit(PackEvent.Deleted(languageTag))
             }
 
             // delete-to-cancel (spec 02 §4.4 step 2)
             OfflineModelState.Downloading -> {
                 states.update { it + (languageTag to OfflineModelState.NotDownloaded) }
+                packEventsFlow.tryEmit(PackEvent.Deleted(languageTag))
             }
 
             else -> {

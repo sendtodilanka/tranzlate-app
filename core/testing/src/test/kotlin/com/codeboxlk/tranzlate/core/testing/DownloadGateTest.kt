@@ -6,10 +6,13 @@ import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
+import com.codeboxlk.tranzlate.domain.translate.PackEvent
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -441,6 +444,8 @@ private class RecordingModelManager : OfflineModelManager {
     val downloads = mutableListOf<String>()
 
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = flowOf(emptyMap())
+
+    override val packEvents: SharedFlow<PackEvent> = MutableSharedFlow() // this fake never emits
 
     override suspend fun download(languageTag: String): DownloadAttempt {
         downloads += languageTag

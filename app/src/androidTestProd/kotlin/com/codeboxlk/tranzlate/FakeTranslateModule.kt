@@ -26,6 +26,7 @@ import com.codeboxlk.tranzlate.domain.ads.AdsCoordinator
 import com.codeboxlk.tranzlate.domain.speech.OfflineVoiceCatalog
 import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
+import com.codeboxlk.tranzlate.domain.translate.PackEvent
 import com.codeboxlk.tranzlate.domain.translate.Translator
 import com.codeboxlk.tranzlate.domain.usage.UsagePolicy
 import dagger.Module
@@ -144,6 +145,8 @@ object FakeTranslateModule {
     fun offlineModelManager(): OfflineModelManager =
         object : OfflineModelManager {
             override fun modelStates() = kotlinx.coroutines.flow.flowOf(emptyMap<String, OfflineModelState>())
+
+            override val packEvents = kotlinx.coroutines.flow.MutableSharedFlow<PackEvent>() // never emits
 
             override suspend fun download(languageTag: String) = DownloadAttempt.Started
 

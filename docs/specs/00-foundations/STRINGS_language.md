@@ -20,6 +20,7 @@ The `verifyStringKeyDocs` Gradle task now fails the build if a key ships without
 | Mark | meaning |
 |------|---------|
 | **SHIPPED** | key exists in `values/` **and** in both locale files — this is the state of every row below |
+| **NEW** | key created together with its catalogue row in the same PR (§5.8, #130 PR-22) — resource and doc land as one change |
 | `%1$s` etc. | positional format argument, order is part of the contract |
 
 ---
@@ -331,6 +332,34 @@ states the size and offers a real way out. Get → **confirm** → the metered g
 ### 5.7.1 Sheet 18a-confirm — testTags (C-1)
 
 `tt_lang_sheet_confirm` (root) · `tt_lang_sheet_confirm_download` · `tt_lang_sheet_confirm_not_now`.
+
+## 5.8 Pack snackbars — 20a (#130 PR-22) · **NEW**
+
+One-shot notices the **app shell** raises from the manager's U-1 `PackEvents`
+channel (`OfflineModelManager.packEvents`) — never a screen, because a download's
+outcome can arrive on any screen or none. `DownloadEventsViewModel` maps each
+`PackEvent` to one of four snackbars and the shell shows it on the app-scoped
+`SnackbarHost`, so a nav pop-out does not dismiss it. Each message names the
+language (`%1$s`); each action is its OWN key even where the word repeats
+(`lang_snackbar_action_retry` = `Retry`, as `lang_sheet_failed_retry` also does),
+so every control owns its own text (§9).
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_snackbar_downloading` | string | `Downloading %1$s` | language name | 20a-1, from `PackEvent.DownloadStarted` |
+| `lang_snackbar_action_view` | string | `View` | — | 20a-1 action → navigates to Manage packs (`LanguagesNavKey`) to watch the transfer |
+| `lang_snackbar_ready` | string | `%1$s is ready to use offline` | language name | 20a-2, from `PackEvent.DownloadSucceeded` |
+| `lang_snackbar_action_use` | string | `Use` | — | 20a-2 action → writes the pack as the target via `TranslatePrefsRepository` |
+| `lang_snackbar_removed` | string | `%1$s removed` | language name | 20a-3, from `PackEvent.Deleted` |
+| `lang_snackbar_action_download_again` | string | `Download again` | — | 20a-3 action → re-requests through `DownloadGate` (the metered-consent home) |
+| `lang_snackbar_failed` | string | `Couldn't download %1$s` | language name | 20a-4, from `PackEvent.DownloadFailed` — the ASYNC failure, not a pre-flight refusal (that travels by `download()`'s return + the row) |
+| `lang_snackbar_action_retry` | string | `Retry` | — | 20a-4 action → asks the manager to download again directly (already past the gate) |
+
+> **20a-5 "Waiting for Wi-Fi" is NOT here, on purpose.** It is gated on experiment
+> E-W1 — can a metered-deferred download's start and completion actually be
+> observed — which has **never run** (#208; the strings it would gate "have been
+> shipping a false promise since #90"). Shipping the string now would state a
+> promise the app cannot verify it keeps, so PR-22 defers it and leaves `Refs: #208`.
 
 ## 6. Language picker — accessibility (C-4)
 
