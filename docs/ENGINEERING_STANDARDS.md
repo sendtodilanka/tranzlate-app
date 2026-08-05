@@ -36,7 +36,8 @@ A PR is done when **all** hold. No exceptions, no "will follow up".
    (`gh run list --json headSha` compared to `git rev-parse origin/<branch>`).
    A `CONFLICTING` PR runs **no workflow** and keeps its stale green — the badge
    is not the check.
-2. **Co-verify lens by a non-author** (rule 5 — the gate). An official
+2. **Co-verify lens by a non-author** (rule 5 — the gate), **its `Co-verify-verdict:`
+   posted to the PR** as a durable record (rule 8, gate 3). An official
    `pr-review-toolkit` specialist chosen by what the PR touches is **optional, the
    caller's choice** — not a merge gate (per `co-verify-lens.md`).
 3. `Call sites:`, `Reproduced:`, `Enumerated by:` present **and true** —
@@ -47,6 +48,14 @@ A PR is done when **all** hold. No exceptions, no "will follow up".
 5. Tracker row moved in the **same** PR.
 6. Worktree removed after merge, `git status --porcelain` checked **first** —
    one dead worktree held the only copy of a 449-line research record.
+
+**Where the earlier rule-8 gates apply, their artifacts are on the PR too:** a
+**design-debate** outcome recorded in the plan-doc for a new feature (gate 1); a
+**red-team** record for a change that adopts a risky *design* (gate 2). These make
+*whether the gate ran* a lookup, not a promise — a durable record, **presence, not
+proof of quality**; the real proof is the evidence each artifact carries, never its
+mere existence. (No hook enforces these — this project's record is that a hook of that
+shape adds rot, not safety; the enforcement is the DoD and the posted artifact.)
 
 **rev5 is done when** every Phase 3 row in `issue-130-language-rev3.md` shows ✅
 **and** `docs/research/issue-130-rev5-audit.md` records all four audit passes with
@@ -116,7 +125,53 @@ fifteen that each need four PRs.
   "per the X decision" asks them to take on faith exactly what every brief tells
   them not to.
 
-## 7. Risk register — reviewed at every wave boundary
+## 7. Never idle-wait on a result — the enemy is the wait, not the verification
+
+**Incident:** #278 was landed fully — including sitting through its CI-on-tip wait —
+**before** the wave-1d builds that did not depend on it were started. They should have been
+building during that wait. The owner's framing, 2026-08-05: *"CI and co-verification running is
+not a problem in itself. The problem is waiting for its result without taking next actions. CI
+and co-verification is strictly necessary for the zero-touch human repo."*
+
+- **CI and co-verify are mandatory and non-negotiable** — a repo with no human must have the
+  machine prove everything. They are **not** the cost to cut.
+- **The cost is idle-waiting on a result with nothing else in flight.** Dispatch, then
+  immediately start the next independent build / lens / scope. A build running, a lens running,
+  a CI-on-tip wait — each is a cue to begin the next thing, never to pause.
+- **Only the final merge is serial** — rebase → CI-green-on-tip → merge, one PR at a time (the
+  guard that protects `main`), bounded by rule 1's two-PR cap. Even its CI-wait overlaps with
+  other PRs building and co-verifying, so it is not idle either.
+- **Building is wide; landing is narrow.** Parallelise building freely (rule 6's ownership map
+  is the safety rail); the merge lane and the open-PR count stay inside rule 1.
+
+## 8. Red-team a design before adopting it — where its failure would be silent
+
+**Incident:** the worst failures were designs that passed implementation-level scrutiny, or
+would have, yet were wrong **by construction** — `main` lost twice to a merge pattern each
+branch passed alone (rule 1); the #213 device-claim hook that "looked fine" and could never
+fire (§4). A co-verify of the implementation catches neither — only an attack on the design does.
+(The gate-enforcement design red-teamed under this very rule is the worked example:
+`docs/research/red-team-gate-enforcement.md`.)
+
+- **Co-verify (rule 5) checks one CHANGE is correct** — a per-PR gate. It does not catch a
+  DESIGN that is wrong by construction.
+- **Before adopting a mechanism or process change whose failure would be SILENT** — a bug slips
+  through, `main` breaks, a guard weakens — put the **chosen** design through a small red-team
+  first: 2–3 adversaries hunting how it fails (*"how does this let a bug through / break
+  `main`?"*). Adopt only if it survives.
+- **Not every change** — that is co-verify's job. Red-team is for designs where the downside is
+  a safety guarantee.
+- **Three gates, three stages — do not conflate them.** A **design-debate** (owner's standing
+  rule, `.claude/memory/`) CHOOSES the design *before building* — advocates arguing *for*
+  competing proposals. A **red-team** ATTACKS the chosen design *before adopting a risky one* —
+  adversaries arguing *against* it. A **co-verify** (rule 5) checks the built CHANGE is correct
+  *before merge* — per-PR. The order is **choose → attack the choice → build → co-verify**;
+  a design-debate's own adversarial judging picks a winner, it does not stress-test the winner
+  for silent failure, which is the red-team's separate job. The **integration-lane** — a
+  merge-queue that would raise rule 1's two-PR cap — is the standing red-team example: it does
+  not ship until a red-team clears it.
+
+## 9. Risk register — reviewed at every wave boundary
 
 | # | Risk | Severity | State |
 |---|---|---|---|
