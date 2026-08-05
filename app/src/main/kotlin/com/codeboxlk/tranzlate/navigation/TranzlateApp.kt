@@ -85,8 +85,18 @@ fun TranzlateApp(
         onStopOrDispose { textViewModel.onHostStopped() }
     }
 
+    // #158 — the push mirror of the guarded pop. `composedTop` is the top AS
+    // COMPOSED: a snapshot read, so each recomposition makes a new value and a new
+    // `navigateTo` closing over it. Two Home cards tapped in the SAME frame hold the
+    // same stale `navigateTo` (no recomposition between them), so both carry
+    // `from = this top`; the first push moves the top and [pushEntry] declines the
+    // second. Every push — the screen callbacks AND the shell's picker/manage-packs
+    // pushes below — funnels through here, so this is the one push chokepoint, as
+    // [popEntry] is the one pop chokepoint.
+    val composedTop = backStack.lastOrNull()
+
     fun navigateTo(key: NavKey) {
-        if (backStack.lastOrNull() != key) backStack.add(key)
+        pushEntry(backStack, from = composedTop, key = key)
     }
 
     SharedTransitionLayout {
@@ -338,6 +348,52 @@ private fun AppNavDisplay(
 }
 
 /**
+ * The ONE push, guarded as its mirror [popEntry] is — the same stale-event race, the
+ * other direction (issue #158).
+ *
+ * `navigateTo` used to refuse only a key equal to the current top. That stopped a
+ * double-tap on ONE card but not two DIFFERENT cards tapped in the same frame: two
+ * different keys both pass the equal-key test, and because a `SnapshotStateList`
+ * mutation is applied synchronously while recomposition is only SCHEDULED, the second
+ * callback reads the stack the first already grew and pushes again — `[Text, Camera,
+ * Languages]` from one gesture, the wanted screen underneath. Measured reachable on a
+ * real device (`NavDoublePushReachabilityTest`): a two-finger tap fires both cards'
+ * `onClick` in one frame, before `NavDisplay` can recompose the leaving screen away.
+ *
+ * The answer is [popEntry]'s: [from] is the destination that rendered the tapped
+ * affordance, captured at COMPOSITION (`composedTop` in the shell), and the push is
+ * declined once that destination is no longer the top. Two same-frame taps hold the
+ * same stale [from]; the first push moves the top, so the second — a card on a screen
+ * already leaving — is refused.
+ *
+ * Unlike a pop, a push ALWAYS has a caller (a user tapped a visible affordance), so
+ * [from] is never legitimately null here; it stays nullable only to mirror [popEntry]
+ * and to no-op rather than crash if ever called without one.
+ *
+ * Keeping the self-dedup (top already equals [key]) is load-bearing, not incidental:
+ * [popEntry]'s identity check is sound ONLY because no two adjacent entries are ever
+ * equal, which this self-dedup is what guarantees.
+ *
+ * Plain `MutableList` and no Compose in the signature, so the invariant is reachable
+ * from a JVM test (`BackStackPushTest`); the device only proves the same-frame race is
+ * real, which CI cannot run (#40).
+ *
+ * @param from the destination that owns the tapped affordance, captured at composition.
+ * @param key the destination to push.
+ * @return the key actually pushed, or null when the request was declined.
+ */
+internal fun pushEntry(
+    backStack: MutableList<NavKey>,
+    from: NavKey?,
+    key: NavKey,
+): NavKey? {
+    if (from != null && backStack.lastOrNull() != from) return null
+    if (backStack.lastOrNull() == key) return null
+    backStack.add(key)
+    return key
+}
+
+/**
  * The ONE pop. Nine call sites used to remove an entry by hand and exactly one of
  * them was guarded (issue #150), so the rule had to be remembered eight more
  * times and never was. It lives here instead.
@@ -361,9 +417,9 @@ private fun AppNavDisplay(
  * destination is no longer on top: the second tap is a no-op because the screen is
  * already leaving, not merely clamped at the root.
  *
- * The identity check is sound because the push side refuses to stack a key on top
- * of itself (`navigateTo`), so no two adjacent entries are ever equal — "the top
- * still equals [from]" can only mean the caller's own entry.
+ * The identity check is sound because the push side ([pushEntry]) refuses to stack a
+ * key on top of itself, so no two adjacent entries are ever equal — "the top still
+ * equals [from]" can only mean the caller's own entry.
  *
  * [from] is null for SYSTEM back, which has no caller and must NOT be
  * identity-checked: `NavDisplay` fires `onBack` once PER ENTRY it needs removed
