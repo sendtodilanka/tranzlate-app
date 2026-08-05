@@ -186,3 +186,18 @@ entries equal" invariant that pop relies on is preserved by the push self-dedup.
 Reachable → the guarded `pushEntry` fix landed. `./gradlew preflight` GREEN.
 Installed: `tranzlateProdDebug` + its androidTest APK on `emulator-5556` (API 29), via
 `connectedTranzlateProdDebugAndroidTest` (`ANDROID_SERIAL=emulator-5556`, class-filtered).
+
+## Landed — PR #286
+Cross-model co-verify (Sonnet 5) **APPROVE-WITH-NOTES**, no defect. The false-decline crux was
+checked three ways: code-trace (`composedTop` is a per-composition snapshot read, so the
+staleness window is only "two calls before the next recomposition" — unreachable for one finger's
+two taps), mutation (delete the `from` check → exactly the two named tests RED, pop suite green),
+**and live on-device** — the lens ran the pre-existing `NavShellSmokeTest` 6/6 through the real
+production shell to prove ordinary single-tap navigation still pushes after the guard. Two
+non-blocking notes:
+- **Line numbers:** the PR body cited the `::navigateTo` refs at pre-KDoc lines 96/102/122; after
+  this PR's own +10 shift they are **106/112/132** (the count of 3 is correct).
+- **Evidence template (worth keeping):** `preflight` *compiles* androidTest but does not *run* it
+  (rule 6), so a device-race fix's evidence bundle should pair the new race-test's device run with
+  a **live run of the nearest existing navigation smoke test**, not a compile-only gate. The lens
+  supplied that run here.
