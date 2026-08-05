@@ -24,7 +24,7 @@ PR #202's body, line 55, was arguing that #173 must stay **open**:
 > prevent…
 
 GitHub's closing-keyword parser read `close #173` out of the hyphenated word
-`auto-close #173` and closed #173 the instant #202 merged. Verified today, months
+`auto-close #173` and closed #173 the instant #202 merged. Verified today, three days
 later, from GitHub's own computed parse of that body:
 
 ```
@@ -153,10 +153,11 @@ repo). Two independent searches, chosen so they could not both miss the same thi
 | 5 | `CLAUDE.md` rule 3 | commit carries `Fixes: #N` | **No** — states the trailer rule correctly; already links "Full workflow: CONTRIBUTING.md", which is where the new detail lives. Adding it here would duplicate the exact way rule 11 warns against. |
 | 6 | `.claude/memory/issue-first-pr-only-workflow.md` | "Fixes:#N trailer" | **No** — a memory summary, not the authoritative convention; points to CONTRIBUTING. |
 | 7 | `.claude/memory/MEMORY.md` | index line "Fixes:#N" | **No** — index pointer. |
-| 8 | `~/.claude/.../orchestration-and-landing.md` §4.3, §C | "`Fixes:`, not `Refs:`"; "auto-close works" | **No** — **user memory, not in the repo**; cannot be edited on a branch. Flagged for the owner to update out-of-band. |
+| 8 | `~/.claude/.../orchestration-and-landing.md` §4 | "`Fixes:`, not `Refs:`"; "auto-close works" | **No** — **user memory, not in the repo**; cannot be edited on a branch. Flagged for the owner to update out-of-band. |
 | 9 | `docs/plan/ROADMAP.md`, `issue-173/201/219-*.md` | per-issue *use* of the convention | **No** — historical/scoped; they consume the rule, they don't define it. |
+| 10 | `.claude/agents/android-builder.md:67` | "commit with a `Fixes: #N` trailer" | **No** — states it correctly; editing it would duplicate (like row 5). Found by the #291 co-verify. |
 
-**Call sites: 9 found, 4 changed** (the 5 unchanged are listed above with the
+**Call sites: 10 found, 4 changed** (the 6 unchanged are listed above with the
 reason each is deliberately left — four are pointers/consumers that would only
 create drift, one is outside the repo).
 
@@ -265,8 +266,10 @@ works today.
 ## 9. Note on "ENGINEERING_STANDARDS.md rule 8"
 
 The brief cites "ENGINEERING_STANDARDS.md rule 8" for the hand-it-back-for-red-team
-requirement. That file has rules **1-7 only**; there is no literal rule 8
-(`grep -nE '^## [0-9]+\.' docs/ENGINEERING_STANDARDS.md` → 1…7). The principle the
+requirement. When this plan was first written that file had rules 1-7 only; **#290 has since
+added rule 8 ("Red-team a design before adopting it"), so on `main` today the citation is valid**
+(`grep -nE '^## [0-9]+\.' docs/ENGINEERING_STANDARDS.md` → 1…9) — and rule 8 is now the precise
+home for the hand-back-for-red-team principle. The principle the
 brief invokes is real and is honoured here — it lives in ES §3 (a mechanism that
 fails twice is rebuilt, not patched; derive checks from source, not copies) and §4
 (make a check fail on purpose before trusting it), reinforced by the standing
@@ -274,3 +277,11 @@ gate-enforcement red-team verdict. This plan does not invent a "rule 8"; it poin
 at the standards that actually carry the principle. Whether to *add* a numbered
 "red-team new mechanisms before building" rule to ES is an owner call and out of
 this issue's scope.
+
+## Landed — PR #291
+Co-verify (Sonnet 5, cross-model) **BLOCK → resolved**, and the block was perfect: this PR's own
+body reproduced the #217 defect — the word "closed" next to `#173` made `closingIssuesReferences`
+return 173 + 217, failing the very §2.4 DoD this PR ships. Fixed by rewording the body (now returns
+**only 217** — the fix's own check catching the fix's own PR). Four non-blocking notes folded here:
+the enumeration corrected **9 → 10** (`android-builder.md:67` is a 10th surface), the stale
+"no rule 8" note updated (#290 has since landed rule 8), the §C citation and the "months" date.
