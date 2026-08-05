@@ -186,3 +186,14 @@ The existing #238 suite (unanswerable metered, unreadable prefs, `Error`,
 `initiallyOnline = true`, so prepending `isOnline() &&` is a no-op for them (§2.2).
 
 Gate: `./gradlew preflight` (rule 6), plus `:core:testing:test` for the suite.
+
+## 7. Landed — PR #280
+Cross-model co-verify (Sonnet 5) **APPROVE-WITH-NOTES**: it mutation-proved the read order is
+load-bearing (inlining the `allowMobileData` read as a conjunct reddens the #238 "unreadable →
+ask" test) and verified the AOSP `isActiveNetworkMetered()` best-guess-true-when-offline
+behaviour against Google's own `ConnectivityService.java`. Both `requestDownload` consumers were
+traced — no dead-end. The one coverage-symmetry gap it flagged is now **closed**:
+`FakeConnectivityMonitor` gained an `onlineFailure` hook and a 16th `DownloadGateTest` ("an
+unreadable connectivity state asks rather than assuming consent"), mutation-proven (degrade the
+catch arm to download → RED). The two-screens no-network divergence it noted is pre-existing and
+filed as **#281**.
