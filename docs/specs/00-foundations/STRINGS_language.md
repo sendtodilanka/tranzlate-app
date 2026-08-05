@@ -272,8 +272,10 @@ pre-commit swap (source ⇄ the language the user picked); reproduced post-commi
 swapping the **last valid pair**, which `TextViewModel` keeps in its
 `SavedStateHandle` so it survives process death. `onSwapLanguages` gained this one
 degenerate branch; every existing swap path is untouched. **"Pick another"** reopens
-the target picker (`onPickLanguage(TARGET)` at the shell). No tonal icon — the
-export's caption reads *"no icon fanfare"*.
+the target picker (`onPickLanguage(TARGET)` at the shell). **Icon:** the sheet draws
+the `swap_horiz` glyph the export's `19m` frames actually contain (a 44dp
+`primaryContainer` slot) — the caption's *"no icon fanfare"* contradicts its own
+drawn pixels, and the pixels win (#299 co-verify).
 
 | Key | Type | `en` | Args | Notes |
 |-----|------|------|------|-------|

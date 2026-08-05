@@ -99,7 +99,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR-17 | 19a mobile-data sheet: `MeteredConsentDialog` + Screen B's inline dialog both deleted, their two string sets retired, one `MobileDataSheet` raised by both screens, the standing "Always ask" preference changeable in the sheet. **E-W1 has never been run, so the drawn "Wait for Wi-Fi" is not shipped** — the owner's pre-approved interim "Not now" is (ruling 8). **Deviations below** | ✅ #209, 2026-08-02 |
 | PR-18 | 19d + 19b + failure-cause map ×1 + 15a Retry-pill deviation fix. **Closes #175.** Deviations below | ✅ #216, 2026-08-02 |
 | PR-19 | 19f + 19g + U-10 saved-count query + the 🗑 becomes a confirmed remove. **No fallback is built: the drawn 19g and ruling 3 both describe a target switch this app does not have** — deviations below | ✅ #227, 2026-08-02 |
-| PR-20 | 19h + 19m + app-shell sheet host | ⬜ |
+| PR-20 | 19h + 19m + app-shell sheet host | ✅ #299 |
 | PR-21 | 18a/18b first run (LocaleList suggestions + E-K1) | ⬜ |
 | PR-22 | PackEvents + app SnackbarHost + snackbars 20a | ⬜ |
 
