@@ -8,28 +8,28 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git.sh\"",
-            "if": "Bash(git *)",
+            "if": "Bash(*git *)",
             "timeout": 40,
             "statusMessage": "Checking git guard rails"
           },
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git.sh\"",
-            "if": "Bash(gh *)",
+            "if": "Bash(*gh *)",
             "timeout": 40,
             "statusMessage": "Checking merge guard rails"
           },
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-pr.sh\"",
-            "if": "Bash(gh *)",
+            "if": "Bash(*gh *)",
             "timeout": 15,
             "statusMessage": "Checking PR body carries its enumeration and repro"
           },
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-tracker.sh\"",
-            "if": "Bash(gh *)",
+            "if": "Bash(*gh *)",
             "timeout": 40,
             "statusMessage": "Checking the epic tracker carries this PR"
           },
