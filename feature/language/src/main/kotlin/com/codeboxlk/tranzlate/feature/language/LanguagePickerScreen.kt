@@ -1392,7 +1392,12 @@ private fun LanguageRow(
 ) {
     val spacing = LocalSpacing.current
     val selected = row.state is LanguageRowState.Selected
-    val supporting = rowSupportingText(row.state)
+    // The ML Kit pivot (English) has no pack of its own, so it never shows a pack
+    // state: its supporting line is the fixed "Included with every language"
+    // sentence #224 introduced on the offline manager, reused here so both screens
+    // tell one story about English (#293). Guarded by id, not state.
+    val pivot = isPivotLanguage(row.id)
+    val supporting = if (pivot) stringResource(R.string.offline_included) else rowSupportingText(row.state)
     val voiceMark = row.showsVoiceMark(target)
     val description = rowContentDescription(row, voiceMark)
     Row(
@@ -1435,7 +1440,7 @@ private fun LanguageRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            RowSupportingLine(state = row.state, text = supporting, voiceMark = voiceMark)
+            RowSupportingLine(state = row.state, text = supporting, voiceMark = voiceMark, pivot = pivot)
         }
         Spacer(Modifier.width(spacing.sm8))
         RowTrailing(row = row, onDownload = onDownload, onStop = onStop)
@@ -1562,6 +1567,7 @@ private fun RowSupportingLine(
     state: LanguageRowState,
     text: String?,
     voiceMark: Boolean,
+    pivot: Boolean = false,
 ) {
     if (text == null && !voiceMark) return
     val spacing = LocalSpacing.current
@@ -1571,9 +1577,15 @@ private fun RowSupportingLine(
             state is LanguageRowState.Failed -> MaterialTheme.colorScheme.error
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
+    // The pivot's line is the fixed "included" sentence, never a live download, so
+    // it takes the static layout even if the model layer ever reported the pivot as
+    // Downloading (#293 guards by id, not state — so must this).
     val downloading =
-        state == LanguageRowState.Downloading ||
-            (state is LanguageRowState.Selected && state.inner == LanguageRowState.Downloading)
+        !pivot &&
+            (
+                state == LanguageRowState.Downloading ||
+                    (state is LanguageRowState.Selected && state.inner == LanguageRowState.Downloading)
+            )
     if (downloading && text != null) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1598,7 +1610,13 @@ private fun RowSupportingLine(
                     color = color,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier =
+                        Modifier
+                            .weight(1f, fill = false)
+                            // The pivot's quiet "Included with every language" line,
+                            // findable by the render test the way #224's
+                            // `tt_offline_included` is (#293).
+                            .then(if (pivot) Modifier.testTag("tt_lang_included") else Modifier),
                 )
             }
             VoiceMark(visible = voiceMark, tint = color)
@@ -1637,6 +1655,15 @@ private fun RowTrailing(
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
 ) {
+    // The ML Kit pivot (English) is inside every X↔en pair — there is no
+    // standalone `en` pack to download, stop, or retry (#224 settled this on the
+    // offline manager; #293 is the same row on this screen). Guard by id, not
+    // state, so even a pivot the model layer reports as
+    // Downloadable/Downloading/Failed offers no control here. Selection is
+    // orthogonal to pack management, so a CHOSEN English still shows its tick via
+    // the `when` below; its "included with every language" story is told by the
+    // supporting line (`tt_lang_included`), not by a trailing control.
+    if (isPivotLanguage(row.id) && row.state !is LanguageRowState.Selected) return
     when (row.state) {
         is LanguageRowState.Selected -> {
             Icon(
@@ -2576,15 +2603,18 @@ private fun RowPreviewSurface(
     state: LanguageRowState,
     hasOfflineVoice: Boolean = false,
     target: LanguageRole = LanguageRole.SOURCE,
+    id: String = "es",
+    displayName: String = "Spanish",
+    avatar: LanguageAvatar = LanguageAvatar.Code("ES"),
 ) {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             LanguageRow(
                 row =
                     LanguagePickerRow(
-                        id = "es",
-                        displayName = "Spanish",
-                        avatar = LanguageAvatar.Code("ES"),
+                        id = id,
+                        displayName = displayName,
+                        avatar = avatar,
                         state = state,
                         hasOfflineVoice = hasOfflineVoice,
                     ),
@@ -2633,6 +2663,41 @@ private fun LanguageRowOnlineOnlyPreview() {
 @Composable
 private fun LanguageRowFailedPreview() {
     RowPreviewSurface(LanguageRowState.Failed(OfflineModelFailure.STORAGE))
+}
+
+/**
+ * The ML Kit pivot (English) row, unselected (#293). Its resting state is
+ * `Downloadable` here — the exact state that used to draw a Download button — yet
+ * the row shows the quiet "Included with every language" line and NO trailing
+ * control, guarded by id. This is the sibling of `OfflinePivotRowPreview` on the
+ * offline manager; the owner reviews both to confirm English reads the same on both
+ * screens, on both themes.
+ */
+@PreviewLightDark
+@Composable
+private fun LanguageRowPivotPreview() {
+    RowPreviewSurface(
+        LanguageRowState.Downloadable,
+        id = "en",
+        displayName = "English",
+        avatar = LanguageAvatar.Code("EN"),
+    )
+}
+
+/**
+ * The pivot row when it IS the current choice (#293). Selection is orthogonal to
+ * pack management: English keeps the selection tick AND the "included" line, and
+ * still offers no pack control.
+ */
+@PreviewLightDark
+@Composable
+private fun LanguageRowPivotSelectedPreview() {
+    RowPreviewSurface(
+        LanguageRowState.Selected(LanguageRowState.Downloadable),
+        id = "en",
+        displayName = "English",
+        avatar = LanguageAvatar.Code("EN"),
+    )
 }
 
 /**
