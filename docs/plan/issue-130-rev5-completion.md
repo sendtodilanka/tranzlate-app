@@ -102,6 +102,9 @@ overlap** — the rule that was absent when #246 and #249 collided.
 **Wave 1a landing note:** #253's gate-coverage half landed in #260 (`preflight`);
 its remaining half — the two live procedure files that still handed out the retired
 five-command gate, plus the SHA-check now wired into `/land-pr` — landed in **PR #263**.
+#258 (leading-path guard bypass, the VERIFIED-TOUCH Pillar 0) landed in **PR #264**;
+its co-verify lens found the same bypass *class* still open two more ways (env/runner
+prefix, path-qualified `git restore`) — filed as **#265**, the consolidation fix.
 
 ### Wave 1f also carries work that is NOT issue-shaped
 
