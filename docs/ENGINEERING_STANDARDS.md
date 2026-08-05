@@ -36,7 +36,8 @@ A PR is done when **all** hold. No exceptions, no "will follow up".
    (`gh run list --json headSha` compared to `git rev-parse origin/<branch>`).
    A `CONFLICTING` PR runs **no workflow** and keeps its stale green — the badge
    is not the check.
-2. **Co-verify lens by a non-author** (rule 5 — the gate). An official
+2. **Co-verify lens by a non-author** (rule 5 — the gate), **its `Co-verify-verdict:`
+   posted to the PR** as a durable record (rule 8, gate 3). An official
    `pr-review-toolkit` specialist chosen by what the PR touches is **optional, the
    caller's choice** — not a merge gate (per `co-verify-lens.md`).
 3. `Call sites:`, `Reproduced:`, `Enumerated by:` present **and true** —
@@ -47,6 +48,14 @@ A PR is done when **all** hold. No exceptions, no "will follow up".
 5. Tracker row moved in the **same** PR.
 6. Worktree removed after merge, `git status --porcelain` checked **first** —
    one dead worktree held the only copy of a 449-line research record.
+
+**Where the earlier rule-8 gates apply, their artifacts are on the PR too:** a
+**design-debate** outcome recorded in the plan-doc for a new feature (gate 1); a
+**red-team** record for a change that adopts a risky *design* (gate 2). These make
+*whether the gate ran* a lookup, not a promise — a durable record, **presence, not
+proof of quality**; the real proof is the evidence each artifact carries, never its
+mere existence. (No hook enforces these — this project's record is that a hook of that
+shape adds rot, not safety; the enforcement is the DoD and the posted artifact.)
 
 **rev5 is done when** every Phase 3 row in `issue-130-language-rev3.md` shows ✅
 **and** `docs/research/issue-130-rev5-audit.md` records all four audit passes with

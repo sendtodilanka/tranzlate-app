@@ -80,6 +80,18 @@ flavours or locales.
 the output. A measured line beats a paragraph of reasoning, and this project's
 rule is explicit: cite a source or say "verified data නෑ".
 
+## Is this a design that should have been red-teamed? (rule 8)
+
+If the PR **adopts a mechanism or process change whose failure would be silent** — a new
+guard/hook, a change to the merge flow or `build-logic/`, a concurrency invariant, anything where
+a wrong *design* (not a wrong line) lets a bug through or weakens a safety guarantee — then per
+`ENGINEERING_STANDARDS.md` rule 8 it should carry a **red-team record** (a `Red-team-verdict:`
+comment, or a `docs/research/red-team-*.md`) produced *before* it was built. This is the judgment a
+path-glob cannot make — a risky design in plain app code touches none of a trigger's paths — so it
+is **yours**. If such a change has **no** red-team record, say so as a finding: a design was
+adopted without the gate rule 8 requires. (Not every change — only one whose downside is a safety
+guarantee. An ordinary feature/bug PR does not need this; that is co-verify's own job.)
+
 ## Build and experiment
 
 ```
@@ -141,3 +153,20 @@ are wrong. If a finding you were briefed on turns out not to be real, say so:
 your brief is a report, not an instruction.
 
 End with one line: **APPROVE**, **APPROVE-WITH-NOTES**, or **BLOCK**.
+
+## Post the verdict to the PR — a durable record, not a chat promise
+
+Before you return, post your verdict as a PR comment so it outlives this session:
+
+```
+gh pr comment <N> --body 'Co-verify-verdict: <APPROVE|APPROVE-WITH-NOTES|BLOCK> model=<your model id>
+
+<2–4 lines: what you attacked, the load-bearing evidence, any blocking finding>'
+```
+
+This turns "did a lens run, and what did it find?" into a page anyone can read later — not a claim
+in a chat log a fresh `/land-pr` session never sees (`orchestration-and-landing.md`: *a citation to
+memory is a citation to nothing* — the same is true of a citation to a past chat). **It is a record,
+not a gate:** it is posted with the same token as the author, so it proves a verdict was *written*,
+never that a real lens *ran* — never let its mere presence be cited as proof of review. The evidence
+in your report is the proof; this is only where it is kept.
