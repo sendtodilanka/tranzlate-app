@@ -311,13 +311,67 @@ class LanguagePickerViewModelTest {
             val vm = viewModel()
 
             vm.selection(LanguageRole.SOURCE).test {
-                skipItems(1) // defaults-table frame — WhileSubscribed starts on first collect
+                // #154: the honest first frame ticks NO row — an empty id, not a
+                // defaults-table "en". The stored choice then replaces it. (This
+                // used to `skipItems(1)`, which looked away from the buggy frame.)
+                assertThat(awaitItem()).isEmpty()
                 assertThat(awaitItem()).isEqualTo("de")
                 cancelAndIgnoreRemainingEvents()
             }
             vm.selection(LanguageRole.TARGET).test {
-                skipItems(1)
+                assertThat(awaitItem()).isEmpty()
                 assertThat(awaitItem()).isEqualTo("ja")
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /**
+     * #154: the radio group must tick NO row until DataStore's first real read.
+     * Seeding a concrete default (`en`/`fr`) ticked a row that is wrong for
+     * anyone whose stored pair differs — a `de → ja` user saw English carry the
+     * tick for one frame on every open. Proved through the real row builder: the
+     * FIRST frame selects nothing; the stored choice then selects its own row and
+     * only that.
+     *
+     * The assertion is on the row STATE, not on the seed's literal value, so a
+     * mutation that merely changes what the seed is cannot green it — only
+     * actually deferring the tick until the read can.
+     */
+    @Test
+    fun `the picker ticks no row until the stored choice is read`() =
+        runTest(dispatcher) {
+            translatePrefs.source.value = "de"
+            val catalog =
+                listOf(
+                    Language("en", "English", offlineAvailable = true, offlineDownloaded = false),
+                    Language("de", "German", offlineAvailable = true, offlineDownloaded = false),
+                )
+            val vm = viewModel()
+
+            vm.selection(LanguageRole.SOURCE).test {
+                // Frame 1 — before the preference is read. No row is ticked: not
+                // "en" (the old seed), not anything.
+                val preReadRows =
+                    buildPickerRows(
+                        languages = catalog,
+                        modelStates = emptyMap(),
+                        selectedId = awaitItem(),
+                        locale = Locale.ENGLISH,
+                    )
+                assertThat(preReadRows.none { it.state is LanguageRowState.Selected }).isTrue()
+
+                // Frame 2 — the stored choice arrives and exactly its row ticks.
+                val realId = awaitItem()
+                assertThat(realId).isEqualTo("de")
+                val readRows =
+                    buildPickerRows(
+                        languages = catalog,
+                        modelStates = emptyMap(),
+                        selectedId = realId,
+                        locale = Locale.ENGLISH,
+                    )
+                assertThat(readRows.filter { it.state is LanguageRowState.Selected }.map { it.id })
+                    .containsExactly("de")
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -338,7 +392,7 @@ class LanguagePickerViewModelTest {
             val vm = viewModel()
 
             vm.selection(LanguageRole.TARGET).test {
-                skipItems(1) // defaults-table frame
+                assertThat(awaitItem()).isEmpty() // #154: nothing ticked until the read
                 val selectedId = awaitItem()
                 assertThat(selectedId).isEqualTo("he")
 
@@ -363,7 +417,7 @@ class LanguagePickerViewModelTest {
             val vm = viewModel()
 
             vm.selection(LanguageRole.SOURCE).test {
-                skipItems(1) // defaults-table frame
+                assertThat(awaitItem()).isEmpty() // #154: nothing ticked until the read
                 assertThat(awaitItem()).isEqualTo(DETECT_LANGUAGE_ID)
                 cancelAndIgnoreRemainingEvents()
             }
