@@ -303,6 +303,76 @@ class RealOfflineModelManagerTest {
             assertThat(state).isInstanceOf(OfflineModelState.Failed::class.java)
         }
 
+    // ---- toFailure()'s mapping, pinned by CAUSE (#242) ------------------------
+    //
+    // The sibling above asserts only that the row is `Failed`, never which cause,
+    // so a recognised exception folding through `toFailure`'s `else -> UNKNOWN`
+    // was invisible. `DownloadFailureTest.every cause the platform can report has
+    // a line` looked like the guard for this and could not be: `entries.map{}` is
+    // size-preserving, so its `hasSize(entries.size)` cannot fail. The real hole
+    // is the `else` here, and only a behavioural assertion holds it — `toFailure`
+    // is a `when` over the OPEN `Exception` hierarchy, so unlike `downloadFailureCopy`
+    // (which is `else`-less and will not compile until a new cause is handled) its
+    // `else` is load-bearing and the compiler guards nothing about it.
+
+    /**
+     * The recognised arm. A download IOException is the NETWORK case — it is what
+     * raises sheet 19d — and must never be mis-reported as UNKNOWN, which is
+     * reserved for a failure ML Kit did not explain (inventing a reason the app
+     * does not have is the same class of fault as a % on an indeterminate
+     * download, and this project has a rule about that).
+     *
+     * Mutation decided first (rule 11): delete `is IOException -> NETWORK` so the
+     * IOException folds through `else -> UNKNOWN`. This goes RED; nothing next
+     * door moves.
+     */
+    @Test
+    fun `a download IOException surfaces as Failed(NETWORK), never UNKNOWN-folded`() =
+        runTest {
+            val store =
+                object : ModelStore by FakeStore() {
+                    override suspend fun download(tag: String): Unit = throw java.io.IOException("dns")
+
+                    override fun capableTags(): Set<String> = setOf("fr")
+                }
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.stateOf("fr"))
+                .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.NETWORK))
+        }
+
+    /**
+     * The `else` arm, from the other side: an exception `toFailure` does NOT
+     * recognise becomes UNKNOWN, and no recognised cause is invented for it.
+     * Paired with the test above this pins BOTH edges of the one boundary the
+     * `else` draws — so widening the recognised arm (e.g. `else -> NETWORK`)
+     * reddens here while the IOException test stays green, and narrowing it
+     * reddens there while this stays green. Neither mutation can pass both.
+     */
+    @Test
+    fun `an unrecognised download failure surfaces as Failed(UNKNOWN)`() =
+        runTest {
+            val store =
+                object : ModelStore by FakeStore() {
+                    // error() throws IllegalStateException — a non-IOException, so it
+                    // exercises toFailure's `else` arm; detekt's UseCheckOrError bans
+                    // the bare throw, matching TextStarFailureTest's diskFailure().
+                    override suspend fun download(tag: String): Unit = error("mlkit internal")
+
+                    override fun capableTags(): Set<String> = setOf("fr")
+                }
+            val manager = RealOfflineModelManager(store, plentyFree, online, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.stateOf("fr"))
+                .isEqualTo(OfflineModelState.Failed(OfflineModelFailure.UNKNOWN))
+        }
+
     // ---- what the call ANSWERS (#234) -----------------------------------------
     //
     // The state map above is a conflating channel and cannot carry "the same
