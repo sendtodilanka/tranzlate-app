@@ -26,7 +26,7 @@ Every item below was a frame disagreeing with another frame, or with what the ap
 - One naming for the unit ids: `translator_picker_banner`, `translator_managepacks_banner`, `translator_managepacks_native`, on the drawings too.
 - The native mock draws its required `{icon}` and no longer draws `{store}` — store and rating exist only on app-install ads, and the inventory says so.
 
-**Structural** — every drawing now carries `data-screen-label`, including the eight sheets, the five snackbars, 20c, 20e and 21c (54 in total, up from 26), so enumerating labels enumerates the whole document.
+**Structural** — the labelling pass added `data-screen-label` to 54 drawings, up from 26. **Correction (#184): the true structural count is 58 — `20c` and `20e` (light + dark) were named here yet never actually labelled, so enumerating *labels* still misses them.** Enumerate by structure instead — `docs/design/language-screens/tools/enumerate-frames.py`.
 
 ## What is inside
 

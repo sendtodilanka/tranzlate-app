@@ -217,9 +217,12 @@ occurrences in the decoded spec, none draws `volume_up`. So `to · landscape` is
 
 ## C. #203 — the first-run meter draws a state the device cannot produce
 
-- **Frame** (`from · foldable first run`, dv-opt `18b`), decoded verbatim: meter
-  overline `Offline library`, headline **`No packs yet`**, detail
-  **`of 59 packs · nothing downloaded`**. The empty state.
+- **Frame** (`from · foldable first run`, dv-opt `18b`), decoded verbatim: the meter is
+  overline `Offline library`, numeral **`0`**, detail **`of 59 packs · nothing
+  downloaded`** — an explicit **0-count** in the same 28px slot the device fills with
+  `1`. (The **`No packs yet`** text is a *separate* element — the suggestion-list
+  overline, the owner's intentional §8 first-run design, out of scope; it is NOT the
+  meter's text. Corrected per the #203 re-verify — three independent DOM parses.)
 - **Device** (E-S1b, `issue-130-e-s1-storage-walk.md:167-178`, `pm clear` on
   `emulator-5554`, 2026-08-02): meter numeral **`1`**, detail
   **`of 59 packs · 8.6 GB free`**, top bar `1 of 59 on device`, English row
