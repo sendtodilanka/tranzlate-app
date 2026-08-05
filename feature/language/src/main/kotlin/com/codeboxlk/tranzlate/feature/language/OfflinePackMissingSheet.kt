@@ -142,7 +142,10 @@ private fun OfflineLanguageRow(
                 .heightIn(min = TranzlateSheetDefaults.ListRowMinHeight)
                 .clickable(onClick = onUse)
                 .testTag(testTag)
-                .semantics {
+                // Merge the cloud_done glyph and the name into ONE node so TalkBack
+                // hears "Use Spanish" once, not a loose icon then a label
+                // (android-accessibility.md:267; every comparable row does this).
+                .semantics(mergeDescendants = true) {
                     contentDescription = useLabel
                     role = Role.Button
                 },

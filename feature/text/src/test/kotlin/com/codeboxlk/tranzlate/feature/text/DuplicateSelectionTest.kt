@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.feature.text
 
+import androidx.lifecycle.SavedStateHandle
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,17 +14,20 @@ import org.junit.Test
  * The picker commits a language choice straight to prefs (it does not call this
  * VM) and does not refuse the opposite side's language, so it can leave the
  * selection **degenerate** — source and target the same real language. This class
- * pins that the VM (a) raises 19m only for that state and (b) makes Swap restore
- * the pair the duplicate displaced.
+ * pins that the VM (a) raises 19m only for that state, (b) makes Swap restore the
+ * pair the duplicate displaced, and (c) — the #299 co-verify fix — NEVER
+ * dead-ends 19m even when the remembered pair is gone after process death.
  *
  * Mutations decided BEFORE the assertions (rule 11), each run afterwards and each
  * reddened the test it was aimed at (see the PR body's Reproduced: block):
  * - `source == target` → `source != target` in `duplicateSelection`: the sheet
  *   fires on every ordinary pair and never on the degenerate one — reddens both
  *   `...raises no...` and `...raises 19m...`.
- * - swap direction `setLanguagePair(sourceId = validTarget, targetId = validSource)`
- *   → the two ids swapped: Swap restores the pre-duplicate pair UNSWAPPED, so the
- *   language the user picked lands on the wrong side — reddens `Swap restores...`.
+ * - swap direction `lastValidTarget to lastValidSource` → the two swapped:
+ *   restores the pre-duplicate pair UNSWAPPED — reddens `Swap restores...`.
+ * - `degenerateResolution`'s no-remembered-pair fallback → `duplicated to
+ *   duplicated`: Swap leaves the selection degenerate — reddens BOTH
+ *   `Swap resolves ... process death` and `resolution never degenerates ...`.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DuplicateSelectionTest {
@@ -100,5 +104,55 @@ class DuplicateSelectionTest {
         settle()
 
         assertThat(vm.duplicateSelection.value).isNull()
+    }
+
+    @Test
+    fun `Swap resolves the degenerate state even with no remembered pair (process death)`() {
+        // The #299 co-verify scenario, at the ViewModel: a degenerate pair persisted
+        // in DataStore while the last-valid pair (in-memory-written by the init
+        // collector) was dropped by process death. Before the fix onSwapLanguages
+        // returned false and changed nothing — Swap dead, scrim/back dead. It must
+        // resolve now, on the exit the sheet keeps.
+        val handle = SavedStateHandle()
+        val prefs =
+            FakeTranslatePrefsRepository().apply {
+                source.value = "de"
+                target.value = "de"
+            }
+        val vm = textViewModel(dispatcher, prefs = prefs, handle = handle)
+        settle()
+        // Reproduce "the remembered pair is gone": clear the saved-state keys the
+        // init collector wrote, leaving the degenerate DataStore pair standing.
+        handle["text_valid_pair_src"] = null
+        handle["text_valid_pair_tgt"] = null
+        assertThat(vm.duplicateSelection.value).isEqualTo("de") // 19m is showing
+
+        assertThat(vm.onSwapLanguages()).isTrue()
+        settle()
+
+        // RESOLVED — no dead end. The exact pair is a fallback default; what the
+        // test pins is that it is NOT degenerate and the guard clears.
+        assertThat(prefs.source.value).isNotEqualTo(prefs.target.value)
+        assertThat(vm.duplicateSelection.value).isNull()
+    }
+
+    // ---- degenerateResolution (pure) — the no-dead-end guarantee ------------
+
+    @Test
+    fun `resolution with a remembered pair swaps it`() {
+        assertThat(degenerateResolution(duplicated = "af", lastValidSource = "af", lastValidTarget = "es"))
+            .isEqualTo("es" to "af")
+    }
+
+    @Test
+    fun `resolution never degenerates even with no remembered pair`() {
+        // The property the whole fix rests on: whatever comes in, the pair out is
+        // valid. Covers the ordinary id AND the id that equals the default source.
+        for (duplicated in listOf("de", "en", "fr")) {
+            val (source, target) = degenerateResolution(duplicated, lastValidSource = null, lastValidTarget = null)
+            assertThat(source).isNotEqualTo(target)
+            // The duplicated language the user picked is kept, as the target.
+            assertThat(target).isEqualTo(duplicated)
+        }
     }
 }

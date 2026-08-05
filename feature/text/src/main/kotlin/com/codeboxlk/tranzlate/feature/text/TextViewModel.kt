@@ -112,6 +112,38 @@ data class StarFailure(
 )
 
 /**
+ * How a degenerate selection (source == target == [duplicated]) resolves when 19m
+ * asks to Swap, or is dismissed — **ALWAYS to a non-degenerate pair**, so 19m is
+ * never a dead end.
+ *
+ * #299 co-verify proved the old `?: return false` WAS a dead end: process death
+ * drops the in-memory-written last-valid pair (the init collector had not re-run)
+ * while DataStore keeps the degenerate selection, so on relaunch Swap and the
+ * scrim/back — both of which call [TextViewModel.onSwapLanguages] — did nothing,
+ * and only "Pick another" escaped. This resolution never fails:
+ *
+ * - With the last valid pair known, it is that pair **swapped**: the duplicated
+ *   language lands on the side the user picked it for (the drawn pre-commit swap).
+ * - Without it, the duplicated language is kept as the **target** (where "already
+ *   the source" put it) and paired with a fallback **source** that differs from it
+ *   — a valid pair to translate with now, or to replace via "Pick another".
+ *
+ * Pure so the process-death case is reproducible without fighting the collector's
+ * timing (`DuplicateSelectionTest`). `@return` (source, target), source != target.
+ */
+internal fun degenerateResolution(
+    duplicated: String,
+    lastValidSource: String?,
+    lastValidTarget: String?,
+): Pair<String, String> =
+    if (lastValidSource != null && lastValidTarget != null && lastValidSource != lastValidTarget) {
+        lastValidTarget to lastValidSource
+    } else {
+        val fallbackSource = if (duplicated != FALLBACK_SOURCE_LANG) FALLBACK_SOURCE_LANG else FALLBACK_TARGET_LANG
+        fallbackSource to duplicated
+    }
+
+/**
  * The Text vertical's ONE state holder (APP_STRUCTURE — the screen ASKS the
  * Translation brain via [TranslateTextUseCase]; it never orchestrates engines,
  * metering or ads itself).
@@ -486,17 +518,21 @@ class TextViewModel
             // Sheet 19m's Swap (#130 PR-20). The selection is degenerate — the user
             // picked the language already on the other side — so there is nothing to
             // swap in the CURRENT pair (swapping X with X is a no-op, the dead
-            // affordance EDGE_CASES §7 forbids). Restore the pair the duplicate
-            // displaced by swapping the LAST VALID pair, which the init collector
-            // keeps in saved state so it survives process death. This is the drawn
-            // pre-commit swap (source ⇄ the just-picked language) reproduced
-            // post-commit; the Detect and plain-pair paths below are untouched, and
-            // their existing tests stay green because they never hit this branch.
+            // affordance EDGE_CASES §7 forbids). [degenerateResolution] ALWAYS
+            // produces a valid pair, so this branch cannot dead-end even when the
+            // remembered pair is gone (process death, #299 co-verify); Swap and the
+            // scrim/back both come through here and both always resolve. The Detect
+            // and plain-pair paths below are untouched, and their existing tests stay
+            // green because they never reach this branch.
             if (currentSource != AUTO_LANG && currentSource == currentTarget) {
-                val validSource = savedStateHandle.get<String>(KEY_VALID_SRC) ?: return false
-                val validTarget = savedStateHandle.get<String>(KEY_VALID_TGT) ?: return false
+                val (newSource, newTarget) =
+                    degenerateResolution(
+                        duplicated = currentSource,
+                        lastValidSource = savedStateHandle.get<String>(KEY_VALID_SRC),
+                        lastValidTarget = savedStateHandle.get<String>(KEY_VALID_TGT),
+                    )
                 viewModelScope.launch {
-                    prefs.setLanguagePair(sourceId = validTarget, targetId = validSource)
+                    prefs.setLanguagePair(sourceId = newSource, targetId = newTarget)
                 }
                 return true
             }

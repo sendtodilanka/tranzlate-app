@@ -175,10 +175,10 @@ fun TranzlateApp(
     // this shell), so nothing is hoisted for it. Suppressed while a picker is open
     // so that "Pick another" — which reopens the target picker — does not leave 19m
     // floating over it. A degenerate pair has no valid no-op to return to, so every
-    // way out RESOLVES it: Swap and a scrim/back dismiss both restore the swapped
-    // pair (the likely intent, ruling §2 "dismiss is always a state-machine
-    // action — no dead end"), and Pick another reopens the picker. The guard clears
-    // itself the instant source ≠ target again.
+    // way out RESOLVES it to a valid pair: Swap and a scrim/back dismiss both call
+    // `onSwapLanguages`, whose degenerate branch never dead-ends even when the
+    // remembered pair is gone (#299 co-verify — process death), and Pick another
+    // reopens the picker. The guard clears itself the instant source ≠ target again.
     val duplicateSelection by textViewModel.duplicateSelection.collectAsStateWithLifecycle()
     val pickerOpen = pickerDialogForSource != null || backStack.lastOrNull() is LanguagePickerNavKey
     duplicateSelection?.takeUnless { pickerOpen }?.let { duplicateId ->
