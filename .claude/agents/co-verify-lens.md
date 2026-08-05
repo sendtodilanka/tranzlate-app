@@ -85,8 +85,11 @@ rule is explicit: cite a source or say "verified data නෑ".
 ```
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
-./gradlew test :app:assembleTranzlateProdDebug :app:assembleTranzlateFakeDebug spotlessCheck detekt
+./gradlew preflight
 ```
+`preflight` (#253) is the single gate — it compiles every androidTest source set
+and both APKs, which the old five-command line did not, so a defect in a
+`*/src/androidTest*` set showed green under it.
 
 - `--rerun-tasks` when anything touches lint, architecture or generated code —
   a cached green has hidden real failures here more than once. **CI is the

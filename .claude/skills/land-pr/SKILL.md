@@ -36,18 +36,28 @@ protects.
    ```
    export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
    export ANDROID_HOME="$HOME/Library/Android/sdk"
-   ./gradlew test :app:assembleTranzlateProdDebug :app:assembleTranzlateFakeDebug spotlessCheck detekt
+   ./gradlew preflight
    ```
-   A rebase can break compilation that neither branch broke — that is the whole
-   point of running it here.
+   `preflight` (#253) compiles every androidTest source set and both APKs — the
+   old five-command line (`test … spotlessCheck detekt`) compiled no androidTest
+   at all, so a rebase could break `:core:database`'s tests and still show green.
+   A rebase can break compilation neither branch broke — that is why this runs here.
 
-3. **Push and wait for CI on the rebased commit:**
+3. **Push and wait for CI ON THE REBASED COMMIT — verified by SHA, not by the badge:**
    ```
    git push --force-with-lease
-   gh run watch $(gh run list --branch <branch> --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status
+   sha=$(git rev-parse --short HEAD)
+   rid=$(gh run list --branch <branch> --limit 1 --json databaseId --jq '.[0].databaseId')
+   gh run watch "$rid" --exit-status
+   # THE CHECK THAT PREVENTS A THIRD main break — the run's SHA must equal the tip:
+   run_sha=$(gh run list --branch <branch> --limit 1 --json headSha --jq '.[0].headSha[0:7]')
+   [ "$run_sha" = "$sha" ] || { echo "STALE: CI ran $run_sha, tip is $sha — DO NOT MERGE"; exit 1; }
    ```
    `gh pr checks` fails on this repo's token scope — watch the run instead.
-   Green on the branch's *old* history does not count.
+   **Green on the branch's *old* history does not count, and a `CONFLICTING` PR
+   runs no workflow at all — its last green sits on a stale commit with nothing
+   saying so (that nearly broke #246's landing). Comparing `headSha` to the tip is
+   the only thing that catches it; the badge cannot (#253).**
 
 4. **Merge** — with the epic tracker row *already carrying this PR's number*.
    The owner's strict rule: a merge that leaves the tracker stale is an
