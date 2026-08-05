@@ -40,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -125,11 +126,24 @@ fun ComposerScreen(
     onBack: () -> Unit,
     onPickLanguage: (LanguageRole) -> Unit,
     onOpenPaywall: () -> Unit,
+    onOfflinePackMissing: (String?) -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Sheet 19h (#130 PR-20). A translation that failed offline means the target
+    // has no on-device pack AND there is no connection, so this HOISTS that target
+    // to the app shell, which — not the composer, to keep `:feature:text` free of a
+    // dependency on `:feature:language` — decides whether to raise 19h, gated on
+    // `ConnectivityMonitor.online` and on there being other packs to offer.
+    // `offlinePackMissingLang` is pure, so which state raises the sheet is decided
+    // and tested away from Compose. The onDispose clear keeps the sheet from
+    // trailing the user onto another screen after they leave the composer.
+    val offlineState by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(offlineState) { onOfflinePackMissing(offlinePackMissingLang(offlineState)) }
+    DisposableEffect(Unit) { onDispose { onOfflinePackMissing(null) } }
     val onNotify: (String) -> Unit = { message ->
         scope.launch { snackbarHostState.showSnackbar(message) }
     }

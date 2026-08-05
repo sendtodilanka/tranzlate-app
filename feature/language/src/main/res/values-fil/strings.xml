@@ -104,4 +104,16 @@
     <string name="lang_dialog_manage_packs">Pamahalaan ang mga pack</string>
     <string name="lang_dialog_cancel">Kanselahin</string>
     <string name="lang_dialog_close">Isara</string>
+
+    <!-- 19h — offline, pack missing (#130 PR-20). NEEDS-TRANSLATION review. -->
+    <string name="lang_sheet_offline_title">Offline ka</string>
+    <string name="lang_sheet_offline_body">Wala pang pack ang %1$s sa device na ito. Handa nang gamitin ang mga ito ngayon.</string>
+    <string name="lang_sheet_offline_use">Gamitin ang %1$s</string>
+    <string name="lang_sheet_offline_close">Isara</string>
+
+    <!-- 19m — already the source (#130 PR-20). NEEDS-TRANSLATION review. -->
+    <string name="lang_sheet_already_title">%1$s na ang pinagmulang wika</string>
+    <string name="lang_sheet_already_body">Pumili ng ibang target, o palitan ang dalawang wika.</string>
+    <string name="lang_sheet_already_swap">Palitan</string>
+    <string name="lang_sheet_already_pick">Pumili ng iba</string>
 </resources>

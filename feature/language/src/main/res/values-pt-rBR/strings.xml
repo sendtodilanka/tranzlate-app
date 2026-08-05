@@ -104,4 +104,16 @@
     <string name="lang_dialog_manage_packs">Gerenciar pacotes</string>
     <string name="lang_dialog_cancel">Cancelar</string>
     <string name="lang_dialog_close">Fechar</string>
+
+    <!-- 19h — offline, pack missing (#130 PR-20). NEEDS-TRANSLATION review. -->
+    <string name="lang_sheet_offline_title">Você está off-line</string>
+    <string name="lang_sheet_offline_body">%1$s ainda não tem um pacote neste dispositivo. Estes estão prontos para usar agora.</string>
+    <string name="lang_sheet_offline_use">Usar %1$s</string>
+    <string name="lang_sheet_offline_close">Fechar</string>
+
+    <!-- 19m — already the source (#130 PR-20). NEEDS-TRANSLATION review. -->
+    <string name="lang_sheet_already_title">%1$s já é o idioma de origem</string>
+    <string name="lang_sheet_already_body">Escolha outro idioma de destino ou troque os dois idiomas.</string>
+    <string name="lang_sheet_already_swap">Trocar</string>
+    <string name="lang_sheet_already_pick">Escolher outro</string>
 </resources>
