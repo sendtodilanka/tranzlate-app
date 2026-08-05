@@ -24,7 +24,7 @@ payload=$(cat)
 cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
 [ -z "$cmd" ] && exit 0
 
-printf '%s' "$cmd" | grep -qE '(^|[;&|][[:space:]]*)gh[[:space:]]+pr[[:space:]]+create' || exit 0
+printf '%s' "$cmd" | grep -qE '(^|[;&|][[:space:]]*)([^[:space:];&|]*/)?gh[[:space:]]+pr[[:space:]]+create' || exit 0
 
 # No body at all → the author is opening a PR some other way; not our business.
 # This runs FIRST now (#178). It used to sit after the marker scan, so an

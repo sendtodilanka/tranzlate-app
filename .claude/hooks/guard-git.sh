@@ -36,17 +36,17 @@ deny() {
 
 # ── 1. the skip-the-gate flag: human-only emergency override (CLAUDE.md rule 6)
 # Anchored to a git/gh invocation so the string can be discussed in prose.
-if printf '%s' "$scan" | grep -qE '(^|[;&|][[:space:]]*)(git|gh)[[:space:]][^;&|]*[[:space:]]--no-verify([[:space:]]|$)'; then
+if printf '%s' "$scan" | grep -qE '(^|[;&|][[:space:]]*)([^[:space:];&|]*/)?(git|gh)[[:space:]][^;&|]*[[:space:]]--no-verify([[:space:]]|$)'; then
   deny "CLAUDE.md rule 6: --no-verify is a human-only emergency override. Fix what the hook is failing on instead — a skipped gate is how a broken commit reaches main."
 fi
 
 # ── 2. direct push to main ────────────────────────────────────────────────────
-if printf '%s' "$scan" | grep -qE '(^|[;&|][[:space:]]*)git[[:space:]]+([^;&|]*[[:space:]])?push'; then
+if printf '%s' "$scan" | grep -qE '(^|[;&|][[:space:]]*)([^[:space:];&|]*/)?git[[:space:]]+([^;&|]*[[:space:]])?push'; then
   if printf '%s' "$scan" | grep -qE 'push[^;&|]*[[:space:]](origin[[:space:]]+)?(main|HEAD:main|[^[:space:]]+:main)([[:space:]]|$)'; then
     deny "Direct push to main is blocked (CLAUDE.md git workflow). Open a PR: git push -u origin <branch> && gh pr create --base main."
   fi
   # A bare `git push` while main is checked out is the same act, less obviously.
-  if printf '%s' "$scan" | grep -qE '(^|[;&|][[:space:]]*)git[[:space:]]+push[[:space:]]*($|[;&|])'; then
+  if printf '%s' "$scan" | grep -qE '(^|[;&|][[:space:]]*)([^[:space:];&|]*/)?git[[:space:]]+push[[:space:]]*($|[;&|])'; then
     branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
     [ "$branch" = "main" ] && deny "Bare 'git push' on main pushes to main. Branch first: git checkout -b <name>."
   fi

@@ -119,6 +119,7 @@ numbers to be actionable.
 |---|---|---|
 | Wire `.claude/hooks/tests/guard-restore-invariant.sh` (112 assertions) and `device-claim-behaviour.sh` (31) into `preflight` | Committed by #257 and runnable, but nothing runs them. No argument needed — it is one line in `PreflightConventionPlugin`. **A loud skip must count as a pass**: the invariant sections skip until #233 lands the hookify rules. | #233, #257 |
 | Fold the man-page-derived regression table into whatever runs above | Same reason. | as above |
+| Add a `settings.json`-matcher regression guard: fail if any git/gh/adb `if:` is start-anchored again (the #258 / #223 leading-path class). Derived from the live settings, so it cannot rot. | #258's convergence-breaker (rule 12, second instance), deferred out of the #258 PR under the governance freeze — the fix ships; the class-guard waits for the wiring above. | #258, then the wiring above |
 
 
 ## Phase 2 — the audit
