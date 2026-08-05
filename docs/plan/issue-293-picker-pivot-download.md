@@ -156,3 +156,13 @@ exactly the state in which two agents have shared one emulator before (rule 12,
 fourth shape; the #213 hook that "had never fired"). Per the brief's "if unsure, do
 NOT", I did not claim or drive it. The reasoning that stands in for the measurement
 is in the research record.
+
+## Landed — PR #297
+
+Merged via `/land-pr` (co-verify APPROVE-WITH-NOTES, cross-model). One non-blocking
+follow-up the lens found and I filed separately: the pivot row's
+`stateContentDescription` is not yet `pivot`-guarded, so a TalkBack user still hears
+"available for offline use" on English even though the visual Download affordance is
+gone — a visual/a11y mismatch this PR introduces. Tracked as its own issue for a
+picker-a11y pass; the visual fix here is a net a11y improvement (one fewer reachable
+misleading action) and stands on its own.
