@@ -33,3 +33,8 @@ covered; what escapes (worst first) and is genuinely new here:
 ## Verify
 `./gradlew :feature:language:test` green; mutate-first RED proof (drop `onDismiss()` or wrong id)
 recorded in the PR body; `./gradlew preflight`.
+
+## Landed
+`PackFailureSheetHostRenderTest` landed in **PR #276** (`Fixes: #240`) — 6 tests, cross-model
+co-verify APPROVE (M1/M2 mutations reproduced independently, skill adherence checked at code
+level). The `Interrupted`+`STORAGE` latent dead-end it pins is filed as **#275**.
