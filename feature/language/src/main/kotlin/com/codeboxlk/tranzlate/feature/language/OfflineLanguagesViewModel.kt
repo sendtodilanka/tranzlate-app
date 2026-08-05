@@ -86,8 +86,8 @@ internal const val KEY_PENDING_REMOVAL = "offline_languages.pending_removal"
  *   Removing it changes no selection — see [RemoveInUseSheet] — it just means
  *   the very next translation is the one that needs a connection.
  * @param savedCount saved phrases using this language, on either side. Read once
- *   per question and only when [inUseAsTarget]: 19f does not draw the line, so
- *   the common removal costs no query at all.
+ *   per question, for every removal: since #230 both sheets draw the reassurance
+ *   line, so the count is no longer reserved for the in-use one.
  */
 data class PendingPackRemoval(
     val id: String,
@@ -241,9 +241,9 @@ class OfflineLanguagesViewModel
                     PendingPackRemoval(
                         id = id,
                         inUseAsTarget = inUse,
-                        // 19f draws no saved line, so the query runs only for the
-                        // sheet that has one to draw.
-                        savedCount = if (inUse) savedCountOf(id) else 0,
+                        // Both sheets draw the saved line since #230, so the count
+                        // is read for every removal — not only the in-use one.
+                        savedCount = savedCountOf(id),
                     )
                 }
 

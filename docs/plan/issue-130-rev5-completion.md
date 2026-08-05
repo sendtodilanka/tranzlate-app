@@ -106,6 +106,14 @@ five-command gate, plus the SHA-check now wired into `/land-pr` — landed in **
 its co-verify lens found the same bypass *class* still open two more ways (env/runner
 prefix, path-qualified `git restore`) — filed as **#265**, the consolidation fix.
 
+**Wave 1c/1d landing note:** the copy-and-preview sweep (#226 #229 #243 #219) and the
+shipped-screen behaviour defects (#224 #244 #248 #154 #158) all landed earlier this
+session. **#230** — the saved-phrases reassurance now drawn on the ordinary removal
+sheet (19f), not only the in-use one (19g) — landed in **PR #294** (co-verify APPROVE
+by a cross-model lens; CI green on the rebased commit `d8146a7`; its lens also caught a
+STRINGS-doc omission, fixed in the same PR). #250 stays deferred to PR-23 by ruling 8,
+carried not fixed. **Wave 1c is complete; 1d is complete but for #250's PR-23 carry.**
+
 ### Wave 1f also carries work that is NOT issue-shaped
 
 *(This section added by **PR #261**.)*

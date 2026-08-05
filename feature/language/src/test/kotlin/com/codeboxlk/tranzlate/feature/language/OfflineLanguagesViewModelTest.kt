@@ -496,17 +496,33 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(3)
         }
 
-    /** 19f draws no saved line, so the ordinary removal must not pay for the query. */
+    /**
+     * Owner ruling 2026-08-05 (#230): 19f draws the saved line too, so the
+     * ordinary removal reports its real count instead of a forced zero. Either
+     * side of the pair counts, same as 19g — the fixture is asymmetric (`de` as a
+     * target, `de` as a source, an unsaved `de` row, and a different language) so a
+     * source-only, target-only, or favourite-blind rule cannot pass.
+     *
+     * Mutation decided first (rule 11): restore `savedCount = if (inUse)
+     * savedCountOf(id) else 0`. `de` is not the target in this fixture, so the
+     * guard forces 0 and the assertion of 2 reddens.
+     */
     @Test
-    fun `an ordinary removal reports no saved count`() =
+    fun `an ordinary removal reports the saved count too`() =
         runTest {
-            translations.seed(saved(id = 1, source = "en", target = "de"))
+            translations.seed(
+                saved(id = 1, source = "en", target = "de"),
+                saved(id = 2, source = "de", target = "en"),
+                unsaved(id = 3, source = "en", target = "de"),
+                saved(id = 4, source = "en", target = "fr"),
+            )
             viewModel.pendingRemoval.launchIn(backgroundScope)
 
             viewModel.requestRemove("de")
             runCurrent()
 
-            assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(0)
+            assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isFalse()
+            assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(2)
         }
 
     /**
@@ -572,10 +588,10 @@ class OfflineLanguagesViewModelTest {
      * `LinkageError`, so an `Error`, so NOT an `Exception`
      * (`TextViewModel.kt:768-779`, verified again in this PR).
      *
-     * The user-visible harm this pins: tap the trash icon on the pack for the
-     * CURRENT target language and the app disappears — no sheet, no message.
-     * `savedCount` is only queried when `inUseAsTarget`, so `fr` is the pack
-     * that reproduces it and any other pack is safe.
+     * The user-visible harm this pins: tap the trash icon and the app disappears
+     * — no sheet, no message. Before #230 only the CURRENT target pack queried the
+     * count, so `fr` was the one that reproduced it; since #230 every removal
+     * queries, so this guard now protects them all. `fr` still exercises it here.
      */
     @Test
     fun `a saved-count query that fails to link still lets the sheet open`() =

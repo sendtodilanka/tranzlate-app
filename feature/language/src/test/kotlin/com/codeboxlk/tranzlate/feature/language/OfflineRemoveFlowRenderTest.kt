@@ -92,6 +92,34 @@ class OfflineRemoveFlowRenderTest {
         compose.onNodeWithText("Remove Spanish?").assertExists()
     }
 
+    /**
+     * #230: the ordinary sheet carries the reassurance line too, gated on the
+     * count. `es` is not the target here, so this is 19f, and its OWN saved-line
+     * tag is present — the join the ViewModel and sheet tests cannot see.
+     *
+     * Mutation decided first (rule 11): in `OfflineLanguagesContent`, hand
+     * `RemovePackSheet` a literal `savedCount = 0` instead of the question's
+     * count. The `PendingPackRemoval` still carries 2, but the sheet receives 0
+     * and draws no line, so `TT_SHEET_REMOVE_SAVED` reddens.
+     */
+    @Test
+    fun `19f draws its saved line when the pack has saved phrases`() {
+        showScreen(PendingPackRemoval(id = "es", inUseAsTarget = false, savedCount = 2))
+
+        compose.onNodeWithTag(TT_SHEET_REMOVE).assertExists()
+        compose.onNodeWithTag(TT_SHEET_REMOVE_IN_USE).assertDoesNotExist()
+        compose.onNodeWithTag(TT_SHEET_REMOVE_SAVED).assertExists()
+    }
+
+    /** #230: gated on the count — at zero the line is absent, never a "0 saved" row. */
+    @Test
+    fun `19f draws no saved line when nothing is saved`() {
+        showScreen(PendingPackRemoval(id = "es", inUseAsTarget = false, savedCount = 0))
+
+        compose.onNodeWithTag(TT_SHEET_REMOVE).assertExists()
+        compose.onNodeWithTag(TT_SHEET_REMOVE_SAVED).assertDoesNotExist()
+    }
+
     /** Mutation D5: drawing 19f for the in-use case would lose the whole warning. */
     @Test
     fun `an in-use question draws 19g with its saved line`() {

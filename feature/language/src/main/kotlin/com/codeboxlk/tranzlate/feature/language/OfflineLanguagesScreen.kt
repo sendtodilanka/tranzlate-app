@@ -123,6 +123,7 @@ internal fun OfflineLanguagesContent(
     RemovePackSheet(
         visible = pendingRemoval != null && !pendingRemoval.inUseAsTarget,
         languageName = removalName,
+        savedCount = pendingRemoval?.savedCount ?: 0,
         onRemove = onConfirmRemove,
         onDismiss = onDismissRemove,
     )
