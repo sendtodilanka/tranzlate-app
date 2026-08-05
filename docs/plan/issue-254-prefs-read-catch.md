@@ -36,3 +36,16 @@ that test goes **RED** (the non-IO cause escapes). Keep the existing write-side 
 ## Verify
 `./gradlew :core:datastore:test :feature:text:test` green; the mutate-first RED→GREEN recorded;
 `preflight` at land.
+
+## Landed — PR #278
+Cross-model co-verify (Sonnet 5) verdict **APPROVE-WITH-NOTES**: both mutations reproduced RED,
+a real-cancellation probe green, and the widen-to-non-Cancellation-Throwable idiom verified
+consistent with #236/#249 against the pinned `kotlinx-coroutines-1.11.0` source. Two non-blocking
+findings recorded rather than dropped:
+- **#279** — after a degraded read the eager `stateIn` subscription *completes* (Flow.catch
+  semantics), so cached UI state freezes at defaults until app restart. Project-wide (applies to
+  #236/#249), **not a #254 regression** — #278 only widens the triggers. Follow-up.
+- **Enumeration undercount** — a 4th eager consumer (`MainActivityViewModel.themeSettings`) is
+  covered by the fix but was missed in the PR body's two searches; corrected in a #278 comment.
+
+Wave 1b (#241, #240, #242, #254) complete.
