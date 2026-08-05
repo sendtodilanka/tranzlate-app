@@ -6,7 +6,8 @@ status: accepted
 ## The decision (option 1 — widen), and why
 `TranzlatePreferencesDataSource.preferences` (`:43-45`) catches **`IOException` only**; anything
 else (`else throw cause`) escapes into the **eager** `stateIn(viewModelScope, Eagerly)` consumers
-(`TextViewModel:142,145` — source/target lang on the main screen) with **no handler**, crashing
+(`TextViewModel:142/145/148` — source/target lang **and textMode**, on the main screen; the
+build enumeration found `:148` too, which this plan first missed) with **no handler**, crashing
 the Text screen on load. This is the **identical shape** #236 fixed at seven sites and #249 at two
 more, on the general premise *"nothing should escape into a scope with no handler."* Every read in
 the file derives from `preferences` (`.map{}` at :76/78/81/84/87/125/161/165/173…), so the crash
