@@ -103,6 +103,28 @@ and both APKs, which the old five-command line did not, so a defect in a
   **empty, untracked files included**, and say so. **Never commit. Never push.
   Never touch another worktree or `main`.**
 
+## For an Android build PR: verify it USED claude-android-ninja, and FOLLOWED it
+
+When the change is app code, tests, Gradle or build-logic — the kind an
+`android-builder` agent produces — one extra check is mandatory, because the owner
+requires the skill *used*, not just loaded. Two halves, and they gate differently:
+
+- **Read (mechanical).** The builder must have consulted the `references/*.md` that
+  bear on the task. Parse its transcript for `Read` calls on
+  `.claude/skills/claude-android-ninja/references/`. Reading **zero** relevant ones is
+  a finding — the #241 build agent launched the skill and read none (the skill was
+  uncommitted then, #268); that is the failure this check exists to catch.
+- **Adhere (judgment — your job, not a script's).** Does the code actually FOLLOW the
+  relevant references? Name the file and the divergence — e.g. *"`compose-patterns.md`
+  hoists state to the caller; `LanguageRow` holds its own."* You cannot `grep` this;
+  it is why a reviewer, not a hook, is the gate (mechanising it would be the
+  #213/#242 "presence check standing in for behaviour" mistake).
+
+**Relevant, not all 43.** Only the references the task touches — a Room change pulls
+`dependencies`/`android-data-sync`, not `android-media`. `SKILL.md` (the router) and
+`LICENSE.md` are not patterns to check. Requiring every file on every PR is wrong, and
+the skill's own "load only what you need" says so.
+
 ## Report
 
 Findings ranked by severity. Each one carries `file:line`, a **concrete failure
