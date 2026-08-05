@@ -88,3 +88,24 @@ three "Mandatory when done" items this PR does not do: an `androidTest` with
 row-survival + the full 1→4 chain, the CI androidTest compile guard, and an API-24
 run. The first two are #40-blocked (no CI emulator); whether the Robolectric route
 supersedes them is an owner scope call.
+
+## androidTest addendum — the remaining 3 items, on the emulator (owner: 2026-08-05)
+
+Owner ruled: use an **emulator** (not a real device) for #241's remaining "Mandatory
+when done" items. `Tranzlate_API24` exists locally. So this completes #241:
+
+1. **`:core:database/src/androidTest/…/MigrationThreeToFourAndroidTest.kt`** — the REAL
+   instrumentation `MigrationTestHelper` (device SQLite, not Robolectric's sim):
+   - **Row-survival:** create v3 via `3.json`, INSERT a `translation` row, run
+     `MigrationThreeToFour`, `runMigrationsAndValidate` to 4, then assert the row is
+     intact (all columns) AND the two indices exist. This is the half the Robolectric
+     test does NOT do (it checks schema shape only).
+   - **Full 1→4 chain:** `createDatabase(1)` then `runMigrationsAndValidate(4, …all…)`.
+2. **CI compile guard** — automatic: `PreflightConventionPlugin` (#253) compiles every
+   androidTest source set AGP reports, so adding this dir is covered with no edit.
+   Verify with `./gradlew :core:database:assembleDebugAndroidTest`.
+3. **API-24 run** — `:core:database:connectedDebugAndroidTest` on `Tranzlate_API24`,
+   output recorded in the PR body (the "non-negotiable" item).
+
+Mutate-first still applies: prove the row-survival assertion goes RED if a column is
+dropped. Then #241 closes.
