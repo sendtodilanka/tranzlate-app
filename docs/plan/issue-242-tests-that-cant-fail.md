@@ -12,7 +12,7 @@ the (new/fixed) test goes RED, revert → GREEN.
 `DownloadFailureTest.every cause the platform can report has a line` asserts
 `lines.hasSize(OfflineModelFailure.entries.size)` — `entries.map{}` is size-preserving, so it
 CANNOT fail. The real hole is one file over: `RealOfflineModelManager.toFailure()`
-(`core/translate/.../RealOfflineModelManager.kt:389`) has an `else`, so a 5th `OfflineModelFailure`
+(`core/translate/.../RealOfflineModelManager.kt:606-610`) has an `else`, so a 5th `OfflineModelFailure`
 constant lands silently as `UNKNOWN`. `downloadFailureCopy` is `else`-less (compile-guarded);
 `toFailure()` is not. **Fix:** a test that a 5th cause is NOT silently `UNKNOWN` — the pattern
 is `DownloadFailureSourceTest` (which bans a second `when(cause)` in named files); add
