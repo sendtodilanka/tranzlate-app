@@ -83,11 +83,14 @@ Robolectric/JVM path first; escalate only if it provably cannot work.
 ## Landed
 
 The CI-executable v3→v4 schema test landed in **PR #266** (cross-model co-verify,
-3 mutations RED). It is `Refs: #241`, **not** `Fixes:` — #241 stays OPEN for its
-three "Mandatory when done" items this PR does not do: an `androidTest` with
-row-survival + the full 1→4 chain, the CI androidTest compile guard, and an API-24
-run. The first two are #40-blocked (no CI emulator); whether the Robolectric route
-supersedes them is an owner scope call.
+3 mutations RED), as `Refs: #241`.
+
+The **androidTest** half — the three "Mandatory when done" items — landed in **PR #272**
+(owner ruled 2026-08-05: use an emulator): row-survival + full 1→4 chain, run GREEN on
+`Tranzlate_API24` with a mutate-first RED proof (a row-wipe turned it red, the schema-only
+test cannot catch that); the CI **compile** guard is automatic (#253, per rule 6);
+API-24 run recorded. With #266 + #272, all of #241's mandatory items are met, so #272
+carries `Fixes: #241` and closes it.
 
 ## androidTest addendum — the remaining 3 items, on the emulator (owner: 2026-08-05)
 
