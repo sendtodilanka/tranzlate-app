@@ -6,20 +6,29 @@
 >
 > `language-screens-spec.html` is rev 5. **All sixteen §11 corrections are in,
 > verified against the drawings**, plus the structural request: every drawing
-> now carries a `data-screen-label` — **26 labels became 54**, so the ten sheets,
-> the five snackbars, 20c, 20e and 21c can no longer be skipped by a reviewer
-> enumerating frames.
+> now carries a `data-screen-label` — 26 labels became 54. **Correction (#184): the
+> true structural count is 58, not 54 — `20c` and `20e` (light + dark = 4 drawings)
+> were named here but never actually labelled, so enumerating *labels* still skips
+> them.** Enumerate by structure instead —
+> `docs/design/language-screens/tools/enumerate-frames.py` (`--self-test` holds the
+> count at 58 when a label is removed).
 >
 > The check that caught rev 4's worst defect was re-run as a script this time:
 > every drawn row's ISO code was cross-referenced against
-> `BundledLanguageCatalog.offlineCapableIds`, across all 54 frames. **Zero
+> `BundledLanguageCatalog.offlineCapableIds`, across 54 of the 58 frames (`20c`/`20e`
+> unlabelled — #184). **Zero
 > contradictions** — nothing offers a pack that cannot exist, nothing marks a
 > capable language online-only. Banned figures re-swept in text nodes only:
 > no user-facing percentages, the only MB figures are the sanctioned range, the
 > aggregate totals, and 19b's tight-space number where it belongs.
 >
 > §9 keeps the rev 4 defect list with each item's outcome. §11 is the commission
-> and its verification. Nothing is outstanding.
+> and its verification. ~~Nothing is outstanding.~~ **Correction (rev5 audit
+> `docs/research/issue-130-rev5-audit.md`, 2026-08-05): three residuals survived this
+> "complete" — the 54→58 miscount (#184); `es`/`ar` speaker marks drawn inconsistently
+> across the adaptive target frames (#183); and the `from · foldable first run` meter
+> drawing a `0` count the device cannot produce (#203). All three are reference-drawing
+> corrections — the shipped app already reads device truth and is correct.**
 
 This brief exists because the spec was first drawn without knowing what the
 Android platform will and will not tell us at runtime. Nothing below is a matter
