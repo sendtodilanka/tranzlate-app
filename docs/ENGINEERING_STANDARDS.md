@@ -149,8 +149,9 @@ and co-verification is strictly necessary for the zero-touch human repo."*
 **Incident:** the worst failures were designs that passed implementation-level scrutiny, or
 would have, yet were wrong **by construction** — `main` lost twice to a merge pattern each
 branch passed alone (rule 1); the #213 device-claim hook that "looked fine" and could never
-fire (§4); the tiering proposal that read as a speedup until a backtest showed it would pass
-bugs. A co-verify of the implementation catches none of these.
+fire (§4). A co-verify of the implementation catches neither — only an attack on the design does.
+(The gate-enforcement design red-teamed under this very rule is the worked example:
+`docs/research/red-team-gate-enforcement.md`.)
 
 - **Co-verify (rule 5) checks one CHANGE is correct** — a per-PR gate. It does not catch a
   DESIGN that is wrong by construction.
