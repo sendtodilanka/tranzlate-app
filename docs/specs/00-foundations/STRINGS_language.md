@@ -46,6 +46,7 @@ The `verifyStringKeyDocs` Gradle task now fails the build if a key ships without
 | `text_lang_online_only` | string | `Online only` | — | language has no offline model |
 | `text_lang_downloading` | string | `Downloading…` | — | ML Kit reports no progress, so no `%` is shown |
 | `text_lang_on_device_count` | plurals | `%1$d of %2$d on device` | on-device, offline-capable | ⚠ the denominator is **offline-capable** languages, not the full catalogue row count |
+| `text_lang_can_be_offline_count` | plurals | `%1$d can be offline` | offline-capable | 18a's zero-pack variant of the counter above (#130 PR-21), on the "All languages" header when nothing is downloaded. Like the meter's `Empty` state this is the no-Play-Services / fake-flavour reading — a real device counts the English pivot from first launch (#203), so it reads `1 of 59 on device`, never this. Denominator is offline-capable, as above |
 
 ### 3.1 Offline-library meter (17b foldable two-leaf · U-5 · issue #130 PR-15)
 
@@ -72,6 +73,27 @@ screen has none.
 | `lang_dialog_manage_packs` | string | `Manage packs` | — | the docked action, as drawn in all four tablet frames. It opens the SAME destination the Home row does, and owner ruling 5 relabels that row **"Language packs"** in PR-23 — the two are deliberately left un-unified here rather than silently changed in one place, because the relabel is PR-23's across three locales |
 | `lang_dialog_cancel` | string | `Cancel` | — | close the card, change nothing. The engineering brief §9 already ruled these four tablet dismisses read "Cancel" correctly; the prohibition on the word applies to the ✕ on a **downloading row**, which stops a download and removes it |
 | `lang_dialog_close` | string | `Close` | — | content description for the card's leading cross. Not `cd_lang_back`: that key says "Back", which promises a return to somewhere, and the card returns to a screen that never left |
+
+### 3.3 First-run suggestion block (18a/18b · issue #130 PR-21)
+
+Drawn on the **source** picker only (both 18a and 18b are "Translate from" frames,
+and its lead reason is "Device language"), in place of the recents section when
+the user has none yet. The suggestions are derived from the device's own locales
+via `LocaleList.getAdjustedDefault()`, so the block invents no signal the platform
+will not give. "No packs yet" is the owner's intentional first-run copy (designer
+brief §8), NOT the offline-library meter's text — the meter is a separate card that
+reads `1 of 59 packs` on a real device (#203).
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_first_run_title` | string | `No packs yet` | — | the primary-container explainer's title; the owner's §8 first-run copy, a suggestion-section header and not a pack count |
+| `lang_first_run_body` | string | `Pick a language to download once, then it works with no signal.` | — | the one fact a first-run user needs |
+| `lang_first_run_privacy` | string | `Translation runs on the device — nothing is sent anywhere.` | — | the on-device privacy line 18a draws under the body |
+| `lang_first_run_suggested_header` | string | `Suggested for you` | — | header over the suggested rows; drawn only when there is at least one suggestion (a header over nothing is the furniture the empty recents section already refuses) |
+| `lang_suggested_reason_device` | string | `Device language` | — | supporting line for the primary locale's suggestion |
+| `lang_suggested_reason_local` | string | `Common where you are` | — | supporting line for a secondary locale's suggestion. The export draws a third reason, **"From your keyboards"**, which needs `InputMethodManager` queries the rev3 ruling scopes as the unproven experiment **E-K1** — not shipped (rule 4), so it has no key |
+| `lang_suggested_get` | string | `Get` | — | the suggested row's action; raises the 18a-confirm sheet (§5.5), not an immediate download |
+| `cd_lang_suggested_get` | string | `Get %1$s for offline use` | language name | the Get button's spoken label — it **contains** the visible word "Get" (WCAG 2.5.3 Label in Name) and names the language the bare button cannot |
 
 ## 4. Language picker — empty, loading and failure states (EDGE_CASES, no dead ends)
 
@@ -290,6 +312,25 @@ drawn pixels, and the pixels win (#299 co-verify).
 `tt_lang_sheet_already_pick` (text). No `cd_*` of its own — a `TranzlateSheetScaffold`
 puts `paneTitle` on the root and `heading()` on the title, which is what a screen
 reader lands on.
+
+## 5.7 Download confirm — sheet 18a-confirm (#130 PR-21)
+
+Raised by a first-run suggestion's **Get** (§3.3) before anything is enqueued: a
+suggestion is the app's idea, not the user's, so it earns one confirming tap that
+states the size and offers a real way out. Get → **confirm** → the metered gate
+(19a). Owned by `DownloadConfirmSheet.kt`.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_confirm_title` | string | `Download %1$s` | language name | names the language, resolved from the row so the confirm says exactly what the row says |
+| `lang_confirm_size` | string | `A language pack is usually 40–65 MB.` | — | the **FIFTH** statement of the pack size (#219): kept in step with `lang_sheet_data_body` (§5), `lang_sheet_space_body` (§5.3), `offline_subtitle` (§7) and `settings_mobile_data_supporting` (`STRINGS_settings.md`). 40–65 MB is the measured on-disk footprint, never the export's pre-#219 "20–45 MB". On the Wi-Fi path this sheet is the ONLY place the size appears — the 19a gate that also states it does not open when the network is unmetered |
+| `lang_confirm_reversible` | string | `You can remove it again from Manage packs.` | — | the network-independent half of the export's Wi-Fi line. The **"On Wi-Fi now"** half is dropped: the metered-data question has one home (`DownloadGate`, run AFTER this confirm), and a sheet asserting the connection state would either duplicate that gate (rev3 ruling §7.8) or read it too early to trust |
+| `lang_confirm_download` | string | `Download and use` | — | the filled action (the likely intent, spec §5); runs the download gate |
+| `lang_confirm_not_now` | string | `Not now` | — | the text action — closes the sheet and leaves the row exactly as it was |
+
+### 5.7.1 Sheet 18a-confirm — testTags (C-1)
+
+`tt_lang_sheet_confirm` (root) · `tt_lang_sheet_confirm_download` · `tt_lang_sheet_confirm_not_now`.
 
 ## 6. Language picker — accessibility (C-4)
 

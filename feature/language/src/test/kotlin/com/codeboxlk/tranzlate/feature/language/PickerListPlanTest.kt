@@ -26,6 +26,9 @@ class PickerListPlanTest {
     private val twoLeaf =
         PickerArrangement(twoPane = true, columns = 1, twoLeaf = true, gutter = Dimensions.pickerCreaseGutter)
 
+    // Mirrors the production signature it exists to drive; the count PR-21 added
+    // took it to detekt's threshold, which it trips AT (the #209 note).
+    @Suppress("LongParameterList")
     private fun plan(
         role: LanguageRole = LanguageRole.TARGET,
         detect: Boolean = false,
@@ -35,6 +38,7 @@ class PickerListPlanTest {
         arrangement: PickerArrangement = PickerArrangement.SinglePane,
         /** The storage snapshot has landed. Default: yes, the resting case. */
         libraryReady: Boolean = true,
+        firstRunSuggestionCount: Int = 0,
     ) = pickerListPlan(
         role = role,
         detectRowPresent = detect,
@@ -43,6 +47,7 @@ class PickerListPlanTest {
         wholeCatalog = railed,
         arrangement = arrangement,
         libraryReady = libraryReady,
+        firstRunSuggestionCount = firstRunSuggestionCount,
     )
 
     // ---- recents: absent, not empty -----------------------------------------
@@ -420,5 +425,92 @@ class PickerListPlanTest {
 
         assertThat(folded.catalogOffset).isEqualTo(landscape.catalogOffset)
         assertThat(folded.copy(showMeter = false)).isEqualTo(landscape)
+    }
+
+    // ---- 18a/18b: the first-run block (PR-21) -------------------------------
+
+    /**
+     * The block sits where recents would and is counted the same way: the
+     * explainer, the "Suggested for you" header, and the suggested rows are all
+     * items above the alphabet, so a rail letter and a restored position that did
+     * not count them would land that many rows short — the third-rule miss again.
+     *
+     * Asserted against the same-shaped TARGET, which shows nothing on empty
+     * recents: 6 on the source, 1 on the target, from identical counts. A
+     * derivation that failed to count the block would give the source 2 (detect +
+     * "All languages") and redden here.
+     */
+    @Test
+    fun `the source first-run block counts its explainer, header and rows into the offset`() {
+        val firstRun = plan(role = LanguageRole.SOURCE, detect = true, recentCount = 0, firstRunSuggestionCount = 2)
+
+        // detect(1) + explainer(1) + "Suggested for you"(1) + 2 rows + "All languages"(1)
+        assertThat(firstRun.firstRun).isTrue()
+        assertThat(firstRun.catalogOffset).isEqualTo(6)
+    }
+
+    /**
+     * With nothing to suggest the block is the explainer alone — no header over an
+     * empty section, the same rule the recents section keeps — so it still shifts
+     * the offset by one. If the explainer were not counted this would read 2.
+     */
+    @Test
+    fun `the explainer alone still shifts the source offset`() {
+        val explainerOnly =
+            plan(role = LanguageRole.SOURCE, detect = true, recentCount = 0, firstRunSuggestionCount = 0)
+
+        // detect(1) + explainer(1) + "All languages"(1)
+        assertThat(explainerOnly.firstRun).isTrue()
+        assertThat(explainerOnly.catalogOffset).isEqualTo(3)
+    }
+
+    /**
+     * The block is a SOURCE affordance — both 18a and 18b are "Translate from"
+     * frames, and the lead reason is "Device language", a source concept. The
+     * target picker keeps the shipped behaviour: an empty recents section is simply
+     * absent, and the offset stays 1 even if a suggestion count is handed in.
+     */
+    @Test
+    fun `the target picker never draws the first-run block`() {
+        val target = plan(role = LanguageRole.TARGET, detect = false, recentCount = 0, firstRunSuggestionCount = 2)
+
+        assertThat(target.firstRun).isFalse()
+        assertThat(target.catalogOffset).isEqualTo(1)
+    }
+
+    /** firstRun is exactly "source, whole catalogue, no recents yet" — one state, four probes. */
+    @Test
+    fun `first run is the source empty-recents whole-catalogue state and nothing else`() {
+        assertThat(plan(role = LanguageRole.SOURCE, recentCount = 0).firstRun).isTrue()
+        assertThat(plan(role = LanguageRole.TARGET, recentCount = 0).firstRun).isFalse()
+        assertThat(plan(role = LanguageRole.SOURCE, recentCount = 1).firstRun).isFalse()
+        // A search is running: the results are the list, and the block does not stand over them.
+        assertThat(plan(role = LanguageRole.SOURCE, recentCount = 0, railed = false).firstRun).isFalse()
+    }
+
+    /**
+     * 17a/17b source first run: the block moves into the side pane like recents,
+     * and it alone is enough to keep the pane — a source pane has no legend and,
+     * on first run, no recents and (searching aside) its Detect row, so without the
+     * block this pane would be the empty 272dp surface the no-dead-end rule refuses.
+     * The target pane with nothing in it is the discriminator: same arrangement,
+     * no block, no pane.
+     */
+    @Test
+    fun `a two-pane source first run keeps its pane for the block`() {
+        val sourceFirstRun =
+            plan(role = LanguageRole.SOURCE, detect = false, recentCount = 0, arrangement = sidePane)
+        val emptyTargetPane =
+            plan(
+                role = LanguageRole.TARGET,
+                detect = false,
+                recentCount = 0,
+                anyVoiceMark = false,
+                arrangement = sidePane,
+            )
+
+        assertThat(sourceFirstRun.firstRun).isTrue()
+        assertThat(sourceFirstRun.sidePane).isTrue()
+        assertThat(emptyTargetPane.sidePane).isFalse()
     }
 }

@@ -144,6 +144,78 @@ class LanguagePickerViewModelTest {
             }
         }
 
+    // ---- 18a: the Get → confirm → gate chain (PR-21) ------------------------
+
+    /**
+     * A suggestion's "Get" raises the confirm sheet and enqueues NOTHING — the
+     * confirm stands between the tap and the gate, so a brand-new user sees what a
+     * pack costs before anything downloads.
+     */
+    @Test
+    fun `a suggestion Get raises the confirm sheet and downloads nothing yet`() =
+        runTest(dispatcher) {
+            val subject = viewModel()
+
+            subject.onSuggestionGet("fr")
+            advanceUntilIdle()
+
+            assertThat(subject.pendingSuggestion.value).isEqualTo("fr")
+            assertThat(manager.downloads).isEmpty()
+        }
+
+    /**
+     * "Download and use" clears the sheet and runs the SAME gate the row ⬇ runs.
+     * On an unmetered network the gate lets it through, so the transfer is
+     * enqueued — the third link of the chain. The mutation this is written against:
+     * a confirm that cleared the sheet but never called [download], which would
+     * leave `manager.downloads` empty while the sheet still looked answered.
+     */
+    @Test
+    fun `confirming a suggestion clears the sheet and reaches the download`() =
+        runTest(dispatcher) {
+            val subject = viewModel()
+            subject.onSuggestionGet("fr")
+
+            subject.confirmSuggestionDownload()
+            advanceUntilIdle()
+
+            assertThat(subject.pendingSuggestion.value).isNull()
+            assertThat(manager.downloads).containsExactly("fr")
+        }
+
+    /**
+     * A metered network without standing consent: confirming runs the gate, the
+     * gate ASKS (19a) rather than downloading, so the chain honours the consent
+     * step it was built to preserve rather than bypassing it.
+     */
+    @Test
+    fun `confirming on metered data reaches the gate, which asks before downloading`() =
+        runTest(dispatcher) {
+            connectivity.metered = true
+            val subject = viewModel()
+            subject.onSuggestionGet("fr")
+
+            subject.confirmSuggestionDownload()
+            advanceUntilIdle()
+
+            assertThat(subject.pendingConsent.value).isEqualTo("fr")
+            assertThat(manager.downloads).isEmpty()
+        }
+
+    /** "Not now", a scrim tap or back: the sheet closes and nothing is enqueued. */
+    @Test
+    fun `dismissing the confirm downloads nothing`() =
+        runTest(dispatcher) {
+            val subject = viewModel()
+            subject.onSuggestionGet("fr")
+
+            subject.dismissSuggestion()
+            advanceUntilIdle()
+
+            assertThat(subject.pendingSuggestion.value).isNull()
+            assertThat(manager.downloads).isEmpty()
+        }
+
     @Test
     fun `offline states are served live from the model manager`() =
         runTest(dispatcher) {

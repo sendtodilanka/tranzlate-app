@@ -61,6 +61,25 @@
         <item quantity="one">%1$d sa %2$d ang nasa device</item>
         <item quantity="other">%1$d sa %2$d ang nasa device</item>
     </plurals>
+    <plurals name="text_lang_can_be_offline_count">
+        <item quantity="one">%1$d ang puwedeng maging offline</item>
+        <item quantity="other">%1$d ang puwedeng maging offline</item>
+    </plurals>
+    <!-- 18a/18b first-run suggestion block (#130 PR-21). -->
+    <string name="lang_first_run_title">Wala pang packs</string>
+    <string name="lang_first_run_body">Pumili ng wikang ida-download minsan, tapos gagana na ito nang walang signal.</string>
+    <string name="lang_first_run_privacy">Nasa device mismo ang pagsasalin — walang ipinapadala kahit saan.</string>
+    <string name="lang_first_run_suggested_header">Iminumungkahi para sa iyo</string>
+    <string name="lang_suggested_reason_device">Wika ng device</string>
+    <string name="lang_suggested_reason_local">Karaniwan sa lugar mo</string>
+    <string name="lang_suggested_get">Kunin</string>
+    <string name="cd_lang_suggested_get">Kunin ang %1$s para magamit offline</string>
+    <!-- Sheet 18a-confirm (#130 PR-21). 40–65 MB matches lang_sheet_data_body. -->
+    <string name="lang_confirm_title">I-download ang %1$s</string>
+    <string name="lang_confirm_size">Karaniwang 40–65 MB ang isang language pack.</string>
+    <string name="lang_confirm_reversible">Puwede mo itong alisin ulit sa Pamahalaan ang mga pack.</string>
+    <string name="lang_confirm_download">I-download at gamitin</string>
+    <string name="lang_confirm_not_now">Hindi ngayon</string>
     <!-- Offline-library meter, foldable two-leaf (17b / U-5). -->
     <string name="text_lang_library_title">Offline library</string>
     <string name="text_lang_library_downloaded">%1$d</string>

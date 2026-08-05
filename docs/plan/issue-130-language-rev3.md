@@ -100,7 +100,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR-18 | 19d + 19b + failure-cause map ×1 + 15a Retry-pill deviation fix. **Closes #175.** Deviations below | ✅ #216, 2026-08-02 |
 | PR-19 | 19f + 19g + U-10 saved-count query + the 🗑 becomes a confirmed remove. **No fallback is built: the drawn 19g and ruling 3 both describe a target switch this app does not have** — deviations below | ✅ #227, 2026-08-02 |
 | PR-20 | 19h + 19m + app-shell sheet host | ✅ #299 |
-| PR-21 | 18a/18b first run (LocaleList suggestions + E-K1) | ⬜ |
+| PR-21 | 18a/18b first run (LocaleList suggestions + E-K1) | ✅ #302 — locale path ships; **E-K1 deferred** (rule 4, InputMethod path unproven, additive) |
 | PR-22 | PackEvents + app SnackbarHost + snackbars 20a | ⬜ |
 
 ### Phase 7 — Manage packs

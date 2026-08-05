@@ -140,6 +140,16 @@
         <item quantity="one">%1$d of %2$d on device</item>
         <item quantity="other">%1$d of %2$d on device</item>
     </plurals>
+    <!-- 18a's zero-pack variant of the counter above, on the "All languages"
+         header. Shown ONLY when nothing is downloaded — which, like the meter's
+         Empty state, is the no-Play-Services / fake-flavour case: a real device
+         counts the English pivot as on-device from first launch (#203), so it
+         reads "1 of 59 on device" on a genuine first run, not this. The count is
+         the offline-CAPABLE denominator (59), not the 194-row catalogue. -->
+    <plurals name="text_lang_can_be_offline_count">
+        <item quantity="one">%1$d can be offline</item>
+        <item quantity="other">%1$d can be offline</item>
+    </plurals>
     <!-- Offline-library meter, foldable two-leaf (17b / U-5). The big numeral is
          its own key so locales with their own digits shape it; the line beside it
          carries the denominator (offline-CAPABLE, as above) and the size.
@@ -152,6 +162,41 @@
          the English pivot before anything is downloaded (E-S1b). `_none` outranks
          both whenever the count is zero, because a size under a count of nought
          is a size for something the user does not have. -->
+    <!-- 18a/18b — the first-run suggestion block (#130 PR-21). Drawn on the source
+         picker when the user has no recents yet, in place of the Recent section.
+         "No packs yet" is the owner's intentional first-run copy (§8 of the
+         designer brief), NOT the offline-library meter's text: the meter is a
+         separate element that reads "1 of 59 packs" on a real device (#203). The
+         suggestions are derived from the device's own locales, so the block never
+         invents a signal the platform will not give — see firstRunSuggestions(). -->
+    <string name="lang_first_run_title">No packs yet</string>
+    <string name="lang_first_run_body">Pick a language to download once, then it works with no signal.</string>
+    <string name="lang_first_run_privacy">Translation runs on the device — nothing is sent anywhere.</string>
+    <string name="lang_first_run_suggested_header">Suggested for you</string>
+    <!-- The supporting line under a suggested language. Only two reasons ship:
+         the device's primary locale, and a secondary one. The export draws a
+         third, "From your keyboards", which needs InputMethodManager queries the
+         rev3 ruling scopes as the unproven experiment E-K1 — not shipped (rule 4),
+         so it has no string. -->
+    <string name="lang_suggested_reason_device">Device language</string>
+    <string name="lang_suggested_reason_local">Common where you are</string>
+    <string name="lang_suggested_get">Get</string>
+    <!-- WCAG 2.5.3 (Label in Name): the visible word is "Get", so the spoken
+         label contains it, and names the language the bare button cannot. -->
+    <string name="cd_lang_suggested_get">Get %1$s for offline use</string>
+    <!-- Sheet 18a-confirm — the download-confirm a suggestion's "Get" raises
+         before the metered gate (#130 PR-21, DownloadConfirmSheet.kt).
+         lang_confirm_size is the FIFTH statement of the pack size (#219): change
+         it and you change lang_sheet_space_body, lang_sheet_data_body,
+         offline_subtitle and settings_mobile_data_supporting too — 40–65 MB is
+         the measured on-disk footprint, never the export's pre-#219 "20–45 MB".
+         No "Wait for Wi-Fi" and no "On Wi-Fi now": the network question is the
+         gate's, and it runs after this. -->
+    <string name="lang_confirm_title">Download %1$s</string>
+    <string name="lang_confirm_size">A language pack is usually 40–65 MB.</string>
+    <string name="lang_confirm_reversible">You can remove it again from Manage packs.</string>
+    <string name="lang_confirm_download">Download and use</string>
+    <string name="lang_confirm_not_now">Not now</string>
     <string name="text_lang_library_title">Offline library</string>
     <string name="text_lang_library_downloaded">%1$d</string>
     <plurals name="text_lang_library_used">

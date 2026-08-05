@@ -67,6 +67,7 @@ private const val NO_SELECTION_YET = ""
 private const val KEY_QUERY = "picker.query"
 private const val KEY_SCROLL_ANCHOR = "picker.scroll_anchor"
 private const val KEY_SCROLL_OFFSET = "picker.scroll_offset"
+private const val KEY_PENDING_SUGGESTION = "picker.pending_suggestion"
 
 /**
  * The picker's OWN state holder (issue #117; decoupled from `TextViewModel`
@@ -357,6 +358,48 @@ class LanguagePickerViewModel
          */
         fun onAlwaysAskChange(alwaysAsk: Boolean) {
             appScope.launch { downloadPrefs.setAllowMobileData(allowMobileDataOf(alwaysAsk)) }
+        }
+
+        /**
+         * The language id whose 18a download-confirm sheet is open, or null
+         * (PR-21). A first-run suggestion's "Get" raises the sheet HERE rather
+         * than downloading straight away, because a brand-new user has never seen
+         * what a pack costs — the sheet states the size and offers "Not now"
+         * before anything is enqueued.
+         *
+         * In [savedStateHandle] for the reason [query] is: the picker is drawn
+         * from several hosts, so a sheet request that lived in the composition
+         * would be lost on a host change, and it survives process death for free.
+         * A row's own ⬇ keeps going straight to [download] — the confirm step is
+         * the suggestion block's, not every download's.
+         */
+        val pendingSuggestion: StateFlow<String?> = savedStateHandle.getStateFlow(KEY_PENDING_SUGGESTION, null)
+
+        /** A suggestion's "Get": raise the confirm sheet for [id]. */
+        fun onSuggestionGet(id: String) {
+            savedStateHandle[KEY_PENDING_SUGGESTION] = id
+        }
+
+        /**
+         * "Download and use" on the confirm sheet: clear the sheet, then run the
+         * SAME [download] the row ⬇ runs — so the metered-data gate (19a) still
+         * stands between the confirm and the transfer. Get → confirm → gate, in
+         * that order, with the confirm inserted ahead of the gate rather than
+         * replacing it.
+         *
+         * Clears before it downloads so the sheet is gone by the time the gate
+         * may raise its own; reads the pending id first because clearing it is
+         * what would otherwise leave [download] nothing to act on.
+         */
+        fun confirmSuggestionDownload() {
+            val id = pendingSuggestion.value ?: return
+            savedStateHandle[KEY_PENDING_SUGGESTION] = null
+            download(id)
+        }
+
+        /** "Not now", a scrim tap or a back press: close the sheet, leave the row exactly as it was. */
+        fun dismissSuggestion() {
+            savedStateHandle[KEY_PENDING_SUGGESTION] = null
         }
 
         /**
