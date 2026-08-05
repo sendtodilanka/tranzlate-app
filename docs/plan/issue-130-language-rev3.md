@@ -749,7 +749,7 @@ change what gets built:
 **Verification is now scripted, not eyeballed:** every drawn row's ISO code is
 cross-checked against `BundledLanguageCatalog.offlineCapableIds` across 54 of the
 58 frames — zero contradictions (the true structural count is **58**; `20c`/`20e`
-were never labelled, corrected in #184). Rev 4 shipped that exact defect past a manual
+were never labelled, corrected in #184 / PR #301). Rev 4 shipped that exact defect past a manual
 scan, so the check is written down in the brief.
 
 **Ads (spec §7) remain OUT of this epic — tracked as #139.** One of its four
