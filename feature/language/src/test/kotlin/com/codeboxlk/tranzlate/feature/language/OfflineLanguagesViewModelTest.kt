@@ -19,10 +19,12 @@ import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.InMemoryConsentQuestionStore
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -586,6 +590,81 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(0)
         }
 
+    /**
+     * `removalFor`'s `.distinctUntilChanged()` on the target, made able to fail
+     * (issue #242). DataStore re-emits EVERY key's flow on ANY key write, so an
+     * unrelated preference change while a 19g sheet is open re-fires `targetLang`
+     * with the SAME target. The guard swallows that equal re-emission; without it
+     * the saved-count query re-runs underneath the open sheet on every unrelated
+     * write. `reEmitTarget()` is the fixture's model of that unrelated write — and
+     * it has to exist, because a `MutableStateFlow` would conflate the equal value
+     * away and the guard could not be tested at all (the tautology this issue is
+     * about). The call counter uses the existing `beforeSavedCount` hook, which
+     * fires once per `savedCountUsing`.
+     *
+     * Mutation decided first (rule 11): delete `.distinctUntilChanged()`. The
+     * second assertion then reads 2 and reddens.
+     */
+    @Test
+    fun `an unrelated write that re-fires the same target does not re-run the saved count`() =
+        runTest {
+            translations.seed(saved(id = 1, source = "en", target = "fr"))
+            var savedCountCalls = 0
+            translations.beforeSavedCount = { savedCountCalls++ }
+            viewModel.pendingRemoval.launchIn(backgroundScope)
+
+            // fr is this fixture's target, so the sheet is 19g and the count runs — once.
+            viewModel.requestRemove("fr")
+            runCurrent()
+            assertThat(savedCountCalls).isEqualTo(1)
+
+            // An unrelated DataStore write re-fires targetLang with the same "fr".
+            translatePrefs.reEmitTarget()
+            runCurrent()
+
+            assertThat(savedCountCalls).isEqualTo(1)
+        }
+
+    /**
+     * `savedCountOf`'s `CancellationException` rethrow, made able to fail (issue
+     * #242 — the arm the production KDoc records as "entered by no test").
+     *
+     * The generic `catch (Throwable) { 0 }` beneath it exists so a database that
+     * cannot answer never blocks a removal. But a `CancellationException` is not
+     * "the database cannot answer" — it is "we are being torn down" — and folding
+     * it to 0 breaks structured concurrency and states a saved count that was
+     * never read. Widening the catch to `Throwable` protects it not at all
+     * (`CancellationException` IS an `Exception`); only the rethrow does
+     * (coroutines-patterns.md — never swallow `CancellationException`; the same
+     * guard `TextStarFailureTest` pins for the composer star, the sibling of this
+     * fix).
+     *
+     * The query is thrown into cancellation WHILE IN FLIGHT. With the rethrow the
+     * cancellation propagates and no sheet is built from a count that never
+     * completed, so this false "nothing saved" sheet for the target pack is never
+     * published. Without it the generic catch folds the cancellation to 0 and it
+     * is.
+     *
+     * Mutation decided first (rule 11): delete the
+     * `catch (CancellationException) { throw }` arm. `published` then contains the
+     * zero-count in-use sheet and reddens.
+     */
+    @Test
+    fun `a cancelled saved-count query is not folded to a zero-count sheet`() =
+        runTest {
+            translations.seed(saved(id = 1, source = "en", target = "fr"))
+            translations.beforeSavedCount = { throw CancellationException("torn down mid-count") }
+            val published = mutableListOf<PendingPackRemoval?>()
+            viewModel.pendingRemoval.onEach { published += it }.launchIn(backgroundScope)
+
+            // fr is the target → 19g → the count runs, and is cancelled in flight.
+            viewModel.requestRemove("fr")
+            runCurrent()
+
+            assertThat(published)
+                .doesNotContain(PendingPackRemoval(id = "fr", inUseAsTarget = true, savedCount = 0))
+        }
+
     private fun saved(
         id: Long,
         source: String,
@@ -631,11 +710,33 @@ private class RecordingTranslatePrefsRepository(
     val target = MutableStateFlow(target)
     val writes = mutableListOf<String>()
 
+    /**
+     * A same-value re-emission seam for [targetLang] (#242).
+     *
+     * Production's `targetLang` is a DataStore flow, and DataStore re-emits EVERY
+     * key's flow whenever ANY key is written — so an unrelated preference change
+     * makes `targetLang` fire the CURRENT target again, unchanged, which is what
+     * `removalFor`'s `.distinctUntilChanged()` exists to swallow. A `MutableStateFlow`
+     * cannot model that: it conflates equal consecutive values by contract
+     * (testing-quick.md — a StateFlow conflates), so a StateFlow-only `targetLang`
+     * could never re-deliver the same value and deleting the guard would change
+     * nothing in any test. This non-conflating channel carries the unrelated-write
+     * re-emission ([reEmitTarget]); real target CHANGES still go through [target],
+     * which keeps the `.value` read/write the other tests already use.
+     */
+    private val targetReemits =
+        MutableSharedFlow<String>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
     override val sourceLang: Flow<String> get() = sourceState
 
-    override val targetLang: Flow<String> get() = target
+    override val targetLang: Flow<String> get() = merge(target, targetReemits)
 
     override val textMode: Flow<ModeId> = flowOf(ModeId.AUTO)
+
+    /** An unrelated DataStore write: re-emit the CURRENT target unchanged. */
+    fun reEmitTarget() {
+        targetReemits.tryEmit(target.value)
+    }
 
     override suspend fun setSourceLang(id: String) {
         writes += "source=$id"
