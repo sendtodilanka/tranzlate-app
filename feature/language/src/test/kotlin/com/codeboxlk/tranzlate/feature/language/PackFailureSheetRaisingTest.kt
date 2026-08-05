@@ -161,6 +161,80 @@ class PackFailureSheetRaisingTest {
         }
 
     /**
+     * **#244, ending two of three: the user cancels their own download.** They tap
+     * ⬇, change their mind, tap ✕. `stopAndRemove` deletes the in-flight transfer,
+     * and the real manager writes `Deleting` while it does — cancel the download
+     * job, then `setTransient(Deleting)` (`RealOfflineModelManager.delete`). The
+     * cancelled job catches `CancellationException` first and rethrows without ever
+     * writing `Failed`, so `Deleting` — not `Failed` — is what the row lands on
+     * (proved end to end by `RealOfflineModelManagerTest.stop mid-download cancels
+     * the manager's job and the row never ghosts back`, which asserts
+     * `NotDownloaded`, "never Downloaded, never Failed").
+     *
+     * So the watcher's `else` must read `Deleting` as the conclusion it is. A sheet
+     * here would tell someone their own cancel failed — the exact harm #244 names.
+     *
+     * Mutation decided first (rule 11): make the watcher raise on its non-failure
+     * endings — `else -> { emit(OfflineModelFailure.UNKNOWN); false }` in
+     * `awaitFailure`. `Deleting` then opens a 19d and this goes RED; with the real
+     * `else -> false` it is GREEN. The fake writes the state the real manager would,
+     * the same way every test in this file does.
+     */
+    @Test
+    fun `a stopped download lands on Deleting and opens no sheet`() =
+        runTest(dispatcher) {
+            manager.put("hi", OfflineModelState.NotDownloaded)
+            manager.onDownload = { tag ->
+                manager.put(tag, OfflineModelState.Downloading)
+                DownloadAttempt.Started
+            }
+            val subject = pickerWatchingRows()
+
+            subject.download("hi")
+            advanceUntilIdle()
+            // The ✕: the delete is requested, and the manager writes Deleting.
+            subject.stopAndRemove("hi")
+            manager.put("hi", OfflineModelState.Deleting)
+            advanceUntilIdle()
+
+            assertThat(subject.packFailure.value).isNull()
+            assertThat(manager.deletes).containsExactly("hi")
+        }
+
+    /**
+     * **#244, ending three of three: the same cancel, resolved to the end.** Once
+     * the platform delete completes, the real manager refreshes the disk and clears
+     * the transient, landing the row back on `NotDownloaded` — nothing was kept. If
+     * `StateFlow` conflation collapses the brief `Deleting`, the FIRST
+     * non-`Downloading` state the watcher observes is `NotDownloaded`: the third
+     * ending its KDoc names and the second it left untested. It is a conclusion, not
+     * a failure, and earns no sheet either.
+     *
+     * Mutation decided first: the same `else -> { emit(…); false }`. `NotDownloaded`
+     * then opens a sheet and this goes RED.
+     */
+    @Test
+    fun `a stopped download that resolves to NotDownloaded opens no sheet`() =
+        runTest(dispatcher) {
+            manager.put("hi", OfflineModelState.NotDownloaded)
+            manager.onDownload = { tag ->
+                manager.put(tag, OfflineModelState.Downloading)
+                DownloadAttempt.Started
+            }
+            val subject = pickerWatchingRows()
+
+            subject.download("hi")
+            advanceUntilIdle()
+            // Stop, and the delete resolves to nothing on disk (Deleting conflated away).
+            subject.stopAndRemove("hi")
+            manager.put("hi", OfflineModelState.NotDownloaded)
+            advanceUntilIdle()
+
+            assertThat(subject.packFailure.value).isNull()
+            assertThat(manager.deletes).containsExactly("hi")
+        }
+
+    /**
      * The ruling's named PR-18 test: **STORAGE pre-flight → 19b.** The real
      * manager refuses before it enqueues anything, so the row never passes
      * through `Downloading` — a watcher that only looked for a transfer failing
