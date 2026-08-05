@@ -94,6 +94,7 @@
     <string name="offline_title">Tradução offline</string>
     <string name="offline_subtitle">Baixe idiomas para traduzir sem internet (40 a 65 MB cada)</string>
     <string name="offline_loading">Carregando idiomas…</string>
+    <string name="offline_included">Incluído em todos os idiomas</string>
     <string name="offline_cd_back">Voltar</string>
     <string name="offline_cd_download">Baixar %1$s</string>
     <string name="offline_cd_stop">Parar o download de %1$s</string>

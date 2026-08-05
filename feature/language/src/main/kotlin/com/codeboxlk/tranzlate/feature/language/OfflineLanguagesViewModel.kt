@@ -37,6 +37,37 @@ data class OfflineLanguageRow(
     val state: OfflineModelState,
 )
 
+/**
+ * The ML Kit English pivot's language id (issue #224).
+ *
+ * Every ML Kit translation model is an `X↔English` pair; there is no standalone
+ * `en` pack, and ML Kit reports English as on-device before ANY pack is fetched
+ * (a first-run downloaded count of 1). So on Screen B the English row arrives in
+ * the `Downloaded` state and draws the same 🗑 every other downloaded pack does —
+ * except tapping it does nothing. Measured on an emulator in
+ * `docs/research/issue-224-en-row-delete.md`: `deleteDownloadedModel("en")` is a
+ * NO-OP (Branch A) — English stays in the downloaded set, offline translation is
+ * unharmed, and the Download side is unreachable because `en` never leaves the set.
+ *
+ * Owner ruling (2026-08-05): the pivot row is **not hidden** — English is the 59th
+ * id in `BundledLanguageCatalog.offlineCapableIds`, so removing it from the list
+ * would make the "59 languages" counter (C-11) lie — but it is **non-actionable**:
+ * no Download, no Delete, because neither acts on the pivot. [OfflineRow] renders
+ * it as "included with every language" instead of a control.
+ *
+ * Identified by the tag, not a position: `TranslateLanguage.ENGLISH` is `"en"` and
+ * this catalog hands ML Kit tags straight through untranslated, so the pivot's id
+ * is exactly `"en"` in every layer that touches it (the picker, the catalog, the
+ * model store). Because the screen renders the mapped [OfflinePackRow] — whose
+ * `buildOfflineRows` transform lives in another file — the identity is a shared
+ * predicate here rather than a flag carried on the row, so both the row builder
+ * and the screen decide "is this the pivot?" the same way and cannot drift.
+ */
+internal const val PIVOT_LANGUAGE_ID: String = "en"
+
+/** True only for the ML Kit pivot row, whose Download/Delete controls are stripped (#224). */
+internal fun isPivotLanguage(id: String): Boolean = id == PIVOT_LANGUAGE_ID
+
 /** The saved-state key for the open remove question. Namespaced — the handle is shared. */
 internal const val KEY_PENDING_REMOVAL = "offline_languages.pending_removal"
 

@@ -198,6 +198,12 @@
     <string name="offline_title">Offline translation</string>
     <string name="offline_subtitle">Download languages to translate without internet (40–65 MB each)</string>
     <string name="offline_loading">Loading languages…</string>
+    <!-- #224: the ML Kit pivot (English) is included with every downloaded pack and
+         cannot be downloaded or removed on its own — a measured no-op (Branch A,
+         docs/research/issue-224-en-row-delete.md). Its Screen-B row stays (English is
+         the 59th offline-capable language, so hiding it would make the "59" count
+         lie) but shows this quiet status line in place of a Download/Delete control. -->
+    <string name="offline_included">Included with every language</string>
     <string name="offline_cd_back">Back</string>
     <string name="offline_cd_download">Download %1$s</string>
     <string name="offline_cd_stop">Stop downloading %1$s</string>

@@ -218,16 +218,31 @@ private fun OfflineRow(
                 text = row.displayName,
                 style = MaterialTheme.typography.bodyLarge,
             )
-            // Issue #90 (EDGE_CASES no-dead-end): a Failed row explains WHY —
-            // ↻ on a full disk re-fails silently otherwise. This is an error
-            // line, not the always-on sub-line the owner removed in #82.
-            //
-            // The sentence itself comes from `DownloadFailure.kt` and is the SAME
-            // one the picker's failed row shows (#175, PR-18). This screen used
-            // to spell its own `when` over the same enum into its own three
-            // string keys, so one dropped connection read differently depending
-            // on which of the two screens the user was standing in.
-            if (row.state is OfflineModelState.Failed) {
+            // #224: the ML Kit pivot (English) is included with every pack and
+            // cannot be downloaded or removed on its own — a measured no-op
+            // (docs/research/issue-224-en-row-delete.md, Branch A). Owner ruling
+            // (2026-08-05): keep the row (it is the 59th offlineCapableId, so
+            // hiding it would make the "59" counter lie) but strip its controls.
+            // This quiet status line is its whole story, and the trailing control
+            // below is skipped for it. Pivot precedes the Failed line, which the
+            // pivot can never reach anyway (it is always Downloaded).
+            if (isPivotLanguage(row.id)) {
+                Text(
+                    text = stringResource(R.string.offline_included),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("tt_offline_included"),
+                )
+            } else if (row.state is OfflineModelState.Failed) {
+                // Issue #90 (EDGE_CASES no-dead-end): a Failed row explains WHY —
+                // ↻ on a full disk re-fails silently otherwise. This is an error
+                // line, not the always-on sub-line the owner removed in #82.
+                //
+                // The sentence itself comes from `DownloadFailure.kt` and is the
+                // SAME one the picker's failed row shows (#175, PR-18). This screen
+                // used to spell its own `when` over the same enum into its own
+                // three string keys, so one dropped connection read differently
+                // depending on which of the two screens the user was standing in.
                 Text(
                     text = stringResource(downloadFailureCopy(row.state.cause).rowLine),
                     style = MaterialTheme.typography.bodySmall,
@@ -236,85 +251,112 @@ private fun OfflineRow(
                 )
             }
         }
-        // Owner (issue #82): the STATE is the single trailing control — the
-        // old app's pattern (reference read, written fresh): ⬇ / ◌+⏹ / 🗑 / ↻.
-        when (row.state) {
-            OfflineModelState.NotDownloaded -> {
-                IconButton(
-                    onClick = { onDownload(row.id) },
-                    modifier = Modifier.testTag("tt_offline_download"),
-                ) {
-                    Icon(
-                        Icons.Outlined.DownloadForOffline,
-                        contentDescription = stringResource(R.string.offline_cd_download, row.displayName),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
+        // Owner (issue #82): the STATE is the single trailing control — ⬇ / ◌+⏹ /
+        // 🗑 / ↻ (the old app's pattern, read as reference and written fresh). #224:
+        // the ML Kit pivot (English) has NO trailing control — it is non-actionable,
+        // its status shown as the "included" line above. Guarded by id, not state,
+        // so a pivot that ever reported NotDownloaded still offers no ⬇ for a pack
+        // that does not exist.
+        if (!isPivotLanguage(row.id)) {
+            OfflineRowTrailingControl(
+                row = row,
+                onDownload = onDownload,
+                onStopDownload = onStopDownload,
+                onRequestRemove = onRequestRemove,
+            )
+        }
+    }
+}
 
-            OfflineModelState.Downloading -> {
-                IconButton(
-                    // The verified stop = delete-to-cancel, and deliberately NOT
-                    // confirm-sheeted: 19f is about removing a pack the user has,
-                    // and this is the way out of a download they no longer want
-                    // (`OfflineLanguagesViewModel.stopDownload`).
-                    onClick = { onStopDownload(row.id) },
-                    modifier = Modifier.testTag("tt_offline_stop"),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(28.dp),
-                            strokeWidth = 2.dp,
-                        )
-                        Icon(
-                            Icons.Filled.Stop,
-                            contentDescription = stringResource(R.string.offline_cd_stop, row.displayName),
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                }
-            }
-
-            OfflineModelState.Downloaded -> {
-                IconButton(
-                    // Asks now (#130 PR-19). Until this PR the tap deleted the
-                    // pack outright with nothing in between — the "unconfirmed 🗑"
-                    // the rev3 ruling's PR-19 row names.
-                    onClick = { onRequestRemove(row.id) },
-                    modifier = Modifier.testTag("tt_offline_delete"),
-                ) {
-                    Icon(
-                        Icons.Outlined.Delete,
-                        contentDescription = stringResource(R.string.offline_cd_delete, row.displayName),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            OfflineModelState.Deleting -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp).testTag("tt_offline_deleting"),
-                    strokeWidth = 2.dp,
+/**
+ * The one trailing control a NON-pivot row carries, chosen by its state
+ * (spec 02 · issue #82): ⬇ / ◌+⏹ / 🗑 / spinner / ↻. The pivot row never reaches
+ * here — [OfflineRow] guards the call by [isPivotLanguage] — so the exhaustive
+ * `when` does not need a pivot arm.
+ */
+@Composable
+private fun OfflineRowTrailingControl(
+    row: OfflinePackRow,
+    onDownload: (String) -> Unit,
+    onStopDownload: (String) -> Unit,
+    onRequestRemove: (String) -> Unit,
+) {
+    when (row.state) {
+        OfflineModelState.NotDownloaded -> {
+            IconButton(
+                onClick = { onDownload(row.id) },
+                modifier = Modifier.testTag("tt_offline_download"),
+            ) {
+                Icon(
+                    Icons.Outlined.DownloadForOffline,
+                    contentDescription = stringResource(R.string.offline_cd_download, row.displayName),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
+        }
 
-            is OfflineModelState.Failed -> {
-                IconButton(
-                    onClick = { onDownload(row.id) },
-                    modifier = Modifier.testTag("tt_offline_retry"),
-                ) {
+        OfflineModelState.Downloading -> {
+            IconButton(
+                // The verified stop = delete-to-cancel, and deliberately NOT
+                // confirm-sheeted: 19f is about removing a pack the user has,
+                // and this is the way out of a download they no longer want
+                // (`OfflineLanguagesViewModel.stopDownload`).
+                onClick = { onStopDownload(row.id) },
+                modifier = Modifier.testTag("tt_offline_stop"),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 2.dp,
+                    )
                     Icon(
-                        Icons.Filled.Refresh,
-                        contentDescription = stringResource(R.string.offline_cd_retry, row.displayName),
-                        tint = MaterialTheme.colorScheme.error,
+                        Icons.Filled.Stop,
+                        contentDescription = stringResource(R.string.offline_cd_stop, row.displayName),
+                        modifier = Modifier.size(14.dp),
                     )
                 }
             }
-
-            OfflineModelState.OnlineOnly -> {
-                Unit
-            } // never listed (VM filters)
         }
+
+        OfflineModelState.Downloaded -> {
+            IconButton(
+                // Asks now (#130 PR-19). Until this PR the tap deleted the
+                // pack outright with nothing in between — the "unconfirmed 🗑"
+                // the rev3 ruling's PR-19 row names.
+                onClick = { onRequestRemove(row.id) },
+                modifier = Modifier.testTag("tt_offline_delete"),
+            ) {
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = stringResource(R.string.offline_cd_delete, row.displayName),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        OfflineModelState.Deleting -> {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp).testTag("tt_offline_deleting"),
+                strokeWidth = 2.dp,
+            )
+        }
+
+        is OfflineModelState.Failed -> {
+            IconButton(
+                onClick = { onDownload(row.id) },
+                modifier = Modifier.testTag("tt_offline_retry"),
+            ) {
+                Icon(
+                    Icons.Filled.Refresh,
+                    contentDescription = stringResource(R.string.offline_cd_retry, row.displayName),
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+
+        OfflineModelState.OnlineOnly -> {
+            Unit
+        } // never listed (VM filters)
     }
 }
 
@@ -440,6 +482,28 @@ private fun OfflineRowStatesPreview() {
                     onRequestRemove = {},
                 )
             }
+        }
+    }
+}
+
+/**
+ * #224 — the ML Kit pivot row (English). It is included with every pack and cannot
+ * be downloaded or removed on its own (a measured no-op, Branch A —
+ * docs/research/issue-224-en-row-delete.md), so it carries the quiet "included"
+ * line and NO trailing control. This is the state the owner ruled on: the row must
+ * stay (it is the 59th capable language) but offer neither ⬇ nor 🗑, on either theme.
+ */
+@PreviewLightDark
+@Composable
+private fun OfflinePivotRowPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            OfflineRow(
+                row = OfflinePackRow("en", "English", OfflineModelState.Downloaded),
+                onDownload = {},
+                onStopDownload = {},
+                onRequestRemove = {},
+            )
         }
     }
 }
