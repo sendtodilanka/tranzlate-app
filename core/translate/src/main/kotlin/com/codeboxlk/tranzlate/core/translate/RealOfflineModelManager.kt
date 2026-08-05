@@ -464,11 +464,34 @@ class RealOfflineModelManager internal constructor(
                     activeDownloads.remove(languageTag, self)
                 }
             }
-        activeDownloads[languageTag] = job
+        // Atomic claim (co-verify #304): putIfAbsent, not a plain put, so "one
+        // in-flight per tag" is not the non-atomic check-then-act the `containsKey`
+        // fast-path above is. Two threads racing one tag both pass that fast-path;
+        // only ONE wins here. The loser cancels its never-started LAZY job — so
+        // store.download() runs once and downloadScope keeps no leaked child — and
+        // returns Ignored WITHOUT announcing anything, exactly as the synchronous
+        // duplicate above does. Only the winner starts the transfer and emits
+        // Started, so a fast double-tap (row Retry pill + the 20a-4 snackbar Retry,
+        // both dispatched on IO) can no longer produce two "Download started"
+        // snackbars or two real ML Kit transfers of the same pack.
+        //
+        // Measured before this fix (co-verify #304): 2 threads on one tag over
+        // Dispatchers.Default, 500 trials, both callers got Started 47.2% of the
+        // time; a 64-way flood invoked store.download() 64x for one pack. The
+        // OUTCOME emits stayed sound throughout — owns()/activeDeletes.remove(tag,
+        // self) are re-checked atomically at the latest point — so only this
+        // registration, and the DownloadStarted riding on it, ever leaked.
+        // `RealOfflineManagerConcurrencyTest` pins it with REAL threads;
+        // runTest's single-thread scheduler cannot reach the race.
+        if (activeDownloads.putIfAbsent(languageTag, job) != null) {
+            job.cancel()
+            return DownloadAttempt.Ignored
+        }
         job.start() // registered BEFORE it runs — Stop can never miss the window
-        // The single confirmed-start point (U-1, 20a-1): reached only after every
-        // pre-flight passed and the job was registered as the tag's owner, so this
-        // notice can never come from a refused, ignored, or duplicate request.
+        // The single confirmed-start point (U-1, 20a-1): reached only by the caller
+        // that WON the atomic claim above, after every pre-flight passed — so this
+        // notice can never come from a refused, ignored, or duplicate request,
+        // whether that duplicate is a second sequential tap or a concurrent race.
         emit(PackEvent.DownloadStarted(languageTag))
         return DownloadAttempt.Started
     }

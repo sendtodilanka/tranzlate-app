@@ -28,7 +28,8 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
  * (no network, no disk) is reported to the caller by `download()`'s return value and
  * the row's own state, never doubled as a snackbar. [DownloadStarted] is the one
  * non-outcome member: it fires once, from the single point `download()` confirms a
- * transfer began, so 20a-1 can offer "View" without inventing a second state channel.
+ * transfer began — the caller that WON the tag's atomic in-flight claim — so 20a-1
+ * can offer "View" without inventing a second state channel.
  *
  * Every member carries the BCP-47 [languageTag] the notice is about; the shell
  * resolves it to a display name and to a snackbar at the point it is shown.
@@ -39,8 +40,11 @@ sealed interface PackEvent {
 
     /**
      * A transfer just began — 20a-1. Fired once from `download()`'s confirmed-start
-     * point, after the job is registered as the tag's owner, so it can never come
-     * from a refused or ignored request.
+     * point, reached only by the caller that WON the tag's atomic in-flight claim
+     * (`putIfAbsent`), so it can never come from a refused, ignored, or duplicate
+     * request — including two callers racing the same tag on different threads
+     * (co-verify #304). A concurrent duplicate loses the claim and returns Ignored
+     * without emitting.
      */
     data class DownloadStarted(
         override val languageTag: String,
