@@ -14,9 +14,14 @@ the (new/fixed) test goes RED, revert → GREEN.
 CANNOT fail. The real hole is one file over: `RealOfflineModelManager.toFailure()`
 (`core/translate/.../RealOfflineModelManager.kt:606-610`) has an `else`, so a 5th `OfflineModelFailure`
 constant lands silently as `UNKNOWN`. `downloadFailureCopy` is `else`-less (compile-guarded);
-`toFailure()` is not. **Fix:** a test that a 5th cause is NOT silently `UNKNOWN` — the pattern
-is `DownloadFailureSourceTest` (which bans a second `when(cause)` in named files); add
-`toFailure`'s file to that ban, or an exhaustiveness assertion over the real mapping.
+`toFailure()` is not. **Fix (delivered scope, corrected per co-verify):** two tests pinning
+**both edges of the current `else`** via the public `download()` path — an `IOException`
+surfaces as `NETWORK` (not UNKNOWN-folded), and an unrecognised failure surfaces as `UNKNOWN`.
+**Honest limit:** because `Exception` is an **open** hierarchy (no compiler exhaustiveness,
+unlike the else-less `downloadFailureCopy`), this pins the *current* mapping — it is **not** a
+future-5th-cause guard. The originally-suggested `DownloadFailureSourceTest` ban does **not**
+fit: that test polices copy-duplication branches, not cause-classification (its own KDoc scopes
+it out).
 **Mutate-first:** add a fake 5th-cause path (or point the check at the else) → RED.
 
 ## 2. A guard the fake conflates away → a non-conflating fixture
@@ -41,3 +46,8 @@ the rethrow → RED.
 ## Verify
 `./gradlew :feature:language:test :core:translate:test` green; each of the 3 mutate-first RED→GREEN
 recorded in the PR body; `preflight` at land.
+
+## Landed
+The three fixes landed in **PR #277** (`Fixes: #242`) — cross-model co-verify APPROVE, all three
+mutations reproduced independently; the co-verify even built a probe to confirm fix-3's
+manual-throw is the only observable technique for that guard.
