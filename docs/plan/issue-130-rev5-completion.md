@@ -99,6 +99,10 @@ overlap** — the rule that was absent when #246 and #249 collided.
 | **1e** | #183 · #184 · #203 | Frame/spec disagreements. #183 is owner-answered-by-measurement; #203 needs a decision. | `docs/design/`, `docs/plan/` |
 | **1f** | #157 · #163 · #188 · #193 · #196 · #204 · #208 · #210 · #215 · #217 · #220 · #228 · #245 · #251 · #252 · #255 · #40 | Process residue. Batch aggressively — several are one fix. | varies |
 
+**Wave 1a landing note:** #253's gate-coverage half landed in #260 (`preflight`);
+its remaining half — the two live procedure files that still handed out the retired
+five-command gate, plus the SHA-check now wired into `/land-pr` — landed in **PR #263**.
+
 ### Wave 1f also carries work that is NOT issue-shaped
 
 *(This section added by **PR #261**.)*

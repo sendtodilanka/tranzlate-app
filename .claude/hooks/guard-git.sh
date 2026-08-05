@@ -63,9 +63,7 @@ for num in $(gh_pr_merge_numbers "$scan"); do
   gh_run 20 git fetch -q origin main "$head" 2>/dev/null || continue   # offline — allow
   behind=$(git rev-list --count "origin/${head}..origin/main" 2>/dev/null) || continue
   if [ "${behind:-0}" -gt 0 ]; then
-    deny "PR #${num} (${head}) is ${behind} commit(s) BEHIND origin/main, so its green CI never saw the merge result. This exact situation broke main twice (#108, #132/#134). Rebase, push, wait for CI green on THAT commit, then merge:
-  cd <the branch's worktree> && git fetch origin && git rebase origin/main && git push --force-with-lease
-  gh run watch \$(gh run list --branch ${head} --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status && gh pr merge ${num} --merge"
+    deny "PR #${num} (${head}) is ${behind} commit(s) BEHIND origin/main, so its green CI never saw the merge result. This exact situation broke main twice (#108, #132/#134). Rebase onto the tip and land through /land-pr — it re-runs preflight and waits for CI green on THAT commit, verified by comparing the run's headSha to the tip rather than trusting the badge, before it merges. Do not hand-run 'gh run watch … && gh pr merge': that is the pre-SHA-check pattern this guard exists to stop."
   fi
 done
 exit 0
