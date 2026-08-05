@@ -148,10 +148,12 @@ internal object MigrationTwoToThree : Migration(2, 3) {
  * (checked against the exported `4.json`) — a drifted hand-written statement is
  * what Room's schema validation rejects on the next open.
  *
- * Same verification stance as v2→v3, and it is a real gap rather than a
- * formality: `MigrationCoverageTest` gates the chain and the exported schema
- * structurally, but the SQL is NOT executed in CI (issue #40 — the
- * instrumentation suite that `MigrationTestHelper` needs does not run).
+ * `MigrationCoverageTest` gates the chain and the exported schema structurally;
+ * the two `CREATE INDEX` statements are now also **executed and validated in CI**
+ * by `MigrationThreeToFourTest` under Robolectric (#241) — a wrong index name,
+ * column set or order turns it red. (An `androidTest` at API 24 with row-survival
+ * and the full 1→4 chain is #241's open follow-up; instrumentation still does not
+ * run in CI, #40.)
  */
 @Suppress("MagicNumber")
 internal object MigrationThreeToFour : Migration(3, 4) {
