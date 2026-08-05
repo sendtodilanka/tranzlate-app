@@ -75,8 +75,12 @@ internal const val TT_SHEET_DATA_ALWAYS_ASK = "tt_lang_sheet_data_always_ask"
  *
  * ## Hosting
  *
- * Screen-local, per the rev3 ruling's two hosting layers, and it takes the
- * scaffold's DEFAULT `SheetState` rather than hoisting one. A hoisted
+ * Screen-local for the picker and Screen B; the app shell ALSO hosts it, as the
+ * "snackbar-raised re-entry" the rev3 ruling §2 names — 20a-3's "Download again"
+ * runs through [DownloadGate], and a metered link with no standing permission asks
+ * 19a here (#130 PR-22). That app-hosting is why this is `public` rather than
+ * `internal`, exactly as `OfflinePackMissingSheet` / `AlreadySourceSheet` already
+ * are. It takes the scaffold's DEFAULT `SheetState` rather than hoisting one. A hoisted
  * `rememberModalBottomSheetState` is `rememberSaveable` underneath, addressed
  * through whichever `SaveableStateHolder` is drawing the screen — the exact
  * thing PR-13 moved the picker's state out of, and `PickerHostAgnosticTest` bans
@@ -91,7 +95,7 @@ internal const val TT_SHEET_DATA_ALWAYS_ASK = "tt_lang_sheet_data_always_ask"
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun MobileDataSheet(
+fun MobileDataSheet(
     visible: Boolean,
     alwaysAsk: Boolean,
     onAlwaysAskChange: (Boolean) -> Unit,
@@ -193,11 +197,15 @@ private fun AlwaysAskRow(
  * put the polarity in as many places as there are screens — which is two today
  * and more from PR-18 on. Both directions are pure functions so a unit test can
  * hold them, and both ViewModels call these rather than spelling `!`.
+ *
+ * `public` (was `internal`) so the app shell's `DownloadEventsViewModel` reads the
+ * polarity from THIS one place too rather than spelling `!` a fourth time (#130
+ * PR-22): its 20a-3 consent re-entry is a third caller of the same flip.
  */
-internal fun alwaysAskOf(allowMobileData: Boolean): Boolean = !allowMobileData
+fun alwaysAskOf(allowMobileData: Boolean): Boolean = !allowMobileData
 
 /** The inverse of [alwaysAskOf] — what the checkbox's new value means for the store. */
-internal fun allowMobileDataOf(alwaysAsk: Boolean): Boolean = !alwaysAsk
+fun allowMobileDataOf(alwaysAsk: Boolean): Boolean = !alwaysAsk
 
 // ---- Previews (rule 7 — one per meaningful STATE; the state here is the toggle) ----
 // `ModalBottomSheet` opens a window and the tooling renders nothing for a

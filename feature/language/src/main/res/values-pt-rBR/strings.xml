@@ -135,4 +135,14 @@
     <string name="lang_sheet_already_body">Escolha outro idioma de destino ou troque os dois idiomas.</string>
     <string name="lang_sheet_already_swap">Trocar</string>
     <string name="lang_sheet_already_pick">Escolher outro</string>
+
+    <!-- 20a — pack snackbars (#130 PR-22). NEEDS-TRANSLATION review (#115). -->
+    <string name="lang_snackbar_downloading">Baixando %1$s</string>
+    <string name="lang_snackbar_action_view">Ver</string>
+    <string name="lang_snackbar_ready">%1$s está pronto para uso off-line</string>
+    <string name="lang_snackbar_action_use">Usar</string>
+    <string name="lang_snackbar_removed">%1$s removido</string>
+    <string name="lang_snackbar_action_download_again">Baixar de novo</string>
+    <string name="lang_snackbar_failed">Não foi possível baixar %1$s</string>
+    <string name="lang_snackbar_action_retry">Tentar de novo</string>
 </resources>

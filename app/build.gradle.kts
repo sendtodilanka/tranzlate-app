@@ -189,6 +189,8 @@ dependencies {
     testImplementation(libs.konsist)
     testImplementation(projects.core.testing)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Drives a Lifecycle through STARTED/STOPPED for the PR-22 STARTED-only test.
+    testImplementation(libs.androidx.lifecycle.runtime.testing)
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)

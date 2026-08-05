@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.domain.translate
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharedFlow
 
 /**
  * Offline-model download manager ask-surface (Translation brain owns model state —
@@ -13,6 +14,16 @@ import kotlinx.coroutines.flow.Flow
 interface OfflineModelManager {
     /** Per-language model states keyed by BCP-47 tag. */
     fun modelStates(): Flow<Map<String, OfflineModelState>>
+
+    /**
+     * One-shot outcome NOTICES for the app-shell snackbars (U-1, #130 PR-22) — a
+     * download starting, finishing, failing, or a pack being removed. This is a
+     * notification channel, NOT a second source of truth: [modelStates] stays the
+     * authority for what is on the device. Hot, `replay = 0`, bounded and
+     * drop-oldest under pressure, so a backgrounded app with no collector loses the
+     * notices and reads the truth from the state map on return. See [PackEvent].
+     */
+    val packEvents: SharedFlow<PackEvent>
 
     /**
      * Ask for [languageTag]'s pack. Returns what was decided BEFORE anything was

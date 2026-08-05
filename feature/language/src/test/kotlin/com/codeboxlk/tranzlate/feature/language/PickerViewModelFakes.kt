@@ -8,9 +8,12 @@ import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
+import com.codeboxlk.tranzlate.domain.translate.PackEvent
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.flow
 
 /**
@@ -150,6 +153,8 @@ internal class PickerModelManager : OfflineModelManager {
 
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = states
 
+    override val packEvents: SharedFlow<PackEvent> = MutableSharedFlow() // picker fake never emits
+
     override suspend fun download(languageTag: String): DownloadAttempt {
         downloads += languageTag
         return onDownload(languageTag)
@@ -163,6 +168,8 @@ internal class PickerModelManager : OfflineModelManager {
 /** Stands in for ML Kit never answering — the flow that emits nothing, ever. */
 internal class SilentPickerModelManager : OfflineModelManager {
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = flow { awaitCancellation() }
+
+    override val packEvents: SharedFlow<PackEvent> = MutableSharedFlow() // picker fake never emits
 
     override suspend fun download(languageTag: String) = DownloadAttempt.Started
 

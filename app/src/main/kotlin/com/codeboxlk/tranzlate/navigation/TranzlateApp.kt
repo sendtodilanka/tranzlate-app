@@ -5,15 +5,22 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleStartEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
@@ -26,15 +33,21 @@ import com.codeboxlk.tranzlate.MainActivityViewModel
 import com.codeboxlk.tranzlate.R
 import com.codeboxlk.tranzlate.core.config.AppConfig
 import com.codeboxlk.tranzlate.core.model.LanguageRole
+import com.codeboxlk.tranzlate.core.ui.languageDisplayName
 import com.codeboxlk.tranzlate.core.ui.languageLabel
 import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 import com.codeboxlk.tranzlate.feature.history.HistoryScreen
 import com.codeboxlk.tranzlate.feature.language.AlreadySourceSheet
 import com.codeboxlk.tranzlate.feature.language.LanguagePickerScreen
+import com.codeboxlk.tranzlate.feature.language.MobileDataSheet
 import com.codeboxlk.tranzlate.feature.language.OfflineLanguagesScreen
 import com.codeboxlk.tranzlate.feature.language.OfflinePackMissingSheet
+import com.codeboxlk.tranzlate.feature.language.PackSnackbarKind
+import com.codeboxlk.tranzlate.feature.language.PackSnackbarScaffold
 import com.codeboxlk.tranzlate.feature.language.PickerDialogHost
 import com.codeboxlk.tranzlate.feature.language.PickerHost
+import com.codeboxlk.tranzlate.feature.language.packSnackbarActionLabel
+import com.codeboxlk.tranzlate.feature.language.packSnackbarMessage
 import com.codeboxlk.tranzlate.feature.language.pickerHost
 import com.codeboxlk.tranzlate.feature.paywall.PaywallScreen
 import com.codeboxlk.tranzlate.feature.settings.SettingsScreen
@@ -59,6 +72,13 @@ fun TranzlateApp(
     // hiltViewModel() at the composition root resolves to the Activity's
     // ViewModelStore — the SAME instance MainActivity reads for the splash gate.
     val mainViewModel: MainActivityViewModel = hiltViewModel()
+
+    // The pack-outcome observer (U-1, #130 PR-22) — activity-scoped for the same
+    // reason mainViewModel is: a download's outcome can land on any screen, so the
+    // thing that turns it into a snackbar outlives every destination. The host is
+    // hoisted here too, ABOVE the nav graph, so a snackbar survives a nav pop-out.
+    val eventsViewModel: DownloadEventsViewModel = hiltViewModel()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // 17c/17d: on a tablet the picker is a card over whatever is on screen, so it
     // is NOT a back-stack entry — the screen behind it has to stay composed, and
@@ -123,15 +143,53 @@ fun TranzlateApp(
         )
     }
 
-    SharedTransitionLayout {
-        AppNavDisplay(
-            backStack = backStack,
-            textViewModel = textViewModel,
-            onNavigate = ::navigateTo,
-            onPickLanguage = ::openPicker,
-            onOfflinePackMissing = mainViewModel::onOfflinePackMissing,
-            sharedScope = this,
-        )
+    // Raise the 20a snackbars from the manager's U-1 channel. Collected under the
+    // shell's OWN lifecycle at STARTED (`collectPackSnackbars`), so a backgrounded app
+    // drops the notices and reads the truth from the state map on return — never a
+    // burst of stale snackbars (replay = 0). On the action tap: View → Manage packs;
+    // Use / Download again / Retry → the observer.
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(eventsViewModel, snackbarHostState, lifecycleOwner) {
+        collectPackSnackbars(lifecycleOwner.lifecycle, eventsViewModel.snackbars) { snackbar ->
+            val languageName = languageDisplayName(snackbar.languageTag)
+            val result =
+                snackbarHostState.showSnackbar(
+                    message = packSnackbarMessage(context, snackbar.kind, languageName),
+                    actionLabel = packSnackbarActionLabel(context, snackbar.kind),
+                    duration = SnackbarDuration.Short,
+                )
+            if (result == SnackbarResult.ActionPerformed) {
+                when (snackbar.kind) {
+                    // A deliberate single tap, not the same-frame double-tap [pushEntry]
+                    // guards, fired from an effect whose captured `navigateTo` may be
+                    // stale — so it pushes unconditionally (from = null), which still
+                    // de-dupes when Manage packs is already on top.
+                    PackSnackbarKind.STARTED -> pushEntry(backStack, from = null, key = LanguagesNavKey)
+
+                    PackSnackbarKind.READY -> eventsViewModel.onUse(snackbar.languageTag)
+
+                    PackSnackbarKind.REMOVED -> eventsViewModel.onDownloadAgain(snackbar.languageTag)
+
+                    PackSnackbarKind.FAILED -> eventsViewModel.onRetry(snackbar.languageTag)
+                }
+            }
+        }
+    }
+
+    // The host sits ABOVE the NavDisplay (`PackSnackbarScaffold`), so a nav pop-out does
+    // not dismiss a 20a snackbar — its state and host are the shell's, not a screen's.
+    PackSnackbarScaffold(snackbarHostState) {
+        SharedTransitionLayout {
+            AppNavDisplay(
+                backStack = backStack,
+                textViewModel = textViewModel,
+                onNavigate = ::navigateTo,
+                onPickLanguage = ::openPicker,
+                onOfflinePackMissing = mainViewModel::onOfflinePackMissing,
+                sharedScope = this,
+            )
+        }
     }
 
     // Composed AFTER the NavDisplay and outside it — both halves matter. Outside,
@@ -189,6 +247,22 @@ fun TranzlateApp(
             onDismiss = { textViewModel.onSwapLanguages() },
         )
     }
+
+    // Sheet 19a re-entered from a snackbar (#130 PR-22) — the "snackbar-raised
+    // re-entries" the ruling §2 assigns to the app shell. 20a-3's "Download again"
+    // runs through the events observer's own DownloadGate, and a metered link with no
+    // standing permission asks here rather than spending the data plan silently. Its
+    // consent question is that observer's alone (its own SavedStateHandle-backed
+    // store), so hosting it here does not touch the picker's or Screen B's.
+    val pendingPackConsent by eventsViewModel.pendingConsent.collectAsStateWithLifecycle()
+    val packConsentAlwaysAsk by eventsViewModel.alwaysAsk.collectAsStateWithLifecycle()
+    MobileDataSheet(
+        visible = pendingPackConsent != null,
+        alwaysAsk = packConsentAlwaysAsk,
+        onAlwaysAskChange = eventsViewModel::onAlwaysAskChange,
+        onDownloadNow = eventsViewModel::onConsentOnce,
+        onDismiss = eventsViewModel::onConsentDismiss,
+    )
 }
 
 /**

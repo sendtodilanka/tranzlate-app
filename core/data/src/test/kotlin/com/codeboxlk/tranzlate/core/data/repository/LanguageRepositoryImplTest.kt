@@ -14,11 +14,14 @@ import com.codeboxlk.tranzlate.core.testing.FakeOfflineVoiceCatalog
 import com.codeboxlk.tranzlate.domain.speech.OfflineVoiceCatalog
 import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
+import com.codeboxlk.tranzlate.domain.translate.PackEvent
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -512,6 +515,8 @@ private class FakeOfflineModelManager(
 ) : OfflineModelManager {
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = MutableStateFlow(states)
 
+    override val packEvents: SharedFlow<PackEvent> = MutableSharedFlow() // never emits in this test
+
     override suspend fun download(languageTag: String) = DownloadAttempt.Started
 
     override suspend fun delete(languageTag: String) = Unit
@@ -520,6 +525,8 @@ private class FakeOfflineModelManager(
 /** Stands in for ML Kit never answering — the flow that emits nothing, ever. */
 private class SilentOfflineModelManager : OfflineModelManager {
     override fun modelStates(): Flow<Map<String, OfflineModelState>> = flow { awaitCancellation() }
+
+    override val packEvents: SharedFlow<PackEvent> = MutableSharedFlow() // never emits in this test
 
     override suspend fun download(languageTag: String) = DownloadAttempt.Started
 
