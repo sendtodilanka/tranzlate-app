@@ -40,11 +40,13 @@ import org.junit.runner.RunWith
  *
  * ## Test names are camelCase, not the sibling's backticked spaces — deliberately
  *
- * This is `src/androidTest`, so it dexes and runs on the API 24 emulator. D8 emits
- * the DEX format for this module's `minSdk = 24`, whose `SimpleName` grammar has no
- * space character; spaces in member names need DEX 040 (minSdk 30+). A test named
- * with backticks and spaces compiles for the JVM `test` task but is not a valid
- * instrumented method on API 24, so these are camelCase.
+ * This is `src/androidTest`, so it dexes and runs on the API 24 emulator. A method
+ * name with backticks and spaces compiles for the JVM `test` task (the Robolectric
+ * sibling uses that style) but is NOT a valid instrumented method on API 24 — the
+ * DEX format at this module's `minSdk = 24` disallows spaces in member names.
+ * Verified functionally: with camelCase these dex, package and run green on
+ * `Tranzlate_API24`. The exact DEX-version cutoff is not sourced here (rule 10) —
+ * only the observed behaviour is.
  *
  * ## Mutate-first (rule 11; #242 is "tests that cannot fail")
  *
