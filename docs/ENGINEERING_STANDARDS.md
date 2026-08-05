@@ -116,7 +116,52 @@ fifteen that each need four PRs.
   "per the X decision" asks them to take on faith exactly what every brief tells
   them not to.
 
-## 7. Risk register — reviewed at every wave boundary
+## 7. Never idle-wait on a result — the enemy is the wait, not the verification
+
+**Incident:** #278 was landed fully — including sitting through its CI-on-tip wait —
+**before** the wave-1d builds that did not depend on it were started. They should have been
+building during that wait. The owner's framing, 2026-08-05: *"CI and co-verification running is
+not a problem in itself. The problem is waiting for its result without taking next actions. CI
+and co-verification is strictly necessary for the zero-touch human repo."*
+
+- **CI and co-verify are mandatory and non-negotiable** — a repo with no human must have the
+  machine prove everything. They are **not** the cost to cut.
+- **The cost is idle-waiting on a result with nothing else in flight.** Dispatch, then
+  immediately start the next independent build / lens / scope. A build running, a lens running,
+  a CI-on-tip wait — each is a cue to begin the next thing, never to pause.
+- **Only the final merge is serial** — rebase → CI-green-on-tip → merge, one PR at a time (the
+  guard that protects `main`), bounded by rule 1's two-PR cap. Even its CI-wait overlaps with
+  other PRs building and co-verifying, so it is not idle either.
+- **Building is wide; landing is narrow.** Parallelise building freely (rule 6's ownership map
+  is the safety rail); the merge lane and the open-PR count stay inside rule 1.
+
+## 8. Red-team a design before adopting it — where its failure would be silent
+
+**Incident:** the worst failures were designs that passed implementation-level scrutiny, or
+would have, yet were wrong **by construction** — `main` lost twice to a merge pattern each
+branch passed alone (rule 1); the #213 device-claim hook that "looked fine" and could never
+fire (§4); the tiering proposal that read as a speedup until a backtest showed it would pass
+bugs. A co-verify of the implementation catches none of these.
+
+- **Co-verify (rule 5) checks one CHANGE is correct** — a per-PR gate. It does not catch a
+  DESIGN that is wrong by construction.
+- **Before adopting a mechanism or process change whose failure would be SILENT** — a bug slips
+  through, `main` breaks, a guard weakens — put the **chosen** design through a small red-team
+  first: 2–3 adversaries hunting how it fails (*"how does this let a bug through / break
+  `main`?"*). Adopt only if it survives.
+- **Not every change** — that is co-verify's job. Red-team is for designs where the downside is
+  a safety guarantee.
+- **Three gates, three stages — do not conflate them.** A **design-debate** (owner's standing
+  rule, `.claude/memory/`) CHOOSES the design *before building* — advocates arguing *for*
+  competing proposals. A **red-team** ATTACKS the chosen design *before adopting a risky one* —
+  adversaries arguing *against* it. A **co-verify** (rule 5) checks the built CHANGE is correct
+  *before merge* — per-PR. The order is **choose → attack the choice → build → co-verify**;
+  a design-debate's own adversarial judging picks a winner, it does not stress-test the winner
+  for silent failure, which is the red-team's separate job. The **integration-lane** — a
+  merge-queue that would raise rule 1's two-PR cap — is the standing red-team example: it does
+  not ship until a red-team clears it.
+
+## 9. Risk register — reviewed at every wave boundary
 
 | # | Risk | Severity | State |
 |---|---|---|---|
