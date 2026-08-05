@@ -33,9 +33,16 @@ All the infra already exists — confirmed on `main` @ c91cb08:
 
 1. `core/database/build.gradle.kts` — add `testImplementation(libs.androidx.room.testing)`.
 2. New `core/database/src/test/.../MigrationThreeToFourTest.kt`:
-   - Construct `MigrationTestHelper` with the **JVM/Robolectric-compatible** constructor
-     that takes a schema-directory **File/Path** (`core/database/schemas/<db>`), NOT the
-     instrumentation constructor. Room 2.8.4's room-testing supports this.
+   - Construct `MigrationTestHelper` and point it at the exported schemas.
+     **CORRECTION (verified at build, `javap` on room-testing 2.8.4):** there is no
+     "schema-directory File/Path" constructor on Android — `AndroidMigrationTestHelper`
+     loads schemas from **assets** (`<db-fqcn>/<version>.json`) for both variants, and
+     the constructor's `File` param is the *database* file. So the actual approach is the
+     **instrumentation constructor run UNDER Robolectric**
+     (`MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), TranzlateDatabase::class.java)`),
+     with `sourceSets.test.assets` pointed at `schemas/` — works without an emulator,
+     in the ordinary `:core:database:test` task. This is the evidence-wins case (rule 12):
+     the agent proved the plan's assumption wrong and did the right thing.
    - `createDatabase(name, 3)` from `3.json`, then
      `runMigrationsAndValidate(name, 4, validateDroppedTables=true, MigrationThreeToFour)`.
      `runMigrationsAndValidate` **executes the two CREATE INDEX statements** and then
@@ -72,3 +79,12 @@ an emulator, the fallback is the instrumentation `MigrationTestHelper` behind an
 `androidTest` source set — but that does NOT run in CI (#40), so it would only
 partly close #241 and must be said plainly rather than reported as done. Try the
 Robolectric/JVM path first; escalate only if it provably cannot work.
+
+## Landed
+
+The CI-executable v3→v4 schema test landed in **PR #266** (cross-model co-verify,
+3 mutations RED). It is `Refs: #241`, **not** `Fixes:` — #241 stays OPEN for its
+three "Mandatory when done" items this PR does not do: an `androidTest` with
+row-survival + the full 1→4 chain, the CI androidTest compile guard, and an API-24
+run. The first two are #40-blocked (no CI emulator); whether the Robolectric route
+supersedes them is an owner scope call.
