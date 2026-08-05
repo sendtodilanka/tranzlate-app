@@ -74,6 +74,16 @@ protects.
    next rebase; step 1 already tells you how, and that conflict is the cheap
    half of this.
 
+   **Last check before merge — the PR closes only what it means to.** GitHub
+   closes from the body's closing keywords, and ordinary prose can collide: #217
+   is where `auto-close #173` in a PR *arguing to keep #173 open* closed it. This
+   is `docs/ENGINEERING_STANDARDS.md` §2 item 4; run it as the final act:
+   ```
+   gh pr view <N> --json closingIssuesReferences --jq '.closingIssuesReferences[].number'
+   ```
+   The list must equal your intended closures. A discussed-but-not-closed issue in
+   it → fix the body (lead with the number, or `Refs: #N`) before merging.
+
 5. **Then, and only then**, start the next PR at step 1 — with the tip that now
    includes what you just merged.
 

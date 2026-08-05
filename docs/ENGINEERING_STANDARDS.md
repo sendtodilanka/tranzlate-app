@@ -43,8 +43,13 @@ A PR is done when **all** hold. No exceptions, no "will follow up".
 3. `Call sites:`, `Reproduced:`, `Enumerated by:` present **and true** —
    re-derived as the **last act before merge**, never at open. On #256 that field
    went stale twice inside one PR.
-4. **At least one issue closes** with `Fixes:`, or the PR states exactly what
-   remains.
+4. **The PR closes EXACTLY the issues it means to** — at least one, with `Fixes:`
+   (or it states exactly what remains). Verified against ground truth, not the body
+   by eye: `gh pr view <N> --json closingIssuesReferences` must list *only* the
+   intended closures. #217 closed an issue the PR was *arguing to keep open*, because
+   `auto-close #173` in prose reads to GitHub as `close #173`; that list would have
+   shown #173 and caught it before merge (CONTRIBUTING.md → "How a PR closes an
+   issue").
 5. Tracker row moved in the **same** PR.
 6. Worktree removed after merge, `git status --porcelain` checked **first** —
    one dead worktree held the only copy of a 449-line research record.
