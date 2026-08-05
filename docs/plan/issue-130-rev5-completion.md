@@ -164,6 +164,16 @@ clean.** A future session checking whether the audit happened opens that one fil
 it does not exist, the audit did not happen; a clean pass that leaves no trace is
 indistinguishable from one that was never run.
 
+**Phase-2 landing note — pass 4 done.** The frame-by-frame re-derivation (pass 4) landed in
+**PR #296** (`docs/research/issue-130-rev5-audit.md` + a committed structural enumerator), against
+`ad41f78`. Result: the "54 frames" claim was a miscount — the true structural count is **58** (20c/20e
+light+dark were never counted); and #183/#184/#203 are **all reference-drawing corrections, none
+design-invalidating** — the shipped app already reads device truth in every case, so Phase 3's PR list
+is NOT stale. Its co-verify BLOCKED a first-draft error (a `to · landscape` legend glyph miscounted as
+an Afrikaans row-mark) — corrected to 2 inconsistent rows (`es`, `ar`), 0 false marks, and re-APPROVED
+cross-model. **Passes 1-3** (the `pr-review-toolkit` specialists over feature/language code, tests, and
+types) are still to run before rule 13's exit condition is met.
+
 ## Phase 3 — finish rev5
 
 `PR-20 … PR-28`, held until phase 1 has no open S0/S1 in groups A or B.
