@@ -62,6 +62,44 @@ class DownloadGateTest {
             assertThat(gate.pendingConsent.value).isEqualTo("de")
         }
 
+    // ---- issue #248: no radio is not a metered link --------------------------
+
+    /**
+     * Airplane mode, brand default. `ConnectivityManager.isActiveNetworkMetered`
+     * returns **true** as a best-guess when there is NO active network (AOSP), so
+     * the metered snapshot alone cannot tell "on mobile data" from "no data at
+     * all". Without the `isOnline()` guard the gate raised sheet 19a — "Download
+     * over mobile data?" — against a data plan that cannot be charged, and its
+     * "Download now" then started nothing: the manager's #218/#247 pre-flight
+     * refused what the sheet had just asked the user to pay for.
+     *
+     * The gate must NOT ask when there is no network — a metered answer is only
+     * meaningful when a network exists. It hands the request to the manager
+     * instead, whose pre-flight refuses with `Failed(NETWORK)` → sheet 19d, the
+     * settled no-connection outcome. The recording manager here stands in for that
+     * hand-off; the manager's own offline refusal is covered in its own suite
+     * (`OfflineModelBoundedWaitTest`).
+     *
+     * Mutation, decided before this test (rule 11): drop the `isOnline()` conjunct
+     * — the production code as it stood for #248. It goes RED there
+     * (`pendingConsent == "de"`, `downloads` empty) and GREEN once the guard is
+     * added. `containsExactly("de")` is the second half on purpose: a "fix" that
+     * merely stopped raising the question, without handing off, would leave the row
+     * a silent dead end — no question, no download, no 19d.
+     */
+    @Test
+    fun `no network does not raise the mobile-data question - it hands off to the manager`() =
+        runTest {
+            connectivity.state.value = false // airplane mode: no active network
+            connectivity.metered = true // the AOSP best-guess when offline
+            prefs.state.value = false // brand default DEFAULT_ALLOW_MOBILE_DATA
+
+            gate.requestDownload("de")
+
+            assertThat(gate.pendingConsent.value).isNull()
+            assertThat(manager.downloads).containsExactly("de")
+        }
+
     // ---- issue #238: the decision had no error handling at all --------------
 
     /**
