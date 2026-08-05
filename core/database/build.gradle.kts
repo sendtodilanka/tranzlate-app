@@ -43,4 +43,15 @@ dependencies {
     // under Robolectric in the ordinary unit-test task (#241). The alias is pinned
     // to the same `room` version as runtime/compiler in the catalogue.
     testImplementation(libs.androidx.room.testing)
+
+    // #241 androidTest half — MigrationThreeToFourAndroidTest runs the migration on
+    // REAL device SQLite (row survival + the full 1->4 chain), the half the
+    // Robolectric MigrationThreeToFourTest does not cover. Instrumented, so it dexes
+    // and runs on an emulator; #40 keeps it out of CI, but `preflight` compiles it.
+    // Same room-testing artifact, on the androidTest classpath this time.
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.truth)
 }

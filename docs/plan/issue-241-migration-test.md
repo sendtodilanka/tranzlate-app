@@ -83,8 +83,32 @@ Robolectric/JVM path first; escalate only if it provably cannot work.
 ## Landed
 
 The CI-executable v3→v4 schema test landed in **PR #266** (cross-model co-verify,
-3 mutations RED). It is `Refs: #241`, **not** `Fixes:` — #241 stays OPEN for its
-three "Mandatory when done" items this PR does not do: an `androidTest` with
-row-survival + the full 1→4 chain, the CI androidTest compile guard, and an API-24
-run. The first two are #40-blocked (no CI emulator); whether the Robolectric route
-supersedes them is an owner scope call.
+3 mutations RED), as `Refs: #241`.
+
+The **androidTest** half — the three "Mandatory when done" items — landed in **PR #272**
+(owner ruled 2026-08-05: use an emulator): row-survival + full 1→4 chain, run GREEN on
+`Tranzlate_API24` with a mutate-first RED proof (a row-wipe turned it red, the schema-only
+test cannot catch that); the CI **compile** guard is automatic (#253, per rule 6);
+API-24 run recorded. With #266 + #272, all of #241's mandatory items are met, so #272
+carries `Fixes: #241` and closes it.
+
+## androidTest addendum — the remaining 3 items, on the emulator (owner: 2026-08-05)
+
+Owner ruled: use an **emulator** (not a real device) for #241's remaining "Mandatory
+when done" items. `Tranzlate_API24` exists locally. So this completes #241:
+
+1. **`:core:database/src/androidTest/…/MigrationThreeToFourAndroidTest.kt`** — the REAL
+   instrumentation `MigrationTestHelper` (device SQLite, not Robolectric's sim):
+   - **Row-survival:** create v3 via `3.json`, INSERT a `translation` row, run
+     `MigrationThreeToFour`, `runMigrationsAndValidate` to 4, then assert the row is
+     intact (all columns) AND the two indices exist. This is the half the Robolectric
+     test does NOT do (it checks schema shape only).
+   - **Full 1→4 chain:** `createDatabase(1)` then `runMigrationsAndValidate(4, …all…)`.
+2. **CI compile guard** — automatic: `PreflightConventionPlugin` (#253) compiles every
+   androidTest source set AGP reports, so adding this dir is covered with no edit.
+   Verify with `./gradlew :core:database:assembleDebugAndroidTest`.
+3. **API-24 run** — `:core:database:connectedDebugAndroidTest` on `Tranzlate_API24`,
+   output recorded in the PR body (the "non-negotiable" item).
+
+Mutate-first still applies: prove the row-survival assertion goes RED if a column is
+dropped. Then #241 closes.
