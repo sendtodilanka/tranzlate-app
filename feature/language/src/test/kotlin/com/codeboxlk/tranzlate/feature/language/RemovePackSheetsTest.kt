@@ -59,12 +59,13 @@ class RemovePackSheetsTest {
     private var removals = 0
     private var dismissals = 0
 
-    private fun showRemoveSheet() {
+    private fun showRemoveSheet(savedCount: Int = 0) {
         compose.setContent {
             TranzlateTheme {
                 RemovePackSheet(
                     visible = true,
                     languageName = "Spanish",
+                    savedCount = savedCount,
                     onRemove = { removals++ },
                     onDismiss = { dismissals++ },
                 )
@@ -131,11 +132,42 @@ class RemovePackSheetsTest {
         compose.onNodeWithTag(TT_SHEET_REMOVE_CONFIRM).assertTextEquals("Remove")
     }
 
+    /** #230: at zero the reassurance line is absent — never a "0 saved" row. */
     @Test
-    fun `19f draws no saved-phrases line`() {
-        showRemoveSheet()
+    fun `19f draws no saved line when nothing is saved`() {
+        showRemoveSheet(savedCount = 0)
 
-        compose.onNodeWithTag(TT_SHEET_REMOVE_IN_USE_SAVED).assertDoesNotExist()
+        compose.onNodeWithTag(TT_SHEET_REMOVE_SAVED).assertDoesNotExist()
+    }
+
+    /**
+     * #230: the reassurance line is on 19f too. Plural: "3 saved phrases use
+     * Spanish", never "3 saved phrase".
+     *
+     * Mutation decided first (rule 11): drop `supportingContent = {
+     * SavedPhrasesLine(...) }` from `RemovePackSheet`. The line is then drawn at
+     * no count, so both the tag and the sentence redden.
+     */
+    @Test
+    fun `19f reads the saved count in the plural`() {
+        showRemoveSheet(savedCount = 3)
+
+        compose.onNodeWithTag(TT_SHEET_REMOVE_SAVED).assertExists()
+        compose
+            .onNodeWithText(
+                "3 saved phrases use Spanish. They stay saved and still open without a connection.",
+            ).assertExists()
+    }
+
+    /** #230: the singular, where a plain `%1$d` string would misread "1 saved phrases". */
+    @Test
+    fun `19f reads a single saved phrase in the singular`() {
+        showRemoveSheet(savedCount = 1)
+
+        compose
+            .onNodeWithText(
+                "1 saved phrase uses Spanish. It stays saved and still opens without a connection.",
+            ).assertExists()
     }
 
     // ---- 19g ------------------------------------------------------------------------------------
@@ -239,6 +271,7 @@ class RemovePackSheetsTest {
                 RemovePackSheet(
                     visible = false,
                     languageName = "Spanish",
+                    savedCount = 3,
                     onRemove = { removals++ },
                     onDismiss = { dismissals++ },
                 )

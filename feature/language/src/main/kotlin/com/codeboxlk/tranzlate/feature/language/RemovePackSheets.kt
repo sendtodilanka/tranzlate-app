@@ -35,6 +35,7 @@ import com.codeboxlk.tranzlate.core.designsystem.sheetBodyTextStyle
 internal const val TT_SHEET_REMOVE = "tt_lang_sheet_remove"
 internal const val TT_SHEET_REMOVE_CONFIRM = "tt_lang_sheet_remove_confirm"
 internal const val TT_SHEET_REMOVE_CANCEL = "tt_lang_sheet_remove_cancel"
+internal const val TT_SHEET_REMOVE_SAVED = "tt_lang_sheet_remove_saved"
 internal const val TT_SHEET_REMOVE_IN_USE = "tt_lang_sheet_remove_inuse"
 internal const val TT_SHEET_REMOVE_IN_USE_CONFIRM = "tt_lang_sheet_remove_inuse_confirm"
 internal const val TT_SHEET_REMOVE_IN_USE_CANCEL = "tt_lang_sheet_remove_inuse_cancel"
@@ -46,6 +47,16 @@ internal const val TT_SHEET_REMOVE_IN_USE_SAVED = "tt_lang_sheet_remove_inuse_sa
  * The 🗑 on the offline manager used to delete on the tap. It now asks, and this
  * is what it asks with: what is freed, and what stops working, in one line — the
  * export's own caption for the frame.
+ *
+ * ## The saved-phrases line, now on this sheet too (#230)
+ *
+ * The export drew the `bookmark` reassurance only on [RemoveInUseSheet], but the
+ * fate of saved work does not depend on whether the pack was the live target — it
+ * is identical either way (saved rows live in Room's `translation` table, which
+ * nothing on the delete path can reach). So the owner ruled (2026-08-05) that this
+ * sheet carries the SAME line, gated the SAME way: present when [savedCount] > 0,
+ * absent at 0. It is the same [SavedPhrasesLine] and the same plural string 19g
+ * uses; only the testTag differs, so each sheet's line is addressable as its own.
  *
  * Every word of this sheet is drawn, and every word of it is TRUE of this app,
  * which is not something the sibling sheet could say (see [RemoveInUseSheet]).
@@ -74,6 +85,7 @@ internal const val TT_SHEET_REMOVE_IN_USE_SAVED = "tt_lang_sheet_remove_inuse_sa
 internal fun RemovePackSheet(
     visible: Boolean,
     languageName: String,
+    savedCount: Int,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -97,6 +109,13 @@ internal fun RemovePackSheet(
                 testTag = TT_SHEET_REMOVE_CANCEL,
                 onClick = onDismiss,
             ),
+        supportingContent = {
+            SavedPhrasesLine(
+                languageName = languageName,
+                savedCount = savedCount,
+                testTag = TT_SHEET_REMOVE_SAVED,
+            )
+        },
         body = { Text(stringResource(R.string.lang_sheet_remove_body, languageName)) },
     )
 }
@@ -191,7 +210,13 @@ internal fun RemoveInUseSheet(
                 testTag = TT_SHEET_REMOVE_IN_USE_CANCEL,
                 onClick = onDismiss,
             ),
-        supportingContent = { SavedPhrasesLine(languageName = languageName, savedCount = savedCount) },
+        supportingContent = {
+            SavedPhrasesLine(
+                languageName = languageName,
+                savedCount = savedCount,
+                testTag = TT_SHEET_REMOVE_IN_USE_SAVED,
+            )
+        },
         body = { Text(stringResource(R.string.lang_sheet_remove_inuse_body, languageName)) },
     )
 }
@@ -222,8 +247,15 @@ private fun InUseIcon() {
 }
 
 /**
- * The `bookmark` line — reassurance, and the only part of this sheet that costs
- * a database read (`TranslationDao.savedCountUsing`, index-backed by U-10).
+ * The `bookmark` line — reassurance, and the only part of either removal sheet
+ * that costs a database read (`TranslationDao.savedCountUsing`, index-backed by
+ * U-10). Shared by [RemovePackSheet] (19f) and [RemoveInUseSheet] (19g) since
+ * #230: the same words, gated the same way, because saved work is affected
+ * identically whichever pack is being removed.
+ *
+ * [testTag] is passed by the caller rather than fixed here, so each sheet's line
+ * carries its own C-1 tag (`tt_lang_sheet_remove_saved` vs `…_inuse_saved`)
+ * instead of one lying about which sheet it is on.
  *
  * Absent at zero: see [RemoveInUseSheet]'s KDoc. The glyph is silent to
  * TalkBack and the sentence carries the whole fact, which is the same rule the
@@ -234,6 +266,7 @@ private fun InUseIcon() {
 private fun SavedPhrasesLine(
     languageName: String,
     savedCount: Int,
+    testTag: String,
 ) {
     if (savedCount <= 0) return
     val spacing = LocalSpacing.current
@@ -248,7 +281,7 @@ private fun SavedPhrasesLine(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = spacing.md16, vertical = spacing.sm8)
-                    .testTag(TT_SHEET_REMOVE_IN_USE_SAVED),
+                    .testTag(testTag),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Bookmark,
@@ -278,10 +311,22 @@ private fun SavedPhrasesLine(
 // paints — `TranzlateSheetPreviewFrame`, which exists for exactly this
 // (`MobileDataSheet.kt:203`, PR-17).
 
-/** 19f: the pack is not the one in use. One state — the sheet has no variants. */
+/** 19f with several saved phrases — the reassurance line #230 adds to this sheet. */
 @PreviewLightDark
 @Composable
-private fun RemovePackSheetPreview() {
+private fun RemovePackSheetWithSavedPreview() {
+    RemovePackSheetPreviewBody(savedCount = 3)
+}
+
+/** 19f with none — the line is absent, exactly as the ordinary removal drew before #230. */
+@PreviewLightDark
+@Composable
+private fun RemovePackSheetNoSavedPreview() {
+    RemovePackSheetPreviewBody(savedCount = 0)
+}
+
+@Composable
+private fun RemovePackSheetPreviewBody(savedCount: Int) {
     TranzlateSheetPreviewFrame(
         title = stringResource(R.string.lang_sheet_remove_title, "Spanish"),
         primaryAction =
@@ -299,6 +344,13 @@ private fun RemovePackSheetPreview() {
                 testTag = TT_SHEET_REMOVE_CANCEL,
                 onClick = {},
             ),
+        supportingContent = {
+            SavedPhrasesLine(
+                languageName = "Spanish",
+                savedCount = savedCount,
+                testTag = TT_SHEET_REMOVE_SAVED,
+            )
+        },
         body = { Text(stringResource(R.string.lang_sheet_remove_body, "Spanish")) },
     )
 }
@@ -325,7 +377,7 @@ private fun RemoveInUseSheetNoSavedPreview() {
 }
 
 // ---- Item-level previews (#243) ---------------------------------------------
-// The line renders inside the three 19g previews above, so nothing was invisible
+// The line renders inside the 19f and 19g previews above, so nothing was invisible
 // — rule 7's LETTER names items built from standard M3 parts and this is one: a
 // Surface holding a Row holding a glyph and a plural. Previewed alone because
 // its wrap is the thing to look at, and inside a sheet it never gets long enough
@@ -353,7 +405,11 @@ private fun SavedPhrasesLinePreviewSurface(savedCount: Int) {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Box(modifier = Modifier.padding(LocalSpacing.current.md16)) {
-                SavedPhrasesLine(languageName = "Spanish", savedCount = savedCount)
+                SavedPhrasesLine(
+                    languageName = "Spanish",
+                    savedCount = savedCount,
+                    testTag = TT_SHEET_REMOVE_SAVED,
+                )
             }
         }
     }
@@ -378,7 +434,13 @@ private fun RemoveInUseSheetPreviewBody(savedCount: Int) {
                 testTag = TT_SHEET_REMOVE_IN_USE_CANCEL,
                 onClick = {},
             ),
-        supportingContent = { SavedPhrasesLine(languageName = "Spanish", savedCount = savedCount) },
+        supportingContent = {
+            SavedPhrasesLine(
+                languageName = "Spanish",
+                savedCount = savedCount,
+                testTag = TT_SHEET_REMOVE_IN_USE_SAVED,
+            )
+        },
         body = { Text(stringResource(R.string.lang_sheet_remove_inuse_body, "Spanish")) },
     )
 }
