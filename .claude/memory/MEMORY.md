@@ -11,4 +11,5 @@ is stale. Rule 11 is why: a rule kept in more than one place drifts.
 - [No direct push to main](no-direct-push-to-main.md) — MANDATORY; all changes reach main via PR only, never `git push --no-verify`
 - [Sinhala prose mandate — RETIRED](sinhala-prose-mandate.md) — a percentage I reported as passing and never computed; CLAUDE.md rule 9 replaces it with comprehension
 - [No speculation / verified data only](no-speculation-verified-data.md) — every claim needs a source or disconfirmation experiment, else "verified data නෑ"
+- [`git grep -E` ignores `\b`](git-grep-ignores-word-boundary.md) — #221 the false-zero enumeration trap; a `\b` count of 0 beside a matching bare term is the signature; use `grep -rE 'Sym\b'` / `git grep -wE 'Sym'`, never `git grep -E 'Sym\b'`
 - [gradlew needs JAVA_HOME (Android Studio JBR)](gradlew-needs-java-home-jbr.md) — terminal ./gradlew fails without JAVA_HOME set to the JBR (Java 21)

@@ -72,8 +72,7 @@ fi
 if ! printf '%s' "$body" | grep -q 'Enumerated by:'; then
   missing="${missing:+$missing and }Enumerated by:"
 fi
-[ -z "$missing" ] && exit 0
-
+if [ -n "$missing" ]; then
 jq -nc --arg r "PR body is missing: ${missing}
 
 Issue #161: five of my PRs in one session shipped a defect a lens then caught, and two causes are checkable right here.
@@ -92,4 +91,50 @@ Issue #161: five of my PRs in one session shipped a defect a lens then caught, a
 
 Run the grep and the repro, then put the numbers in the body. If neither applies, say so in those words — an explicit 'none' and 'n/a' both pass." \
   '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
+  exit 0
+fi
+
+# ── the git-grep word-boundary enumeration trap (#221) ────────────────────────
+# All three markers are present, so the PR would pass clean. Before it does,
+# catch the one enumeration that is present AND false: `git grep` counting with a
+# `\b`. `git grep -E` does NOT support `\b` — it returns 0 matches, exit 1, the
+# SAME answer as "this symbol appears nowhere". So `git grep -cE 'Sym\b'` reports
+# a fiction, the `Call sites:` marker presents it as truth, and the reviewer sees
+# a clean enumeration. That is rule 12's second shape, with the command right
+# there and quietly lying.
+#
+# WARN, never deny — a hook sees a body, not an intent. A body may show the bad
+# command as a documented example (this repo's own #221 PRs do), and a deny on
+# that gets the guard switched off. `device-claim.sh` and `guard-restore.sh` warn
+# for the same reason.
+#
+# WHY THIS IS NOT REDUNDANT with `hookify.git-grep-word-boundary`, which BLOCKS
+# the command at run time: that hook scans the COMMAND text, so it never sees a
+# body passed as `--body-file <path>` (the text is in the file, not the command)
+# — the exact form most PR bodies take. This is the body-side half of the pair.
+#
+# PRECISE ON PURPOSE — it requires an enumeration shape (a leading `-c`/`-l`/`-L`
+# count/list flag), not merely the words `git grep`. 8 of 142 shipped PR bodies
+# name the trap in PROSE ("never `git grep -E`, no `\b`", citing #221); a bare
+# `git grep …\b` pattern warns on every one of them, and a guard that fires on
+# the correct write is a guard people learn to scroll past.
+#
+# KNOWN LIMITS, named not discovered: the count flag must be the FIRST token after
+# `git grep` (so `git grep -n -c 'Sym\b'` and long `--count` are missed), the `\b`
+# must sit on the same line with no `;`/`&`/`|` between (mirrors the run-time
+# hook), and a `--body "$VAR"`/`$(…)` body was already unreadable and skipped
+# above. Silent misses, never false alarms. Behaviour is pinned by
+# `.claude/hooks/tests/guard-pr-word-boundary.sh` — run it if you touch the pattern.
+if printf '%s' "$body" | grep -qE 'git[[:space:]]+grep[[:space:]]+-[A-Za-z]*[clL][A-Za-z]*[^;&|]*\\b'; then
+  jq -nc --arg m "Heads-up (not blocking) — issue #221, the git-grep word-boundary trap.
+
+This PR body's enumeration counts with \`git grep\` and a \`\\b\` word boundary, e.g. \`git grep -cE 'Sym\\b'\`. \`git grep -E\` does NOT support \`\\b\`: it returns 0 matches, exit 1 — the SAME answer as 'this symbol appears nowhere'. A \`Call sites:\` count built from it is a fiction that reads as clean.
+
+Re-run the enumeration and confirm the number with a tool that honours \\b:
+  grep -rE 'Sym\\b' --include='*.kt' <dirs>      # POSIX grep supports \\b
+  git grep -wE 'Sym'                            # -w = whole word
+  git grep -E '(^|[^A-Za-z0-9_])Sym([^A-Za-z0-9_]|\$)'
+Signature: a \\b count of 0 while the bare term matches. If this line is prose or a documented example rather than a real count, ignore this." \
+    '{systemMessage:$m}'
+fi
 exit 0
