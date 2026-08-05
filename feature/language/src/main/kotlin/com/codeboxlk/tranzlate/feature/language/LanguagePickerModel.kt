@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.dp
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
+import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.DETECT_LANGUAGE_ID
@@ -758,6 +759,128 @@ fun onDeviceCount(languages: List<Language>): OnDeviceCount =
         capable = languages.count { it.offlineAvailable },
     )
 
+// ---- 18a / 18b: the first-run suggestion block (PR-21) -------------------
+
+/** A shortcut, not a second catalog — the frame draws three, and more defeats the point (cf. [RECENT_LIMIT]). */
+const val SUGGESTION_LIMIT = 3
+
+/**
+ * Why a language is being suggested — the supporting line the [SuggestedLanguage]
+ * row carries under its name (18a: "Device language", "Common where you are").
+ *
+ * There is deliberately NO `FROM_KEYBOARDS` case. The export draws a third source
+ * — the user's installed keyboards, via `InputMethodManager` — and the rev3
+ * ruling scopes it as experiment **E-K1**, "additive only if it passes". E-K1 has
+ * no research record (rule 4), so the keyboard path is not shipped and the reason
+ * it would carry is not written down: a value with no producer is a lie the type
+ * system can prevent. The locale path below is the whole of what ships, and the
+ * ruling records it as the reliable one ("a locale-only fallback always yields
+ * something") — `LocaleList.getAdjustedDefault()` is documented never to be empty.
+ */
+enum class SuggestionReason {
+    /** The device's PRIMARY locale — the first entry of the adjusted default list. */
+    DEVICE_LANGUAGE,
+
+    /** A secondary system locale — the user has it, but it is not their first. */
+    COMMON_WHERE_YOU_ARE,
+}
+
+/** One first-run suggestion: a language the user is offered a one-tap offline download of. */
+@Immutable
+data class SuggestedLanguage(
+    val id: String,
+    val displayName: String,
+    val avatar: LanguageAvatar,
+    val reason: SuggestionReason,
+)
+
+/**
+ * The first-run suggestions, derived from the device's preferred locales alone
+ * (18a/18b, PR-21). PURE so a plain unit test can exhaust it without a platform
+ * `LocaleList`: the composable reads `LocaleList.getAdjustedDefault()` and hands
+ * the tags in here.
+ *
+ * The derivation, and why each step is what it is:
+ * - **Order is preserved from the locale list.** The adjusted default puts the
+ *   user's most-preferred locale first, so the first entry is the device
+ *   language and the rest are "where you are". The reason is assigned from that
+ *   POSITION, before any filtering, so it describes the locale's rank rather than
+ *   the suggestion's — a French primary reads "Device language" whether or not an
+ *   English secondary was filtered out ahead of it.
+ * - **A locale resolves to the most specific catalog id it can, then falls back
+ *   to its base language** ([downloadableSuggestionId]). The catalog carries
+ *   `fr-FR` and `fr-CA` as their own ids, both online-only, while the ML Kit
+ *   offline pack is the base `fr`; a `fr-FR` device — which is what
+ *   `getAdjustedDefault()` reports — must reach that pack. So the specific id is
+ *   tried first (a region that has its own pack keeps it) and the primary subtag
+ *   second, and the first DOWNLOADABLE, non-pivot one wins.
+ * - **The pivot is never suggested.** English ships inside every pack and is
+ *   on-device from first launch (#203/#224), so "Get English" would offer a
+ *   download that is already done. Excluded by id, so it holds even on a build
+ *   that reports the pivot as not-yet-downloaded.
+ * - **Only a plain [LanguageRowState.Downloadable] row is suggested.** That is
+ *   exactly "offline-capable, nothing on disk, nothing in flight": a `Downloaded`
+ *   row has no download to offer, an `OnlineOnly` row can never have one, and a
+ *   `Downloading`/`Failed`/`Selected` row is already telling its own story on the
+ *   list below. So the block never suggests a download that cannot happen.
+ * - **Deduplicated by resolved id and capped at [limit].** Two locales can
+ *   resolve to one catalog id (`en-US`, `en-GB`; or `fr-FR`, `fr-CA` both falling
+ *   back to `fr`); the first occurrence fixes both the order and the reason.
+ *
+ * The result CAN be empty — a strictly monolingual-English device has no
+ * offline-capable non-pivot locale to offer — and the caller draws the explainer
+ * alone in that case, with the full catalogue one tap below it (no dead end). The
+ * ruling's "never empty" is the property of the INPUT (`getAdjustedDefault()`),
+ * not a promise that every device has a second language worth a pack.
+ */
+fun firstRunSuggestions(
+    preferredLocaleTags: List<String>,
+    rows: List<LanguagePickerRow>,
+    limit: Int = SUGGESTION_LIMIT,
+): List<SuggestedLanguage> {
+    val rowById = rows.associateBy(LanguagePickerRow::id)
+    val seen = HashSet<String>()
+    val out = mutableListOf<SuggestedLanguage>()
+    preferredLocaleTags.forEachIndexed { index, tag ->
+        if (out.size >= limit) return out
+        val id = downloadableSuggestionId(tag, rowById) ?: return@forEachIndexed
+        // Dedupe on the id actually chosen — fr-FR and fr-CA both resolve here to
+        // the base `fr`, so the second is dropped rather than repeated.
+        if (!seen.add(id)) return@forEachIndexed
+        val row = rowById.getValue(id)
+        out +=
+            SuggestedLanguage(
+                id = id,
+                displayName = row.displayName,
+                avatar = row.avatar,
+                reason = if (index == 0) SuggestionReason.DEVICE_LANGUAGE else SuggestionReason.COMMON_WHERE_YOU_ARE,
+            )
+    }
+    return out
+}
+
+/**
+ * The catalog id a locale [tag] should be OFFERED as a download of, or null when
+ * none of its resolutions is a downloadable, non-pivot row.
+ *
+ * Most specific first, then the primary subtag: a `fr-FR` locale prefers a
+ * `fr-FR` pack if the catalog has a downloadable one, and reaches the base `fr`
+ * pack when — as ML Kit actually ships — only the base language has one.
+ */
+private fun downloadableSuggestionId(
+    tag: String,
+    rowById: Map<String, LanguagePickerRow>,
+): String? {
+    val candidates =
+        listOfNotNull(
+            LanguageTagResolver.canonicalId(tag),
+            LanguageTagResolver.canonicalId(tag.substringBefore('-')),
+        )
+    return candidates.firstOrNull { id ->
+        !isPivotLanguage(id) && rowById[id]?.state == LanguageRowState.Downloadable
+    }
+}
+
 /** Which words head the recents section — or that it is not emitted at all. */
 enum class RecentHeader {
     /** 15a: "Recent", role-neutral because the section is served the merged view. */
@@ -816,6 +939,19 @@ data class PickerListPlan(
      * recents section — the reason the pane exists — off the bottom.
      */
     val showMeter: Boolean = false,
+    /**
+     * The 18a/18b first-run block is drawn in place of the (absent) recents
+     * section: the "No packs yet" explainer, and — when there is something to
+     * suggest — a "Suggested for you" header over the suggested rows (PR-21).
+     *
+     * True only on the SOURCE picker with an empty recents section and the whole
+     * catalogue showing. It is a source affordance by design: both 18a and 18b
+     * are "Translate from" frames, and its lead suggestion reason is "Device
+     * language", which is a source concept. The target picker keeps the shipped
+     * behaviour — an empty recents section is simply absent — so its
+     * [catalogOffset] is unchanged by this PR.
+     */
+    val firstRun: Boolean = false,
 )
 
 /**
@@ -896,7 +1032,16 @@ data class PickerListPlan(
  *   genuinely empty. A `showMeter && library != null` test where the card is
  *   drawn would be a second source for one fact, and `sidePane` would be reading
  *   the wrong one.
+ *
+ * `@Suppress("LongParameterList")`: eight inputs, and each is a distinct fact this
+ * layout turns on — the role, the four section-presence questions, the arrangement,
+ * whether the disk has answered, and (PR-21) how many first-run suggestions there
+ * are. A parameter object would hide them from the callers that read them one at a
+ * time and from the tests that drive each independently, the same trade the
+ * ViewModel's own suppression records; detekt trips AT the threshold, not above it
+ * (the #209 note).
  */
+@Suppress("LongParameterList")
 fun pickerListPlan(
     role: LanguageRole,
     detectRowPresent: Boolean,
@@ -905,9 +1050,9 @@ fun pickerListPlan(
     wholeCatalog: Boolean,
     arrangement: PickerArrangement = PickerArrangement.SinglePane,
     libraryReady: Boolean = false,
+    firstRunSuggestionCount: Int = 0,
 ): PickerListPlan {
     val twoPane = arrangement.twoPane
-    val twoLeaf = arrangement.twoLeaf
     val showVoiceLegend = role == LanguageRole.TARGET && anyVoiceMark
     val recentHeader =
         when {
@@ -915,37 +1060,78 @@ fun pickerListPlan(
             role == LanguageRole.TARGET -> RecentHeader.TARGET
             else -> RecentHeader.GENERIC
         }
-    // Emission order, and therefore counting order: detect row · recents
-    // (header + rows) · "All languages" header · the alphabet. The legend is
-    // deliberately absent from both — it is not an item of this list. In
-    // two-pane the first two move to the side pane and stop being counted; only
-    // the "All languages" header is left above the alphabet.
+    // 18a/18b sit exactly where recents would, and only when recents is empty —
+    // source side, whole catalogue — so the block and the recents section are
+    // mutually exclusive by construction and can never both add to the offset.
+    val firstRun = role == LanguageRole.SOURCE && wholeCatalog && recentCount == 0
+    // Once the disk has answered, the meter is a permanent tenant of the leaf, so
+    // 17b's pane is never empty. Before it answers there is nothing to draw.
+    val showMeter = arrangement.twoLeaf && libraryReady
+    // The prefix and the tenant test are lifted into their own functions: they are
+    // the branch-heavy half, and keeping them here is what pushed this over
+    // detekt's complexity gate when the first-run block was added.
     val aboveTheAlphabet =
         if (twoPane) {
             0
         } else {
-            (if (detectRowPresent) 1 else 0) + (if (recentHeader == null) 0 else recentCount + 1)
+            catalogPrefixCount(detectRowPresent, recentHeader, recentCount, firstRun, firstRunSuggestionCount)
         }
-    // Once the disk has answered, the meter is a permanent tenant of the leaf,
-    // so 17b's pane is never empty — which is why it is one of the terms below
-    // rather than an afterthought. Before it answers there is nothing to draw,
-    // and the pane has to be able to go.
-    val showMeter = twoLeaf && libraryReady
-    // A side pane with nothing in it is 272dp of empty surface next to the
-    // results — reachable the moment a search clears the recents on the source
-    // side. EDGE_CASES' no-dead-end rule cuts the same way for furniture as it
-    // does for errors: the pane goes, and the catalog takes the width back.
-    val sidePane = twoPane && (recentHeader != null || detectRowPresent || showVoiceLegend || showMeter)
     return PickerListPlan(
         showVoiceLegend = showVoiceLegend,
         recentHeader = recentHeader,
         showAllHeader = wholeCatalog,
         catalogOffset = aboveTheAlphabet + (if (wholeCatalog) 1 else 0),
-        sidePane = sidePane,
+        sidePane = twoPane && sidePaneHasTenant(recentHeader, detectRowPresent, showVoiceLegend, showMeter, firstRun),
         counterInTopBar = twoPane,
         showMeter = showMeter,
+        firstRun = firstRun,
     )
 }
+
+/**
+ * How many items the single-pane grid emits ABOVE the alphabet — the number both
+ * the A–Z rail and a restored [PickerListPosition] land against.
+ *
+ * Emission (and counting) order: the detect pseudo-row · the recents section OR
+ * the 18a first-run block · the "All languages" header (added by the caller). The
+ * recents section and the first-run block are mutually exclusive — [firstRun] is
+ * only ever true when [recentHeader] is null — so at most one of the two middle
+ * terms is non-zero. The legend is deliberately not among them: it is drawn above
+ * the `LazyColumn`, not inside it (see [pickerListPlan]).
+ *
+ * The first-run block is the explainer card, and — only when there is something to
+ * suggest — the "Suggested for you" header over the suggested rows. A header over
+ * nothing is the furniture the empty recents section already refuses, so with no
+ * suggestions it is the explainer alone.
+ */
+private fun catalogPrefixCount(
+    detectRowPresent: Boolean,
+    recentHeader: RecentHeader?,
+    recentCount: Int,
+    firstRun: Boolean,
+    firstRunSuggestionCount: Int,
+): Int {
+    val recentBlock = if (recentHeader == null) 0 else recentCount + 1
+    val firstRunBlock =
+        if (firstRun) 1 + (if (firstRunSuggestionCount > 0) firstRunSuggestionCount + 1 else 0) else 0
+    return (if (detectRowPresent) 1 else 0) + recentBlock + firstRunBlock
+}
+
+/**
+ * Whether a two-pane arrangement's side pane has anything to hold. An empty pane
+ * is 272dp of surface next to the results — reachable the moment a search clears
+ * the recents on the source side — and EDGE_CASES' no-dead-end rule cuts the same
+ * way for furniture as for errors: the pane goes and the catalog takes the width
+ * back. The first-run block is a tenant like the others (a source first-run leaf
+ * keeps its pane on the explainer alone), which is why it is one of the terms.
+ */
+private fun sidePaneHasTenant(
+    recentHeader: RecentHeader?,
+    detectRowPresent: Boolean,
+    showVoiceLegend: Boolean,
+    showMeter: Boolean,
+    firstRun: Boolean,
+): Boolean = recentHeader != null || detectRowPresent || showVoiceLegend || showMeter || firstRun
 
 // ---- U-5: the offline-library meter (17b) -------------------------------
 

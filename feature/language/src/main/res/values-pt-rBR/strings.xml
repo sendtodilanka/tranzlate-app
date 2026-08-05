@@ -61,6 +61,25 @@
         <item quantity="one">%1$d de %2$d no dispositivo</item>
         <item quantity="other">%1$d de %2$d no dispositivo</item>
     </plurals>
+    <plurals name="text_lang_can_be_offline_count">
+        <item quantity="one">%1$d pode ficar off-line</item>
+        <item quantity="other">%1$d podem ficar off-line</item>
+    </plurals>
+    <!-- 18a/18b first-run suggestion block (#130 PR-21). -->
+    <string name="lang_first_run_title">Nenhum pacote ainda</string>
+    <string name="lang_first_run_body">Escolha um idioma para baixar uma vez e ele funciona sem sinal.</string>
+    <string name="lang_first_run_privacy">A tradução acontece no dispositivo — nada é enviado a lugar nenhum.</string>
+    <string name="lang_first_run_suggested_header">Sugeridos para você</string>
+    <string name="lang_suggested_reason_device">Idioma do dispositivo</string>
+    <string name="lang_suggested_reason_local">Comum onde você está</string>
+    <string name="lang_suggested_get">Obter</string>
+    <string name="cd_lang_suggested_get">Obter %1$s para uso off-line</string>
+    <!-- Sheet 18a-confirm (#130 PR-21). 40–65 MB matches lang_sheet_data_body. -->
+    <string name="lang_confirm_title">Baixar %1$s</string>
+    <string name="lang_confirm_size">Um pacote de idioma costuma ter de 40 a 65 MB.</string>
+    <string name="lang_confirm_reversible">Você pode removê-lo de novo em Gerenciar pacotes.</string>
+    <string name="lang_confirm_download">Baixar e usar</string>
+    <string name="lang_confirm_not_now">Agora não</string>
     <!-- Offline-library meter, foldable two-leaf (17b / U-5). -->
     <string name="text_lang_library_title">Biblioteca off-line</string>
     <string name="text_lang_library_downloaded">%1$d</string>

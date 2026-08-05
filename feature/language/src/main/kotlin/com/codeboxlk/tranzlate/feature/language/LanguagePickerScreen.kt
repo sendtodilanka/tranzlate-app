@@ -1,5 +1,6 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import android.os.LocaleList
 import android.text.format.Formatter
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ScrollState
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Search
@@ -45,6 +47,7 @@ import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -70,6 +73,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -106,6 +110,7 @@ import kotlin.math.roundToInt
 
 private const val CONTENT_TYPE_ROW = "lang_row"
 private const val CONTENT_TYPE_HEADER = "lang_header"
+private const val CONTENT_TYPE_FIRST_RUN = "lang_first_run"
 
 /** "no finger on the rail" — an index no slot can equal. */
 private const val NO_SLOT = -1
@@ -163,6 +168,7 @@ fun LanguagePickerScreen(
     val recents by viewModel.recents(target).collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val library by viewModel.library.collectAsStateWithLifecycle()
+    val pendingSuggestion by viewModel.pendingSuggestion.collectAsStateWithLifecycle()
     LanguagePickerContent(
         target = target,
         languages = languages,
@@ -194,6 +200,10 @@ fun LanguagePickerScreen(
         packFailure = packFailure,
         onDismissFailure = viewModel::dismissPackFailure,
         onManagePacks = onManagePacks,
+        onSuggestionGet = viewModel::onSuggestionGet,
+        pendingSuggestion = pendingSuggestion,
+        onSuggestionConfirm = viewModel::confirmSuggestionDownload,
+        onSuggestionDismiss = viewModel::dismissSuggestion,
     )
 }
 
@@ -271,7 +281,18 @@ fun LanguagePickerContent(
     packFailure: PackFailureRequest? = null,
     onDismissFailure: () -> Unit = {},
     onManagePacks: () -> Unit = {},
+    onSuggestionGet: (String) -> Unit = {},
+    pendingSuggestion: String? = null,
+    onSuggestionConfirm: () -> Unit = {},
+    onSuggestionDismiss: () -> Unit = {},
     arrangementOverride: PickerArrangement? = null,
+    /**
+     * PREVIEWS / TESTS ONLY, the twin of [arrangementOverride]. Production leaves
+     * it null so [firstRunSuggestions] derives them from the device locales; a
+     * preview or a Robolectric test cannot set `LocaleList.getAdjustedDefault()`,
+     * so it names the suggestions the first-run block should show.
+     */
+    suggestionsOverride: List<SuggestedLanguage>? = null,
 ) {
     val title =
         when (target) {
@@ -309,6 +330,15 @@ fun LanguagePickerContent(
         onManagePacks = onManagePacks,
         onDismiss = onDismissFailure,
     )
+    // Sheet 18a-confirm (PR-21). The NAME is resolved from `sections.all` the way
+    // the failure sheet's is, so the confirm title says exactly what the row says;
+    // a null name draws nothing (the id only ever comes from a suggestion the
+    // catalogue produced, so it resolves in every real path).
+    DownloadConfirmSheet(
+        languageName = pendingSuggestion?.let { id -> sections.all.firstOrNull { it.id == id }?.displayName },
+        onConfirm = onSuggestionConfirm,
+        onDismiss = onSuggestionDismiss,
+    )
     // BOTH sizes are read from the CONSTRAINTS this screen was handed, never from
     // the window: a nav rail, or a host that draws the picker beside something
     // else, has already been subtracted here and has not been there — and, the
@@ -332,6 +362,21 @@ fun LanguagePickerContent(
         // draws in every one of them.
         val wholeCatalog = !sections.searching && !sections.catalogEmpty
         val railed = arrangement.rail && wholeCatalog
+        // The 18a/18b block is a SOURCE affordance shown when there are no recents
+        // yet — the same condition `pickerListPlan` derives `firstRun` from, kept
+        // here too only to gate the `LocaleList` read below rather than pay it on
+        // every picker. `suggestionsOverride` short-circuits it for previews/tests
+        // that cannot set the device locales.
+        val firstRunEligible = target == LanguageRole.SOURCE && wholeCatalog && sections.recent.isEmpty()
+        // Called unconditionally (Compose forbids a composable behind a `?:`); the
+        // override wins for previews/tests, and `active` is false when it is set so
+        // production's locale read is not paid on a path that discards it.
+        val derivedSuggestions =
+            rememberFirstRunSuggestions(
+                active = firstRunEligible && suggestionsOverride == null,
+                rows = sections.all,
+            )
+        val suggestions = suggestionsOverride ?: derivedSuggestions
         val plan =
             remember(
                 target,
@@ -341,6 +386,7 @@ fun LanguagePickerContent(
                 wholeCatalog,
                 arrangement,
                 library,
+                suggestions.size,
             ) {
                 pickerListPlan(
                     role = target,
@@ -350,6 +396,7 @@ fun LanguagePickerContent(
                     wholeCatalog = wholeCatalog,
                     arrangement = arrangement,
                     libraryReady = library != null,
+                    firstRunSuggestionCount = suggestions.size,
                 )
             }
         PickerScaffold(
@@ -367,6 +414,8 @@ fun LanguagePickerContent(
             onBack = onBack,
             onDownload = onDownload,
             onStop = onStop,
+            suggestions = suggestions,
+            onSuggestionGet = onSuggestionGet,
             listPosition = listPosition,
             onListPositionChange = onListPositionChange,
             library = library,
@@ -469,6 +518,8 @@ private fun PickerScaffold(
     onBack: () -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
+    suggestions: List<SuggestedLanguage>,
+    onSuggestionGet: (String) -> Unit,
     listPosition: PickerListPosition,
     onListPositionChange: (PickerListPosition) -> Unit,
     library: OfflineLibraryMeter?,
@@ -530,6 +581,8 @@ private fun PickerScaffold(
                 onSelect = onSelect,
                 onDownload = onDownload,
                 onStop = onStop,
+                suggestions = suggestions,
+                onSuggestionGet = onSuggestionGet,
                 onClearQuery = { onQueryChange("") },
                 listPosition = listPosition,
                 onListPositionChange = onListPositionChange,
@@ -637,6 +690,8 @@ private fun PickerBody(
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
+    suggestions: List<SuggestedLanguage>,
+    onSuggestionGet: (String) -> Unit,
     onClearQuery: () -> Unit,
     listPosition: PickerListPosition,
     onListPositionChange: (PickerListPosition) -> Unit,
@@ -698,9 +753,11 @@ private fun PickerBody(
                     plan = plan,
                     width = arrangement.sidePaneWidth,
                     library = library,
+                    suggestions = suggestions,
                     onSelect = onSelect,
                     onDownload = onDownload,
                     onStop = onStop,
+                    onSuggestionGet = onSuggestionGet,
                 )
                 // 17a: 8dp, a gap. 17b: 24dp, the strip of window the crease
                 // runs down — content on either side of it, nothing in it. The
@@ -721,6 +778,8 @@ private fun PickerBody(
                 onSelect = onSelect,
                 onDownload = onDownload,
                 onStop = onStop,
+                suggestions = suggestions,
+                onSuggestionGet = onSuggestionGet,
                 onClearQuery = onClearQuery,
                 modifier = Modifier.weight(1f),
             )
@@ -756,6 +815,8 @@ private fun PickerBody(
                 onSelect = onSelect,
                 onDownload = onDownload,
                 onStop = onStop,
+                suggestions = suggestions,
+                onSuggestionGet = onSuggestionGet,
                 onClearQuery = onClearQuery,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
@@ -796,9 +857,11 @@ private fun PickerSidePane(
     plan: PickerListPlan,
     width: Dp,
     library: OfflineLibraryMeter?,
+    suggestions: List<SuggestedLanguage>,
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
+    onSuggestionGet: (String) -> Unit,
 ) {
     val spacing = LocalSpacing.current
     Column(
@@ -812,6 +875,16 @@ private fun PickerSidePane(
                 .padding(horizontal = spacing.xs4, vertical = spacing.sm8)
                 .testTag("tt_lang_side_pane"),
     ) {
+        // 18b's leaf: the first-run block sits where recents would (they are
+        // mutually exclusive — `plan.firstRun` is only ever true when the recents
+        // section is absent), above the meter the leaf also carries.
+        if (plan.firstRun) {
+            FirstRunExplainer()
+            if (suggestions.isNotEmpty()) {
+                SectionHeader(R.string.lang_first_run_suggested_header)
+                suggestions.forEach { suggestion -> SuggestedRow(suggestion, onSuggestionGet) }
+            }
+        }
         plan.recentHeader?.let { header ->
             SectionHeader(recentHeaderRes(header))
             sections.recent.forEach { row ->
@@ -969,6 +1042,8 @@ private fun PickerCatalog(
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
+    suggestions: List<SuggestedLanguage>,
+    onSuggestionGet: (String) -> Unit,
     onClearQuery: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1019,6 +1094,13 @@ private fun PickerCatalog(
                 fullSpanItem(key = "empty_result") { NoSearchResults(query = query, onShowAll = onClearQuery) }
             }
             if (shortcutsInGrid) {
+                // The 18a block, where recents would be — mutually exclusive with
+                // them (`plan.firstRun` only when the recents section is absent),
+                // so at most one of these two `if`s emits anything and the
+                // `catalogOffset` sum counts whichever it is.
+                if (plan.firstRun) {
+                    firstRunItems(suggestions, onSuggestionGet)
+                }
                 plan.recentHeader?.let { header ->
                     fullSpanItem(key = "header_recent", contentType = CONTENT_TYPE_HEADER) {
                         SectionHeader(recentHeaderRes(header))
@@ -1358,13 +1440,27 @@ private fun SectionHeader(
         )
         if (counts != null) {
             Text(
+                // Zero downloaded → 18a's "59 can be offline", because "0 of 59 on
+                // device" states an on-device count of nothing when the honest
+                // fact is the opposite: all 59 are still available to download.
+                // Like the meter's Empty state this is the no-Play-Services /
+                // fake-flavour reading — a real device counts the pivot as 1
+                // (#203) and reads "1 of 59 on device" instead.
                 text =
-                    pluralStringResource(
-                        R.plurals.text_lang_on_device_count,
-                        counts.downloaded,
-                        counts.downloaded,
-                        counts.capable,
-                    ),
+                    if (counts.downloaded == 0) {
+                        pluralStringResource(
+                            R.plurals.text_lang_can_be_offline_count,
+                            counts.capable,
+                            counts.capable,
+                        )
+                    } else {
+                        pluralStringResource(
+                            R.plurals.text_lang_on_device_count,
+                            counts.downloaded,
+                            counts.downloaded,
+                            counts.capable,
+                        )
+                    },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("tt_lang_counter"),
@@ -1372,6 +1468,196 @@ private fun SectionHeader(
         }
     }
 }
+
+// ---- 18a / 18b: the first-run block (PR-21) -----------------------------
+
+/**
+ * The device's preferred locales as BCP-47 tags, most-preferred first, read from
+ * `LocaleList.getAdjustedDefault()` — the system list with the primary locale
+ * moved to the front (API 24+), documented never to be empty. Keyed on
+ * [LocalConfiguration] so a locale change, which recreates the configuration and
+ * the default list together, re-reads it.
+ *
+ * The platform read lives HERE and the derivation is a pure function
+ * ([firstRunSuggestions]) so a unit test can exhaust the derivation without a
+ * `LocaleList`, and a preview can bypass both with `suggestionsOverride`.
+ */
+@Composable
+private fun rememberAdjustedDefaultLocaleTags(): List<String> {
+    val configuration = LocalConfiguration.current
+    return remember(configuration) {
+        val locales = LocaleList.getAdjustedDefault()
+        List(locales.size()) { index -> locales[index].toLanguageTag() }
+    }
+}
+
+/**
+ * The first-run suggestions for this picker, or an empty list when [active] is
+ * false. [active] is passed rather than computed here so the ONE first-run
+ * condition lives in [pickerListPlan]; the read of the device locales is
+ * unconditional (Compose forbids a `remember` behind an early return) but cheap
+ * and memoized.
+ */
+@Composable
+private fun rememberFirstRunSuggestions(
+    active: Boolean,
+    rows: List<LanguagePickerRow>,
+): List<SuggestedLanguage> {
+    val localeTags = rememberAdjustedDefaultLocaleTags()
+    return remember(active, rows, localeTags) {
+        if (active) firstRunSuggestions(localeTags, rows) else emptyList()
+    }
+}
+
+/**
+ * The 18a block's grid items, in emission (and [PickerListPlan.catalogOffset]
+ * counting) order: the explainer card, then — only when there is something to
+ * suggest — the "Suggested for you" header over the suggested rows. Every item is
+ * full-span so the arithmetic is one-item-per-line whatever the column count, and
+ * so a two-column grid never files a wide explainer beside a language.
+ */
+private fun LazyGridScope.firstRunItems(
+    suggestions: List<SuggestedLanguage>,
+    onGet: (String) -> Unit,
+) {
+    fullSpanItem(key = "first_run_explainer", contentType = CONTENT_TYPE_FIRST_RUN) { FirstRunExplainer() }
+    if (suggestions.isNotEmpty()) {
+        fullSpanItem(key = "first_run_header", contentType = CONTENT_TYPE_HEADER) {
+            SectionHeader(R.string.lang_first_run_suggested_header)
+        }
+        suggestions.forEach { suggestion ->
+            fullSpanItem(key = "sug_${suggestion.id}", contentType = CONTENT_TYPE_ROW) {
+                SuggestedRow(suggestion, onGet)
+            }
+        }
+    }
+}
+
+/**
+ * 18a's primary-container block: the one fact a first-run user needs, stated
+ * before any suggestion. "No packs yet" is the owner's intentional first-run copy
+ * (designer brief §8), NOT the offline-library meter's text — the meter is a
+ * separate card that reads "1 of 59 packs" on a real device (#203).
+ *
+ * One merged semantics node so TalkBack reads it as a single statement rather
+ * than three stops.
+ */
+@Composable
+private fun FirstRunExplainer() {
+    val spacing = LocalSpacing.current
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = spacing.sm8, vertical = spacing.sm8)
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(spacing.md16)
+                .semantics(mergeDescendants = true) {}
+                .testTag("tt_lang_first_run"),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.CloudOff,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(Dimensions.iconMd),
+        )
+        Column(modifier = Modifier.padding(start = spacing.md16)) {
+            Text(
+                text = stringResource(R.string.lang_first_run_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = stringResource(R.string.lang_first_run_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(top = spacing.xs4),
+            )
+            Text(
+                text = stringResource(R.string.lang_first_run_privacy),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(top = spacing.sm8),
+            )
+        }
+    }
+}
+
+/**
+ * One suggested language: its avatar, its name, why it is suggested, and a "Get"
+ * that raises the confirm sheet. The avatar draws in the [LanguageRowState.Downloadable]
+ * styling because that is exactly what every suggestion is — offline-capable,
+ * nothing on disk.
+ *
+ * The Get button follows [RetryPill]'s label-in-name pattern: the visible word is
+ * "Get", and the spoken `contentDescription` names the language the bare word
+ * cannot, while still containing "Get" (WCAG 2.5.3).
+ */
+@Composable
+private fun SuggestedRow(
+    suggestion: SuggestedLanguage,
+    onGet: (String) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    val spoken = stringResource(R.string.cd_lang_suggested_get, suggestion.displayName)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Dimensions.pickerRowHeight)
+                .padding(horizontal = spacing.sm8, vertical = spacing.xs4)
+                .testTag("tt_lang_suggested_${suggestion.id}"),
+    ) {
+        LanguageAvatarCircle(avatar = suggestion.avatar, state = LanguageRowState.Downloadable)
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = spacing.md16),
+        ) {
+            Text(
+                text = suggestion.displayName,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+            )
+            Text(
+                text = stringResource(suggestionReasonRes(suggestion.reason)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        FilledTonalButton(
+            onClick = { onGet(suggestion.id) },
+            contentPadding = PaddingValues(horizontal = spacing.md16),
+            modifier =
+                Modifier
+                    .heightIn(min = Dimensions.touchTargetMin)
+                    .testTag("tt_lang_suggested_get_${suggestion.id}")
+                    .semantics { contentDescription = spoken },
+        ) {
+            // Left in the tree: TalkBack prefers the contentDescription, so "Get"
+            // is not read twice, and a test can still read the label (RetryPill).
+            Text(
+                text = stringResource(R.string.lang_suggested_get),
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** The supporting line's string for a suggestion's reason (mirrors [recentHeaderRes]). */
+@StringRes
+private fun suggestionReasonRes(reason: SuggestionReason): Int =
+    when (reason) {
+        SuggestionReason.DEVICE_LANGUAGE -> R.string.lang_suggested_reason_device
+        SuggestionReason.COMMON_WHERE_YOU_ARE -> R.string.lang_suggested_reason_local
+    }
 
 /**
  * One picker row. The container, the avatar and the trailing control are all
@@ -2904,6 +3190,79 @@ private fun SectionHeaderPreview() {
                 SectionHeader(R.string.text_lang_recent_header)
                 SectionHeader(R.string.text_lang_target_recent_header)
                 SectionHeader(R.string.text_lang_all_header, OnDeviceCount(downloaded = 3, capable = 59))
+                // 18a's zero-pack variant: the "All languages" counter reads
+                // "59 can be offline" when nothing is downloaded, not "0 of 59".
+                SectionHeader(R.string.text_lang_all_header, OnDeviceCount(downloaded = 0, capable = 59))
+            }
+        }
+    }
+}
+
+/** 18a's two suggestion reasons, one row each — the owner reviews both on both themes (rule 7). */
+@PreviewLightDark
+@Composable
+private fun SuggestedRowPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column {
+                SuggestedRow(
+                    suggestion =
+                        SuggestedLanguage(
+                            id = "es",
+                            displayName = "Spanish",
+                            avatar = LanguageAvatar.Code("ES"),
+                            reason = SuggestionReason.DEVICE_LANGUAGE,
+                        ),
+                    onGet = {},
+                )
+                SuggestedRow(
+                    suggestion =
+                        SuggestedLanguage(
+                            id = "fr",
+                            displayName = "French",
+                            avatar = LanguageAvatar.Code("FR"),
+                            reason = SuggestionReason.COMMON_WHERE_YOU_ARE,
+                        ),
+                    onGet = {},
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The whole 18a block as it sits above the catalogue: the "No packs yet"
+ * explainer, the "Suggested for you" header, and the suggested rows. Literal fake
+ * data — the preview never reads the device locales.
+ */
+@PreviewLightDark
+@Composable
+private fun FirstRunBlockPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column {
+                FirstRunExplainer()
+                SectionHeader(R.string.lang_first_run_suggested_header)
+                SuggestedRow(
+                    suggestion =
+                        SuggestedLanguage(
+                            id = "es",
+                            displayName = "Spanish",
+                            avatar = LanguageAvatar.Code("ES"),
+                            reason = SuggestionReason.DEVICE_LANGUAGE,
+                        ),
+                    onGet = {},
+                )
+                SuggestedRow(
+                    suggestion =
+                        SuggestedLanguage(
+                            id = "fr",
+                            displayName = "French",
+                            avatar = LanguageAvatar.Code("FR"),
+                            reason = SuggestionReason.COMMON_WHERE_YOU_ARE,
+                        ),
+                    onGet = {},
+                )
             }
         }
     }

@@ -87,12 +87,13 @@ class PickerListPositionTest {
      * on part of the bug.
      *
      * The gaps are asserted as numbers first: 5 for a source picker with three
-     * recents (its detect row, the recents header and three rows), 1 for one with
-     * none (the detect row alone), 4 for a target picker with three (no detect row
-     * on that side), and **0** for a target picker with none. That last one is the
-     * case where the two arrangements genuinely agree — included so the suite
-     * states where the round trip is trivially true rather than quietly relying
-     * on it.
+     * recents (its detect row, the recents header and three rows), **2** for one
+     * with none (the detect row AND the 18a first-run explainer, which stand in the
+     * single-pane grid and move to the side pane in the split one — PR-21), 4 for a
+     * target picker with three (no detect row on that side), and **0** for a target
+     * picker with none (the source-only first-run block does not apply, so the two
+     * arrangements genuinely agree — included so the suite states where the round
+     * trip is trivially true rather than quietly relying on it).
      */
     @Test
     fun `the gap is covered with recents present and absent, on both sides`() {
@@ -101,7 +102,8 @@ class PickerListPositionTest {
 
         assertThat(recents).hasSize(3)
         assertGapAndRoundTrip(LanguageRole.SOURCE, recents, catalog, expectedGap = 5)
-        assertGapAndRoundTrip(LanguageRole.SOURCE, emptyList(), catalog, expectedGap = 1)
+        // Source, no recents: detect row + first-run explainer above the catalog.
+        assertGapAndRoundTrip(LanguageRole.SOURCE, emptyList(), catalog, expectedGap = 2)
         assertGapAndRoundTrip(LanguageRole.TARGET, recents, catalog, expectedGap = 4)
         assertGapAndRoundTrip(LanguageRole.TARGET, emptyList(), catalog, expectedGap = 0)
     }
@@ -202,6 +204,8 @@ class PickerListPositionTest {
                 "\"detect_",
                 "\"catalog_loading\"",
                 "\"empty_result\"",
+                // The 18a block, emitted where recents would be (PR-21).
+                "firstRunItems(",
                 "\"header_recent\"",
                 "RECENT_ROW_KEY_PREFIX",
                 "\"header_all\"",
@@ -483,6 +487,10 @@ private fun emittedKeys(
 ): List<String> =
     buildList {
         if (!twoPane && detect) add("detect_$DETECT_LANGUAGE_ID")
+        // The 18a block sits where recents would, and is mutually exclusive with
+        // them (PR-21). These arrangements carry no suggestions, so it is the
+        // explainer alone — the one item `firstRunSuggestionCount = 0` counts.
+        if (!twoPane && plan.firstRun) add("first_run_explainer")
         if (!twoPane && plan.recentHeader != null) {
             add("header_recent")
             recents.forEach { add(RECENT_ROW_KEY_PREFIX + it.id) }
