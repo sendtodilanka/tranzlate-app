@@ -3,6 +3,10 @@
 
 ## Issue
 Fixes: #
+<!-- Intended closes ONLY, as `Fixes: #N`. To MENTION an issue you are NOT closing,
+     lead with the number (`#N stays open`) or use `Refs: #N` — a closing keyword
+     (fix/close/resolve...) next to any #N ANYWHERE in this body closes it (#217).
+     Before merge: `gh pr view <N> --json closingIssuesReferences` must equal your intent. -->
 
 ## Plan / research
 - Plan: `docs/plan/issue-NN-<slug>.md` (status: accepted)
