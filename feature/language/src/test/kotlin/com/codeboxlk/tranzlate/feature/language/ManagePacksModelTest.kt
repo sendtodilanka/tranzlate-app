@@ -442,6 +442,53 @@ class ManagePacksModelTest {
         assertThat(merged).containsEntry("fr", daysAgo(1))
     }
 
+    // ── packRoleUsage: the 20d detail's per-role "source" line (#130 PR-26) ──────
+
+    /**
+     * The detail pane reads each role from its OWN map, and a role with no stamp is
+     * date-less — never a fabricated date (ruling ⑧). German was translated FROM 3
+     * days ago and never INTO.
+     *
+     * Mutation: map the absent target to [PackUsage.Today] (or any date) instead of
+     * [PackUsage.NoRecord] — the honesty rule this whole screen exists to keep,
+     * broken in the detail.
+     */
+    @Test
+    fun `per-role usage reads each role's own stamp and is date-less where absent`() {
+        val roleUsage =
+            packRoleUsage(
+                id = "de",
+                usageAsSource = mapOf("de" to daysAgo(3)),
+                usageAsTarget = emptyMap(),
+                nowMillis = NOW,
+            )
+
+        assertThat(roleUsage.asSource).isEqualTo(PackUsage.DaysAgo(3))
+        assertThat(roleUsage.asTarget).isEqualTo(PackUsage.NoRecord)
+    }
+
+    /**
+     * The mirror, so a SWAP of the two maps cannot pass: a pack used only as a
+     * TARGET has a date-less source, and the target date is not bled onto it.
+     *
+     * Mutation: read `usageAsTarget` for the source side and `usageAsSource` for the
+     * target — this test reddens (source would read the 2-day date) while the one
+     * above reddens the other way, so the pair pins which map feeds which line.
+     */
+    @Test
+    fun `per-role usage does not bleed one role's date into the other`() {
+        val roleUsage =
+            packRoleUsage(
+                id = "de",
+                usageAsSource = emptyMap(),
+                usageAsTarget = mapOf("de" to daysAgo(2)),
+                nowMillis = NOW,
+            )
+
+        assertThat(roleUsage.asSource).isEqualTo(PackUsage.NoRecord)
+        assertThat(roleUsage.asTarget).isEqualTo(PackUsage.DaysAgo(2))
+    }
+
     private fun packRow(
         id: String,
         state: OfflineModelState,

@@ -187,6 +187,11 @@
     </plurals>
     <string name="manage_used_never">sem uso registrado ainda</string>
     <string name="manage_in_use">EM USO</string>
+    <!-- 20d list-detail (#130 PR-26) · #115 provisional, pending native review -->
+    <string name="manage_detail_usage_header">Uso</string>
+    <string name="manage_detail_role_source">Como origem</string>
+    <string name="manage_detail_role_target">Como destino</string>
+    <string name="manage_detail_empty">Selecione um pacote para ver como ele foi usado.</string>
     <string name="manage_cd_options">Opções para %1$s</string>
     <string name="manage_actions_use_target">Usar como destino agora</string>
     <string name="manage_actions_voice">Pode ser falado off-line</string>

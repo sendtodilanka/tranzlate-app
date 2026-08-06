@@ -8,15 +8,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Cloud
@@ -41,15 +46,18 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
@@ -72,6 +80,7 @@ import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.ui.adaptiveMarginShim
 import com.codeboxlk.tranzlate.core.ui.languageAvatarCode
 import com.codeboxlk.tranzlate.core.ui.languageDisplayName
+import com.codeboxlk.tranzlate.core.ui.rememberWindowInfo
 
 /**
  * Manage packs (20b/20f · spec rev 5 · #130 PR-23) — behind the SAME
@@ -156,6 +165,9 @@ fun OfflineLanguagesScreen(
         suggestions = suggestions,
         capable = data.capable,
         total = data.total,
+        usageAsSource = data.usageAsSource,
+        usageAsTarget = data.usageAsTarget,
+        nowMillis = data.nowMillis,
         onBack = onBack,
         onGet = viewModel::download,
         onStopDownload = viewModel::stopDownload,
@@ -212,6 +224,12 @@ internal fun ManagePacksContent(
     // existing render-test / preview call sites are untouched.
     stalePacks: List<PackRow> = emptyList(),
     onRemovePacks: (List<String>) -> Unit = {},
+    // 20d list-detail (#130 PR-26): the per-role #122 maps and the clock the detail
+    // pane's "source" line reads. Defaulted so the compact-width render tests and the
+    // previews that draw no detail pane keep their existing call untouched.
+    usageAsSource: Map<String, Long> = emptyMap(),
+    usageAsTarget: Map<String, Long> = emptyMap(),
+    nowMillis: Long = 0L,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val spacing = LocalSpacing.current
@@ -232,6 +250,17 @@ internal fun ManagePacksContent(
     // rememberSaveable and survives process death; this flag only needs to survive a
     // recomposition, which `remember` does (#130 PR-25).
     var freeUpSpaceOpen by remember { mutableStateOf(false) }
+    // 20d (#130 PR-26): the two-pane list-detail appears ONLY at EXPANDED width
+    // (≥840dp — a tablet or unfolded foldable in landscape, the 1280×800 the ruling
+    // names). Read through the C-13 canonical `WindowInfo`, never a hardcoded dp:
+    // the picker needs sub-breakpoint dp arithmetic for the OnePlus 7 Pro (issue
+    // #99), but list-detail wants exactly the M3 expanded breakpoint and nothing
+    // finer, so the size class is the honest signal here.
+    val windowInfo = rememberWindowInfo()
+    // Which pack the detail pane shows. Screen-local and `rememberSaveable` (a
+    // String survives process death) — the selection is a view concern, not
+    // ViewModel state, and it must outlive a rotation that crosses the width gate.
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     PackActionsSheet(
         target = actionsTarget,
         onUseAsTarget = { id ->
@@ -293,6 +322,31 @@ internal fun ManagePacksContent(
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(spacing.lg24).testTag("tt_manage_loading"),
+                    )
+                }
+
+                windowInfo.isExpanded -> {
+                    ManagePacksTwoPane(
+                        sections = sections,
+                        storage = storage,
+                        nudge = nudge,
+                        suggestions = suggestions,
+                        capable = capable,
+                        total = total,
+                        usageAsSource = usageAsSource,
+                        usageAsTarget = usageAsTarget,
+                        nowMillis = nowMillis,
+                        selectedId = selectedId,
+                        onSelectPack = { selectedId = it.id },
+                        onGet = onGet,
+                        onStopDownload = onStopDownload,
+                        onRetry = onRetry,
+                        onMoreOptions = { row ->
+                            actionsTarget = PackActionsTarget(row.id, row.displayName, row.hasOfflineVoice)
+                        },
+                        onDismissNudge = onDismissNudge,
+                        onReviewPacks = { freeUpSpaceOpen = true },
+                        onBrowseAll = onBrowseAll,
                     )
                 }
 
@@ -360,6 +414,11 @@ private fun PopulatedList(
     onDismissNudge: () -> Unit,
     onReviewPacks: () -> Unit,
     onBrowseAll: () -> Unit,
+    // 20d (#130 PR-26): non-null ONLY in the expanded-width two-pane, where a row
+    // tap SELECTS the pack the detail shows. Null on a phone, where the list is the
+    // whole screen and the row keeps its single job — the overflow — untouched.
+    selectedId: String? = null,
+    onSelectPack: ((PackRow) -> Unit)? = null,
 ) {
     val spacing = LocalSpacing.current
     LazyColumn(
@@ -375,14 +434,28 @@ private fun PopulatedList(
         if (sections.downloading.isNotEmpty()) {
             item(key = "hdr_downloading") { SectionHeaderText(stringResource(R.string.manage_section_downloading)) }
             items(sections.downloading, key = { "dl_${it.id}" }) { row ->
-                PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
+                SelectablePackRow(
+                    row = row,
+                    selected = row.id == selectedId,
+                    onSelectPack = onSelectPack,
+                    onStopDownload = onStopDownload,
+                    onRetry = onRetry,
+                    onMoreOptions = onMoreOptions,
+                )
             }
             item(key = "downloading_note") { DownloadingNote() }
         }
         if (sections.failed.isNotEmpty()) {
             item(key = "hdr_failed") { SectionHeaderText(stringResource(R.string.manage_section_failed)) }
             items(sections.failed, key = { "fail_${it.id}" }) { row ->
-                PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
+                SelectablePackRow(
+                    row = row,
+                    selected = row.id == selectedId,
+                    onSelectPack = onSelectPack,
+                    onStopDownload = onStopDownload,
+                    onRetry = onRetry,
+                    onMoreOptions = onMoreOptions,
+                )
             }
         }
         if (sections.onDevice.isNotEmpty()) {
@@ -399,7 +472,14 @@ private fun PopulatedList(
                 )
             }
             items(sections.onDevice, key = { "dev_${it.id}" }) { row ->
-                PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
+                SelectablePackRow(
+                    row = row,
+                    selected = row.id == selectedId,
+                    onSelectPack = onSelectPack,
+                    onStopDownload = onStopDownload,
+                    onRetry = onRetry,
+                    onMoreOptions = onMoreOptions,
+                )
             }
         }
         // "Browse all languages" belongs here too, not only on the empty state (20f):
@@ -432,6 +512,258 @@ private fun EmptyList(
         item(key = "browse") { BrowseAllButton(onBrowseAll) }
         storage?.let { item(key = "storage") { StorageCardView(it, Modifier.padding(vertical = spacing.sm8)) } }
         item(key = "footer") { FooterView(capable = capable, total = total) }
+    }
+}
+
+// ── Two-pane list-detail (20d · #130 PR-26) ──────────────────────────────────
+
+/**
+ * The list pane's fixed width in the 20d two-pane. A single-column pack list reads
+ * best at about a phone's width, so the list keeps ~400dp and the detail takes the
+ * rest of a 1280dp tablet — a plain `Row`, never `ListDetailPaneScaffold` and never
+ * the `adaptive-layout` dependency (a standing REJECT, ruling :90/:238).
+ */
+private val ManagePacksListWidth = 400.dp
+
+/**
+ * 20d Manage packs at EXPANDED width: the existing list on the left, the selected
+ * pack's detail on the right, as a plain `Row` gated by [WindowInfo.isExpanded]
+ * (the caller's branch). The list pane is the SAME [PopulatedList]/[EmptyList] a
+ * phone draws — only now its rows select the pack the detail shows — so there is
+ * one list, not a widened rewrite of it.
+ */
+@Composable
+private fun ManagePacksTwoPane(
+    sections: ManagePacksSections,
+    storage: StorageCard?,
+    nudge: HygieneNudge?,
+    suggestions: List<SuggestedLanguage>,
+    capable: Int,
+    total: Int,
+    usageAsSource: Map<String, Long>,
+    usageAsTarget: Map<String, Long>,
+    nowMillis: Long,
+    selectedId: String?,
+    onSelectPack: (PackRow) -> Unit,
+    onGet: (String) -> Unit,
+    onStopDownload: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onMoreOptions: (PackRow) -> Unit,
+    onDismissNudge: () -> Unit,
+    onReviewPacks: () -> Unit,
+    onBrowseAll: () -> Unit,
+) {
+    // Every selectable pack, in the order the list draws them, so the default
+    // selection is the first row the eye lands on and the detail is never blank
+    // while packs exist. A remembered stale id (its pack removed) falls back to
+    // that first row rather than a dead pane.
+    val displayed = remember(sections) { sections.downloading + sections.failed + sections.onDevice }
+    val selectedPack = displayed.firstOrNull { it.id == selectedId } ?: displayed.firstOrNull()
+    val roleUsage =
+        remember(selectedPack?.id, usageAsSource, usageAsTarget, nowMillis) {
+            selectedPack?.let { packRoleUsage(it.id, usageAsSource, usageAsTarget, nowMillis) }
+        }
+    Row(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.width(ManagePacksListWidth)) {
+            if (sections.hasPacks) {
+                PopulatedList(
+                    sections = sections,
+                    storage = storage,
+                    nudge = nudge,
+                    capable = capable,
+                    total = total,
+                    onStopDownload = onStopDownload,
+                    onRetry = onRetry,
+                    onMoreOptions = onMoreOptions,
+                    onDismissNudge = onDismissNudge,
+                    onReviewPacks = onReviewPacks,
+                    onBrowseAll = onBrowseAll,
+                    // The RESOLVED selection, so the highlighted row and the detail
+                    // always agree — even on the default-first row, before any tap.
+                    selectedId = selectedPack?.id,
+                    onSelectPack = onSelectPack,
+                )
+            } else {
+                EmptyList(
+                    storage = storage,
+                    suggestions = suggestions,
+                    capable = capable,
+                    total = total,
+                    onGet = onGet,
+                    onBrowseAll = onBrowseAll,
+                )
+            }
+        }
+        VerticalDivider()
+        ManagePacksDetailPane(
+            pack = selectedPack,
+            roleUsage = roleUsage,
+            storage = storage,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+    }
+}
+
+/**
+ * One list-pane row that, in the two-pane, SELECTS the pack the detail shows.
+ *
+ * When [onSelectPack] is null (the phone's single pane) it is exactly the old
+ * [PackRow] and nothing about the row changes. When non-null it wraps the same row
+ * in a `selectable`, so a tap picks the pack and the row keeps its own overflow
+ * button working (a nested control the selectable does not swallow), and the picked
+ * row carries a `secondaryContainer` tint plus the "selected" state a screen reader
+ * announces.
+ */
+@Composable
+private fun SelectablePackRow(
+    row: PackRow,
+    selected: Boolean,
+    onSelectPack: ((PackRow) -> Unit)?,
+    onStopDownload: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onMoreOptions: (PackRow) -> Unit,
+) {
+    if (onSelectPack == null) {
+        PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
+        return
+    }
+    val background = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(background)
+                .selectable(selected = selected, onClick = { onSelectPack(row) })
+                .testTag("tt_manage_select_row"),
+    ) {
+        PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
+    }
+}
+
+/**
+ * The 20d detail pane: the SELECTED pack, its per-role last-used from the #122
+ * store, and the same used-against-free storage bar the list draws.
+ *
+ * `internal` so the render test and the preview can mount it without the two-pane
+ * `Row` around it. The camera card and the pair-share line the spec's 20d also drew
+ * are deliberately ABSENT — the first names a feature that does not exist (#78/#112),
+ * the second an undocumented version-fragile layout — both standing REJECTs of the
+ * rev.3 ruling (§7, :238/:249). Every date shown is a real usage stamp or the
+ * honest "no recorded use yet"; the pane never fabricates one (ruling ⑧).
+ */
+@Composable
+internal fun ManagePacksDetailPane(
+    pack: PackRow?,
+    roleUsage: PackRoleUsage?,
+    storage: StorageCard?,
+    modifier: Modifier = Modifier,
+) {
+    if (pack == null || roleUsage == null) {
+        DetailNoSelection(modifier)
+        return
+    }
+    val spacing = LocalSpacing.current
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(spacing.lg24)
+                .testTag("tt_manage_detail"),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PackAvatar(id = pack.id, downloaded = pack.state == OfflineModelState.Downloaded)
+            Text(
+                text = pack.displayName,
+                style = MaterialTheme.typography.headlineSmall,
+                modifier =
+                    Modifier
+                        .padding(start = spacing.md16)
+                        .weight(1f)
+                        .testTag("tt_manage_detail_name"),
+            )
+            if (pack.inUse) {
+                InUseBadge(modifier = Modifier.padding(start = spacing.sm8))
+            }
+        }
+        Text(
+            text = stringResource(R.string.manage_detail_usage_header),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = spacing.lg24, bottom = spacing.xs4),
+        )
+        DetailRoleLine(
+            role = stringResource(R.string.manage_detail_role_source),
+            usage = roleUsage.asSource,
+            tag = "tt_manage_detail_source",
+        )
+        DetailRoleLine(
+            role = stringResource(R.string.manage_detail_role_target),
+            usage = roleUsage.asTarget,
+            tag = "tt_manage_detail_target",
+        )
+        storage?.let {
+            StorageCardView(it, Modifier.padding(top = spacing.lg24))
+        }
+    }
+}
+
+/** One "As source · used today" / "As target · no recorded use yet" line, honest per role. */
+@Composable
+private fun DetailRoleLine(
+    role: String,
+    usage: PackUsage,
+    tag: String,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = spacing.xs4)
+                .semantics(mergeDescendants = true) {},
+    ) {
+        Text(
+            text = role,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = packUsageText(usage),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.testTag(tag),
+        )
+    }
+}
+
+/** The detail pane with nothing selected (no packs yet, or a removed pack) — never a dead end. */
+@Composable
+private fun DetailNoSelection(modifier: Modifier = Modifier) {
+    val spacing = LocalSpacing.current
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(spacing.lg24)
+                .testTag("tt_manage_detail_empty"),
+    ) {
+        Icon(
+            Icons.Filled.Cloud,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(Dimensions.iconChip),
+        )
+        Text(
+            text = stringResource(R.string.manage_detail_empty),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = spacing.sm8),
+        )
     }
 }
 
@@ -1301,6 +1633,129 @@ private fun NudgeCardPreview() {
             Column {
                 NudgeCardView(HygieneNudge(stalePackCount = 1), {}, {})
                 NudgeCardView(HygieneNudge(stalePackCount = 2), {}, {})
+            }
+        }
+    }
+}
+
+// ── 20d list-detail previews (#130 PR-26) ─────────────────────────────────────
+// A preview cannot resize the window it renders in, so — exactly as the picker's
+// landscape previews do — these borrow the ruling's 1280×800 tablet geometry in a
+// sized frame and call [ManagePacksTwoPane] directly, past the width gate the real
+// screen reads from [rememberWindowInfo]. The emulator pass (ruling :144) is what
+// proves the gate itself; these show the composition the owner reviews.
+
+/** The ruling's 1280×800 tablet-landscape frame, the geometry the emulator pass captures. */
+private val previewListDetailWidth = 1280.dp
+private val previewListDetailHeight = 800.dp
+
+/** A fixed instant for the detail's per-role dates, so "3 days ago" is stable across renders. */
+private val previewDetailNow = 40L * DAY_MILLIS
+
+private val previewDetailOnDevice =
+    listOf(
+        row("es", "Spanish", OfflineModelState.Downloaded, PackUsage.DaysAgo(3), inUse = true),
+        row("de", "German", OfflineModelState.Downloaded, PackUsage.MonthsAgo(4)),
+        row("af", "Afrikaans", OfflineModelState.Downloaded, PackUsage.WeeksAgo(2)),
+        row("en", "English", OfflineModelState.Downloaded, PackUsage.Today, isPivot = true),
+    )
+
+// Spanish (the default selection) was translated FROM three days ago and never
+// INTO — so the detail shows one real date and one honest "no recorded use yet",
+// the two cases the ruling's honesty rule (⑧) turns on, in one frame.
+private val previewDetailSource = mapOf("es" to previewDetailNow - 3 * DAY_MILLIS)
+private val previewDetailTarget = emptyMap<String, Long>()
+
+@Composable
+private fun ListDetailPreviewFrame(content: @Composable () -> Unit) {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Box(modifier = Modifier.size(width = previewListDetailWidth, height = previewListDetailHeight)) {
+                content()
+            }
+        }
+    }
+}
+
+/** 20d with a pack selected: the list on the left, Spanish's per-role usage and the storage bar on the right. */
+@PreviewLightDark
+@Composable
+private fun ManagePacksListDetailPreview() {
+    ListDetailPreviewFrame {
+        ManagePacksTwoPane(
+            sections = previewSections(onDevice = previewDetailOnDevice),
+            storage = previewSizedStorage,
+            nudge = null,
+            suggestions = emptyList(),
+            capable = 59,
+            total = 194,
+            usageAsSource = previewDetailSource,
+            usageAsTarget = previewDetailTarget,
+            nowMillis = previewDetailNow,
+            selectedId = null,
+            onSelectPack = {},
+            onGet = {},
+            onStopDownload = {},
+            onRetry = {},
+            onMoreOptions = {},
+            onDismissNudge = {},
+            onReviewPacks = {},
+            onBrowseAll = {},
+        )
+    }
+}
+
+/** 20d with no packs: the empty list on the left, the no-selection placeholder on the right (no dead end). */
+@PreviewLightDark
+@Composable
+private fun ManagePacksListDetailEmptyPreview() {
+    ListDetailPreviewFrame {
+        ManagePacksTwoPane(
+            sections = previewSections(onDevice = emptyList()),
+            storage = StorageCard.FreeOnly(packCount = 0, freeBytes = 23 * GB),
+            nudge = null,
+            suggestions =
+                listOf(
+                    SuggestedLanguage("es", "Spanish", LanguageAvatar.Code("ES"), SuggestionReason.DEVICE_LANGUAGE),
+                    SuggestedLanguage("fr", "French", LanguageAvatar.Code("FR"), SuggestionReason.COMMON_WHERE_YOU_ARE),
+                ),
+            capable = 59,
+            total = 194,
+            usageAsSource = emptyMap(),
+            usageAsTarget = emptyMap(),
+            nowMillis = previewDetailNow,
+            selectedId = null,
+            onSelectPack = {},
+            onGet = {},
+            onStopDownload = {},
+            onRetry = {},
+            onMoreOptions = {},
+            onDismissNudge = {},
+            onReviewPacks = {},
+            onBrowseAll = {},
+        )
+    }
+}
+
+/** The detail pane alone, both meaningful states: a selected pack (per-role usage + storage) and no selection. */
+@PreviewLightDark
+@Composable
+private fun ManagePacksDetailPanePreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Row {
+                ManagePacksDetailPane(
+                    pack = previewDetailOnDevice.first(),
+                    roleUsage = PackRoleUsage(asSource = PackUsage.DaysAgo(3), asTarget = PackUsage.NoRecord),
+                    storage = previewSizedStorage,
+                    modifier = Modifier.weight(1f),
+                )
+                ManagePacksDetailPane(
+                    pack = null,
+                    roleUsage = null,
+                    storage = null,
+                    modifier = Modifier.weight(1f).height(320.dp),
+                )
             }
         }
     }

@@ -413,6 +413,15 @@
     <string name="manage_used_never">no recorded use yet</string>
     <!-- The badge on the pack of the current TARGET language. -->
     <string name="manage_in_use">IN USE</string>
+    <!-- 20d list-detail (#130 PR-26): the detail pane for the SELECTED pack, at EXPANDED
+         width only (a tablet/foldable in landscape). The "source" line is the pack's
+         last-used from the #122 store, split by role; each side reuses the manage_used_*
+         buckets, so a role with no stamp reads `manage_used_never` — never a fabricated
+         date (ruling ⑧). No apostrophe in manage_detail_empty (unescaped ' breaks the build). -->
+    <string name="manage_detail_usage_header">Usage</string>
+    <string name="manage_detail_role_source">As source</string>
+    <string name="manage_detail_role_target">As target</string>
+    <string name="manage_detail_empty">Select a pack to see how it has been used.</string>
     <!-- The overflow control's accessible name. It opens the 20c pack-actions sheet. -->
     <string name="manage_cd_options">Options for %1$s</string>
     <!-- 20c pack-actions sheet (PR-24), opened from a downloaded pack's overflow. It is a
