@@ -116,7 +116,7 @@ carried not fixed. **Wave 1c is complete; 1d is complete but for #250's PR-23 ca
 
 **Phase-2 pass-1 remediation note.** The silent-failure-hunter pass over the
 pack-download path (recorded in `docs/research/issue-130-rev5-audit.md` §"Pass 1")
-returned two confirmed defects, both fixed in **PR #PENDING**: **#314** (S2 — the
+returned two confirmed defects, both fixed in **PR #323**: **#314** (S2 — the
 app-shell snackbar Retry / Download-again / Download-now discarded the manager's
 `DownloadAttempt`, so a synchronous refusal while still offline or full was a silent
 no-op) and **#319** (S3, crash-class — the `RealOfflineModelManager` connectivity
