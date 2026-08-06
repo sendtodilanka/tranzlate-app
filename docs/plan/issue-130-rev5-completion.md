@@ -1,5 +1,9 @@
 # Plan — rev5 completion: the operational order to finish the Language screen
 
+> **issue #130 has three plan files.** **This one = the operational plan** — the order of work to finish rev5. The other two: the per-PR tracker → [`issue-130-language-rev3.md`](issue-130-language-rev3.md) · the design authority → [`issue-130-language-rev3-ruling.md`](issue-130-language-rev3-ruling.md).
+> ⚠️ **"rev3" in those two filenames is the 2026-07-31 architecture-planning round, NOT a design revision.** All three build the **rev5** design (spec of record: `docs/design/language-screens/language-screens-spec.html`).
+> *(These cross-reference headers were added 2026-08-06, at the owner's request, in #328.)*
+
 status: accepted
 (accepted basis: owner directive, 2026-08-03, verbatim below. This is not a new
 decision to be ratified — it is his objective written down as an order of work.)
