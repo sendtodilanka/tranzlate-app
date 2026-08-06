@@ -45,56 +45,98 @@ full 84-role app dump annotated with frame-occurrence counts). Scripts:
 **Two rev5 colours with NO token** (would otherwise be scattered as raw hex):
 
 - **`#410E0B`** (37×) — failed-row / failure-sheet / "Did not download" TEXT &
-  icon tone on an `errorContainer` fill. Always a foreground colour. Darker than
-  `onErrorContainer #8C1D18` on purpose. Dark counterpart `#F9DEDC`
-  (= `onErrorContainer` dark).
-- **`#C4D7F5`** (16×) — muted-primary meter tint: downloading progress track,
-  storage-bar track & "used" segment, "Other apps" legend dot. Always a fill, no
-  text. No M3 role equals it in light (`primaryContainer` = `#D3E3FD`).
+  icon tone on an `errorContainer` fill. Always a FOREGROUND colour = the semantics of
+  `onErrorContainer`. Dark counterpart `#F9DEDC` already **is** `onErrorContainer` dark;
+  the light role was the sole outlier (`#8C1D18`), corrected here (decision 2).
+- **`#C4D7F5`** (16×) — muted-primary meter tint: storage-bar **used** segment, "Other
+  apps" legend dot (dark `#0842A0`); and the downloading-row progress **track** (dark
+  `#2D2F31`). Always a fill, no text. No M3 role equals it in light (`primaryContainer`
+  = `#D3E3FD`). The used-segment reading is the one carried by `LocalMeterFillColor`.
 
-## Decisions
+## Decisions (revised during implementation — see the note below)
 
-1. **Correct** `DarkSurfaceContainerHigh` `#282A2C` → `#2D2F31` (Color.kt) and the
-   `DESIGN_SYSTEM §1.2` row.
-2. **Add two theme-scoped extension colours** — the fixed 48-role `ColorScheme`
-   has no slot for a new tone, so follow the repo's existing extension-colour
-   pattern (`LocalFloatingSurface` / `LocalPrimaryActionColors` /
-   `LocalResultCardColors`): `staticCompositionLocalOf` provided by
-   `TranzlateTheme`, dark value resolved from the ACTIVE scheme.
-   - `LocalFailureTextColor` — light `#410E0B` / dark `onErrorContainer #F9DEDC`.
-   - `LocalMeterTrackColor` — light `#C4D7F5` / dark `surfaceContainerHigh #2D2F31`.
-   - The two new raw hexes live in `Color.kt` (§10: it is the only home for raw hex).
-3. **Document** both in `DESIGN_SYSTEM` (new §1.4) and update the §0 WCAG summary.
+1. **Correct** `DarkSurfaceContainerHigh` `#282A2C` → `#2D2F31` (Color.kt §1.2) and the
+   `DESIGN_SYSTEM §1.2` row. (Unchanged from the initial plan.)
+2. **Correct the `onErrorContainer` LIGHT role** `#8C1D18` → `#410E0B` (Color.kt §1.1 +
+   `DESIGN_SYSTEM §1.1`), rather than adding a parallel `LocalFailureTextColor` token.
+   `#410E0B` is always a FOREGROUND on `errorContainer` (JSON `fg`), which is exactly what
+   `onErrorContainer` denotes; dark `onErrorContainer` is ALREADY the rev5 failure tone
+   `#F9DEDC`; and every consumer (`TranzlateSheet` Loss tone, `PackFailureSheets`,
+   `ErrorCard`, History) already reads `onErrorContainer` — so correcting the role renders
+   rev5 automatically, no per-screen rewire, restoring the M3 error10-on-error90 baseline
+   pairing. **No new failure-text token is created.**
+3. **Add ONE extension colour** for the meter tint (the 48-role scheme has no slot),
+   following the repo's `LocalFloatingSurface` pattern (`staticCompositionLocalOf`, dark
+   resolved from the ACTIVE scheme in `TranzlateTheme`):
+   - `LocalMeterFillColor` (`MeterColors.kt`) — light `#C4D7F5` (`LightMeterFill`, the one
+     new raw hex, in `Color.kt` §10) / dark `primaryContainer #0842A0`. This is the
+     storage-bar **used** segment — the confirmed 20d defect. The downloading-row progress
+     **track** shares the light value but takes `surfaceContainerHigh #2D2F31` in dark, so
+     it is composed per-screen, NOT from this token (documented in `MeterColors.kt` + §1.4).
+4. **Document** in `DESIGN_SYSTEM` (new §1.4) and update the §0 WCAG summary.
+5. **Pin** all three to the SSOT with a failing JVM test (`RevFiveColorTokenTest`).
 
-## WCAG (formula (L1+0.05)/(L2+0.05), same as §0; OLD values reproduce §0 exactly)
+### Note — why this diverges from the initial staged plan (2026-08-05)
 
-- dark `surfaceContainerHigh` correction — text pairs stay **AAA**:
-  `onSurfaceVariant` 8.45→7.89, `onSurface` 11.22→10.47; outline border 4.53→4.22
-  (≥3:1). No AA/AAA threshold crossed.
-- `LocalFailureTextColor` — light `#410E0B`/`errorContainer` **12.77 AAA** (higher
-  than the `#8C1D18` the sheet uses today, 7.17); dark 7.17 AAA.
-- `LocalMeterTrackColor` — carries no text. Progress `primary` fill over the track
-  4.37 (≥3:1 ✓). Light storage used-vs-track **1.25** and legend dot-vs-page
-  **1.40** fall below the 3:1 non-text guideline — flagged, non-blocking: the
-  figure is redundant with the numeric label and legend text, and rev5 is
-  authoritative per the ruling.
+The initial plan proposed two extension tokens: `LocalFailureTextColor` (for `#410E0B`)
+and `LocalMeterTrackColor` (meter, dark `#2D2F31`). Implementation revised both, on the
+evidence and on the direct build brief (which lists "`onErrorContainer` corrected" first,
+and calls the meter tone the "used bar fill"). The owner **ruling** — "correct the token
+to match rev5" — is unchanged; only the mechanism is refined, so this stays `accepted`.
+
+- **`#410E0B` → role, not token.** The initial plan's own "out-of-scope findings" admitted
+  the token approach leaves `TranzlateSheet.sheetIconContentColor(Loss)` rendering the
+  wrong `#8C1D18` until a separate rewire. Correcting the `onErrorContainer` role removes
+  that gap (the sheets read the role today) and avoids a token whose dark value would only
+  DUPLICATE `onErrorContainer` dark `#F9DEDC`. rev5 uses `#8C1D18` **0×** in light — so by
+  this plan's own "the app renders a colour the SSOT never uses" argument (made for dark
+  `surfaceContainerHigh`), the light `onErrorContainer` value must move.
+- **Meter dark `#0842A0`, not `#2D2F31`.** The confirmed 20d defect is the storage **used
+  segment** (build used `primaryContainer #D3E3FD`); rev5 draws that segment `#C4D7F5 |
+  #0842A0` (digest §B6/§C, and `PackFailureSheets.kt:355` uses `primaryContainer` there
+  today). `#2D2F31` is the download-*track* dark — a different element, documented as
+  per-screen. (A one-line change if a co-verify lens prefers the track pairing instead.)
+
+## WCAG (formula (L1+0.05)/(L2+0.05), same as §0; recomputed by `scratchpad/wcag.py`)
+
+- **`onErrorContainer` light** `#410E0B` on `errorContainer` `#F9DEDC`: **12.77 AAA** —
+  IMPROVES on the pre-fix `#8C1D18` (7.17). Dark unchanged (7.17 AAA). No regression.
+- **dark `surfaceContainerHigh`** `#2D2F31` — the two text pairs fall a shade but stay
+  **AAA**: `onSurfaceVariant` 8.45→7.89, `onSurface` 11.22→10.47. No AA/AAA threshold
+  crossed. (Light `surfaceContainerHigh #E9EEF6` unchanged.)
+- **`LocalMeterFillColor`** — carries no text (no on-colour pair). The download `primary`
+  fill over the light track scores 4.37 (≥3:1 ✓). The storage **used-vs-track** ratio —
+  `#C4D7F5` vs `#E9EEF6` (light) **1.25:1**, `#0842A0` vs `#2D2F31` (dark) **1.47:1** —
+  falls below the WCAG 1.4.11 3:1 guideline for graphical objects. **Flagged,
+  non-blocking, NOT a regression:** the pre-fix `primaryContainer #D3E3FD` was lower
+  (1.11:1); the figure is stated in text and the legend uses labelled solid/dashed dots
+  (info is not conveyed by the bar alone); rev5 is authoritative per the ruling.
 
 ## Out-of-scope findings (for the orchestrator to file / fold in)
 
-- `TranzlateSheet.sheetIconContentColor(Loss)` resolves the failure-sheet badge
-  icon to `onErrorContainer #8C1D18`, but rev5 draws those icons in `#410E0B`
-  (19d/19f/19g). A per-component rewire to `LocalFailureTextColor` — separate work.
-- The failed picker row and the meter/storage components that consume these two
-  tokens are not built yet; the tokens ship ahead of them by design (this ruling).
+- **RESOLVED by decision 2:** `TranzlateSheet.sheetIconContentColor(Loss)` reads
+  `onErrorContainer`, so correcting the role renders the failure-sheet icon/text in rev5
+  `#410E0B` (light) with **no rewire**. The initial plan flagged this as separate work; it
+  no longer is. (The one enforced Roborazzi golden renders no failure content, so it is
+  unaffected — verified.)
+- `PackFailureSheets.kt:355` fills the storage-legend "space used" swatch with
+  `primaryContainer` (`#D3E3FD` light) — the exact `#C4D7F5` bug. Rewiring it to
+  `LocalMeterFillColor.current` is per-screen work in `:feature:language` (the 20b/20d/20f
+  conformance PRs own it), NOT this token PR. The token ships ahead of it by design.
+- The meter/storage and failed-row picker components that will consume the new token are
+  not built/rewired yet; the token ships ahead of them (this ruling).
 
 ## File ownership (this PR touches only these)
 
 - `core/designsystem/src/main/kotlin/.../Color.kt`
 - `core/designsystem/src/main/kotlin/.../Theme.kt`
-- `core/designsystem/src/main/kotlin/.../FailureTextColor.kt` (new)
-- `core/designsystem/src/main/kotlin/.../MeterTrackColor.kt` (new)
+- `core/designsystem/src/main/kotlin/.../MeterColors.kt` (new — `LocalMeterFillColor`)
+- `core/designsystem/src/test/kotlin/.../RevFiveColorTokenTest.kt` (new — SSOT pin)
 - `docs/specs/00-foundations/DESIGN_SYSTEM.md`
 - `docs/plan/issue-347-color-token-reconciliation.md` (this file)
+
+(No `FailureTextColor.kt` — decision 2 corrects the `onErrorContainer` role instead. No
+`MeterTrackColor.kt` — one `MeterColors.kt` holds the single meter token.)
 
 ## Verify
 

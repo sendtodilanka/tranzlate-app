@@ -11,7 +11,7 @@
 
 ---
 
-## 0. Contrast validation summary (P9 — recomputed 2026-07-22, issue #15 · neutral rows re-recomputed 2026-07-26, issue #42)
+## 0. Contrast validation summary (P9 — recomputed 2026-07-22, issue #15 · neutral rows re-recomputed 2026-07-26, issue #42 · rev5 token reconcile 2026-08-05, #347)
 
 Every pair below was computed with the WCAG 2.x relative-luminance formula
 `(L1 + 0.05) / (L2 + 0.05)` against the shipped `Color.kt` values.
@@ -23,6 +23,14 @@ Rows marked **↺** were recomputed on 2026-07-26 because the neutral ramp chang
 the light page pairs got *slightly better* — the tinted surfaces are marginally
 darker than the warm greys they replaced.
 
+Rows tagged **(#347)** moved on 2026-08-05 when the tokens were reconciled to the rev5
+colour SSOT. `onErrorContainer`/`errorContainer` light **improves** (7.17→12.77) because
+the light role dropped from error30 `#8C1D18` to error10 `#410E0B`; the two dark
+`surfaceContainerHigh` text pairs **fall a shade** (8.45→7.89, 11.22→10.47) because the
+dark chip fill lightened `#282A2C`→`#2D2F31` — **both still AAA**, no AA/AAA threshold
+crossed. The new §1.4 `LocalMeterFillColor` carries no text (no on-colour pair); its
+used-vs-track luminance ratio is intentionally low per the SSOT and is discussed there.
+
 | Pair | Light | Dark |
 |---|---|---|
 | `onPrimary` / `primary` | 6.39 ✓ | 7.50 ✓ |
@@ -31,12 +39,12 @@ darker than the warm greys they replaced.
 | `onPrimaryContainer` / `primaryContainer` | 7.04 ✓ | 7.04 ✓ |
 | `onSecondaryContainer` / `secondaryContainer` | 7.20 ✓ | 7.20 ✓ |
 | `onTertiaryContainer` / `tertiaryContainer` | 7.32 ✓ | 7.32 ✓ |
-| `onErrorContainer` / `errorContainer` | 7.17 ✓ | 7.17 ✓ |
+| `onErrorContainer` / `errorContainer` (#347) | ~~7.17~~ **12.77** ✓ | 7.17 ✓ |
 | `primary` / `surface` (icon/label accent use) ↺ | ~~6.07~~ **6.11** ✓ | 10.80 ✓ |
 | `onSurface` / `surfaceContainerLowest` (panel text) | 16.48 ✓ | 15.03 ✓ |
-| `onSurfaceVariant` / `surfaceContainerHigh` (pill label) ↺ | ~~7.68~~ **8.06** ✓ | ~~8.42~~ **8.45** ✓ |
+| `onSurfaceVariant` / `surfaceContainerHigh` (pill label) ↺ | ~~7.68~~ **8.06** ✓ | ~~8.45~~ **7.89** ✓ (#347) |
 | `onSurfaceVariant` / `surface` (supporting text) ↺ | ~~8.93~~ **8.98** ✓ | 10.90 ✓ |
-| `onSurface` / `surfaceContainerHigh` (pill text) ↺ | **14.15** ✓ | **11.22** ✓ |
+| `onSurface` / `surfaceContainerHigh` (pill text) ↺ | **14.15** ✓ | ~~11.22~~ **10.47** ✓ (#347) |
 | `onSurface` / `surfaceContainerLow` ↺ | **14.92** ✓ | 12.84 ✓ |
 | `onSurface` / `surfaceContainer` (card fill) ↺ | 14.13 ✓ | **12.86** ✓ |
 | `primary` / `surfaceContainer` (mini-card icon) ↺ | 5.48 ✓ | **9.60** ✓ |
@@ -94,7 +102,7 @@ darker than the warm greys they replaced.
 | `error` | `#B3261E` | 1P error set |
 | `onError` | `#FFFFFF` | |
 | `errorContainer` | `#F9DEDC` | Error card container |
-| `onErrorContainer` | `#8C1D18` | |
+| `onErrorContainer` | `#410E0B` | error10 — rev5 SSOT failure text/icon on `errorContainer` (was error30 `#8C1D18`, which rev5 never uses in light); #347 |
 | `scrim` | `#000000` | |
 
 ### 1.2 Dark scheme
@@ -124,7 +132,7 @@ darker than the warm greys they replaced.
 | `surfaceContainerLowest` | `#0E0E0F` | |
 | `surfaceContainerLow` | `#1F1F1F` | **unchanged** |
 | `surfaceContainer` ↺ | `#1E1F20` | Floating card fill in dark (`LocalFloatingSurface`) — was `#1F2020` |
-| `surfaceContainerHigh` ↺ | `#282A2C` | Chip / language-pill / swap fill — was `#2A2A2A` |
+| `surfaceContainerHigh` ↺ | `#2D2F31` | Chip / language-pill / swap fill / meter track — rev5 SSOT (202× in the drawings; was `#282A2C`, which rev5 never uses); README:54, #347 |
 | `surfaceContainerHighest` | `#343535` | **unchanged** |
 | `surfaceTint` | `#A8C7FA` | = `primary` (tonal elevation tint) |
 | `inverseSurface` | `#E3E3E3` | |
@@ -153,6 +161,36 @@ Fixed = tone90 · FixedDim = tone80 · onFixed = tone10 · onFixedVariant = tone
 | `secondaryFixedDim` | `#7FCFFF` | `onSecondaryFixedVariant` | `#004A77` |
 | `tertiaryFixed` | `#C4EED0` | `onTertiaryFixed` | `#072711` |
 | `tertiaryFixedDim` | `#6DD58C` | `onTertiaryFixedVariant` | `#0F5223` |
+
+### 1.4 Extension colours — beyond the fixed 48-role scheme (#347)
+
+The M3 `ColorScheme` is a fixed 48-role set; rev5 draws a few tones it has no slot for.
+These are provided as `CompositionLocal`s off the **active** scheme by `TranzlateTheme`
+(so a screen reads them theme-aware without branching on `isSystemInDarkTheme()`), each
+in its own file in `:core:designsystem`. Only the light value that is not already a
+scheme role is a raw hex (in `Color.kt`, §10); the dark value is an existing role.
+
+| Token | Light | Dark | Purpose |
+|---|---|---|---|
+| `LocalFloatingSurface` | `surfaceContainerLowest` `#FFFFFF` | `surfaceContainer` `#1E1F20` | Card/panel lift over the flat page (§2) |
+| `LocalPrimaryActionColors` | `primary` / `onPrimary` | `primaryContainer` / `onPrimaryContainer` | The one saturated action per screen (§0 rule) |
+| `LocalResultCardColors` | `#D3E3FD` / `#0842A0` / `#041E49` | `#0842A0` / `#A8C7FA` / `#D3E3FD` | Result card container / label / text |
+| **`LocalMeterFillColor`** (new) | **`#C4D7F5`** (`LightMeterFill`, raw) | `primaryContainer` **`#0842A0`** | Storage-meter **used**/consumed segment + "other apps" legend dot (20b/20d/20f/19b) |
+
+**`LocalMeterFillColor` — the rev5 meter tint.** A muted primary between `primaryContainer`
+`#D3E3FD` and `primary` `#0B57D0`. The 20d build wrongly used `primaryContainer` for the
+used segment, which is right in dark (`#0842A0`) but visibly wrong in light (`#D3E3FD` vs
+rev5 `#C4D7F5`) — this token fixes that. It carries **no text**, so it has no on-colour
+pair; the numeric figure and legend labels beside the bar carry the information. Its
+used-vs-track luminance ratio is **1.25:1 light / 1.47:1 dark** — below the WCAG 1.4.11
+3:1 guideline for graphical objects, but the information is not conveyed by the bar alone
+(the legend uses labelled solid/dashed dots and the figure is stated in text), and rev5 is
+authoritative per the #347 ruling. This is **not a regression** — the pre-fix
+`primaryContainer #D3E3FD` was lower still (1.11:1). Flagged, non-blocking.
+
+> The **downloading-row progress track** also draws light `#C4D7F5`, but takes
+> `surfaceContainerHigh` `#2D2F31` in dark — a different pairing, so that track is composed
+> per-screen, not from `LocalMeterFillColor`.
 
 ---
 

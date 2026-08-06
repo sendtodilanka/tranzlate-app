@@ -61,11 +61,15 @@ fun TranzlateTheme(
                 text = colorScheme.onPrimaryFixed,
             )
         }
+    // rev5 storage-meter used-segment fill (#347): light #C4D7F5, dark
+    // primaryContainer #0842A0. See [LocalMeterFillColor].
+    val meterFill = if (darkTheme) colorScheme.primaryContainer else LightMeterFill
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
         LocalFloatingSurface provides floatingSurface,
         LocalPrimaryActionColors provides primaryActionColors,
         LocalResultCardColors provides resultCardColors,
+        LocalMeterFillColor provides meterFill,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
