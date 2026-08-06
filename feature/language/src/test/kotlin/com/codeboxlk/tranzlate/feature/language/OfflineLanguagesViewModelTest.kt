@@ -1,18 +1,25 @@
 package com.codeboxlk.tranzlate.feature.language
 
 import androidx.lifecycle.SavedStateHandle
+import com.codeboxlk.tranzlate.core.common.AppClock
+import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.model.Translation
+import com.codeboxlk.tranzlate.core.testing.FakeClock
 import com.codeboxlk.tranzlate.core.testing.FakeConnectivityMonitor
 import com.codeboxlk.tranzlate.core.testing.FakeDownloadPrefsRepository
+import com.codeboxlk.tranzlate.core.testing.FakeLanguageUsageRepository
+import com.codeboxlk.tranzlate.core.testing.FakeStorageProbe
 import com.codeboxlk.tranzlate.core.testing.FakeTranslationRepository
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherProvider
 import com.codeboxlk.tranzlate.core.testing.TestDispatcherRule
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
+import com.codeboxlk.tranzlate.domain.repository.LanguageUsageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
@@ -22,6 +29,7 @@ import com.codeboxlk.tranzlate.domain.translate.PackEvent
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
@@ -36,6 +44,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -44,11 +53,14 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Screen B's own seams. The issue-#90 consent RULE is no longer proved here —
- * it lives in `DownloadGate` with one matrix over it (`DownloadGateTest`), so
- * what is left to pin is the wiring: that this screen's taps actually reach
- * that gate and that its dialog is the gate's own question.
+ * Manage packs' ViewModel seams (#130 PR-23, the rewrite of Screen B). The pure
+ * classification, nudge, storage and usage LOGIC is pinned in
+ * `ManagePacksModelTest`; what is left to hold here is the WIRING — that the four
+ * brains reach `uiState`, that the consent taps reach the gate, and that the
+ * remove flow behaves exactly as PR-19 built it (it never writes a language
+ * preference).
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class OfflineLanguagesViewModelTest {
     @get:Rule
     val dispatcherRule = TestDispatcherRule()
@@ -59,19 +71,20 @@ class OfflineLanguagesViewModelTest {
 
     /**
      * The language SELECTION, read-only from this screen's point of view. It is
-     * here so the remove flow can be asked which pack is the live target — and
-     * the assertions below check that it is never WRITTEN, which is the whole
-     * correction PR-19 makes to the drawn 19g.
+     * here so the remove flow can be asked which pack is the live target — and the
+     * assertions below check that it is never WRITTEN, the whole PR-19 correction.
      */
     private val translatePrefs = RecordingTranslatePrefsRepository(target = "fr")
     private val translations = FakeTranslationRepository()
+    private val usage = FakeLanguageUsageRepository()
+    private val storage = FakeStorageProbe()
+    private val clock = FakeClock()
     private val handle = SavedStateHandle()
 
     /**
-     * The standing-preference write runs on the APPLICATION scope, for the
-     * reason `LanguagePickerViewModelTest` gives: a preference the user just
-     * changed must not be dropped because they walked off the screen. Same shape
-     * here so the two screens' consent behaviour is tested the same way.
+     * The standing-preference write runs on the APPLICATION scope, for the reason
+     * `LanguagePickerViewModelTest` gives: a preference the user just changed must
+     * not be dropped because they walked off the screen.
      */
     private val appScope = CoroutineScope(dispatcherRule.dispatcher + SupervisorJob())
 
@@ -82,25 +95,159 @@ class OfflineLanguagesViewModelTest {
 
     @Before
     fun setUp() {
-        viewModel =
-            OfflineLanguagesViewModel(
-                languageRepository = StaticLanguageRepository(),
-                modelManager = manager,
-                downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
-                downloadPrefs = prefs,
-                translatePrefs = translatePrefs,
-                translations = translations,
-                handle = handle,
-                dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
-                appScope = appScope,
-            )
+        viewModel = buildViewModel()
     }
 
     /**
+     * The DownloadGate always drives the recording [manager] so the consent tests
+     * observe its downloads, even when the ViewModel under test is handed a silent
+     * or scripted model manager to script the row states.
+     */
+    private fun buildViewModel(
+        languageRepository: LanguageRepository = StaticLanguageRepository(),
+        modelManager: OfflineModelManager = manager,
+        handle: SavedStateHandle = this.handle,
+    ): OfflineLanguagesViewModel =
+        OfflineLanguagesViewModel(
+            languageRepository = languageRepository,
+            modelManager = modelManager,
+            downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
+            downloadPrefs = prefs,
+            translatePrefs = translatePrefs,
+            translations = translations,
+            usageRepository = usage,
+            storageProbe = storage,
+            clock = clock,
+            handle = handle,
+            dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
+            appScope = appScope,
+        )
+
+    // ── uiState wiring: the four brains reach the snapshot ─────────────────────
+
+    /**
+     * Issue #130 PR-2 carried through: the forever-Loading dead end. `combine`
+     * waits for EVERY source, so a manager whose ML Kit answer never comes (no Play
+     * Services) must not hold the rows hostage — the `onStart` guard makes the
+     * catalogue paint at its resting state.
+     */
+    @Test
+    fun `silent manager - rows still paint the offline catalog at resting state`() =
+        runTest {
+            val viewModel = buildViewModel(modelManager = SilentModelManager(), handle = SavedStateHandle())
+            viewModel.uiState.launchIn(backgroundScope)
+            runCurrent()
+
+            assertThat(viewModel.uiState.value.rows)
+                .containsExactly(
+                    OfflineLanguageRow(id = "de", name = "German", state = OfflineModelState.NotDownloaded),
+                    OfflineLanguageRow(id = "fr", name = "French", state = OfflineModelState.NotDownloaded),
+                ).inOrder()
+            assertThat(viewModel.uiState.value.loading).isFalse()
+        }
+
+    @Test
+    fun `late manager answer flips the resting rows to the real states`() =
+        runTest {
+            val scripted = ScriptedModelManager()
+            val viewModel = buildViewModel(modelManager = scripted, handle = SavedStateHandle())
+            viewModel.uiState.launchIn(backgroundScope)
+            runCurrent()
+
+            assertThat(
+                viewModel.uiState.value.rows
+                    .map(OfflineLanguageRow::state),
+            ).containsExactly(OfflineModelState.NotDownloaded, OfflineModelState.NotDownloaded)
+
+            scripted.states.emit(mapOf("de" to OfflineModelState.Downloaded, "fr" to OfflineModelState.Downloading))
+            runCurrent()
+
+            assertThat(viewModel.uiState.value.rows)
+                .containsExactly(
+                    OfflineLanguageRow(id = "de", name = "German", state = OfflineModelState.Downloaded),
+                    OfflineLanguageRow(id = "fr", name = "French", state = OfflineModelState.Downloading),
+                ).inOrder()
+        }
+
+    @Test
+    fun `online-only languages never appear - even before the manager answers`() =
+        runTest {
+            val viewModel =
+                buildViewModel(
+                    languageRepository = MixedTierLanguageRepository(),
+                    modelManager = SilentModelManager(),
+                    handle = SavedStateHandle(),
+                )
+            viewModel.uiState.launchIn(backgroundScope)
+            runCurrent()
+
+            // D-E2: Manage packs = catalog ∩ MLKit-capable. The resting default must
+            // not smuggle online-only rows in while the state map is still empty.
+            assertThat(
+                viewModel.uiState.value.rows
+                    .map(OfflineLanguageRow::id),
+            ).containsExactly("de")
+        }
+
+    /**
+     * The storage probe reaches the card, count and bytes and all. Scripted so one
+     * pack is on device (count 1), and the probe answers a real byte figure, so the
+     * card is Sized with exactly what the probe said. A ViewModel that never called
+     * the probe, or built the count off the wrong set, reddens here.
+     */
+    @Test
+    fun `the storage probe reaches the card`() =
+        runTest {
+            storage.packs = 110L
+            storage.free = 900L
+            storage.total = 1000L
+            val scripted = ScriptedModelManager()
+            val viewModel = buildViewModel(modelManager = scripted, handle = SavedStateHandle())
+            viewModel.uiState.launchIn(backgroundScope)
+            runCurrent() // subscribe before emitting into the replay-0 SharedFlow
+            scripted.states.emit(mapOf("de" to OfflineModelState.Downloaded, "fr" to OfflineModelState.NotDownloaded))
+            advanceUntilIdle()
+
+            val card = viewModel.uiState.value.storage
+            assertThat(card).isInstanceOf(StorageCard.Sized::class.java)
+            assertThat((card as StorageCard.Sized).packCount).isEqualTo(1)
+            assertThat(card.packsBytes).isEqualTo(110L)
+        }
+
+    /**
+     * A usage stamp reaches `uiState.usage`, merged across roles. The stamp is
+     * written as a TARGET use; a ViewModel that only read the source role, or read
+     * neither, reddens.
+     */
+    @Test
+    fun `a translation-use stamp reaches uiState usage`() =
+        runTest {
+            usage.stampUse("de", LanguageRole.TARGET, atMillis = 1234L)
+            viewModel.uiState.launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.usage).containsEntry("de", 1234L)
+        }
+
+    /** "Not now" on the nudge sets a durable flag the screen reads to hide it. Mutation: dismiss does nothing. */
+    @Test
+    fun `dismissing the nudge sets the durable flag`() =
+        runTest {
+            viewModel.uiState.launchIn(backgroundScope)
+            runCurrent()
+            assertThat(viewModel.uiState.value.nudgeDismissed).isFalse()
+
+            viewModel.dismissNudge()
+            runCurrent()
+
+            assertThat(viewModel.uiState.value.nudgeDismissed).isTrue()
+        }
+
+    // ── Consent gate wiring (#90) ──────────────────────────────────────────────
+
+    /**
      * The whole route in one pass: a metered tap reaches the gate (dialog up,
-     * nothing downloaded), and the dialog's yes reaches it too (downloaded,
-     * dialog gone). Wiring the row's ⬇ straight to the manager, or exposing a
-     * `pendingConsent` of the screen's own, is red here.
+     * nothing downloaded), and the dialog's yes reaches it too.
      */
     @Test
     fun `row taps and the dialog answer are routed through the gate`() =
@@ -118,12 +265,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingConsent.value).isNull()
         }
 
-    /**
-     * The SAME sheet is raised here as on the picker, so it must be answered the
-     * same way — including the polarity of its checkbox. This screen having its
-     * own idea of what "Always ask" means is precisely the drift that made two
-     * dialogs worth deleting.
-     */
     @Test
     fun `unticking Always ask grants the standing permission here too`() =
         runTest {
@@ -131,7 +272,6 @@ class OfflineLanguagesViewModelTest {
 
             viewModel.onAlwaysAskChange(false)
             runCurrent()
-
             assertThat(prefs.allowMobileData.first()).isTrue()
 
             viewModel.download("de")
@@ -148,7 +288,6 @@ class OfflineLanguagesViewModelTest {
 
             viewModel.onAlwaysAskChange(true)
             runCurrent()
-
             assertThat(prefs.allowMobileData.first()).isFalse()
 
             viewModel.download("de")
@@ -157,7 +296,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingConsent.value).isEqualTo("de")
         }
 
-    /** "Not now" closes the gate's question from this screen too. */
     @Test
     fun `dismissing the dialog reaches the gate`() =
         runTest {
@@ -172,102 +310,81 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingConsent.value).isNull()
         }
 
-    // Issue #130 PR-2: the forever-Loading dead end. `combine` waits for EVERY
-    // source, so a manager whose ML Kit answer never comes (no Play Services)
-    // must not be able to hold the rows hostage — the onStart guard makes the
-    // catalog paint at its resting state, exactly as the repository/picker do.
+    // ── Retry honesty: a synchronous refusal reaches the screen (#234/#250) ─────
 
+    /**
+     * The other half of the #250 fix (the first is that the STORAGE row keeps a
+     * Retry pill at all — an `OfflineLanguagesScreen` render test). A Retry whose
+     * disk is still full is REFUSED synchronously (`DownloadAttempt.Refused(STORAGE)`),
+     * which writes a value-equal `Failed(STORAGE)` map (no re-emit) and fires no
+     * PackEvent — so a discarded return leaves the retry a silent no-op behind an
+     * enabled pill. Captured, it reaches [refusals] for the screen's snackbar.
+     *
+     * Mutation decided first: revert `download()` to
+     * `viewModelScope.launch { withContext(io) { downloadGate.requestDownload(id) } }`
+     * (discard the return, drop the `reportOutcome` capture) — `received` is empty
+     * and this reddens.
+     */
     @Test
-    fun `silent manager - rows still paint the offline catalog at resting state`() =
+    fun `a retry refused for space surfaces a message, not silence`() =
         runTest {
-            val viewModel =
-                OfflineLanguagesViewModel(
-                    languageRepository = StaticLanguageRepository(),
-                    modelManager = SilentModelManager(),
-                    downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
-                    downloadPrefs = prefs,
-                    translatePrefs = translatePrefs,
-                    translations = translations,
-                    handle = SavedStateHandle(),
-                    dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
-                    appScope = appScope,
-                )
-            viewModel.rows.launchIn(backgroundScope)
-            runCurrent()
+            manager.attempt = DownloadAttempt.Refused(OfflineModelFailure.STORAGE)
+            val received = mutableListOf<OfflineModelFailure>()
+            viewModel.refusals.onEach { received += it }.launchIn(backgroundScope)
 
-            assertThat(viewModel.rows.value)
-                .containsExactly(
-                    OfflineLanguageRow(id = "de", name = "German", state = OfflineModelState.NotDownloaded),
-                    OfflineLanguageRow(id = "fr", name = "French", state = OfflineModelState.NotDownloaded),
-                ).inOrder()
+            viewModel.download("de")
+            advanceUntilIdle()
+
+            assertThat(received).containsExactly(OfflineModelFailure.STORAGE)
         }
 
+    /**
+     * Non-vacuity for the test above: the message is tied to a REFUSAL, not emitted
+     * on every tap. A download that STARTS surfaces nothing here — its outcome
+     * travels through the row and the U-1 PackEvents app snackbar instead. Mutation:
+     * report unconditionally in `reportOutcome` (drop the `is Refused` guard) and
+     * this reddens.
+     */
     @Test
-    fun `late manager answer flips the resting rows to the real states`() =
+    fun `a download that starts surfaces no refusal message`() =
         runTest {
-            val scripted = ScriptedModelManager()
-            val viewModel =
-                OfflineLanguagesViewModel(
-                    languageRepository = StaticLanguageRepository(),
-                    modelManager = scripted,
-                    downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
-                    downloadPrefs = prefs,
-                    translatePrefs = translatePrefs,
-                    translations = translations,
-                    handle = SavedStateHandle(),
-                    dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
-                    appScope = appScope,
-                )
-            viewModel.rows.launchIn(backgroundScope)
-            runCurrent()
+            manager.attempt = DownloadAttempt.Started
+            val received = mutableListOf<OfflineModelFailure>()
+            viewModel.refusals.onEach { received += it }.launchIn(backgroundScope)
 
-            // Before ANY manager emission: resting rows, not an empty "Loading…".
-            assertThat(viewModel.rows.value.map(OfflineLanguageRow::state))
-                .containsExactly(OfflineModelState.NotDownloaded, OfflineModelState.NotDownloaded)
+            viewModel.download("de")
+            advanceUntilIdle()
 
-            scripted.states.emit(
-                mapOf(
-                    "de" to OfflineModelState.Downloaded,
-                    "fr" to OfflineModelState.Downloading,
-                ),
-            )
-            runCurrent()
-
-            assertThat(viewModel.rows.value)
-                .containsExactly(
-                    OfflineLanguageRow(id = "de", name = "German", state = OfflineModelState.Downloaded),
-                    OfflineLanguageRow(id = "fr", name = "French", state = OfflineModelState.Downloading),
-                ).inOrder()
+            assertThat(received).isEmpty()
         }
 
+    /**
+     * The second capture site: "Download now" on a metered link runs
+     * `downloadConsented`, which can also come back `Refused`. Mutation: discard the
+     * return in `downloadAnyway()` and this reddens while the row-tap test above
+     * stays green — the two sites fail independently.
+     */
     @Test
-    fun `online-only languages never appear - even before the manager answers`() =
+    fun `a consented retry refused for space also surfaces a message`() =
         runTest {
-            val viewModel =
-                OfflineLanguagesViewModel(
-                    languageRepository = MixedTierLanguageRepository(),
-                    modelManager = SilentModelManager(),
-                    downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
-                    downloadPrefs = prefs,
-                    translatePrefs = translatePrefs,
-                    translations = translations,
-                    handle = SavedStateHandle(),
-                    dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
-                    appScope = appScope,
-                )
-            viewModel.rows.launchIn(backgroundScope)
-            runCurrent()
+            connectivity.metered = true
+            manager.attempt = DownloadAttempt.Refused(OfflineModelFailure.STORAGE)
+            val received = mutableListOf<OfflineModelFailure>()
+            viewModel.refusals.onEach { received += it }.launchIn(backgroundScope)
 
-            // D-E2: Screen B = catalog ∩ MLKit-capable. The resting default must
-            // not smuggle online-only rows in while the state map is still empty.
-            assertThat(viewModel.rows.value.map(OfflineLanguageRow::id)).containsExactly("de")
+            viewModel.download("de") // metered → consent sheet, nothing downloaded yet
+            runCurrent()
+            viewModel.downloadAnyway() // "Download now" → downloadConsented → Refused
+            advanceUntilIdle()
+
+            assertThat(received).containsExactly(OfflineModelFailure.STORAGE)
         }
 
-    // ---- #130 PR-19: the 🗑 asks first (sheets 19f / 19g) ---------------------------------------
+    // ── Remove flow (#130 PR-19), unchanged ────────────────────────────────────
 
-    /** Mutation C1: wire 🗑 straight back to the manager and this reddens. */
+    /** Mutation C1: wire the overflow straight back to the manager and this reddens. */
     @Test
-    fun `the bin asks and deletes nothing yet`() =
+    fun `the overflow asks and deletes nothing yet`() =
         runTest {
             viewModel.pendingRemoval.launchIn(backgroundScope)
 
@@ -308,10 +425,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value).isNull()
         }
 
-    /**
-     * A second confirm on an answered sheet finds nothing to do — the id is read
-     * from the durable handle, not carried in the call.
-     */
     @Test
     fun `confirming twice removes the pack once`() =
         runTest {
@@ -328,8 +441,8 @@ class OfflineLanguagesViewModelTest {
 
     /**
      * Mutation C5. The ⏹ on a DOWNLOADING row is delete-to-cancel and stays
-     * immediate: it is the way out of a download, not the removal of a pack the
-     * user has. Routing it through the confirm sheet reddens here.
+     * immediate — the way out of a download, not the removal of a pack the user
+     * has. Routing it through the confirm sheet reddens here.
      */
     @Test
     fun `stopping a download still happens immediately with no sheet`() =
@@ -343,11 +456,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value).isNull()
         }
 
-    /**
-     * Mutations B2/B3: which sheet gets drawn. `fr` is the target in this
-     * fixture and `de` is not, so a rule stuck at either constant reddens on one
-     * of these two assertions.
-     */
     @Test
     fun `only the live target raises the in-use sheet`() =
         runTest {
@@ -362,12 +470,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isTrue()
         }
 
-    /**
-     * Mutation B1: `inUse = (source == id)`. The fixture's source is `en` and is
-     * NOT the target, so a rule that reads the wrong side of the pair reddens.
-     * Removing the pack of the language you translate FROM is an ordinary
-     * removal — 19f, which says everything true about it.
-     */
     @Test
     fun `the source language is not in use in the sense 19g means`() =
         runTest {
@@ -379,11 +481,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isFalse()
         }
 
-    /**
-     * Mutation B4: reading the target once at construction. The user can change
-     * their target on another screen while this one is in the back stack, so the
-     * question has to be answered against the live preference.
-     */
     @Test
     fun `a target changed after the screen was built still decides the sheet`() =
         runTest {
@@ -397,20 +494,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isTrue()
         }
 
-    /**
-     * Mutation B4, second form — and the one that found the gap.
-     *
-     * The test above raises its question AFTER the target moves, so a
-     * ViewModel that snapshots the target the first time it is asked and caches
-     * it forever passes it: the first ask already sees the new value. That
-     * mutation SURVIVED until this case was added, which is the whole reason the
-     * mutation is decided before the test rather than after.
-     *
-     * The harm it leaves is a wrong sheet on the SECOND removal of a session:
-     * ask about one pack, cancel, change the target elsewhere, ask about the new
-     * target — and the sheet says the pack is not in use. Asserting across two
-     * questions is what separates a live flow from a cached first answer.
-     */
     @Test
     fun `a second question is answered against the target as it is now`() =
         runTest {
@@ -429,11 +512,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value?.inUseAsTarget).isTrue()
         }
 
-    /**
-     * The target can only move from another screen, and if it moves while this
-     * question is open the sheet has to stop saying the old thing. A live flow
-     * gives that for nothing; a snapshot taken when the sheet opened does not.
-     */
     @Test
     fun `an open question follows the target if it moves underneath it`() =
         runTest {
@@ -450,12 +528,8 @@ class OfflineLanguagesViewModelTest {
         }
 
     /**
-     * **The correction this PR exists for.** The export's 19g says *"Removing it
-     * switches the target to English."* Nothing switches, so nothing may write a
-     * language preference from this flow — not the confirm, not the request, not
-     * the dismiss. The recording repository fails the test if any write arrives,
-     * which is the assertion that would have caught the drawn behaviour being
-     * built to match the drawn copy.
+     * The correction PR-19 exists for: removing a pack writes NO language
+     * preference. The recording repository fails if any write arrives.
      */
     @Test
     fun `removing the in-use pack changes no language selection`() =
@@ -472,14 +546,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(translatePrefs.target.value).isEqualTo("fr")
         }
 
-    /**
-     * The saved count, and the two mutations around it: dropping the
-     * `favourite` filter, and dropping either side of the language test. The
-     * fixture is deliberately ASYMMETRIC — one row uses `fr` only as a target,
-     * one only as a source, one on both sides, one is unsaved, one is another
-     * language — because a fixture where every row uses the language both ways
-     * lets a source-only or target-only rule pass.
-     */
     @Test
     fun `the in-use sheet counts saved phrases on either side of the pair`() =
         runTest {
@@ -498,17 +564,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(3)
         }
 
-    /**
-     * Owner ruling 2026-08-05 (#230): 19f draws the saved line too, so the
-     * ordinary removal reports its real count instead of a forced zero. Either
-     * side of the pair counts, same as 19g — the fixture is asymmetric (`de` as a
-     * target, `de` as a source, an unsaved `de` row, and a different language) so a
-     * source-only, target-only, or favourite-blind rule cannot pass.
-     *
-     * Mutation decided first (rule 11): restore `savedCount = if (inUse)
-     * savedCountOf(id) else 0`. `de` is not the target in this fixture, so the
-     * guard forces 0 and the assertion of 2 reddens.
-     */
     @Test
     fun `an ordinary removal reports the saved count too`() =
         runTest {
@@ -527,13 +582,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.pendingRemoval.value?.savedCount).isEqualTo(2)
         }
 
-    /**
-     * Mutation C6. The question is a `String` in the `SavedStateHandle`, so a
-     * ViewModel rebuilt over the SAME handle — which is what a process death
-     * followed by a return looks like — still has it open. The derived halves
-     * are recomputed rather than restored, which this checks by moving the
-     * target while the "dead" ViewModel is gone.
-     */
     @Test
     fun `an open question survives the ViewModel and is re-derived`() =
         runTest {
@@ -542,18 +590,7 @@ class OfflineLanguagesViewModelTest {
             runCurrent()
 
             translatePrefs.target.value = "de"
-            val reborn =
-                OfflineLanguagesViewModel(
-                    languageRepository = StaticLanguageRepository(),
-                    modelManager = manager,
-                    downloadGate = DownloadGate(connectivity, prefs, manager, InMemoryConsentQuestionStore()),
-                    downloadPrefs = prefs,
-                    translatePrefs = translatePrefs,
-                    translations = translations,
-                    handle = handle,
-                    dispatchers = TestDispatcherProvider(dispatcherRule.dispatcher),
-                    appScope = appScope,
-                )
+            val reborn = buildViewModel(handle = handle)
             reborn.pendingRemoval.launchIn(backgroundScope)
             runCurrent()
 
@@ -561,11 +598,6 @@ class OfflineLanguagesViewModelTest {
             assertThat(reborn.pendingRemoval.value?.inUseAsTarget).isTrue()
         }
 
-    /**
-     * A database that cannot answer must not block a removal. Zero renders as an
-     * absent line, which is what a user with nothing saved sees anyway — a
-     * missing reassurance rather than a false one.
-     */
     @Test
     fun `a broken saved-count query still lets the sheet open`() =
         runTest {
@@ -580,20 +612,9 @@ class OfflineLanguagesViewModelTest {
         }
 
     /**
-     * The sibling of the test above, and the one that was missing (issue #236).
-     *
-     * That one throws `IllegalStateException` — an `Exception`, which the old
-     * narrow catch already covered — so it passed while the crash class the
-     * guard exists for went straight past it. Room here runs every statement
-     * through a `native` method on `android.database.sqlite.SQLiteConnection`,
-     * and a JNI link that cannot be satisfied raises `UnsatisfiedLinkError`: a
-     * `LinkageError`, so an `Error`, so NOT an `Exception`
-     * (`TextViewModel.kt:768-779`, verified again in this PR).
-     *
-     * The user-visible harm this pins: tap the trash icon and the app disappears
-     * — no sheet, no message. Before #230 only the CURRENT target pack queried the
-     * count, so `fr` was the one that reproduced it; since #230 every removal
-     * queries, so this guard now protects them all. `fr` still exercises it here.
+     * The sibling that was missing (#236): an `UnsatisfiedLinkError` is an `Error`,
+     * NOT an `Exception`, so a narrow catch would let the app disappear on the
+     * trash tap. The widened `Throwable` catch keeps the sheet opening.
      */
     @Test
     fun `a saved-count query that fails to link still lets the sheet open`() =
@@ -609,19 +630,11 @@ class OfflineLanguagesViewModelTest {
         }
 
     /**
-     * `removalFor`'s `.distinctUntilChanged()` on the target, made able to fail
-     * (issue #242). DataStore re-emits EVERY key's flow on ANY key write, so an
-     * unrelated preference change while a 19g sheet is open re-fires `targetLang`
-     * with the SAME target. The guard swallows that equal re-emission; without it
-     * the saved-count query re-runs underneath the open sheet on every unrelated
-     * write. `reEmitTarget()` is the fixture's model of that unrelated write — and
-     * it has to exist, because a `MutableStateFlow` would conflate the equal value
-     * away and the guard could not be tested at all (the tautology this issue is
-     * about). The call counter uses the existing `beforeSavedCount` hook, which
-     * fires once per `savedCountUsing`.
-     *
-     * Mutation decided first (rule 11): delete `.distinctUntilChanged()`. The
-     * second assertion then reads 2 and reddens.
+     * `removalFor`'s `.distinctUntilChanged()` on the target (#242): an unrelated
+     * preference write re-fires `targetLang` with the SAME target, and the guard
+     * swallows the equal re-emission so the saved-count query does not re-run under
+     * an open sheet. Mutation: delete `.distinctUntilChanged()` — the count runs
+     * twice and the second assertion reddens.
      */
     @Test
     fun `an unrelated write that re-fires the same target does not re-run the saved count`() =
@@ -631,12 +644,10 @@ class OfflineLanguagesViewModelTest {
             translations.beforeSavedCount = { savedCountCalls++ }
             viewModel.pendingRemoval.launchIn(backgroundScope)
 
-            // fr is this fixture's target, so the sheet is 19g and the count runs — once.
             viewModel.requestRemove("fr")
             runCurrent()
             assertThat(savedCountCalls).isEqualTo(1)
 
-            // An unrelated DataStore write re-fires targetLang with the same "fr".
             translatePrefs.reEmitTarget()
             runCurrent()
 
@@ -644,28 +655,9 @@ class OfflineLanguagesViewModelTest {
         }
 
     /**
-     * `savedCountOf`'s `CancellationException` rethrow, made able to fail (issue
-     * #242 — the arm the production KDoc records as "entered by no test").
-     *
-     * The generic `catch (Throwable) { 0 }` beneath it exists so a database that
-     * cannot answer never blocks a removal. But a `CancellationException` is not
-     * "the database cannot answer" — it is "we are being torn down" — and folding
-     * it to 0 breaks structured concurrency and states a saved count that was
-     * never read. Widening the catch to `Throwable` protects it not at all
-     * (`CancellationException` IS an `Exception`); only the rethrow does
-     * (coroutines-patterns.md — never swallow `CancellationException`; the same
-     * guard `TextStarFailureTest` pins for the composer star, the sibling of this
-     * fix).
-     *
-     * The query is thrown into cancellation WHILE IN FLIGHT. With the rethrow the
-     * cancellation propagates and no sheet is built from a count that never
-     * completed, so this false "nothing saved" sheet for the target pack is never
-     * published. Without it the generic catch folds the cancellation to 0 and it
-     * is.
-     *
-     * Mutation decided first (rule 11): delete the
-     * `catch (CancellationException) { throw }` arm. `published` then contains the
-     * zero-count in-use sheet and reddens.
+     * `savedCountOf`'s `CancellationException` rethrow (#242): folding a
+     * cancellation to 0 would publish a false zero-count sheet. Mutation: delete the
+     * `catch (CancellationException) { throw }` arm — `published` then contains it.
      */
     @Test
     fun `a cancelled saved-count query is not folded to a zero-count sheet`() =
@@ -675,7 +667,6 @@ class OfflineLanguagesViewModelTest {
             val published = mutableListOf<PendingPackRemoval?>()
             viewModel.pendingRemoval.onEach { published += it }.launchIn(backgroundScope)
 
-            // fr is the target → 19g → the count runs, and is cancelled in flight.
             viewModel.requestRemove("fr")
             runCurrent()
 
@@ -713,12 +704,9 @@ class OfflineLanguagesViewModelTest {
 }
 
 /**
- * A [TranslatePrefsRepository] that answers reads and RECORDS every write.
- *
- * The recording half is the point. PR-19's whole correction is that removing a
- * pack changes no language selection, and the only way to hold that is to fail
- * when a write arrives — a fake that silently accepted one would let the drawn
- * "switches the target to English" be built back in with every test still green.
+ * A [TranslatePrefsRepository] that answers reads and RECORDS every write. The
+ * recording half is the point: PR-19's whole correction is that removing a pack
+ * changes no language selection, held only by failing when a write arrives.
  */
 private class RecordingTranslatePrefsRepository(
     source: String = "en",
@@ -728,20 +716,6 @@ private class RecordingTranslatePrefsRepository(
     val target = MutableStateFlow(target)
     val writes = mutableListOf<String>()
 
-    /**
-     * A same-value re-emission seam for [targetLang] (#242).
-     *
-     * Production's `targetLang` is a DataStore flow, and DataStore re-emits EVERY
-     * key's flow whenever ANY key is written — so an unrelated preference change
-     * makes `targetLang` fire the CURRENT target again, unchanged, which is what
-     * `removalFor`'s `.distinctUntilChanged()` exists to swallow. A `MutableStateFlow`
-     * cannot model that: it conflates equal consecutive values by contract
-     * (testing-quick.md — a StateFlow conflates), so a StateFlow-only `targetLang`
-     * could never re-deliver the same value and deleting the guard would change
-     * nothing in any test. This non-conflating channel carries the unrelated-write
-     * re-emission ([reEmitTarget]); real target CHANGES still go through [target],
-     * which keeps the `.value` read/write the other tests already use.
-     */
     private val targetReemits =
         MutableSharedFlow<String>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -776,6 +750,9 @@ private class RecordingModelManager : OfflineModelManager {
     val downloads = mutableListOf<String>()
     val deletes = mutableListOf<String>()
 
+    /** What `download()` decides. Default [DownloadAttempt.Started]; the refusal tests script a [Refused]. */
+    var attempt: DownloadAttempt = DownloadAttempt.Started
+
     override fun modelStates(): Flow<Map<String, OfflineModelState>> =
         flowOf(
             mapOf(
@@ -788,7 +765,7 @@ private class RecordingModelManager : OfflineModelManager {
 
     override suspend fun download(languageTag: String): DownloadAttempt {
         downloads += languageTag
-        return DownloadAttempt.Started
+        return attempt
     }
 
     override suspend fun delete(languageTag: String) {

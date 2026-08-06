@@ -145,4 +145,54 @@
     <string name="lang_snackbar_action_download_again">I-download ulit</string>
     <string name="lang_snackbar_failed">Hindi na-download ang %1$s</string>
     <string name="lang_snackbar_action_retry">Subukan ulit</string>
+
+    <!-- 20b / 20f — Manage packs (#130 PR-23). Provisional translations pending
+         #115 native review. -->
+    <string name="manage_title">Pamahalaan ang mga pack</string>
+    <string name="manage_storage_packs_title">Storage na ginagamit ng mga pack</string>
+    <plurals name="manage_storage_across">
+        <item quantity="one">sa %1$d pack</item>
+        <item quantity="other">sa %1$d na pack</item>
+    </plurals>
+    <string name="manage_storage_explainer">Libre at walang limitasyon ang mga pack. Nagbabahagi sila ng data sa pagitan ng mga pares ng wika, kaya walang sariling laki ang isang pack.</string>
+    <string name="manage_storage_device_title">Storage ng device</string>
+    <string name="manage_storage_free_caption">libre sa device na ito</string>
+    <string name="manage_storage_packs_none">Mga pack — wala pa</string>
+    <string name="manage_storage_empty_explainer">Wala pang na-download, kaya walang ginagamit na espasyo ang mga pack. Libre at walang limitasyon ang mga ito — karaniwang 40–65 MB ang isang pack.</string>
+    <plurals name="manage_storage_packs_count">
+        <item quantity="one">%1$d pack sa device</item>
+        <item quantity="other">%1$d na pack sa device</item>
+    </plurals>
+    <string name="manage_section_downloading">Dina-download</string>
+    <string name="manage_section_failed">Hindi na-download</string>
+    <string name="manage_section_on_device">Nasa device na ito</string>
+    <plurals name="manage_on_device_count">
+        <item quantity="one">%1$d sa %2$d pack</item>
+        <item quantity="other">%1$d sa %2$d na pack</item>
+    </plurals>
+    <string name="manage_downloading_note">Walang pause — kapag itinigil, itatapon ang pack.</string>
+    <string name="manage_used_today">ginamit ngayon</string>
+    <plurals name="manage_used_days">
+        <item quantity="one">ginamit %1$d araw na nakalipas</item>
+        <item quantity="other">ginamit %1$d na araw na nakalipas</item>
+    </plurals>
+    <plurals name="manage_used_weeks">
+        <item quantity="one">ginamit %1$d linggo na nakalipas</item>
+        <item quantity="other">ginamit %1$d na linggo na nakalipas</item>
+    </plurals>
+    <plurals name="manage_used_months">
+        <item quantity="one">ginamit %1$d buwan na nakalipas</item>
+        <item quantity="other">ginamit %1$d na buwan na nakalipas</item>
+    </plurals>
+    <string name="manage_used_never">wala pang naitalang paggamit</string>
+    <string name="manage_in_use">GINAGAMIT</string>
+    <string name="manage_cd_options">Mga opsyon para sa %1$s</string>
+    <string name="manage_browse_all">I-browse ang lahat ng wika</string>
+    <string name="manage_footer">%1$d sa %2$d na wika ang may pack. Ang iba pang %3$d ay isinasalin online lang.</string>
+    <plurals name="manage_nudge_title">
+        <item quantity="one">%1$d pack ang hindi nagamit sa loob ng ilang buwan</item>
+        <item quantity="other">%1$d na pack ang hindi nagamit sa loob ng ilang buwan</item>
+    </plurals>
+    <string name="manage_nudge_body">Ang pagpapanatili lamang ng mga wikang ginagamit mo ay nagpapagaan sa app. Walang buburahin nang hindi nagtatanong.</string>
+    <string name="manage_nudge_dismiss">Hindi ngayon</string>
 </resources>

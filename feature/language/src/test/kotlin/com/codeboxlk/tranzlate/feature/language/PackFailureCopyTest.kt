@@ -82,18 +82,33 @@ class PackFailureCopyTest {
     }
 
     private fun showOfflineManager(cause: OfflineModelFailure = OfflineModelFailure.NETWORK) {
+        val sections =
+            buildManagePacksSections(
+                rows = listOf(OfflineLanguageRow("hi", "Hindi", OfflineModelState.Failed(cause))),
+                usage = emptyMap(),
+                targetId = "",
+                nowMillis = 0L,
+                locale = Locale.ENGLISH,
+            )
         compose.setContent {
             TranzlateTheme {
-                OfflineLanguagesContent(
-                    rows = listOf(OfflineLanguageRow("hi", "Hindi", OfflineModelState.Failed(cause))),
-                    onDownload = { retried += it },
-                    // `onDelete` split in two when the 🗑 became a confirmed remove
-                    // (#130 PR-19): the bin raises a question, the ⏹ still stops a
-                    // download outright. Neither is this test's subject — it is
-                    // about the failure SENTENCE — so both are inert here.
-                    onStopDownload = {},
-                    onRequestRemove = {},
+                ManagePacksContent(
+                    loading = false,
+                    sections = sections,
+                    storage = null,
+                    nudge = null,
+                    suggestions = emptyList(),
+                    capable = 59,
+                    total = 194,
                     onBack = {},
+                    // The failure SENTENCE is this test's subject; the actions are
+                    // inert here (retry/stop/remove each have their own coverage).
+                    onGet = { retried += it },
+                    onStopDownload = {},
+                    onRetry = { retried += it },
+                    onRemove = {},
+                    onDismissNudge = {},
+                    onBrowseAll = {},
                 )
             }
         }
@@ -121,8 +136,48 @@ class PackFailureCopyTest {
         showOfflineManager()
 
         compose
-            .onNodeWithTag("tt_offline_error_line")
+            .onNodeWithTag("tt_manage_error_line")
             .assertTextEquals(context.getString(R.string.lang_pack_error_network))
+    }
+
+    /**
+     * **Issue #250, CORRECTED (co-verify block on PR-23).** PR-23 first shipped the
+     * space-failed row with NO Retry, reasoning that a bare retry re-fails. That made
+     * it a permanent dead-end: the red "Not enough space" line promised an action
+     * with no control to tap, and freeing space by removing other packs never
+     * restored one (the manager's `transient` map only moves on a `download()`, which
+     * `refreshDownloaded()` never touches). The ruling's intent is *"the row still
+     * offers Retry"*; the #234 concern is a Retry that SILENTLY does nothing — a
+     * ViewModel matter, not grounds to drop the control. So EVERY failed cause,
+     * out-of-space included, keeps its Retry, and the ViewModel makes the space retry
+     * HONEST (`OfflineLanguagesViewModelTest`: a still-full retry surfaces a "not
+     * enough space" message; a freed-disk retry actually downloads).
+     *
+     * Mutation decided first (rule 11): re-add `if (state.cause != STORAGE)` in
+     * `PackRowControl` so the space row draws no pill — this `assertIsDisplayed`
+     * reddens, the #250 dead-end returning. The network test is the control that
+     * keeps it honest: a guard hiding EVERY Retry would redden that one instead.
+     */
+    @Test
+    fun `a space-failed row keeps its Retry - no dead-end`() {
+        showOfflineManager(OfflineModelFailure.STORAGE)
+        compose.onNodeWithTag("tt_manage_retry").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a network-failed row keeps its Retry`() {
+        showOfflineManager(OfflineModelFailure.NETWORK)
+        compose.onNodeWithTag("tt_manage_retry").assertIsDisplayed()
+    }
+
+    /** The retryable failure's pill does what it says — asks for the download again. */
+    @Test
+    fun `the manager's Retry asks for the download again`() {
+        showOfflineManager(OfflineModelFailure.NETWORK)
+
+        compose.onNodeWithTag("tt_manage_retry").performClick()
+
+        assertThat(retried).containsExactly("hi")
     }
 
     /**
