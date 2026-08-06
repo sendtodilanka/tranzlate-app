@@ -43,7 +43,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -150,6 +152,7 @@ fun OfflineLanguagesScreen(
         onStopDownload = viewModel::stopDownload,
         onRetry = viewModel::download,
         onRemove = viewModel::requestRemove,
+        onUseAsTarget = viewModel::useAsTarget,
         onDismissNudge = viewModel::dismissNudge,
         onBrowseAll = onBrowseAll,
         pendingConsent = pendingConsent,
@@ -190,6 +193,9 @@ internal fun ManagePacksContent(
     pendingRemoval: PendingPackRemoval? = null,
     onConfirmRemove: () -> Unit = {},
     onDismissRemove: () -> Unit = {},
+    // The 20c pack-actions sheet's "Use as target now" write. Defaulted so the render
+    // tests and previews that do not exercise the sheet keep their existing call.
+    onUseAsTarget: (String) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val spacing = LocalSpacing.current
@@ -199,6 +205,23 @@ internal fun ManagePacksContent(
     // each cannot. The removal name is resolved against the composition's locale,
     // never carried in the ViewModel, so it follows a locale change like every row.
     val locale = LocalLocale.current.platformLocale
+    // The 20c pack-actions sheet's open pack (#130 PR-24), or null. Screen-local
+    // rather than ViewModel state: it survives a recomposition, which is all a
+    // transient menu needs, and it keeps the write path the only thing that reaches
+    // the ViewModel. The overflow sets it; every action clears it.
+    var actionsTarget by remember { mutableStateOf<PackActionsTarget?>(null) }
+    PackActionsSheet(
+        target = actionsTarget,
+        onUseAsTarget = { id ->
+            onUseAsTarget(id)
+            actionsTarget = null
+        },
+        onRemove = { id ->
+            onRemove(id)
+            actionsTarget = null
+        },
+        onDismiss = { actionsTarget = null },
+    )
     MobileDataSheet(
         visible = pendingConsent != null,
         alwaysAsk = alwaysAsk,
@@ -253,7 +276,9 @@ internal fun ManagePacksContent(
                         total = total,
                         onStopDownload = onStopDownload,
                         onRetry = onRetry,
-                        onRemove = onRemove,
+                        onMoreOptions = { row ->
+                            actionsTarget = PackActionsTarget(row.id, row.displayName, row.hasOfflineVoice)
+                        },
                         onDismissNudge = onDismissNudge,
                         onBrowseAll = onBrowseAll,
                     )
@@ -301,7 +326,7 @@ private fun PopulatedList(
     total: Int,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
-    onRemove: (String) -> Unit,
+    onMoreOptions: (PackRow) -> Unit,
     onDismissNudge: () -> Unit,
     onBrowseAll: () -> Unit,
 ) {
@@ -315,14 +340,14 @@ private fun PopulatedList(
         if (sections.downloading.isNotEmpty()) {
             item(key = "hdr_downloading") { SectionHeaderText(stringResource(R.string.manage_section_downloading)) }
             items(sections.downloading, key = { "dl_${it.id}" }) { row ->
-                PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onRemove = onRemove)
+                PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
             }
             item(key = "downloading_note") { DownloadingNote() }
         }
         if (sections.failed.isNotEmpty()) {
             item(key = "hdr_failed") { SectionHeaderText(stringResource(R.string.manage_section_failed)) }
             items(sections.failed, key = { "fail_${it.id}" }) { row ->
-                PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onRemove = onRemove)
+                PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
             }
         }
         if (sections.onDevice.isNotEmpty()) {
@@ -339,7 +364,7 @@ private fun PopulatedList(
                 )
             }
             items(sections.onDevice, key = { "dev_${it.id}" }) { row ->
-                PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onRemove = onRemove)
+                PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
             }
         }
         // "Browse all languages" belongs here too, not only on the empty state (20f):
@@ -615,8 +640,9 @@ private fun SectionHeaderText(
  *   the manager's synchronous refusal and the screen shows a "not enough space"
  *   snackbar over the removable packs, while a retry after space is freed actually
  *   downloads (see `OfflineLanguagesViewModel.reportOutcome`).
- * - **Downloaded, non-pivot** → `more_vert` opening the remove flow (19f/19g).
- *   The fuller 20c actions sheet ("Use as target now", the voice line) is PR-24.
+ * - **Downloaded, non-pivot** → `more_vert` opening the 20c pack-actions sheet
+ *   (Use as target now · a voice line when this device can also speak the language ·
+ *   Remove pack, which routes on to the 19f/19g confirm — #130 PR-24).
  * - **Downloaded, pivot (English, #224)** → no control; it cannot be removed.
  * - **Deleting** → a spinner.
  */
@@ -625,7 +651,7 @@ private fun PackRow(
     row: PackRow,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
-    onRemove: (String) -> Unit,
+    onMoreOptions: (PackRow) -> Unit,
 ) {
     val spacing = LocalSpacing.current
     Row(
@@ -647,7 +673,7 @@ private fun PackRow(
             }
             PackRowSupporting(row)
         }
-        PackRowControl(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onRemove = onRemove)
+        PackRowControl(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
     }
 }
 
@@ -701,7 +727,7 @@ private fun PackRowControl(
     row: PackRow,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
-    onRemove: (String) -> Unit,
+    onMoreOptions: (PackRow) -> Unit,
 ) {
     when (row.state) {
         OfflineModelState.Downloading -> {
@@ -734,10 +760,12 @@ private fun PackRowControl(
         }
 
         OfflineModelState.Downloaded -> {
-            // The pivot (English, #224) is non-actionable — no overflow, because it
-            // cannot be removed. Every other downloaded pack gets the overflow.
+            // The pivot (English, #224) is non-actionable — no overflow, because none
+            // of the 20c pack actions apply to it (it cannot be removed, and it is
+            // always the pivot, never a chosen target). Every other downloaded pack
+            // gets the overflow, which opens the 20c pack-actions sheet.
             if (!row.isPivot) {
-                IconButton(onClick = { onRemove(row.id) }, modifier = Modifier.testTag("tt_manage_options")) {
+                IconButton(onClick = { onMoreOptions(row) }, modifier = Modifier.testTag("tt_manage_options")) {
                     Icon(
                         Icons.Filled.MoreVert,
                         contentDescription = stringResource(R.string.manage_cd_options, row.displayName),

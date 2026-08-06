@@ -399,7 +399,10 @@ own header is `manage_title` (`Manage packs`), deliberately distinct.
 | `manage_used_months` | plurals | `used %1$d month(s) ago` | months | ≥1 month — the stale zone; never a named calendar month (ambiguous past a year) |
 | `manage_used_never` | string | `no recorded use yet` | — | the honest date-less line (ruling ⑧, risk R6) — a pack never translated with; excluded from the nudge |
 | `manage_in_use` | string | `IN USE` | — | badge on the pack of the current TARGET language |
-| `manage_cd_options` | string | `Options for %1$s` | language name | the `more_vert` overflow's accessible name — opens the remove flow (19f/19g); the fuller 20c sheet is PR-24 |
+| `manage_cd_options` | string | `Options for %1$s` | language name | the `more_vert` overflow's accessible name — opens the 20c pack-actions sheet (PR-24) |
+| `manage_actions_use_target` | string | `Use as target now` | — | 20c action row — makes this pack's language the translation TARGET, via `TranslatePrefsRepository` (PR-24) |
+| `manage_actions_voice` | string | `Can be spoken offline` | — | 20c informational line, NOT an action — shown IFF the device also has an offline voice (`hasOfflineVoice`); same verb as `cd_text_lang_row_voice` (PR-24) |
+| `manage_actions_remove` | string | `Remove pack` | — | 20c destructive row — routes to the existing 19f/19g remove-confirm flow (PR-24) |
 | `manage_browse_all` | string | `Browse all languages` | — | the empty state's second way forward — opens the picker (no dead end, brief §8) |
 | `manage_footer` | string | `%1$d of the %2$d languages have a pack. The other %3$d translate online only.` | capable, total, online-only | catalogue facts, sourced not hardcoded |
 | `manage_nudge_title` | plurals | `%1$d pack(s) haven't been used in months` | count | the hygiene nudge (brief §6.1) — packs stale past 90 days; date-less packs never counted (ruling ⑧) |

@@ -187,6 +187,9 @@
     <string name="manage_used_never">sem uso registrado ainda</string>
     <string name="manage_in_use">EM USO</string>
     <string name="manage_cd_options">Opções para %1$s</string>
+    <string name="manage_actions_use_target">Usar como destino agora</string>
+    <string name="manage_actions_voice">Pode ser falado off-line</string>
+    <string name="manage_actions_remove">Remover pacote</string>
     <string name="manage_browse_all">Ver todos os idiomas</string>
     <string name="manage_footer">%1$d dos %2$d idiomas têm pacote. Os outros %3$d traduzem apenas on-line.</string>
     <plurals name="manage_nudge_title">
