@@ -3,6 +3,7 @@ package com.codeboxlk.tranzlate.feature.language
 import android.os.LocaleList
 import android.text.format.Formatter
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -113,6 +114,14 @@ fun OfflineLanguagesScreen(
         remember(sections.onDevice, data.nowMillis, data.nudgeDismissed) {
             if (data.nudgeDismissed) null else hygieneNudge(sections.onDevice, data.nowMillis)
         }
+    // The packs the 20e "Free up space" sheet lists — the SAME [stalePacks] the
+    // nudge counts, so the sheet and the nudge can never disagree. Computed here
+    // (not the ViewModel) because it depends on the on-device SECTIONS the composable
+    // builds from the reader's locale, exactly as [nudge] does.
+    val stalePackRows =
+        remember(sections.onDevice, data.nowMillis) {
+            stalePacks(sections.onDevice, data.nowMillis)
+        }
     val localeTags = rememberAdjustedDefaultLocaleTags()
     val suggestions =
         remember(sections.downloadable, localeTags) {
@@ -163,6 +172,8 @@ fun OfflineLanguagesScreen(
         pendingRemoval = pendingRemoval,
         onConfirmRemove = viewModel::confirmRemove,
         onDismissRemove = viewModel::dismissRemove,
+        stalePacks = stalePackRows,
+        onRemovePacks = viewModel::removePacks,
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
@@ -196,6 +207,11 @@ internal fun ManagePacksContent(
     // The 20c pack-actions sheet's "Use as target now" write. Defaulted so the render
     // tests and previews that do not exercise the sheet keep their existing call.
     onUseAsTarget: (String) -> Unit = {},
+    // The 20e "Free up space" cleanup (#130 PR-25): the stale packs it lists — the
+    // SAME set the nudge counts — and the batch-remove it commits. Defaulted so the
+    // existing render-test / preview call sites are untouched.
+    stalePacks: List<PackRow> = emptyList(),
+    onRemovePacks: (List<String>) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val spacing = LocalSpacing.current
@@ -210,6 +226,12 @@ internal fun ManagePacksContent(
     // transient menu needs, and it keeps the write path the only thing that reaches
     // the ViewModel. The overflow sets it; every action clears it.
     var actionsTarget by remember { mutableStateOf<PackActionsTarget?>(null) }
+    // The 20e "Free up space" sheet's open flag. Screen-local like [actionsTarget]:
+    // the nudge's "Review N packs" and (a picker's) 19b "Free up space" open it, and
+    // dismiss / confirm close it. The CHECKBOX selection inside the sheet is its own
+    // rememberSaveable and survives process death; this flag only needs to survive a
+    // recomposition, which `remember` does (#130 PR-25).
+    var freeUpSpaceOpen by remember { mutableStateOf(false) }
     PackActionsSheet(
         target = actionsTarget,
         onUseAsTarget = { id ->
@@ -243,6 +265,13 @@ internal fun ManagePacksContent(
         savedCount = pendingRemoval?.savedCount ?: 0,
         onRemoveAnyway = onConfirmRemove,
         onDismiss = onDismissRemove,
+    )
+    FreeUpSpaceSheet(
+        visible = freeUpSpaceOpen,
+        stalePacks = stalePacks,
+        storage = storage,
+        onRemovePacks = onRemovePacks,
+        onDismiss = { freeUpSpaceOpen = false },
     )
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -280,6 +309,7 @@ internal fun ManagePacksContent(
                             actionsTarget = PackActionsTarget(row.id, row.displayName, row.hasOfflineVoice)
                         },
                         onDismissNudge = onDismissNudge,
+                        onReviewPacks = { freeUpSpaceOpen = true },
                         onBrowseAll = onBrowseAll,
                     )
                 }
@@ -328,6 +358,7 @@ private fun PopulatedList(
     onRetry: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
     onDismissNudge: () -> Unit,
+    onReviewPacks: () -> Unit,
     onBrowseAll: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
@@ -336,7 +367,11 @@ private fun PopulatedList(
         modifier = Modifier.fillMaxSize().testTag("tt_manage_list"),
     ) {
         storage?.let { item(key = "storage") { StorageCardView(it, Modifier.padding(vertical = spacing.sm8)) } }
-        nudge?.let { item(key = "nudge") { NudgeCardView(it, onDismissNudge, Modifier.padding(bottom = spacing.sm8)) } }
+        nudge?.let {
+            item(key = "nudge") {
+                NudgeCardView(it, onDismissNudge, onReviewPacks, Modifier.padding(bottom = spacing.sm8))
+            }
+        }
         if (sections.downloading.isNotEmpty()) {
             item(key = "hdr_downloading") { SectionHeaderText(stringResource(R.string.manage_section_downloading)) }
             items(sections.downloading, key = { "dl_${it.id}" }) { row ->
@@ -408,9 +443,14 @@ private fun EmptyList(
  * Kit does not expose. The bar is device-used vs free on the whole volume (the
  * only honest bar at 110 MB against a whole device — 19b's own reasoning), its
  * semantics cleared because the numerals above already say it in words.
+ *
+ * `internal`, not `private`: the 20e "Free up space" sheet (FreeUpSpaceSheet.kt)
+ * reuses this EXACT card for its storage breakdown, which is how "one vocabulary,
+ * one colour" is guaranteed rather than re-drawn (#130 PR-25, README.md:15 — the
+ * used-vs-free breakdown belongs to 20e, and it is this same card).
  */
 @Composable
-private fun StorageCardView(
+internal fun StorageCardView(
     card: StorageCard,
     modifier: Modifier = Modifier,
 ) {
@@ -546,17 +586,20 @@ private fun DeviceUsedBar(
 
 /**
  * The storage-hygiene nudge (brief §6.1): N packs unused past the stale
- * threshold. It informs and offers "Not now"; the stale packs it counts are
- * listed just below with their "used N months ago" lines and are removable there.
+ * threshold. It informs, offers "Not now", and — now that 20e exists (#130 PR-25) —
+ * a "Review N packs" action that opens the batch "Free up space" cleanup sheet over
+ * exactly the [stalePacks] this count is drawn from. The same stale packs are also
+ * listed just below with their "used N months ago" lines and removable one by one,
+ * so the nudge was never a dead end even before this action was wired.
  *
- * The frame's "Review N packs" action opens the batch 20e "Free up space" sheet,
- * which is **PR-25** — omitted rather than wired to nothing (EDGE_CASES §7, the
- * same call PR-18 made for 19b's second action). Carried as a #250/PR-25 residual.
+ * "Review N packs" is the emphasised (filled) action — reviewing the cleanup is the
+ * likely intent of a nudge about clutter — with "Not now" the text action beside it.
  */
 @Composable
 private fun NudgeCardView(
     nudge: HygieneNudge,
     onDismiss: () -> Unit,
+    onReview: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
@@ -589,11 +632,24 @@ private fun NudgeCardView(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = spacing.xs4),
         )
-        TextButton(
-            onClick = onDismiss,
-            modifier = Modifier.align(Alignment.End).testTag("tt_manage_nudge_dismiss"),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.align(Alignment.End).padding(top = spacing.xs4),
         ) {
-            Text(stringResource(R.string.manage_nudge_dismiss))
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("tt_manage_nudge_dismiss"),
+            ) {
+                Text(stringResource(R.string.manage_nudge_dismiss))
+            }
+            Button(
+                onClick = onReview,
+                contentPadding = PaddingValues(horizontal = spacing.md16),
+                modifier = Modifier.heightIn(min = Dimensions.touchTargetMin).testTag("tt_manage_nudge_review"),
+            ) {
+                Text(pluralStringResource(R.plurals.manage_nudge_review, nudge.stalePackCount, nudge.stalePackCount))
+            }
         }
     }
 }
@@ -860,9 +916,13 @@ private fun DownloadingNote() {
     }
 }
 
-/** Relative last-used as the row reads it. `NoRecord` is the honest date-less line (ruling ⑧). */
+/**
+ * Relative last-used as the row reads it. `NoRecord` is the honest date-less line
+ * (ruling ⑧). `internal` so the 20e cleanup sheet reads a stale pack's age with the
+ * SAME vocabulary this screen's rows do — never a calendar month (#130 PR-25).
+ */
 @Composable
-private fun packUsageText(usage: PackUsage): String =
+internal fun packUsageText(usage: PackUsage): String =
     when (usage) {
         PackUsage.NoRecord -> stringResource(R.string.manage_used_never)
         PackUsage.Today -> stringResource(R.string.manage_used_today)
@@ -1239,8 +1299,8 @@ private fun NudgeCardPreview() {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Column {
-                NudgeCardView(HygieneNudge(stalePackCount = 1), {})
-                NudgeCardView(HygieneNudge(stalePackCount = 2), {})
+                NudgeCardView(HygieneNudge(stalePackCount = 1), {}, {})
+                NudgeCardView(HygieneNudge(stalePackCount = 2), {}, {})
             }
         }
     }

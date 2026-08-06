@@ -39,6 +39,7 @@ class PackFailureSheetsTest {
     private var retries = 0
     private var manages = 0
     private var dismissals = 0
+    private var freeUps = 0
 
     private fun showInterrupted(cause: OfflineModelFailure = OfflineModelFailure.NETWORK) {
         compose.setContent {
@@ -57,6 +58,7 @@ class PackFailureSheetsTest {
     private fun showNoSpace(
         freeBytes: Long = 12L * 1024 * 1024,
         volumeBytes: Long = 64L * 1024 * 1024 * 1024,
+        onFreeUpSpace: (() -> Unit)? = null,
     ) {
         compose.setContent {
             TranzlateTheme {
@@ -65,6 +67,7 @@ class PackFailureSheetsTest {
                     volumeBytes = volumeBytes,
                     onManagePacks = { manages++ },
                     onDismiss = { dismissals++ },
+                    onFreeUpSpace = onFreeUpSpace,
                 )
             }
         }
@@ -216,16 +219,44 @@ class PackFailureSheetsTest {
     }
 
     /**
-     * The action that is NOT there, asserted as absent rather than left to a
-     * reader's memory of the ruling. A "Free up space" button wired to nothing
-     * is the dead end EDGE_CASES §7 forbids, and PR-25 is where it earns its
-     * place back.
+     * The honest degrade: where the host does NOT wire [onFreeUpSpace] — 20e is not
+     * reachable from that surface — 19b shows no "Free up space" at all, only its
+     * single filled "Manage packs". A button opening nothing is the dead end
+     * EDGE_CASES §7 forbids, so the sheet omits it rather than draw it disabled.
+     *
+     * Mutation decided first (rule 11): draw the second action unconditionally (drop
+     * the `if (onFreeUpSpace != null)` guard) — "Free up space" then appears with a
+     * no-op onClick and this `assertDoesNotExist` reddens.
      */
     @Test
-    fun `19b offers no Free up space until 20e exists`() {
-        showNoSpace()
+    fun `19b without a Free up space callback shows only Manage packs`() {
+        showNoSpace(onFreeUpSpace = null)
 
         compose.onNodeWithText("Free up space").assertDoesNotExist()
+        compose.onNodeWithTag(TT_SHEET_SPACE_MANAGE).assertTextEquals("Manage packs")
+    }
+
+    /**
+     * With 20e reachable (#130 PR-25) 19b draws BOTH actions the export shows: the
+     * filled "Free up space" (the likely intent) opening 20e, and "Manage packs"
+     * beside it. Each routes to its OWN callback and to nothing else.
+     *
+     * Mutation decided first: point the primary action's onClick at `onManagePacks`
+     * (or swap the two labels) — `freeUps` stays 0 while `manages` moves, and the
+     * `freeUps == 1 / manages == 0` pair reddens. Recording every callback catches a
+     * tap that fired both.
+     */
+    @Test
+    fun `19b with a Free up space callback offers both actions and each routes to its own`() {
+        showNoSpace(onFreeUpSpace = { freeUps++ })
+
+        compose.onNodeWithTag(TT_SHEET_SPACE_FREE_UP).assertTextEquals("Free up space")
+        compose.onNodeWithTag(TT_SHEET_SPACE_MANAGE).assertTextEquals("Manage packs")
+
+        compose.onNodeWithTag(TT_SHEET_SPACE_FREE_UP).performClick()
+        assertThat(freeUps).isEqualTo(1)
+        assertThat(manages).isEqualTo(0)
+        assertThat(dismissals).isEqualTo(0)
     }
 
     // ---- the HOST, not the sheet (#235) ---------------------------------------

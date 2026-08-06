@@ -177,12 +177,14 @@ this constant IS 19b's trigger.
 | `lang_sheet_space_body` | string | `There is %1$s free on this device. A language pack usually needs 40–65 MB.` | free space | the free-space figure is read at the moment of refusal, never the drawn `12 MB`. The pack figure is the shared one — see `lang_sheet_data_body` (§5.2) for where it comes from. ⚠ **It is not the threshold that raised this sheet.** `REQUIRED_FREE_BYTES` is 150 MiB (157.3 MB), because a download holds the compressed file and the unpacked pack at once — 111.4 MB peak for `en_ja`. So between 65 MB and 157 MB free, this sentence reads as though the user has enough. What 19b should say about that is a design call, residual on **#250** |
 | `lang_sheet_space_used` | string | `Other apps and system` | — | the bar's FILL. Used-against-free on one volume, never packs-against-device: at 110 MB the library cannot be plotted against a whole device without misstating one of the two figures (`docs/design/language-screens/README.md:15`) |
 | `lang_sheet_space_free` | string | `%1$s free` | free space | the bar's track |
-| `lang_sheet_space_manage` | string | `Manage packs` | — | the sole action. The drawn second action, `Free up space`, opens 20e — **PR-25** — so it is omitted rather than wired to nothing (rev3 ruling, PR-18 row). A third wording of "Manage packs" is not introduced: `lang_dialog_manage_packs` is the tablet card's docked action and owner ruling 5 relabels the Home row in PR-23, so this key joins that relabel rather than pre-empting it |
+| `lang_sheet_space_manage` | string | `Manage packs` | — | with 20e reachable it is the TEXT action beside the filled `Free up space`; where the host cannot reach 20e it stays the sole filled action (no dead end). A third wording of "Manage packs" is not introduced: `lang_dialog_manage_packs` is the tablet card's docked action and owner ruling 5 relabels the Home row in PR-23, so this key joins that relabel rather than pre-empting it |
+| `lang_sheet_space_free_up` | string | `Free up space` | — | 19b's SECOND action (#130 PR-25) — the filled likely-intent action, opening the 20e batch-cleanup sheet. Optional at the sheet API: a host that cannot reach 20e omits it and 19b degrades to the single `Manage packs` (PR-18's no-dead-end single action, kept intact) |
 
 ### 5.3.1 Sheet 19b — testTags (C-1)
 
 `tt_lang_sheet_space` (root) · `tt_lang_sheet_space_bar` (the storage bar, semantics cleared —
-the body already says "There is 12 MB free" in words) · `tt_lang_sheet_space_manage`.
+the body already says "There is 12 MB free" in words) · `tt_lang_sheet_space_manage` ·
+`tt_lang_sheet_space_free_up` (the second action, #130 PR-25).
 ## 5.4 Remove a pack — sheets 19f + 19g (#130 PR-19)
 
 The 🗑 on the offline manager deleted on the tap until this PR; it now asks. Owned by
@@ -407,13 +409,14 @@ own header is `manage_title` (`Manage packs`), deliberately distinct.
 | `manage_footer` | string | `%1$d of the %2$d languages have a pack. The other %3$d translate online only.` | capable, total, online-only | catalogue facts, sourced not hardcoded |
 | `manage_nudge_title` | plurals | `%1$d pack(s) haven't been used in months` | count | the hygiene nudge (brief §6.1) — packs stale past 90 days; date-less packs never counted (ruling ⑧) |
 | `manage_nudge_body` | string | `Keeping only the languages you use keeps the app light. Nothing is deleted without asking.` | — | the nudge's reassurance |
-| `manage_nudge_dismiss` | string | `Not now` | — | dismisses the nudge (session-durable). The drawn `Review N packs` action opens the batch 20e sheet — PR-25 — so it is omitted, not wired to nothing (the stale packs are listed just below, each removable: no dead end) |
+| `manage_nudge_dismiss` | string | `Not now` | — | dismisses the nudge (session-durable), the text action beside the filled `Review N packs` |
+| `manage_nudge_review` | plurals | `Review %1$d pack(s)` | count | the nudge's filled action (#130 PR-25) — opens the batch 20e "Free up space" sheet over exactly the stale packs it counts (`manage_nudge_title`) |
 
 ### 5.9.1 Manage packs — testTags (C-1)
 
 `tt_manage_back` · `tt_manage_list` · `tt_manage_empty` · `tt_manage_loading` ·
-`tt_manage_storage` · `tt_manage_nudge` · `tt_manage_nudge_dismiss` · `tt_manage_row` ·
-`tt_manage_usage_line` · `tt_manage_error_line` · `tt_manage_options` · `tt_manage_stop` ·
+`tt_manage_storage` · `tt_manage_nudge` · `tt_manage_nudge_dismiss` · `tt_manage_nudge_review` ·
+`tt_manage_row` · `tt_manage_usage_line` · `tt_manage_error_line` · `tt_manage_options` · `tt_manage_stop` ·
 `tt_manage_retry` · `tt_manage_deleting` · `tt_manage_no_packs` · `tt_manage_suggestion` ·
 `tt_manage_get` · `tt_manage_browse_all`.
 
@@ -425,11 +428,39 @@ own header is `manage_title` (`Manage packs`), deliberately distinct.
   space" refusal snackbar rather than silently re-failing. The #234 dead-control
   class is closed by *capturing the refusal and reporting it*, not by hiding the
   control. The removable packs below remain the in-screen space-freeing path; the
-  drawn batch `Free up space` action opening 20e is still **PR-25** (`Fixes: #250`).
+  drawn batch `Free up space` action opening 20e is **built in PR-25** (§5.10).
 - **`more_vert` → remove.** The overflow opens the existing 19f/19g confirm flow
   for now; the fuller 20c pack-actions sheet (Use as target now, voice line) is
   **PR-24**.
-- **Nudge `Review N packs` → 20e.** Omitted (PR-25), as above.
+- **Nudge `Review N packs` → 20e.** BUILT in **PR-25** (§5.10): the nudge's filled
+  action opens the 20e cleanup sheet over the stale packs it counts.
+
+## 5.10 Free up space — sheet 20e (#130 PR-25)
+
+The batch-cleanup sheet the nudge (`manage_nudge_review`) and 19b
+(`lang_sheet_space_free_up`) open. It lists ONLY the packs `stalePacks` returns —
+installed, removable, and stale by a REAL translation-use date past the 90-day
+threshold — so a date-less pack (`PackUsage.NoRecord`) is never listed and a
+pre-checked selection never fabricates a date (ruling ⑧). Every stale pack starts
+checked, in a `rememberSaveable` selection that survives process death. The storage
+breakdown is the SAME `StorageCardView` §5.9 draws (one vocabulary, one colour —
+`README.md:15`: the used-vs-free breakdown belongs to 20e). Re-downloading is free
+(packs are free and unlimited), which the body states so the cleanup reads as
+reversible; the batch removes through the existing per-pack delete path.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `lang_sheet_free_title` | string | `Free up space` | — | the sheet title, and the nudge/19b actions that open it share the wording |
+| `lang_sheet_free_body` | string | `These packs haven't been used in months. Removing them frees space — each is free to download again whenever you need it.` | — | states that re-downloading is free (packs unlimited), so no one fears the cleanup |
+| `lang_sheet_free_empty` | string | `Every pack here has been used recently, so there is nothing to clean up.` | — | the no-dead-end empty state — the sheet was reached but nothing qualifies; a single Close, no Remove |
+| `lang_sheet_free_remove` | plurals | `Remove %1$d pack(s)` | count of CHECKED packs | the filled action; disabled at zero (nothing checked). Cancel reuses `lang_sheet_remove_cancel` |
+| `lang_sheet_free_close` | string | `Close` | — | the empty state's single action (the populated sheet uses Remove + Cancel) |
+
+### 5.10.1 Free up space — testTags (C-1)
+
+`tt_lang_sheet_free` (root) · `tt_lang_sheet_free_remove` (the filled Remove) ·
+`tt_lang_sheet_free_cancel` (Cancel) · `tt_lang_sheet_free_close` (empty-state Close) ·
+`tt_lang_sheet_free_row_<id>` (one per stale-pack checkbox row, e.g. `…_row_de`).
 
 ## 6. Language picker — accessibility (C-4)
 

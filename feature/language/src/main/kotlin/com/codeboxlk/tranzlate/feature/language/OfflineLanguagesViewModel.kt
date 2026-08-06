@@ -497,6 +497,30 @@ class OfflineLanguagesViewModel
             handle[KEY_PENDING_REMOVAL] = null
             appScope.launch { modelManager.delete(id) }
         }
+
+        /**
+         * 20e "Free up space" — remove EVERY selected stale pack in one confirm
+         * (#130 PR-25). It is the batch form of [confirmRemove] and reuses the exact
+         * same per-pack path ([OfflineModelManager.delete]); there is no bulk-delete
+         * API and one would only re-implement the single delete N times less
+         * carefully. Each id is deleted, not just the first — the mutation this
+         * guards against (`ids.first()`) is pinned in `OfflineLanguagesViewModelTest`.
+         *
+         * On [appScope], not `viewModelScope`, for the reason [confirmRemove] and
+         * `useAsTarget` give: the 20e sheet dismisses the instant the user confirms
+         * and the screen can be popped underneath the deletes, so a `viewModelScope`
+         * launch would be cancelled mid-batch and silently leave packs behind. The
+         * deletes are launched in one coroutine, in order, so the appScope holds a
+         * single child until the whole batch is done.
+         *
+         * There is no re-download here and so no #234 trap to re-open: this only
+         * removes. A pack the user wants back is fetched again through the honest
+         * [download] path (PR-23's `reportOutcome`), never a discarding shortcut.
+         */
+        fun removePacks(ids: List<String>) {
+            if (ids.isEmpty()) return
+            appScope.launch { ids.forEach { modelManager.delete(it) } }
+        }
     }
 
 /** Offline-capable rows with their state, plus the full catalogue size for the footer. */

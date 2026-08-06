@@ -261,6 +261,85 @@ class ManagePacksModelTest {
         assertThat(hygieneNudge(onDevice, NOW)).isNull()
     }
 
+    // ── stalePacks: the 20e "Free up space" selector (#130 PR-25) ──────────────
+
+    /**
+     * The ⑧ honesty rule on the 20e LIST: a pack with no recorded translation-use has
+     * no date to call stale, so it is NEVER offered for batch removal — a pre-checked
+     * selection must not fabricate a date. `de` (genuinely stale) is present so the
+     * list is non-empty for the right reason, not because everything was filtered out.
+     *
+     * Mutation decided first (rule 11): widen [stalePacks]' predicate to
+     * `it.lastUsedMillis == null || isStale(...)` — `pl` then appears and the
+     * `containsExactly` reddens.
+     */
+    @Test
+    fun `stalePacks never lists a date-less pack`() {
+        val onDevice =
+            listOf(
+                packRow("pl", OfflineModelState.Downloaded, lastUsedMillis = null),
+                packRow("de", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(120)),
+            )
+
+        assertThat(stalePacks(onDevice, NOW).map { it.id }).containsExactly("de")
+    }
+
+    /**
+     * Only PAST the threshold: a pack used inside 90 days is not offered for cleanup.
+     *
+     * Mutation decided first: drop the threshold from [stalePacks] (predicate becomes
+     * `it.lastUsedMillis != null`) — the fresh `de` then appears and this reddens.
+     */
+    @Test
+    fun `stalePacks never lists a fresh-dated pack`() {
+        val onDevice =
+            listOf(
+                packRow("de", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(3)),
+                packRow("ru", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(120)),
+            )
+
+        assertThat(stalePacks(onDevice, NOW).map { it.id }).containsExactly("ru")
+    }
+
+    /**
+     * The pivot frees nothing, so it is never offered — even when stale. Mutation:
+     * drop the `!it.isPivot` guard from [stalePacks] and the pivot `en` appears.
+     */
+    @Test
+    fun `stalePacks never lists the pivot`() {
+        val onDevice =
+            listOf(
+                packRow("en", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(200), isPivot = true),
+                packRow("ru", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(120)),
+            )
+
+        assertThat(stalePacks(onDevice, NOW).map { it.id }).containsExactly("ru")
+    }
+
+    /**
+     * The whole selector at once, and its tie to the nudge: the nudge COUNT is the
+     * SIZE of the 20e LIST, so a nudge that says "2 packs" always opens a sheet
+     * listing 2. The fixture carries all three traps plus two genuinely stale packs.
+     *
+     * Mutation: give [hygieneNudge] its own separate predicate again (the pre-PR-25
+     * `onDevice.count { ... }`) and let one of them drift — the size and the count
+     * then disagree and this reddens.
+     */
+    @Test
+    fun `stalePacks is the exact set the nudge counts`() {
+        val onDevice =
+            listOf(
+                packRow("en", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(200), isPivot = true),
+                packRow("pl", OfflineModelState.Downloaded, lastUsedMillis = null),
+                packRow("de", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(1)),
+                packRow("ru", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(120)),
+                packRow("sv", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(95)),
+            )
+
+        assertThat(stalePacks(onDevice, NOW).map { it.id }).containsExactly("ru", "sv")
+        assertThat(stalePacks(onDevice, NOW).size).isEqualTo(hygieneNudge(onDevice, NOW)?.stalePackCount)
+    }
+
     // ── storageCard ───────────────────────────────────────────────────────────
 
     /** A measured positive byte answer → Sized, carrying the real figures. Mutation: read free as used. */

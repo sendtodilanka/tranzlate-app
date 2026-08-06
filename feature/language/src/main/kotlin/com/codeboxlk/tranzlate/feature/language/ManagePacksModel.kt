@@ -112,6 +112,28 @@ internal fun isStale(
 ): Boolean = lastUsedMillis != null && (nowMillis - lastUsedMillis) >= STALE_THRESHOLD_DAYS * DAY_MILLIS
 
 /**
+ * The exact packs the 20e "Free up space" cleanup sheet lists and the nudge counts
+ * (#130 PR-25) — installed packs that are removable AND provably stale.
+ *
+ * Three exclusions, the same three the nudge has always applied (this is now their
+ * one home, so the LIST 20e removes and the COUNT the nudge shows can never
+ * disagree):
+ * - the pivot (English, #224): removing it frees nothing, so it is never offered;
+ * - a date-less pack ([PackUsage.NoRecord], `lastUsedMillis == null`): staleness
+ *   needs a real date to measure, and a selection must never fabricate one
+ *   (ruling ⑧, brief §7b) — so a pack nobody has translated with is NEVER listed;
+ * - a pack used within [STALE_THRESHOLD_DAYS]: not yet stale.
+ *
+ * Order is inherited from [buildManagePacksSections]' on-device sort (most-recent
+ * first), so within the stale set the least-stale sits at the top — the same
+ * reading order the management list keeps.
+ */
+internal fun stalePacks(
+    onDevice: List<PackRow>,
+    nowMillis: Long,
+): List<PackRow> = onDevice.filter { !it.isPivot && isStale(it.lastUsedMillis, nowMillis) }
+
+/**
  * One Manage-packs row: an offline-capable language the user HAS, is fetching, or
  * a fetch that failed. Not the catalog — the picker is where new packs are
  * browsed; this screen shows only what is installed / in flight / failed.
@@ -254,8 +276,10 @@ fun hygieneNudge(
     onDevice: List<PackRow>,
     nowMillis: Long,
 ): HygieneNudge? {
-    val stale = onDevice.count { !it.isPivot && isStale(it.lastUsedMillis, nowMillis) }
-    return if (stale > 0) HygieneNudge(stalePackCount = stale) else null
+    // The count IS the size of the exact list 20e will offer ([stalePacks]) — one
+    // predicate, so the nudge can never say "3 packs" over a sheet that lists 2.
+    val stale = stalePacks(onDevice, nowMillis)
+    return if (stale.isNotEmpty()) HygieneNudge(stalePackCount = stale.size) else null
 }
 
 /**
