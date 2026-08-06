@@ -33,6 +33,7 @@
     <string name="lang_sheet_space_used">Ibang app at system</string>
     <string name="lang_sheet_space_free">%1$s na libre</string>
     <string name="lang_sheet_space_manage">Pamahalaan ang mga pack</string>
+    <string name="lang_sheet_space_free_up">Magbakante ng espasyo</string>
     <!-- Sheet 19a — see values/strings.xml for why there is no language name and
          why the second action is not "Wait for Wi-Fi". -->
     <string name="lang_sheet_data_title">I-download gamit ang mobile data?</string>
@@ -198,4 +199,18 @@
     </plurals>
     <string name="manage_nudge_body">Ang pagpapanatili lamang ng mga wikang ginagamit mo ay nagpapagaan sa app. Walang buburahin nang hindi nagtatanong.</string>
     <string name="manage_nudge_dismiss">Hindi ngayon</string>
+    <plurals name="manage_nudge_review">
+        <item quantity="one">Suriin ang %1$d pack</item>
+        <item quantity="other">Suriin ang %1$d na pack</item>
+    </plurals>
+
+    <!-- 20e — Magbakante ng espasyo (#130 PR-25). -->
+    <string name="lang_sheet_free_title">Magbakante ng espasyo</string>
+    <string name="lang_sheet_free_body">Ilang buwan nang hindi nagagamit ang mga pack na ito. Ang pag-alis sa mga ito ay nagbabakante ng espasyo — libreng ma-download muli ang bawat isa kapag kailangan mo.</string>
+    <string name="lang_sheet_free_empty">Kamakailan lang ginamit ang bawat pack dito, kaya wala nang lilinisin.</string>
+    <plurals name="lang_sheet_free_remove">
+        <item quantity="one">Alisin ang %1$d pack</item>
+        <item quantity="other">Alisin ang %1$d na pack</item>
+    </plurals>
+    <string name="lang_sheet_free_close">Isara</string>
 </resources>

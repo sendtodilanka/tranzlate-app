@@ -33,6 +33,7 @@
     <string name="lang_sheet_space_used">Outros apps e sistema</string>
     <string name="lang_sheet_space_free">%1$s livres</string>
     <string name="lang_sheet_space_manage">Gerenciar pacotes</string>
+    <string name="lang_sheet_space_free_up">Liberar espaço</string>
     <!-- Sheet 19a — see values/strings.xml for why there is no language name and
          why the second action is not "Wait for Wi-Fi". -->
     <string name="lang_sheet_data_title">Baixar usando dados móveis?</string>
@@ -198,4 +199,18 @@
     </plurals>
     <string name="manage_nudge_body">Manter apenas os idiomas que você usa deixa o app leve. Nada é excluído sem perguntar.</string>
     <string name="manage_nudge_dismiss">Agora não</string>
+    <plurals name="manage_nudge_review">
+        <item quantity="one">Revisar %1$d pacote</item>
+        <item quantity="other">Revisar %1$d pacotes</item>
+    </plurals>
+
+    <!-- 20e — Liberar espaço (#130 PR-25). -->
+    <string name="lang_sheet_free_title">Liberar espaço</string>
+    <string name="lang_sheet_free_body">Estes pacotes não são usados há meses. Removê-los libera espaço — cada um pode ser baixado de novo gratuitamente quando você precisar.</string>
+    <string name="lang_sheet_free_empty">Todos os pacotes aqui foram usados recentemente, então não há nada para limpar.</string>
+    <plurals name="lang_sheet_free_remove">
+        <item quantity="one">Remover %1$d pacote</item>
+        <item quantity="other">Remover %1$d pacotes</item>
+    </plurals>
+    <string name="lang_sheet_free_close">Fechar</string>
 </resources>

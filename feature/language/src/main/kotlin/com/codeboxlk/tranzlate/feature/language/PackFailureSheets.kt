@@ -51,6 +51,7 @@ internal const val TT_SHEET_FAILED_RETRY = "tt_lang_sheet_failed_retry"
 internal const val TT_SHEET_SPACE = "tt_lang_sheet_space"
 internal const val TT_SHEET_SPACE_BAR = "tt_lang_sheet_space_bar"
 internal const val TT_SHEET_SPACE_MANAGE = "tt_lang_sheet_space_manage"
+internal const val TT_SHEET_SPACE_FREE_UP = "tt_lang_sheet_space_free_up"
 
 /**
  * Sheet **19d — "Interrupted"** (#130 PR-18): the download the user just asked
@@ -206,17 +207,23 @@ private fun CauseCard(causeRes: Int) {
  * the volume that is not free — "Other apps and system" — and this app's own
  * packs are not broken out of it. The breakdown is 20e's job (PR-25).
  *
- * ## One action, not the two that are drawn
+ * ## The second action, now that 20e exists (#130 PR-25)
  *
- * The frame draws `Manage packs` beside a filled `Free up space`. **Free up
- * space opens 20e, which does not exist until PR-25**, and the rev3 ruling
- * pre-decided this exact case: *""Free up space" button 20e එනකම් omit (single
- * action "Manage packs" — no dead end)"*. A button that opens nothing is the
- * dead end EDGE_CASES §7 forbids, and a button that silently did something else
- * would be worse. `Manage packs` therefore becomes the sole action and is
- * filled, because a lone action is by definition the likely intent — and it
- * leads somewhere that can actually free space, which is what keeps the sheet
- * inside the no-dead-end rule with one action instead of two.
+ * The frame draws `Manage packs` beside a filled `Free up space`. PR-18 shipped
+ * only `Manage packs` because *"Free up space opens 20e, which does not exist"* —
+ * a button that opens nothing is the dead end EDGE_CASES §7 forbids, and the rev3
+ * ruling pre-decided the single-action case (PR-18 row). 20e exists now, so this
+ * sheet can carry both: with [onFreeUpSpace] wired, `Free up space` is the filled
+ * likely-intent action and `Manage packs` the text action beside it, exactly as
+ * drawn.
+ *
+ * [onFreeUpSpace] is **optional** for a deliberate reason: the host decides whether
+ * 20e is reachable from where it raised this sheet. A host that CAN open the 20e
+ * cleanup sheet passes the callback and gets both actions; a host that cannot
+ * (opening 20e from that surface would be a dead-end button, or need navigation it
+ * does not own) omits it and gets the single filled `Manage packs` — the same
+ * no-dead-end degrade PR-18 shipped, never a button that opens nothing. So the
+ * two-action frame is honoured only where it can actually work.
  *
  * The tone is [TranzlateSheetTone.Neutral], as drawn: the export paints this
  * icon slot `#d3e3fd`/`#0842a0` — the primary container pair — where 19d's is
@@ -224,6 +231,9 @@ private fun CauseCard(causeRes: Int) {
  *
  * The `@OptIn` is the scaffold's default `SheetState` argument — see
  * [InterruptedSheet] for why none is hoisted.
+ *
+ * @param onFreeUpSpace opens the 20e "Free up space" batch-cleanup sheet. When
+ *   `null`, the sheet degrades to the single `Manage packs` action (no dead end).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -232,20 +242,35 @@ internal fun NoSpaceSheet(
     volumeBytes: Long,
     onManagePacks: () -> Unit,
     onDismiss: () -> Unit,
+    onFreeUpSpace: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val free = Formatter.formatShortFileSize(context, freeBytes)
+    val managePacksAction =
+        TranzlateSheetAction(
+            label = stringResource(R.string.lang_sheet_space_manage),
+            testTag = TT_SHEET_SPACE_MANAGE,
+            onClick = onManagePacks,
+        )
     TranzlateSheetScaffold(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.lang_sheet_space_title),
+        // Filled = likely intent (spec §5). With 20e reachable, that is "Free up
+        // space"; "Manage packs" moves to the text slot. Without it, "Manage packs"
+        // is the lone filled action — PR-18's no-dead-end single action.
         primaryAction =
-            TranzlateSheetAction(
-                label = stringResource(R.string.lang_sheet_space_manage),
-                testTag = TT_SHEET_SPACE_MANAGE,
-                onClick = onManagePacks,
-            ),
+            if (onFreeUpSpace != null) {
+                TranzlateSheetAction(
+                    label = stringResource(R.string.lang_sheet_space_free_up),
+                    testTag = TT_SHEET_SPACE_FREE_UP,
+                    onClick = onFreeUpSpace,
+                )
+            } else {
+                managePacksAction
+            },
         modifier = Modifier.testTag(TT_SHEET_SPACE),
         icon = { NoSpaceIcon() },
+        secondaryAction = if (onFreeUpSpace != null) managePacksAction else null,
         supportingContent = { StorageBarCard(freeLabel = free, fraction = deviceUsedFraction(freeBytes, volumeBytes)) },
         body = { Text(stringResource(R.string.lang_sheet_space_body, free)) },
     )
@@ -436,20 +461,46 @@ private fun NoSpaceSheetUnmeasuredVolumePreview() {
     NoSpaceSheetPreviewBody(freeBytes = 12L * 1024 * 1024, volumeBytes = 0L)
 }
 
+/**
+ * 19b with 20e reachable (#130 PR-25): both actions the export draws — "Free up
+ * space" filled (the likely intent), "Manage packs" the text action beside it.
+ */
+@PreviewLightDark
+@Composable
+private fun NoSpaceSheetWithFreeUpPreview() {
+    NoSpaceSheetPreviewBody(
+        freeBytes = 12L * 1024 * 1024,
+        volumeBytes = 64L * 1024 * 1024 * 1024,
+        withFreeUp = true,
+    )
+}
+
 @Composable
 private fun NoSpaceSheetPreviewBody(
     freeBytes: Long,
     volumeBytes: Long,
+    withFreeUp: Boolean = false,
 ) {
     val free = Formatter.formatShortFileSize(LocalContext.current, freeBytes)
+    val managePacks =
+        TranzlateSheetAction(
+            label = stringResource(R.string.lang_sheet_space_manage),
+            testTag = TT_SHEET_SPACE_MANAGE,
+            onClick = {},
+        )
     TranzlateSheetPreviewFrame(
         title = stringResource(R.string.lang_sheet_space_title),
         primaryAction =
-            TranzlateSheetAction(
-                label = stringResource(R.string.lang_sheet_space_manage),
-                testTag = TT_SHEET_SPACE_MANAGE,
-                onClick = {},
-            ),
+            if (withFreeUp) {
+                TranzlateSheetAction(
+                    label = stringResource(R.string.lang_sheet_space_free_up),
+                    testTag = TT_SHEET_SPACE_FREE_UP,
+                    onClick = {},
+                )
+            } else {
+                managePacks
+            },
+        secondaryAction = if (withFreeUp) managePacks else null,
         icon = { NoSpaceIcon() },
         supportingContent = { StorageBarCard(freeLabel = free, fraction = deviceUsedFraction(freeBytes, volumeBytes)) },
         body = { Text(stringResource(R.string.lang_sheet_space_body, free)) },

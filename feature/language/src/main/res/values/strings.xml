@@ -79,6 +79,12 @@
     <string name="lang_sheet_space_used">Other apps and system</string>
     <string name="lang_sheet_space_free">%1$s free</string>
     <string name="lang_sheet_space_manage">Manage packs</string>
+    <!-- 19b's SECOND action (#130 PR-25). Now that 20e exists, the space-refusal
+         sheet can offer the batch cleanup directly, not only "Manage packs". PR-18
+         omitted this while 20e did not exist — a button opening nothing is the dead
+         end EDGE_CASES §7 forbids. It is the likely intent, so it is the filled one;
+         "Manage packs" becomes the text action beside it. -->
+    <string name="lang_sheet_space_free_up">Free up space</string>
     <!-- Sheet 19a — the ONE mobile-data consent copy (#130 PR-17). It replaced
          text_lang_data_dialog_* and offline_data_dialog_*, two identical sets
          behind two dialogs. No language name: an answer here can be made
@@ -436,4 +442,34 @@
     </plurals>
     <string name="manage_nudge_body">Keeping only the languages you use keeps the app light. Nothing is deleted without asking.</string>
     <string name="manage_nudge_dismiss">Not now</string>
+    <!-- The nudge's action (#130 PR-25): opens the batch 20e "Free up space" sheet
+         over exactly the stale packs it counts. A plural so one pack does not read
+         "Review 1 packs". -->
+    <plurals name="manage_nudge_review">
+        <item quantity="one">Review %1$d pack</item>
+        <item quantity="other">Review %1$d packs</item>
+    </plurals>
+
+    <!-- 20e — Free up space (#130 PR-25). The batch-cleanup sheet the nudge and 19b
+         open. It lists ONLY packs with a real translation-use date older than the
+         90-day stale threshold — a date-less pack is NEVER listed, because staleness
+         needs a real date and a selection must not fabricate one (ruling ⑧). Every
+         stale pack starts checked. The storage breakdown above the list is the SAME
+         aggregate card 20b draws (one vocabulary, one colour). Removing is free to
+         undo: packs are free and unlimited, so re-downloading any of them costs
+         nothing — the copy says so, so no one fears the cleanup. -->
+    <string name="lang_sheet_free_title">Free up space</string>
+    <string name="lang_sheet_free_body">These packs haven\'t been used in months. Removing them frees space — each is free to download again whenever you need it.</string>
+    <!-- The empty state: the sheet was reached but nothing qualifies (everything has
+         been used recently, or the stale packs were just removed). Not a dead end —
+         it says so plainly and offers only the way out. -->
+    <string name="lang_sheet_free_empty">Every pack here has been used recently, so there is nothing to clean up.</string>
+    <!-- The filled action, counting the CHECKED packs; disabled at zero. A plural so
+         one pack does not read "Remove 1 packs". Cancel reuses lang_sheet_remove_cancel. -->
+    <plurals name="lang_sheet_free_remove">
+        <item quantity="one">Remove %1$d pack</item>
+        <item quantity="other">Remove %1$d packs</item>
+    </plurals>
+    <!-- The empty state's single action (the populated sheet uses Remove + Cancel). -->
+    <string name="lang_sheet_free_close">Close</string>
 </resources>

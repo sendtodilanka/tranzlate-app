@@ -440,6 +440,35 @@ class OfflineLanguagesViewModelTest {
         }
 
     /**
+     * 20e batch remove (#130 PR-25): EVERY selected pack is deleted, not just the
+     * first, reusing the same per-pack [OfflineModelManager.delete] the single
+     * remove does.
+     *
+     * Mutation decided first (rule 11): change [OfflineLanguagesViewModel.removePacks]
+     * to `modelManager.delete(ids.first())` — only "de" is then deleted and this
+     * reddens on the missing "pl"/"sv". `containsExactly(...).inOrder()` also pins the
+     * batch order, so a mutation that shuffled the deletes reddens too.
+     */
+    @Test
+    fun `removePacks deletes every selected pack`() =
+        runTest {
+            viewModel.removePacks(listOf("de", "pl", "sv"))
+            runCurrent()
+
+            assertThat(manager.deletes).containsExactly("de", "pl", "sv").inOrder()
+        }
+
+    /** An empty batch touches nothing — a confirm with no boxes ticked is a no-op, never a stray delete. */
+    @Test
+    fun `removePacks with an empty selection deletes nothing`() =
+        runTest {
+            viewModel.removePacks(emptyList())
+            runCurrent()
+
+            assertThat(manager.deletes).isEmpty()
+        }
+
+    /**
      * Mutation C5. The ⏹ on a DOWNLOADING row is delete-to-cancel and stays
      * immediate — the way out of a download, not the removal of a pack the user
      * has. Routing it through the confirm sheet reddens here.
