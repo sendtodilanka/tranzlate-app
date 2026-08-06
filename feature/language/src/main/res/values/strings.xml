@@ -407,9 +407,19 @@
     <string name="manage_used_never">no recorded use yet</string>
     <!-- The badge on the pack of the current TARGET language. -->
     <string name="manage_in_use">IN USE</string>
-    <!-- The overflow control's accessible name. It opens the remove flow for now; the
-         fuller 20c actions sheet ("Use as target now", the voice line) is PR-24. -->
+    <!-- The overflow control's accessible name. It opens the 20c pack-actions sheet. -->
     <string name="manage_cd_options">Options for %1$s</string>
+    <!-- 20c pack-actions sheet (PR-24), opened from a downloaded pack's overflow. It is a
+         pure action-LIST sheet: its rows ARE the actions, so there is no primary button.
+         The sheet's own title is the language name. -->
+    <!-- Action row: make this pack's language the one the app translates INTO, right now. -->
+    <string name="manage_actions_use_target">Use as target now</string>
+    <!-- Informational line, NOT an action — shown only when this device also has an offline
+         VOICE for the language (a separate install from the translate pack). Same verb as
+         the picker's speaker mark (cd_text_lang_row_voice). -->
+    <string name="manage_actions_voice">Can be spoken offline</string>
+    <!-- Destructive action row; routes to the existing remove-confirm sheet (19f/19g). -->
+    <string name="manage_actions_remove">Remove pack</string>
     <!-- The empty state's second way forward beside the suggestions: open the picker. -->
     <string name="manage_browse_all">Browse all languages</string>
     <!-- The footer. Three catalogue facts, sourced not hardcoded: capable (59), total

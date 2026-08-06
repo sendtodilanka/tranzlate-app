@@ -187,6 +187,9 @@
     <string name="manage_used_never">wala pang naitalang paggamit</string>
     <string name="manage_in_use">GINAGAMIT</string>
     <string name="manage_cd_options">Mga opsyon para sa %1$s</string>
+    <string name="manage_actions_use_target">Gamitin bilang target ngayon</string>
+    <string name="manage_actions_voice">Kayang bigkasin offline</string>
+    <string name="manage_actions_remove">Alisin ang pack</string>
     <string name="manage_browse_all">I-browse ang lahat ng wika</string>
     <string name="manage_footer">%1$d sa %2$d na wika ang may pack. Ang iba pang %3$d ay isinasalin online lang.</string>
     <plurals name="manage_nudge_title">

@@ -123,6 +123,12 @@ internal fun isStale(
  *   "IN USE" badge, and the only sense of in-use either drawn frame has.
  * @property isPivot the ML Kit English pivot (#224): included with every pack,
  *   removable by nothing, so it carries no overflow control and is never nudged.
+ * @property hasOfflineVoice this device can also SPEAK this language offline — a
+ *   voice, installed separately from the translate pack (device truth, the same
+ *   `Language.hasOfflineVoice` the picker's speaker mark reads). Feeds the 20c
+ *   pack-actions sheet's informational voice line ONLY; it never gates a row's
+ *   presence, its removal, or its ordering. Defaulted so the many existing PackRow
+ *   constructions (previews, tests) are untouched (#130 PR-24).
  */
 @Immutable
 data class PackRow(
@@ -133,6 +139,7 @@ data class PackRow(
     val lastUsedMillis: Long?,
     val inUse: Boolean,
     val isPivot: Boolean,
+    val hasOfflineVoice: Boolean = false,
 )
 
 /**
@@ -180,6 +187,11 @@ fun buildManagePacksSections(
     nowMillis: Long,
     locale: Locale,
 ): ManagePacksSections {
+    // Voice is looked up by id from the INPUT rows, exactly as `usage` is: the
+    // localized `OfflinePackRow` [buildOfflineRows] returns carries only id/name/
+    // state, and the id is preserved, so this reaches the device's per-language
+    // voice truth without that row type having to carry it (#130 PR-24).
+    val voiceById = rows.associate { it.id to it.hasOfflineVoice }
     val packRows =
         buildOfflineRows(rows, locale).map { row ->
             val lastUsed = usage[row.id]
@@ -191,6 +203,7 @@ fun buildManagePacksSections(
                 lastUsedMillis = lastUsed,
                 inUse = row.id == targetId,
                 isPivot = isPivotLanguage(row.id),
+                hasOfflineVoice = voiceById[row.id] == true,
             )
         }
     val downloading = packRows.filter { it.state == OfflineModelState.Downloading }

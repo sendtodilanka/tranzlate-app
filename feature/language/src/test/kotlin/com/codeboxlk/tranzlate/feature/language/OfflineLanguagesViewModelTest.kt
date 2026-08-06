@@ -546,6 +546,35 @@ class OfflineLanguagesViewModelTest {
             assertThat(translatePrefs.target.value).isEqualTo("fr")
         }
 
+    // ── 20c "Use as target now" (#130 PR-24) ──────────────────────────────────
+
+    /**
+     * The mirror of the remove test above: removing writes NO preference, but "Use as
+     * target now" writes exactly ONE — the pack, as the target, through the same
+     * [TranslatePrefsRepository] the picker uses. Mutation decided first (rule 11): drop
+     * the `translatePrefs.setTargetLang(id)` line in `useAsTarget` and `writes` is empty,
+     * reddening this. It runs on [appScope] (the picker's dropped-write lesson), so
+     * `runCurrent` advances it exactly as it does `confirmRemove` above.
+     */
+    @Test
+    fun `useAsTarget writes the pack as the target preference`() =
+        runTest {
+            viewModel.useAsTarget("es")
+            runCurrent()
+
+            assertThat(translatePrefs.writes).containsExactly("target=es")
+        }
+
+    /** And it touches nothing else — no pack is deleted by choosing a target. */
+    @Test
+    fun `useAsTarget deletes no pack`() =
+        runTest {
+            viewModel.useAsTarget("es")
+            runCurrent()
+
+            assertThat(manager.deletes).isEmpty()
+        }
+
     @Test
     fun `the in-use sheet counts saved phrases on either side of the pair`() =
         runTest {

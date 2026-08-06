@@ -107,7 +107,7 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR | Scope | Status |
 |---|---|---|
 | PR-23 | 20b rewrite behind the SAME Home row + relabel "Language packs" (ruling 5) + **20f** empty state (ruling 7 — drawn in rev4) | ✅ #310 — co-verify BLOCK (STORAGE dead-end) fixed: honest Retry + refusal snackbar; 428 tests. Fast-follows filed (onRetry discard, two-SnackbarHost overlap, repeatOnLifecycle) |
-| PR-24 | 20c pack-actions sheet | ⬜ |
+| PR-24 | 20c pack-actions sheet | ✅ inline `TranzlateListSheet` off the downloaded-pack overflow: "Use as target now" (appScope write through the picker's `TranslatePrefsRepository` path) · voice line IFF `hasOfflineVoice` (plumbed `Language`→`OfflineLanguageRow`→`PackRow`) · Remove → existing 19f/19g. 4 mutation-proven tests; preflight + build green |
 | PR-25 | 20e Free up space | ⬜ |
 | PR-26 | 20d list-detail (camera card + pair-share line omitted) | ⬜ |
 | PR-27 | Ruling 2 execution: remove the Detect "ONLINE ONLY" chip; 19i never built | ✅ #309 — chip stripped from both faces (visible chip + TalkBack cd); real online-only langs keep theirs |

@@ -41,11 +41,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-/** One Manage-packs row source: a catalog language that MLKit can hold offline. */
+/**
+ * One Manage-packs row source: a catalog language that MLKit can hold offline.
+ *
+ * @property hasOfflineVoice this device can also SPEAK this language offline — copied
+ *   straight from [Language.hasOfflineVoice] (the same device truth the picker's
+ *   speaker mark reads), never crossed with the translate-pack state: a voice and a
+ *   pack are separate installs. Carried only so the 20c pack-actions sheet can draw
+ *   its informational voice line; defaulted so existing constructions are untouched.
+ */
 data class OfflineLanguageRow(
     val id: String,
     val name: String,
     val state: OfflineModelState,
+    val hasOfflineVoice: Boolean = false,
 )
 
 /**
@@ -204,6 +213,7 @@ class OfflineLanguagesViewModel
                                     id = language.id,
                                     name = language.name,
                                     state = states[language.id] ?: OfflineModelState.NotDownloaded,
+                                    hasOfflineVoice = language.hasOfflineVoice,
                                 )
                             },
                     total = catalog.size,
@@ -434,6 +444,28 @@ class OfflineLanguagesViewModel
             ) {
                 0
             }
+
+        /**
+         * 20c "Use as target now" — make this pack's language the one the app
+         * translates INTO, written through the SAME [TranslatePrefsRepository] (and
+         * therefore the same DataStore key) the picker's target selection uses, so the
+         * composer's chip and this screen agree by construction. The repository
+         * canonicalises on the write side, so the raw catalog id is handed straight
+         * through exactly as `LanguagePickerViewModel.select` does.
+         *
+         * On [appScope], not `viewModelScope`, for the reason the picker's `select`
+         * proved by co-verify and [confirmRemove] repeats here: this is a write the
+         * user explicitly asked for, and the screen can go away underneath it — a Back
+         * press right after the tap pops [LanguagesNavKey], the nav decorator clears
+         * this ViewModel's store, and DataStore's `edit` runs in the CALLER's context,
+         * so a `viewModelScope` write would be DROPPED on the pop and the target would
+         * silently not change. It does NOT stamp the per-role recents the picker does:
+         * "Recently used as target" is fed by the picker's own selections, and adding a
+         * second writer here is out of this sheet's scope (#130 PR-24).
+         */
+        fun useAsTarget(id: String) {
+            appScope.launch { translatePrefs.setTargetLang(id) }
+        }
 
         /** Row overflow / suggestion 🗑: ask first. Nothing is deleted until [confirmRemove]. */
         fun requestRemove(id: String) {

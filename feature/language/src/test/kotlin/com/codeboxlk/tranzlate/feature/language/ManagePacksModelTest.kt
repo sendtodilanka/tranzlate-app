@@ -168,6 +168,26 @@ class ManagePacksModelTest {
         assertThat(sections.onDevice.single().isPivot).isTrue()
     }
 
+    /**
+     * The device's offline-voice truth threads from the source row to the built pack
+     * row, so the 20c sheet can gate its voice line on it (#130 PR-24). Mutation decided
+     * first (rule 11): hardcode `hasOfflineVoice = false` in `buildManagePacksSections`
+     * and the Spanish assertion reddens; hardcode it `true` and the German one does. The
+     * two rows in one call also prove it is looked up per id, not applied blanket.
+     */
+    @Test
+    fun `offline voice threads per-pack from the source row to the pack row`() {
+        val rows =
+            listOf(
+                OfflineLanguageRow("es", "Spanish", OfflineModelState.Downloaded, hasOfflineVoice = true),
+                OfflineLanguageRow("de", "German", OfflineModelState.Downloaded, hasOfflineVoice = false),
+            )
+        val sections = buildManagePacksSections(rows, emptyMap(), targetId = "", nowMillis = NOW, locale = en)
+
+        assertThat(sections.onDevice.single { it.id == "es" }.hasOfflineVoice).isTrue()
+        assertThat(sections.onDevice.single { it.id == "de" }.hasOfflineVoice).isFalse()
+    }
+
     // ── on-device order: in use first, then most-recent, then alphabetical ─────
 
     /**

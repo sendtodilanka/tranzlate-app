@@ -77,12 +77,24 @@ class OfflineRemoveFlowRenderTest {
         compose.waitForIdle()
     }
 
-    /** The whole point: the overflow ASKS. Wiring it back to the delete reddens here. */
+    /**
+     * The route the overflow takes since #130 PR-24: it opens the 20c pack-actions
+     * sheet, and REMOVE INSIDE that sheet raises the question. Before PR-24 the
+     * overflow called `onRemove` straight off (this test asserted exactly that); now
+     * the overflow ASKS the sheet, so `removeRequests` is still empty right after it,
+     * and only the sheet's Remove raises the question. Wiring the overflow back to
+     * `onRemove` directly, or wiring the sheet's Remove to nothing, reddens here.
+     */
     @Test
-    fun `the overflow raises the question and nothing else`() {
+    fun `the overflow opens the actions sheet, and Remove there raises the question`() {
         showScreen()
 
         compose.onNodeWithTag("tt_manage_options").performClick()
+        compose.waitForIdle()
+        assertThat(removeRequests).isEmpty()
+
+        compose.onNodeWithTag(TT_SHEET_PACK_REMOVE).performClick()
+        compose.waitForIdle()
 
         assertThat(removeRequests).containsExactly("es")
         assertThat(stops).isEmpty()
