@@ -50,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -120,14 +121,17 @@ fun OfflineLanguagesScreen(
     // Retry that could not even start because the disk is still full. Drained from
     // the ViewModel's one-shot channel (never the U-1 PackEvents channel: that is for
     // a transfer that actually ran) and shown over the packs the user can remove to
-    // free room. `getString`, not `stringResource`, because showSnackbar runs in a
-    // coroutine; the copy is `downloadFailureCopy`'s so the message matches the row.
+    // free room. Read via `LocalResources` (captured at composition): not
+    // `stringResource`, which is @Composable and illegal inside showSnackbar's
+    // coroutine; and not `LocalContext.current.getString`, which lint flags as
+    // `LocalContextGetResourceValueCall`. The copy is `downloadFailureCopy`'s so the
+    // message matches the row.
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
+    val resources = LocalResources.current
     LaunchedEffect(viewModel, snackbarHostState) {
         viewModel.refusals.collect { cause ->
             snackbarHostState.showSnackbar(
-                message = context.getString(downloadFailureCopy(cause).rowLine),
+                message = resources.getString(downloadFailureCopy(cause).rowLine),
                 duration = SnackbarDuration.Short,
             )
         }
