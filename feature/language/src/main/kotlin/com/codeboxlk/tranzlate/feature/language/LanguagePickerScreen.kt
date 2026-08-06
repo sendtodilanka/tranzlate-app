@@ -1950,6 +1950,13 @@ private fun RowTrailing(
     // the `when` below; its "included with every language" story is told by the
     // supporting line (`tt_lang_included`), not by a trailing control.
     if (isPivotLanguage(row.id) && row.state !is LanguageRowState.Selected) return
+    // The "Detect language" pseudo-row is not a language pack. Detection runs
+    // on-device (`MlKitLanguageIdentifier`), so it can carry no honest `ONLINE
+    // ONLY` chip — owner ruling 2 / designer-brief §11-10 strip it. Guarded by id
+    // like the pivot above, so its borrowed `OnlineOnly` state never reaches the
+    // chip below; a CHOSEN Detect still shows its tick via the `when`. This is the
+    // ONE render site of the chip, so the 135 real online-only languages keep it.
+    if (row.id == DETECT_LANGUAGE_ID && row.state !is LanguageRowState.Selected) return
     when (row.state) {
         is LanguageRowState.Selected -> {
             Icon(
@@ -2001,7 +2008,10 @@ private fun RowTrailing(
         }
 
         LanguageRowState.OnlineOnly -> {
-            OnlineOnlyChip()
+            // Tagged per row so a render test can see WHICH rows draw the chip:
+            // absent on the Detect pseudo-row (ruling 2), present on the 135 real
+            // online-only languages. The chip itself stays silent to TalkBack.
+            OnlineOnlyChip(modifier = Modifier.testTag("tt_lang_online_only_${row.id}"))
         }
 
         is LanguageRowState.Failed -> {
@@ -2140,24 +2150,33 @@ private fun VoiceLegend(modifier: Modifier = Modifier) {
 /**
  * The design's own chip, reused for the 135 catalog languages that ML Kit
  * cannot hold offline at all (plan R4) — same visual language, nothing invented.
+ * NOT drawn on the "Detect language" pseudo-row: detection is on-device, so its
+ * chip is stripped in [RowTrailing] (owner ruling 2 / designer-brief §11-10).
+ *
+ * [modifier] rides the OUTER [Box], not the inner [Text]: the text clears its own
+ * semantics (it is decorative — the row's content description already carries
+ * "online only" for TalkBack), and a `testTag` applied to a cleared node would be
+ * wiped. The Box is the un-cleared home for the per-row tag the call site passes.
  */
 @Composable
-private fun OnlineOnlyChip() {
+private fun OnlineOnlyChip(modifier: Modifier = Modifier) {
     val spacing = LocalSpacing.current
     val locale = LocalLocale.current.platformLocale
-    Text(
-        text = stringResource(R.string.text_lang_online_only).uppercase(locale),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        modifier =
-            Modifier
-                .heightIn(min = Dimensions.pickerChipHeight)
-                .clip(MaterialTheme.shapes.extraSmall)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(horizontal = spacing.sm8, vertical = spacing.xs4)
-                .clearAndSetSemantics { },
-    )
+    Box(modifier = modifier) {
+        Text(
+            text = stringResource(R.string.text_lang_online_only).uppercase(locale),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            modifier =
+                Modifier
+                    .heightIn(min = Dimensions.pickerChipHeight)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = spacing.sm8, vertical = spacing.xs4)
+                    .clearAndSetSemantics { },
+        )
+    }
 }
 
 /**
@@ -2172,7 +2191,18 @@ private fun rowContentDescription(
     row: LanguagePickerRow,
     voiceMark: Boolean,
 ): String {
-    val base = stateContentDescription(row.state, row.displayName)
+    // The Detect pseudo-row announces only its name. Its borrowed `OnlineOnly`
+    // state would otherwise speak "online only" (`cd_text_lang_row_online_only`),
+    // the same falsehood the visible chip carries — and, because the chip clears
+    // its own semantics, the ONLY place that claim reaches TalkBack. Detection is
+    // on-device, so owner ruling 2 strips this spoken face of the chip too.
+    // Guarded by id like the pivot; a real online-only language keeps its line.
+    val base =
+        if (row.id == DETECT_LANGUAGE_ID) {
+            row.displayName
+        } else {
+            stateContentDescription(row.state, row.displayName)
+        }
     return if (voiceMark) stringResource(R.string.cd_text_lang_row_voice, base) else base
 }
 
@@ -3142,6 +3172,13 @@ private fun VoiceLegendPreview() {
     }
 }
 
+/**
+ * The "Detect language" pseudo-row, unselected then selected. Owner ruling 2:
+ * NO `ONLINE ONLY` chip on either (detection is on-device) — the unselected row
+ * ends after its name, the selected row shows the tick. Contrast
+ * [LanguageRowOnlineOnlyPreview], which is a real online-only language and KEEPS
+ * its chip.
+ */
 @PreviewLightDark
 @Composable
 private fun LanguageRowDetectPreview() {
