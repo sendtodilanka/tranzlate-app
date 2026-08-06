@@ -47,10 +47,10 @@ class FreeUpSpaceSheetRenderTest {
         id = id,
         displayName = name,
         state = state,
-        usage = PackUsage.MonthsAgo(monthsAgo),
-        lastUsedMillis = daysAgo(monthsAgo * 30L),
+        // A REAL stale stamp `monthsAgo` months in the past — genuinely stale for the
+        // 20e batch-delete tests, coherent by construction (the stamp IS the usage, #325).
+        usage = PackUsage.Used(daysAgo(monthsAgo * 30L)),
         inUse = false,
-        isPivot = false,
     )
 
     private val twoStale = listOf(stale("de", "German", 4), stale("pl", "Polish", 6))
@@ -65,6 +65,7 @@ class FreeUpSpaceSheetRenderTest {
                     visible = true,
                     stalePacks = stalePacks,
                     storage = null,
+                    nowMillis = NOW,
                     onRemovePacks = onRemovePacks,
                     onDismiss = {},
                 )
@@ -105,6 +106,7 @@ class FreeUpSpaceSheetRenderTest {
                     visible = true,
                     stalePacks = twoStale,
                     storage = null,
+                    nowMillis = NOW,
                     onRemovePacks = {},
                     onDismiss = {},
                 )
@@ -186,7 +188,6 @@ class FreeUpSpaceSheetRenderTest {
                 rows = onDevice,
                 usage = mapOf("de" to daysAgo(120)), // pl omitted → NoRecord
                 targetId = "",
-                nowMillis = NOW,
                 locale = Locale.ENGLISH,
             )
         val staleRows = stalePacks(sections.onDevice, NOW)
@@ -201,6 +202,7 @@ class FreeUpSpaceSheetRenderTest {
                     suggestions = emptyList(),
                     capable = 59,
                     total = 194,
+                    nowMillis = NOW,
                     onBack = {},
                     onGet = {},
                     onStopDownload = {},

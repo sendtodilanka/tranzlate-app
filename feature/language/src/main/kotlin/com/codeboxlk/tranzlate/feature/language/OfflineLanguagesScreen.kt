@@ -116,8 +116,8 @@ fun OfflineLanguagesScreen(
     // clock instant travels IN the data so "used today" is fixed per emission, not
     // recomputed on every recomposition a fling produces.
     val sections =
-        remember(data.rows, data.usage, data.targetId, data.nowMillis, locale) {
-            buildManagePacksSections(data.rows, data.usage, data.targetId, data.nowMillis, locale)
+        remember(data.rows, data.usage, data.targetId, locale) {
+            buildManagePacksSections(data.rows, data.usage, data.targetId, locale)
         }
     val nudge =
         remember(sections.onDevice, data.nowMillis, data.nudgeDismissed) {
@@ -299,6 +299,7 @@ internal fun ManagePacksContent(
         visible = freeUpSpaceOpen,
         stalePacks = stalePacks,
         storage = storage,
+        nowMillis = nowMillis,
         onRemovePacks = onRemovePacks,
         onDismiss = { freeUpSpaceOpen = false },
     )
@@ -357,6 +358,7 @@ internal fun ManagePacksContent(
                         nudge = nudge,
                         capable = capable,
                         total = total,
+                        nowMillis = nowMillis,
                         onStopDownload = onStopDownload,
                         onRetry = onRetry,
                         onMoreOptions = { row ->
@@ -408,6 +410,9 @@ private fun PopulatedList(
     nudge: HygieneNudge?,
     capable: Int,
     total: Int,
+    // The clock each on-device row reads to turn its [PackUsage.Used] stamp into a
+    // relative "5 days ago" line (#325). One value per emission, from the ViewModel.
+    nowMillis: Long,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
@@ -437,6 +442,7 @@ private fun PopulatedList(
                 SelectablePackRow(
                     row = row,
                     selected = row.id == selectedId,
+                    nowMillis = nowMillis,
                     onSelectPack = onSelectPack,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
@@ -451,6 +457,7 @@ private fun PopulatedList(
                 SelectablePackRow(
                     row = row,
                     selected = row.id == selectedId,
+                    nowMillis = nowMillis,
                     onSelectPack = onSelectPack,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
@@ -475,6 +482,7 @@ private fun PopulatedList(
                 SelectablePackRow(
                     row = row,
                     selected = row.id == selectedId,
+                    nowMillis = nowMillis,
                     onSelectPack = onSelectPack,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
@@ -560,8 +568,8 @@ private fun ManagePacksTwoPane(
     val displayed = remember(sections) { sections.downloading + sections.failed + sections.onDevice }
     val selectedPack = displayed.firstOrNull { it.id == selectedId } ?: displayed.firstOrNull()
     val roleUsage =
-        remember(selectedPack?.id, usageAsSource, usageAsTarget, nowMillis) {
-            selectedPack?.let { packRoleUsage(it.id, usageAsSource, usageAsTarget, nowMillis) }
+        remember(selectedPack?.id, usageAsSource, usageAsTarget) {
+            selectedPack?.let { packRoleUsage(it.id, usageAsSource, usageAsTarget) }
         }
     Row(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.width(ManagePacksListWidth)) {
@@ -572,6 +580,7 @@ private fun ManagePacksTwoPane(
                     nudge = nudge,
                     capable = capable,
                     total = total,
+                    nowMillis = nowMillis,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
                     onMoreOptions = onMoreOptions,
@@ -599,6 +608,7 @@ private fun ManagePacksTwoPane(
             pack = selectedPack,
             roleUsage = roleUsage,
             storage = storage,
+            nowMillis = nowMillis,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
     }
@@ -618,13 +628,20 @@ private fun ManagePacksTwoPane(
 private fun SelectablePackRow(
     row: PackRow,
     selected: Boolean,
+    nowMillis: Long,
     onSelectPack: ((PackRow) -> Unit)?,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
 ) {
     if (onSelectPack == null) {
-        PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
+        PackRow(
+            row = row,
+            nowMillis = nowMillis,
+            onStopDownload = onStopDownload,
+            onRetry = onRetry,
+            onMoreOptions = onMoreOptions,
+        )
         return
     }
     val background = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
@@ -636,7 +653,13 @@ private fun SelectablePackRow(
                 .selectable(selected = selected, onClick = { onSelectPack(row) })
                 .testTag("tt_manage_select_row"),
     ) {
-        PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
+        PackRow(
+            row = row,
+            nowMillis = nowMillis,
+            onStopDownload = onStopDownload,
+            onRetry = onRetry,
+            onMoreOptions = onMoreOptions,
+        )
     }
 }
 
@@ -656,6 +679,7 @@ internal fun ManagePacksDetailPane(
     pack: PackRow?,
     roleUsage: PackRoleUsage?,
     storage: StorageCard?,
+    nowMillis: Long,
     modifier: Modifier = Modifier,
 ) {
     if (pack == null || roleUsage == null) {
@@ -694,11 +718,13 @@ internal fun ManagePacksDetailPane(
         DetailRoleLine(
             role = stringResource(R.string.manage_detail_role_source),
             usage = roleUsage.asSource,
+            nowMillis = nowMillis,
             tag = "tt_manage_detail_source",
         )
         DetailRoleLine(
             role = stringResource(R.string.manage_detail_role_target),
             usage = roleUsage.asTarget,
+            nowMillis = nowMillis,
             tag = "tt_manage_detail_target",
         )
         storage?.let {
@@ -712,6 +738,7 @@ internal fun ManagePacksDetailPane(
 private fun DetailRoleLine(
     role: String,
     usage: PackUsage,
+    nowMillis: Long,
     tag: String,
 ) {
     val spacing = LocalSpacing.current
@@ -730,7 +757,7 @@ private fun DetailRoleLine(
             modifier = Modifier.weight(1f),
         )
         Text(
-            text = packUsageText(usage),
+            text = packUsageText(usage, nowMillis),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.testTag(tag),
@@ -1037,6 +1064,7 @@ private fun SectionHeaderText(
 @Composable
 private fun PackRow(
     row: PackRow,
+    nowMillis: Long,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
@@ -1059,19 +1087,23 @@ private fun PackRow(
                     InUseBadge(modifier = Modifier.padding(start = spacing.sm8))
                 }
             }
-            PackRowSupporting(row)
+            PackRowSupporting(row, nowMillis)
         }
         PackRowControl(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
     }
 }
 
 @Composable
-private fun PackRowSupporting(row: PackRow) {
+private fun PackRowSupporting(
+    row: PackRow,
+    nowMillis: Long,
+) {
     // #224: the ML Kit pivot (English) is included with every pack and cannot be
     // removed on its own (a measured no-op). Owner ruling (2026-08-05): keep the
-    // row but say WHY it has no control, in place of a usage line. Guarded by id,
-    // so the story holds whatever state ML Kit reports for the pivot.
-    if (row.isPivot) {
+    // row but say WHY it has no control, in place of a usage line. Guarded by id
+    // ([isPivotLanguage], not a stored flag), so the story holds whatever state ML
+    // Kit reports for the pivot and a row can never disagree with its own id (#325).
+    if (isPivotLanguage(row.id)) {
         Text(
             text = stringResource(R.string.offline_included),
             style = MaterialTheme.typography.bodySmall,
@@ -1101,7 +1133,7 @@ private fun PackRowSupporting(row: PackRow) {
         else -> {
             // Downloaded / Deleting: "On device · used today" (or "· no recorded use yet").
             Text(
-                text = stringResource(R.string.text_lang_on_device_size, packUsageText(row.usage)),
+                text = stringResource(R.string.text_lang_on_device_size, packUsageText(row.usage, nowMillis)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("tt_manage_usage_line"),
@@ -1151,8 +1183,9 @@ private fun PackRowControl(
             // The pivot (English, #224) is non-actionable — no overflow, because none
             // of the 20c pack actions apply to it (it cannot be removed, and it is
             // always the pivot, never a chosen target). Every other downloaded pack
-            // gets the overflow, which opens the 20c pack-actions sheet.
-            if (!row.isPivot) {
+            // gets the overflow, which opens the 20c pack-actions sheet. Pivot-ness is
+            // asked of the id ([isPivotLanguage]), never a stored flag (#325).
+            if (!isPivotLanguage(row.id)) {
                 IconButton(onClick = { onMoreOptions(row) }, modifier = Modifier.testTag("tt_manage_options")) {
                     Icon(
                         Icons.Filled.MoreVert,
@@ -1249,18 +1282,41 @@ private fun DownloadingNote() {
 }
 
 /**
- * Relative last-used as the row reads it. `NoRecord` is the honest date-less line
- * (ruling ⑧). `internal` so the 20e cleanup sheet reads a stale pack's age with the
- * SAME vocabulary this screen's rows do — never a calendar month (#130 PR-25).
+ * Relative last-used as the row reads it. [PackUsage.NoRecord] is the honest date-less
+ * line (ruling ⑧); a [PackUsage.Used] derives its relative bucket from the stamp at
+ * [nowMillis] ([PackUsage.Used.bucket]) — so a date-less pack can never print a month,
+ * by construction (#325). `internal` so the 20e cleanup sheet reads a stale pack's age
+ * with the SAME vocabulary this screen's rows do — never a calendar month (#130 PR-25).
  */
 @Composable
-internal fun packUsageText(usage: PackUsage): String =
+internal fun packUsageText(
+    usage: PackUsage,
+    nowMillis: Long,
+): String =
     when (usage) {
-        PackUsage.NoRecord -> stringResource(R.string.manage_used_never)
-        PackUsage.Today -> stringResource(R.string.manage_used_today)
-        is PackUsage.DaysAgo -> pluralStringResource(R.plurals.manage_used_days, usage.days, usage.days)
-        is PackUsage.WeeksAgo -> pluralStringResource(R.plurals.manage_used_weeks, usage.weeks, usage.weeks)
-        is PackUsage.MonthsAgo -> pluralStringResource(R.plurals.manage_used_months, usage.months, usage.months)
+        PackUsage.NoRecord -> {
+            stringResource(R.string.manage_used_never)
+        }
+
+        is PackUsage.Used -> {
+            when (val bucket = usage.bucket(nowMillis)) {
+                UsageBucket.Today -> {
+                    stringResource(R.string.manage_used_today)
+                }
+
+                is UsageBucket.DaysAgo -> {
+                    pluralStringResource(R.plurals.manage_used_days, bucket.days, bucket.days)
+                }
+
+                is UsageBucket.WeeksAgo -> {
+                    pluralStringResource(R.plurals.manage_used_weeks, bucket.weeks, bucket.weeks)
+                }
+
+                is UsageBucket.MonthsAgo -> {
+                    pluralStringResource(R.plurals.manage_used_months, bucket.months, bucket.months)
+                }
+            }
+        }
     }
 
 // ── Footer ──────────────────────────────────────────────────────────────────
@@ -1424,23 +1480,27 @@ private fun rememberAdjustedDefaultLocaleTags(): List<String> {
 private const val MB = 1_048_576L
 private const val GB = 1_073_741_824L
 
+/** A fixed instant for preview rows, so a relative date ("5 days ago") is stable across renders. */
+private val previewNow = 200L * DAY_MILLIS
+
+/** A preview stamp [days] before [previewNow] — bucketed against `previewNow` at render (#325). */
+private fun usedDaysAgo(days: Long): PackUsage = PackUsage.Used(previewNow - days * DAY_MILLIS)
+
 private fun row(
     id: String,
     name: String,
     state: OfflineModelState,
-    usage: PackUsage = PackUsage.Today,
-    lastUsedMillis: Long? = 0L,
+    usage: PackUsage = PackUsage.Used(previewNow),
     inUse: Boolean = false,
-    isPivot: Boolean = false,
-) = PackRow(id, name, state, usage, lastUsedMillis, inUse, isPivot)
+) = PackRow(id, name, state, usage, inUse)
 
 private val previewOnDevice =
     listOf(
-        row("es", "Spanish", OfflineModelState.Downloaded, PackUsage.Today, inUse = true),
-        row("en", "English", OfflineModelState.Downloaded, PackUsage.Today, isPivot = true),
-        row("af", "Afrikaans", OfflineModelState.Downloaded, PackUsage.DaysAgo(5)),
-        row("de", "German", OfflineModelState.Downloaded, PackUsage.MonthsAgo(4)),
-        row("pl", "Polish", OfflineModelState.Downloaded, PackUsage.NoRecord, lastUsedMillis = null),
+        row("es", "Spanish", OfflineModelState.Downloaded, inUse = true),
+        row("en", "English", OfflineModelState.Downloaded),
+        row("af", "Afrikaans", OfflineModelState.Downloaded, usedDaysAgo(5)),
+        row("de", "German", OfflineModelState.Downloaded, usedDaysAgo(120)),
+        row("pl", "Polish", OfflineModelState.Downloaded, PackUsage.NoRecord),
     )
 
 private val previewSizedStorage =
@@ -1464,6 +1524,7 @@ private fun ManagePacksScreenNudgePreview() {
             suggestions = emptyList(),
             capable = 59,
             total = 194,
+            nowMillis = previewNow,
             onBack = {},
             onGet = {},
             onStopDownload = {},
@@ -1485,9 +1546,9 @@ private fun ManagePacksScreenNoNudgePreview() {
                 previewSections(
                     onDevice =
                         listOf(
-                            row("es", "Spanish", OfflineModelState.Downloaded, PackUsage.Today, inUse = true),
-                            row("en", "English", OfflineModelState.Downloaded, PackUsage.Today, isPivot = true),
-                            row("af", "Afrikaans", OfflineModelState.Downloaded, PackUsage.DaysAgo(3)),
+                            row("es", "Spanish", OfflineModelState.Downloaded, inUse = true),
+                            row("en", "English", OfflineModelState.Downloaded),
+                            row("af", "Afrikaans", OfflineModelState.Downloaded, usedDaysAgo(3)),
                         ),
                 ),
             storage = previewSizedStorage,
@@ -1495,6 +1556,7 @@ private fun ManagePacksScreenNoNudgePreview() {
             suggestions = emptyList(),
             capable = 59,
             total = 194,
+            nowMillis = previewNow,
             onBack = {},
             onGet = {},
             onStopDownload = {},
@@ -1518,6 +1580,7 @@ private fun ManagePacksScreenDownloadingPreview() {
             suggestions = emptyList(),
             capable = 59,
             total = 194,
+            nowMillis = previewNow,
             onBack = {},
             onGet = {},
             onStopDownload = {},
@@ -1548,6 +1611,7 @@ private fun ManagePacksScreenFailedPreview() {
             suggestions = emptyList(),
             capable = 59,
             total = 194,
+            nowMillis = previewNow,
             onBack = {},
             onGet = {},
             onStopDownload = {},
@@ -1575,6 +1639,7 @@ private fun ManagePacksScreenEmptyPreview() {
                 ),
             capable = 59,
             total = 194,
+            nowMillis = previewNow,
             onBack = {},
             onGet = {},
             onStopDownload = {},
@@ -1593,19 +1658,26 @@ private fun PackRowStatesPreview() {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Column {
-                PackRow(row("es", "Spanish", OfflineModelState.Downloaded, PackUsage.Today, inUse = true), {}, {}, {})
-                PackRow(row("de", "German", OfflineModelState.Downloaded, PackUsage.MonthsAgo(4)), {}, {}, {})
+                PackRow(row("es", "Spanish", OfflineModelState.Downloaded, inUse = true), previewNow, {}, {}, {})
+                PackRow(row("de", "German", OfflineModelState.Downloaded, usedDaysAgo(120)), previewNow, {}, {}, {})
+                PackRow(row("pl", "Polish", OfflineModelState.Downloaded, PackUsage.NoRecord), previewNow, {}, {}, {})
+                PackRow(row("en", "English", OfflineModelState.Downloaded), previewNow, {}, {}, {})
+                PackRow(row("it", "Italian", OfflineModelState.Deleting), previewNow, {}, {}, {})
+                PackRow(row("ar", "Arabic", OfflineModelState.Downloading), previewNow, {}, {}, {})
                 PackRow(
-                    row("pl", "Polish", OfflineModelState.Downloaded, PackUsage.NoRecord, lastUsedMillis = null),
+                    row("hi", "Hindi", OfflineModelState.Failed(OfflineModelFailure.NETWORK)),
+                    previewNow,
                     {},
                     {},
                     {},
                 )
-                PackRow(row("en", "English", OfflineModelState.Downloaded, PackUsage.Today, isPivot = true), {}, {}, {})
-                PackRow(row("it", "Italian", OfflineModelState.Deleting), {}, {}, {})
-                PackRow(row("ar", "Arabic", OfflineModelState.Downloading), {}, {}, {})
-                PackRow(row("hi", "Hindi", OfflineModelState.Failed(OfflineModelFailure.NETWORK)), {}, {}, {})
-                PackRow(row("ta", "Tamil", OfflineModelState.Failed(OfflineModelFailure.STORAGE)), {}, {}, {})
+                PackRow(
+                    row("ta", "Tamil", OfflineModelState.Failed(OfflineModelFailure.STORAGE)),
+                    previewNow,
+                    {},
+                    {},
+                    {},
+                )
             }
         }
     }
@@ -1649,15 +1721,15 @@ private fun NudgeCardPreview() {
 private val previewListDetailWidth = 1280.dp
 private val previewListDetailHeight = 800.dp
 
-/** A fixed instant for the detail's per-role dates, so "3 days ago" is stable across renders. */
-private val previewDetailNow = 40L * DAY_MILLIS
+/** The detail previews reuse [previewNow] as their clock, so a "3 days ago" line is stable across renders. */
+private val previewDetailNow = previewNow
 
 private val previewDetailOnDevice =
     listOf(
-        row("es", "Spanish", OfflineModelState.Downloaded, PackUsage.DaysAgo(3), inUse = true),
-        row("de", "German", OfflineModelState.Downloaded, PackUsage.MonthsAgo(4)),
-        row("af", "Afrikaans", OfflineModelState.Downloaded, PackUsage.WeeksAgo(2)),
-        row("en", "English", OfflineModelState.Downloaded, PackUsage.Today, isPivot = true),
+        row("es", "Spanish", OfflineModelState.Downloaded, usedDaysAgo(3), inUse = true),
+        row("de", "German", OfflineModelState.Downloaded, usedDaysAgo(120)),
+        row("af", "Afrikaans", OfflineModelState.Downloaded, usedDaysAgo(14)),
+        row("en", "English", OfflineModelState.Downloaded),
     )
 
 // Spanish (the default selection) was translated FROM three days ago and never
@@ -1746,14 +1818,16 @@ private fun ManagePacksDetailPanePreview() {
             Row {
                 ManagePacksDetailPane(
                     pack = previewDetailOnDevice.first(),
-                    roleUsage = PackRoleUsage(asSource = PackUsage.DaysAgo(3), asTarget = PackUsage.NoRecord),
+                    roleUsage = PackRoleUsage(asSource = usedDaysAgo(3), asTarget = PackUsage.NoRecord),
                     storage = previewSizedStorage,
+                    nowMillis = previewDetailNow,
                     modifier = Modifier.weight(1f),
                 )
                 ManagePacksDetailPane(
                     pack = null,
                     roleUsage = null,
                     storage = null,
+                    nowMillis = previewDetailNow,
                     modifier = Modifier.weight(1f).height(320.dp),
                 )
             }

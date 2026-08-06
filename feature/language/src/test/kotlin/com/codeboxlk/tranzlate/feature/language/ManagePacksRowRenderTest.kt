@@ -53,7 +53,7 @@ class ManagePacksRowRenderTest {
         nowMillis: Long = 0L,
     ) {
         val sections =
-            buildManagePacksSections(rows, usage = usage, targetId = "", nowMillis = nowMillis, locale = Locale.ENGLISH)
+            buildManagePacksSections(rows, usage = usage, targetId = "", locale = Locale.ENGLISH)
         compose.setContent {
             TranzlateTheme {
                 ManagePacksContent(
@@ -64,6 +64,7 @@ class ManagePacksRowRenderTest {
                     suggestions = emptyList(),
                     capable = 59,
                     total = 194,
+                    nowMillis = nowMillis,
                     onBack = {},
                     onGet = {},
                     onStopDownload = {},
@@ -134,8 +135,8 @@ class ManagePacksRowRenderTest {
 
     /**
      * A pack used within the last day reads "used today". `usage["es"] == nowMillis`
-     * → elapsed 0 → `PackUsage.Today`. The mirror of the test above: the same
-     * `manage_used_*` swap makes this row read "no recorded use yet" and reddens.
+     * → `Used(nowMillis)`, elapsed 0 → `UsageBucket.Today`. The mirror of the test
+     * above: the same `manage_used_*` swap makes this row read "no recorded use yet".
      */
     @Test
     fun `a pack used today shows the today line`() {

@@ -37,7 +37,7 @@ class OfflinePivotRowRenderTest {
 
     private fun show(rows: List<OfflineLanguageRow>) {
         val sections =
-            buildManagePacksSections(rows, usage = emptyMap(), targetId = "", nowMillis = 0L, locale = Locale.ENGLISH)
+            buildManagePacksSections(rows, usage = emptyMap(), targetId = "", locale = Locale.ENGLISH)
         compose.setContent {
             TranzlateTheme {
                 ManagePacksContent(
@@ -62,11 +62,11 @@ class OfflinePivotRowRenderTest {
     }
 
     /**
-     * Mutation decided first: delete the `if (row.isPivot)` guard in
+     * Mutation decided first: delete the `if (!isPivotLanguage(row.id))` guard in
      * `PackRowControl` (so the pivot's `Downloaded` state falls through to the
      * overflow) — `tt_manage_options` then appears and this reddens; that is the
-     * #224 defect coming back. Deleting the `isPivot` branch in `PackRowSupporting`
-     * reddens the `tt_manage_included` assertion.
+     * #224 defect coming back. Deleting the `isPivotLanguage(row.id)` branch in
+     * `PackRowSupporting` reddens the `tt_manage_included` assertion.
      */
     @Test
     fun `the English pivot row shows the included line and no overflow control`() {

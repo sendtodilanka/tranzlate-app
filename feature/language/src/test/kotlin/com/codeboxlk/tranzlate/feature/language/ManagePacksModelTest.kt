@@ -27,45 +27,53 @@ class ManagePacksModelTest {
 
     private fun daysAgo(days: Long): Long = NOW - days * DAY_MILLIS
 
-    // ── packUsage: relative buckets, and the honest date-less case ────────────
+    // ── packUsage: the honest wrap, and the derived relative buckets ──────────
 
     /**
      * The honesty rule this whole screen exists to keep (ruling ⑧): a pack with no
-     * recorded translation-use has NO date, and says so — never a fabricated one.
+     * recorded translation-use has NO stamp, and says so — never a fabricated one.
      *
-     * Mutation: `packUsage` drops the `null -> NoRecord` line and lets a null stamp
-     * fall through to `Today`. Then a pack nobody has ever translated with would
-     * read "used today", which is exactly the invented figure the brief forbids.
+     * Mutation: `packUsage` drops the `null -> NoRecord` line and wraps null as a
+     * `Used`. `Used` demands a non-null `Long`, so "a date-less pack carrying a date"
+     * no longer type-checks at all (#325); at runtime, mapping null to `Used(0L)`
+     * reddens this.
      */
     @Test
     fun `a pack with no stamp is NoRecord, never a date`() {
-        assertThat(packUsage(lastUsedMillis = null, nowMillis = NOW)).isEqualTo(PackUsage.NoRecord)
+        assertThat(packUsage(lastUsedMillis = null)).isEqualTo(PackUsage.NoRecord)
     }
 
-    /** Mutation: `elapsedDays <= 0` → `< 0`, so a stamp from earlier today becomes DaysAgo(0). */
+    /** A real stamp is carried verbatim as [PackUsage.Used] — the single source the row, order and staleness read. */
     @Test
-    fun `a stamp from earlier today is Today`() {
-        assertThat(packUsage(NOW - 3 * 60 * 60 * 1000L, NOW)).isEqualTo(PackUsage.Today)
+    fun `a real stamp is carried as Used`() {
+        assertThat(packUsage(daysAgo(3))).isEqualTo(PackUsage.Used(daysAgo(3)))
+    }
+
+    /** Mutation: `elapsedDays <= 0` → `< 0`, so a stamp from earlier today buckets as DaysAgo(0). */
+    @Test
+    fun `a stamp from earlier today buckets as Today`() {
+        assertThat(PackUsage.Used(NOW - 3 * 60 * 60 * 1000L).bucket(NOW)).isEqualTo(UsageBucket.Today)
     }
 
     /**
      * The three bucket boundaries, chosen so each is one day off a neighbour:
      * mutations that turn a `<` into `<=` (or shift a divisor) move exactly one of
-     * these across a line.
+     * these across a line. Derived from a real stamp ([PackUsage.Used.bucket]), never
+     * stored — a [PackUsage.NoRecord] cannot be asked for a bucket at all (#325).
      */
     @Test
     fun `elapsed days bucket into today, days, weeks and months at their boundaries`() {
-        assertThat(packUsage(daysAgo(6), NOW)).isEqualTo(PackUsage.DaysAgo(6))
-        assertThat(packUsage(daysAgo(7), NOW)).isEqualTo(PackUsage.WeeksAgo(1))
-        assertThat(packUsage(daysAgo(29), NOW)).isEqualTo(PackUsage.WeeksAgo(4))
-        assertThat(packUsage(daysAgo(30), NOW)).isEqualTo(PackUsage.MonthsAgo(1))
-        assertThat(packUsage(daysAgo(90), NOW)).isEqualTo(PackUsage.MonthsAgo(3))
+        assertThat(PackUsage.Used(daysAgo(6)).bucket(NOW)).isEqualTo(UsageBucket.DaysAgo(6))
+        assertThat(PackUsage.Used(daysAgo(7)).bucket(NOW)).isEqualTo(UsageBucket.WeeksAgo(1))
+        assertThat(PackUsage.Used(daysAgo(29)).bucket(NOW)).isEqualTo(UsageBucket.WeeksAgo(4))
+        assertThat(PackUsage.Used(daysAgo(30)).bucket(NOW)).isEqualTo(UsageBucket.MonthsAgo(1))
+        assertThat(PackUsage.Used(daysAgo(90)).bucket(NOW)).isEqualTo(UsageBucket.MonthsAgo(3))
     }
 
     /** A stamp in the future (clock skew) is not a negative age. Mutation: report DaysAgo(negative). */
     @Test
-    fun `a future stamp reads as Today, not a negative age`() {
-        assertThat(packUsage(NOW + 5 * DAY_MILLIS, NOW)).isEqualTo(PackUsage.Today)
+    fun `a future stamp buckets as Today, not a negative age`() {
+        assertThat(PackUsage.Used(NOW + 5 * DAY_MILLIS).bucket(NOW)).isEqualTo(UsageBucket.Today)
     }
 
     // ── isStale: the nudge threshold ──────────────────────────────────────────
@@ -76,15 +84,15 @@ class ManagePacksModelTest {
      */
     @Test
     fun `staleness turns on at exactly 90 days`() {
-        assertThat(isStale(daysAgo(90), NOW)).isTrue()
-        assertThat(isStale(daysAgo(89), NOW)).isFalse()
-        assertThat(isStale(daysAgo(120), NOW)).isTrue()
+        assertThat(isStale(PackUsage.Used(daysAgo(90)), NOW)).isTrue()
+        assertThat(isStale(PackUsage.Used(daysAgo(89)), NOW)).isFalse()
+        assertThat(isStale(PackUsage.Used(daysAgo(120)), NOW)).isTrue()
     }
 
-    /** Mutation: drop the `!= null` guard so a date-less pack is treated as stale (ruling ⑧). */
+    /** Mutation: make the `when`/guard treat [PackUsage.NoRecord] as stale (return true) — a date-less pack (ruling ⑧). */
     @Test
     fun `a date-less pack is never stale`() {
-        assertThat(isStale(lastUsedMillis = null, nowMillis = NOW)).isFalse()
+        assertThat(isStale(PackUsage.NoRecord, NOW)).isFalse()
     }
 
     // ── buildManagePacksSections: classification ──────────────────────────────
@@ -105,7 +113,7 @@ class ManagePacksModelTest {
                 capable("es", "Spanish", OfflineModelState.NotDownloaded),
                 capable("it", "Italian", OfflineModelState.Deleting),
             )
-        val sections = buildManagePacksSections(rows, emptyMap(), targetId = "", nowMillis = NOW, locale = en)
+        val sections = buildManagePacksSections(rows, emptyMap(), targetId = "", locale = en)
 
         assertThat(sections.downloading.map { it.id }).containsExactly("ar")
         assertThat(sections.failed.map { it.id }).containsExactly("hi")
@@ -117,32 +125,37 @@ class ManagePacksModelTest {
     /**
      * THE no-date honest case, at the section level (ruling ⑧ · risk R6): a
      * downloaded pack with no usage stamp carries [PackUsage.NoRecord], not a date
-     * conjured from thin air. Mutation: `packUsage` folds null to `Today` — this
-     * row would then claim "used today" for a language never translated with.
+     * conjured from thin air. The row holds no stamp to fabricate from — `NoRecord`
+     * carries none (#325). Mutation: `packUsage` folds null to a `Used(0L)` — this
+     * row would then claim a date (an ancient one) for a language never translated with.
      */
     @Test
     fun `a downloaded pack with no usage stamp shows no recorded use, not a date`() {
         val rows = listOf(capable("pl", "Polish", OfflineModelState.Downloaded))
-        val sections = buildManagePacksSections(rows, usage = emptyMap(), targetId = "", nowMillis = NOW, locale = en)
+        val sections = buildManagePacksSections(rows, usage = emptyMap(), targetId = "", locale = en)
 
         assertThat(sections.onDevice.single().usage).isEqualTo(PackUsage.NoRecord)
-        assertThat(sections.onDevice.single().lastUsedMillis).isNull()
     }
 
-    /** A stamp that exists reaches the row as its relative bucket. Mutation: ignore the usage map. */
+    /**
+     * A stamp that exists reaches the row verbatim (as [PackUsage.Used]) AND buckets to
+     * its relative age. Mutation: ignore the usage map — the row is `NoRecord` and both
+     * assertions redden.
+     */
     @Test
-    fun `a downloaded pack with a stamp shows its relative age`() {
+    fun `a downloaded pack with a stamp carries it and buckets to its relative age`() {
         val rows = listOf(capable("de", "German", OfflineModelState.Downloaded))
         val sections =
             buildManagePacksSections(
                 rows,
                 usage = mapOf("de" to daysAgo(3)),
                 targetId = "",
-                nowMillis = NOW,
                 locale = en,
             )
 
-        assertThat(sections.onDevice.single().usage).isEqualTo(PackUsage.DaysAgo(3))
+        val usage = sections.onDevice.single().usage
+        assertThat(usage).isEqualTo(PackUsage.Used(daysAgo(3)))
+        assertThat((usage as PackUsage.Used).bucket(NOW)).isEqualTo(UsageBucket.DaysAgo(3))
     }
 
     /** The current target's pack is flagged in use; no other is. Mutation: read the wrong side / a constant. */
@@ -153,19 +166,24 @@ class ManagePacksModelTest {
                 capable("es", "Spanish", OfflineModelState.Downloaded),
                 capable("de", "German", OfflineModelState.Downloaded),
             )
-        val sections = buildManagePacksSections(rows, emptyMap(), targetId = "es", nowMillis = NOW, locale = en)
+        val sections = buildManagePacksSections(rows, emptyMap(), targetId = "es", locale = en)
 
         assertThat(sections.onDevice.single { it.id == "es" }.inUse).isTrue()
         assertThat(sections.onDevice.single { it.id == "de" }.inUse).isFalse()
     }
 
-    /** English is flagged as the pivot; it is never nudged and carries no overflow. Mutation: drop the pivot check. */
+    /**
+     * The pivot lands on-device and is recognizable BY ID — pivot-ness is asked of
+     * [isPivotLanguage], not a stored flag a row could contradict (#325 finding 2).
+     * Mutation: `isPivotLanguage` answering false for `en` reddens the second assertion.
+     */
     @Test
-    fun `the English pivot is flagged`() {
+    fun `the English pivot lands on-device and is recognizable by id`() {
         val rows = listOf(capable("en", "English", OfflineModelState.Downloaded))
-        val sections = buildManagePacksSections(rows, emptyMap(), targetId = "", nowMillis = NOW, locale = en)
+        val sections = buildManagePacksSections(rows, emptyMap(), targetId = "", locale = en)
 
-        assertThat(sections.onDevice.single().isPivot).isTrue()
+        assertThat(sections.onDevice.map { it.id }).containsExactly("en")
+        assertThat(isPivotLanguage(sections.onDevice.single().id)).isTrue()
     }
 
     /**
@@ -182,7 +200,7 @@ class ManagePacksModelTest {
                 OfflineLanguageRow("es", "Spanish", OfflineModelState.Downloaded, hasOfflineVoice = true),
                 OfflineLanguageRow("de", "German", OfflineModelState.Downloaded, hasOfflineVoice = false),
             )
-        val sections = buildManagePacksSections(rows, emptyMap(), targetId = "", nowMillis = NOW, locale = en)
+        val sections = buildManagePacksSections(rows, emptyMap(), targetId = "", locale = en)
 
         assertThat(sections.onDevice.single { it.id == "es" }.hasOfflineVoice).isTrue()
         assertThat(sections.onDevice.single { it.id == "de" }.hasOfflineVoice).isFalse()
@@ -218,7 +236,7 @@ class ManagePacksModelTest {
                 "ar" to daysAgo(0),
                 // pl: no stamp
             )
-        val sections = buildManagePacksSections(rows, usage, targetId = "es", nowMillis = NOW, locale = en)
+        val sections = buildManagePacksSections(rows, usage, targetId = "es", locale = en)
 
         assertThat(sections.onDevice.map { it.id })
             .containsExactly("es", "af", "ar", "de", "pl")
@@ -232,15 +250,15 @@ class ManagePacksModelTest {
      * fixture carries every trap: a stale-but-pivot pack, a date-less pack, a fresh
      * pack, and one genuinely stale dated pack. Only the last counts.
      *
-     * Three mutations this reddens: drop the `!isPivot` guard (pivot counted, 2),
-     * drop the date-less exclusion (`pl` counted, 2), or drop the staleness test
-     * (fresh `de` counted).
+     * Three mutations this reddens: drop the `!isPivotLanguage(it.id)` guard (pivot
+     * counted, 2), drop the date-less exclusion (`pl` counted, 2), or drop the
+     * staleness test (fresh `de` counted).
      */
     @Test
     fun `the nudge counts only stale, dated, non-pivot packs`() {
         val onDevice =
             listOf(
-                packRow("en", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(200), isPivot = true),
+                packRow("en", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(200)),
                 packRow("pl", OfflineModelState.Downloaded, lastUsedMillis = null),
                 packRow("de", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(1)),
                 packRow("ru", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(120)),
@@ -269,9 +287,8 @@ class ManagePacksModelTest {
      * selection must not fabricate a date. `de` (genuinely stale) is present so the
      * list is non-empty for the right reason, not because everything was filtered out.
      *
-     * Mutation decided first (rule 11): widen [stalePacks]' predicate to
-     * `it.lastUsedMillis == null || isStale(...)` — `pl` then appears and the
-     * `containsExactly` reddens.
+     * Mutation decided first (rule 11): widen [isStale] to also return true for
+     * [PackUsage.NoRecord] — `pl` then appears and the `containsExactly` reddens.
      */
     @Test
     fun `stalePacks never lists a date-less pack`() {
@@ -287,8 +304,8 @@ class ManagePacksModelTest {
     /**
      * Only PAST the threshold: a pack used inside 90 days is not offered for cleanup.
      *
-     * Mutation decided first: drop the threshold from [stalePacks] (predicate becomes
-     * `it.lastUsedMillis != null`) — the fresh `de` then appears and this reddens.
+     * Mutation decided first: drop the threshold from [isStale] (it returns true for
+     * ANY [PackUsage.Used]) — the fresh `de` then appears and this reddens.
      */
     @Test
     fun `stalePacks never lists a fresh-dated pack`() {
@@ -303,13 +320,13 @@ class ManagePacksModelTest {
 
     /**
      * The pivot frees nothing, so it is never offered — even when stale. Mutation:
-     * drop the `!it.isPivot` guard from [stalePacks] and the pivot `en` appears.
+     * drop the `!isPivotLanguage(it.id)` guard from [stalePacks] and the pivot `en` appears.
      */
     @Test
     fun `stalePacks never lists the pivot`() {
         val onDevice =
             listOf(
-                packRow("en", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(200), isPivot = true),
+                packRow("en", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(200)),
                 packRow("ru", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(120)),
             )
 
@@ -329,7 +346,7 @@ class ManagePacksModelTest {
     fun `stalePacks is the exact set the nudge counts`() {
         val onDevice =
             listOf(
-                packRow("en", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(200), isPivot = true),
+                packRow("en", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(200)),
                 packRow("pl", OfflineModelState.Downloaded, lastUsedMillis = null),
                 packRow("de", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(1)),
                 packRow("ru", OfflineModelState.Downloaded, lastUsedMillis = daysAgo(120)),
@@ -449,7 +466,7 @@ class ManagePacksModelTest {
      * date-less — never a fabricated date (ruling ⑧). German was translated FROM 3
      * days ago and never INTO.
      *
-     * Mutation: map the absent target to [PackUsage.Today] (or any date) instead of
+     * Mutation: map the absent target to a [PackUsage.Used] (any date) instead of
      * [PackUsage.NoRecord] — the honesty rule this whole screen exists to keep,
      * broken in the detail.
      */
@@ -460,10 +477,9 @@ class ManagePacksModelTest {
                 id = "de",
                 usageAsSource = mapOf("de" to daysAgo(3)),
                 usageAsTarget = emptyMap(),
-                nowMillis = NOW,
             )
 
-        assertThat(roleUsage.asSource).isEqualTo(PackUsage.DaysAgo(3))
+        assertThat(roleUsage.asSource).isEqualTo(PackUsage.Used(daysAgo(3)))
         assertThat(roleUsage.asTarget).isEqualTo(PackUsage.NoRecord)
     }
 
@@ -482,26 +498,24 @@ class ManagePacksModelTest {
                 id = "de",
                 usageAsSource = emptyMap(),
                 usageAsTarget = mapOf("de" to daysAgo(2)),
-                nowMillis = NOW,
             )
 
         assertThat(roleUsage.asSource).isEqualTo(PackUsage.NoRecord)
-        assertThat(roleUsage.asTarget).isEqualTo(PackUsage.DaysAgo(2))
+        assertThat(roleUsage.asTarget).isEqualTo(PackUsage.Used(daysAgo(2)))
     }
 
     private fun packRow(
         id: String,
         state: OfflineModelState,
         lastUsedMillis: Long? = null,
-        isPivot: Boolean = false,
     ) = PackRow(
         id = id,
         displayName = id,
         state = state,
-        usage = packUsage(lastUsedMillis, NOW),
-        lastUsedMillis = lastUsedMillis,
+        // The stamp (or its absence) travels inside `usage` now; pivot-ness is by id
+        // ([isPivotLanguage]), so a test can no longer set a flag that contradicts it (#325).
+        usage = packUsage(lastUsedMillis),
         inUse = false,
-        isPivot = isPivot,
     )
 
     private companion object {
