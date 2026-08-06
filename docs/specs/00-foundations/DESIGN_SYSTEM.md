@@ -188,9 +188,10 @@ used-vs-track luminance ratio is **1.25:1 light / 1.47:1 dark** — below the WC
 authoritative per the #347 ruling. This is **not a regression** — the pre-fix
 `primaryContainer #D3E3FD` was lower still (1.11:1). Flagged, non-blocking.
 
-> The **downloading-row progress track** also draws light `#C4D7F5`, but takes
-> `surfaceContainerHigh` `#2D2F31` in dark — a different pairing, so that track is composed
-> per-screen, not from `LocalMeterFillColor`.
+> The **downloading-row progress track** draws the SAME values (light `#C4D7F5` / dark
+> `#0842A0`) as this token. The **storage bar's own track** (the unfilled remainder) is the
+> different element — dark `surfaceContainerHigh` `#2D2F31` — composed per-screen, not from
+> `LocalMeterFillColor`.
 
 ---
 

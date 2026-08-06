@@ -21,8 +21,9 @@ import androidx.compose.ui.graphics.Color
  * used-vs-track luminance ratio is intentionally low per the rev5 SSOT — see
  * DESIGN_SYSTEM §0 / the #347 plan doc).
  *
- * NOTE the downloading-row progress TRACK also draws light `#C4D7F5`, but takes
- * `surfaceContainerHigh` (#2D2F31) in dark — so that track is composed per-screen, not
+ * The downloading-row progress TRACK draws the SAME values (light `#C4D7F5` / dark
+ * `#0842A0`) as this token. The storage bar's own track (the unfilled remainder) is a
+ * different element — dark `surfaceContainerHigh` `#2D2F31` — composed per-screen, not
  * read from this token.
  */
 val LocalMeterFillColor =

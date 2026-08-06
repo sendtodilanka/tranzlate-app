@@ -94,8 +94,10 @@ to match rev5" — is unchanged; only the mechanism is refined, so this stays `a
 - **Meter dark `#0842A0`, not `#2D2F31`.** The confirmed 20d defect is the storage **used
   segment** (build used `primaryContainer #D3E3FD`); rev5 draws that segment `#C4D7F5 |
   #0842A0` (digest §B6/§C, and `PackFailureSheets.kt:355` uses `primaryContainer` there
-  today). `#2D2F31` is the download-*track* dark — a different element, documented as
-  per-screen. (A one-line change if a co-verify lens prefers the track pairing instead.)
+  today). The download-row track dark is also `#0842A0` (the same as this token); `#2D2F31`
+  is the **storage bar's own track** — a different element, composed per-screen. (Corrected
+  after the #348 co-verify decoded the spec directly: the earlier draft mis-attributed
+  `#2D2F31` to the download-row track.)
 
 ## WCAG (formula (L1+0.05)/(L2+0.05), same as §0; recomputed by `scratchpad/wcag.py`)
 

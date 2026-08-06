@@ -139,9 +139,10 @@ internal val OnTertiaryFixedVariant = Color(0xFF0F5223) // ref tertiary30
 // Storage-meter "used"/consumed-segment tint (storage bar used segment, the "other
 // apps and system" legend dot — 20b/20d/20f/19b). A muted primary between
 // primaryContainer #D3E3FD and primary #0B57D0. Dark counterpart = primaryContainer
-// #0842A0 (resolved in Theme.kt). NOTE: the downloading-row progress TRACK also draws
-// this in light, but takes surfaceContainerHigh #2D2F31 in dark — so that track is
-// composed per-screen, not from this token.
+// #0842A0 (resolved in Theme.kt). The downloading-row progress track draws the SAME
+// values (light #C4D7F5 / dark #0842A0); the storage bar's own track (the unfilled
+// remainder) is the different element — dark surfaceContainerHigh #2D2F31 — composed
+// per-screen, not from this token.
 internal val LightMeterFill = Color(0xFFC4D7F5)
 
 /** Static light scheme — guaranteed fallback for API 24–30 / dynamic-color-off (§ header). */
