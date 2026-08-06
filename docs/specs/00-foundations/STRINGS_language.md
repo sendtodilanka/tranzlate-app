@@ -89,7 +89,7 @@ reads `1 of 59 packs` on a real device (#203).
 |-----|------|------|------|-------|
 | `lang_first_run_title` | string | `No packs yet` | — | the primary-container explainer's title; the owner's §8 first-run copy, a suggestion-section header and not a pack count |
 | `lang_first_run_body` | string | `Pick a language to download once, then it works with no signal.` | — | the one fact a first-run user needs |
-| `lang_first_run_privacy` | string | `Translation runs on the device — nothing is sent anywhere.` | — | the on-device privacy line 18a draws under the body |
+| `lang_first_run_privacy` | string | `Downloaded languages translate on your device. Without a pack, your text is sent over the internet.` | — | the privacy line 18a draws under the body. Ruling ④ (#130 PR-28): flavor-scoped — this is the honest DEFAULT for the multi-engine `tranzlate` brand (waterfall MLKit→GOT→GCT uploads on fallback); a future offline-only brand shadows this key from `app/src/<brand>/res` with the stronger "nothing uploaded" claim |
 | `lang_first_run_suggested_header` | string | `Suggested for you` | — | header over the suggested rows; drawn only when there is at least one suggestion (a header over nothing is the furniture the empty recents section already refuses) |
 | `lang_suggested_reason_device` | string | `Device language` | — | supporting line for the primary locale's suggestion |
 | `lang_suggested_reason_local` | string | `Common where you are` | — | supporting line for a secondary locale's suggestion. The export draws a third reason, **"From your keyboards"**, which needs `InputMethodManager` queries the rev3 ruling scopes as the unproven experiment **E-K1** — not shipped (rule 4), so it has no key |

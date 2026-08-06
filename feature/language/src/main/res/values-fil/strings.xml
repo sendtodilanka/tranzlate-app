@@ -68,7 +68,7 @@
     <!-- 18a/18b first-run suggestion block (#130 PR-21). -->
     <string name="lang_first_run_title">Wala pang packs</string>
     <string name="lang_first_run_body">Pumili ng wikang ida-download minsan, tapos gagana na ito nang walang signal.</string>
-    <string name="lang_first_run_privacy">Nasa device mismo ang pagsasalin — walang ipinapadala kahit saan.</string>
+    <string name="lang_first_run_privacy">Ang mga na-download na wika ay isinasalin sa iyong device. Kapag walang pack, ipinapadala ang teksto mo sa internet.</string>
     <string name="lang_first_run_suggested_header">Iminumungkahi para sa iyo</string>
     <string name="lang_suggested_reason_device">Wika ng device</string>
     <string name="lang_suggested_reason_local">Karaniwan sa lugar mo</string>
