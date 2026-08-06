@@ -1,6 +1,7 @@
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import com.android.build.api.variant.HasDeviceTests
 import com.android.build.api.variant.LibraryAndroidComponentsExtension
+import com.android.build.api.variant.Variant
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -62,6 +63,12 @@ import org.gradle.language.base.plugins.LifecycleBasePlugin
  *  - **App packaging** — every debug variant of every application module, from the same
  *    variant callback, replacing the two hand-named `:app:assembleTranzlate*Debug`
  *    entries in the old prose list.
+ *  - **Android lint** — `lint<Variant>` for every DEBUG variant of every Android module
+ *    (application AND library), from the same variant callbacks. This is the one CI check
+ *    (`./gradlew build`) `preflight` did not run: a `LocalContextGetResourceValueCall`
+ *    lint error rode a green local `preflight` into CI on PR #310 and cost it a CI cycle
+ *    and a rebase (#315). Debug-only, like `assemble` above — release `lintVital` stays
+ *    `./gradlew build`'s job.
  *
  * ## Why it COMPILES androidTest instead of assembling it
  *
@@ -130,6 +137,7 @@ class PreflightConventionPlugin : Plugin<Project> {
                 module.extensions.configure<ApplicationAndroidComponentsExtension> {
                     onVariants { variant ->
                         preflight.dependOnDeviceTestCompilation(module, variant)
+                        preflight.dependOnDebugLint(module, variant)
                         // Both white-label brands must still package. `buildType`
                         // rather than a variant-name pattern: a brand added to the
                         // flavor catalog is picked up with no edit here, and the
@@ -147,6 +155,7 @@ class PreflightConventionPlugin : Plugin<Project> {
                 module.extensions.configure<LibraryAndroidComponentsExtension> {
                     onVariants { variant ->
                         preflight.dependOnDeviceTestCompilation(module, variant)
+                        preflight.dependOnDebugLint(module, variant)
                     }
                 }
             }
@@ -166,6 +175,25 @@ class PreflightConventionPlugin : Plugin<Project> {
         }
     }
 
+    /**
+     * Adds `lint<Variant>` for every DEBUG variant of an Android [module] (application or
+     * library). Android lint is the ONE CI check `preflight` did not run (#315): CI's
+     * `./gradlew build` runs `lint<Variant>` per module, and a
+     * `LocalContextGetResourceValueCall` lint error rode a green local `preflight` into
+     * CI on PR #310 — a wasted CI cycle and a forced rebase. Now `preflight` catches it
+     * at the same point the agent already runs the gate, before the PR is pushed.
+     *
+     * DEBUG variants only — the same brand-agnostic `buildType` filter [apply]'s
+     * `assemble` uses, so both white-label debug flavours are linted (a SUPERSET of CI's
+     * single default-variant debug lint) while release `lintVital` stays `./gradlew
+     * build`'s job, kept out of a pre-PR gate for the same reason R8 is.
+     */
+    private fun TaskProvider<*>.dependOnDebugLint(module: Project, variant: Variant) {
+        if (variant.buildType == DEBUG_BUILD_TYPE) {
+            configure { dependsOn("${module.path}:lint${variant.name.taskSuffix()}") }
+        }
+    }
+
     private companion object {
         const val TASK_NAME = "preflight"
         const val UNIT_TEST_TASK = "test"
@@ -173,11 +201,12 @@ class PreflightConventionPlugin : Plugin<Project> {
 
         const val DESCRIPTION =
             "The gate to run before opening a PR: string-key catalogue, detekt, spotless, " +
-                "every module's unit tests, every androidTest source set's COMPILATION, and " +
-                "both debug APKs. Does NOT run instrumentation tests (#40), does NOT " +
-                "analyse build-logic's own Kotlin (#210), and COMPILES androidTest " +
-                "rather than assembling it, so dex-merge and duplicate-class defects " +
-                "outside :app still escape."
+                "Android lint on every module's debug variants, every module's unit tests, " +
+                "every androidTest source set's COMPILATION, and both debug APKs. Does NOT " +
+                "run instrumentation tests (#40), does NOT analyse build-logic's own Kotlin " +
+                "(#210), COMPILES androidTest rather than assembling it (so dex-merge and " +
+                "duplicate-class defects outside :app still escape), and lints DEBUG " +
+                "variants only — a release-only lintVital finding stays ./gradlew build's job (#315)."
 
         /** `debugAndroidTest` -> `DebugAndroidTest`, for the AGP task-name convention. */
         fun String.taskSuffix(): String = replaceFirstChar(Char::uppercaseChar)
