@@ -15,19 +15,21 @@ import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
 
 /**
- * The Roborazzi proof-of-concept + regression lock for Manage packs (#333).
+ * The Roborazzi regression lock for Manage packs (#333 harness, #338 20d golden).
  *
- * ONE golden: the SHIPPED `ManagePacksContent` at COMPACT width (`w411dp-h891dp`), the
- * phone frame, captured through the same `createComposeRule` the module's render tests
- * already use — so the screenshot harness sits on the existing Robolectric compose-test
- * foundation, not beside it.
+ * TWO goldens, both captured through the same `createComposeRule` the module's render
+ * tests already use — so the screenshot harness sits on the existing Robolectric
+ * compose-test foundation, not beside it:
+ *  - `ManagePacksContent` at COMPACT width (`w411dp-h891dp`), the phone frame (#333);
+ *  - `ManagePacksContent` at EXPANDED width (`w1280dp-h800dp`), the 20d two-pane (#338).
  *
- * **Why only the compact pane, not the 20d two-pane.** The two-pane at expanded width is
- * still the PRE-FIX 20d on `main` (`ManagePacksDetailPane` — avatar+name, a bare "Usage"
- * header, a duplicated storage card); a golden of it would lock the exact defect PR #338
- * fixes. The two-pane golden lands with #338, recorded against the FIXED + conformance-
- * verified 20d. This PR ships only the compact pane, which a conformance review has
- * confirmed correct.
+ * **The two-pane golden locks the FIXED 20d.** #337 deliberately DROPPED it: on `main`
+ * the two-pane was still the pre-fix `ManagePacksDetailPane` (avatar+name, a bare "Usage"
+ * header, a duplicated storage card), and a golden of that would have locked the exact
+ * defect #338 fixes. Recorded here against the rebuilt, conformance-verified detail pane,
+ * `managePacksTwoPaneExpanded` locks the design #338 ships: identity + on-device status,
+ * the Text/Voice capability cards, "Where this pack is used" with the saved-phrases line,
+ * the per-role usage, and the Remove action.
  *
  * Native graphics (`@GraphicsMode(NATIVE)`) is what makes `captureRoboImage()` produce
  * real pixels under Robolectric; the path names the committed golden under the module's
@@ -118,11 +120,76 @@ class ManagePacksScreenshotTest {
         )
     }
 
+    /**
+     * The 20d two-pane at EXPANDED width (`w1280dp-h800dp`, the ruling's tablet frame and
+     * the same gate `ManagePacksListDetailRenderTest` drives), locking the FIXED detail
+     * pane (#338). Method-level `@Config` overrides the class's compact qualifier so this
+     * one test draws `ManagePacksTwoPane`.
+     *
+     * The fixture ids are REAL (`fr`, `de`): `displayName` derives from the id via
+     * `languageDisplayName(id, …, fallback = row.name)` (`OfflinePackRow.kt`), so `name`
+     * alone would not render "French"/"German". French is the current target
+     * (`targetId = "fr"`) → the default selection the detail draws, and it carries an
+     * on-device voice, a saved count, and a target-role stamp, so every non-ruled block —
+     * the two capability cards, "Where this pack is used" + the saved-phrases line, the
+     * per-role usage, the Remove action — is exercised in one frame. Only downloaded rows,
+     * kept STATIC like the compact fixture: no `Downloading` row whose indeterminate
+     * progress would animate the captured frame.
+     */
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp")
+    fun managePacksTwoPaneExpanded() {
+        val rows =
+            listOf(
+                OfflineLanguageRow("fr", "French", OfflineModelState.Downloaded, hasOfflineVoice = true),
+                OfflineLanguageRow("de", "German", OfflineModelState.Downloaded),
+            )
+        val sections =
+            buildManagePacksSections(rows, usage = mapOf("fr" to NOW), targetId = "fr", locale = Locale.ENGLISH)
+        compose.setContent {
+            TranzlateTheme {
+                ManagePacksContent(
+                    loading = false,
+                    sections = sections,
+                    storage = StorageCard.FreeOnly(packCount = rows.size, freeBytes = 8L * 1024 * 1024 * 1024),
+                    nudge = null,
+                    suggestions = emptyList(),
+                    capable = 59,
+                    total = 194,
+                    usageAsSource = emptyMap(),
+                    usageAsTarget = mapOf("fr" to NOW),
+                    nowMillis = NOW,
+                    onBack = {},
+                    onGet = {},
+                    onStopDownload = {},
+                    onRetry = {},
+                    onRemove = {},
+                    onDismissNudge = {},
+                    onBrowseAll = {},
+                    // The detail's saved-phrases line reads this for the selected pack (#332).
+                    onSavedCount = { 4 },
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        compose.onRoot().captureRoboImage(
+            filePath = "src/test/screenshots/ManagePacksTwoPane_expanded_w1280dp_h800dp.png",
+            roborazziOptions =
+                RoborazziOptions(
+                    compareOptions = RoborazziOptions.CompareOptions(changeThreshold = COMPARE_THRESHOLD),
+                ),
+        )
+    }
+
     private companion object {
         /**
          * 1% of pixels — see the class KDoc. The regression lock's tolerance for cross-OS
          * font-AA noise, well below the smallest real UI regression.
          */
         const val COMPARE_THRESHOLD = 0.01f
+
+        /** A fixed "now", and the French target-role stamp, so "used today" is stable across renders. */
+        const val NOW = 1_000_000_000_000L
     }
 }

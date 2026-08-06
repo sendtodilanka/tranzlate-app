@@ -116,6 +116,24 @@ the do-not-relitigate REJECT list live in the ruling doc.
 | PR-27 | Ruling 2 execution: remove the Detect "ONLINE ONLY" chip; 19i never built | ✅ #309 — chip stripped from both faces (visible chip + TalkBack cd); real online-only langs keep theirs |
 | PR-28 | 19n flavor-scoped copy (ruling 4) | ✅ #308 — 19n NOT built (no trigger); became the privacy-copy fix: `lang_first_run_privacy` was a lie (app uploads on AUTO fallback), rewritten honest ×3 locales |
 
+### Design-conformance remediation (2026-08-06)
+
+A Phase-2 audit compared each shipped rev5 screen to its SSOT design frame (not the
+derived summary that hid the 20d gap — the `frame-dump.py` extractor now makes "what the
+frame shows" a computed fact). The pass found screens that had drifted from their frames
+and merged anyway; this section tracks the remediation, each fix LOCKED by a Roborazzi
+golden-diff so it cannot silently regress again (the lock runs in CI `build`, #337).
+
+| PR | Scope | Status |
+|---|---|---|
+| #337 | Roborazzi visual-diff harness — `ComposeTestConventionPlugin` wires `verifyRoborazzi<Variant>` into `build`; one compact `ManagePacksContent` golden. The 20d two-pane golden was DEFERRED (it would have locked the pre-fix broken pane) | ✅ #337, 2026-08-06 |
+| #339 | Language picker design-conformance | ✅ #339 |
+| **#338** | **20d detail-pane rebuild + 20b failed-row Dismiss** (this PR) — identity status subtitle (`On device · ready to use with no connection`), Text/Voice capability cards (supported/muted, status in words), header renamed to "Where this pack is used" + a saved-phrases line, a Remove block routing to the existing 19f/19g confirm, and the duplicated `StorageCardView` removed from the detail (#331); 20b adds a session-mask Dismiss beside Retry (#336). Bundled onto #337: records the two-pane `ManagePacksTwoPane_expanded_w1280dp_h800dp.png` golden against the FIXED pane, and a Dismiss render test | ⏳ #338 — co-verify APPROVED (20d + 20b CONFORM to their frames); mutation-proven tests, preflight + build green, 1280×800 emulator pass (light+dark) + both goldens committed. Do-not-merge pending a golden-aware co-verify |
+| #346 | 20e Free-up-space design-conformance | in progress |
+| 20c / #335 | 20c pack-actions sheet design-conformance | queued |
+| 19b / #320 | 19b storage screen + the picker→20e "Free up space" wiring | queued |
+| 20f / 17b / 18a | empty state / foldable / first-run — deltas pending owner ratification | owner-ratify |
+
 ### PR-13 deviations from the ruling's PR-13 row (2026-08-02)
 
 Three, each verified against the code rather than against the ruling text
