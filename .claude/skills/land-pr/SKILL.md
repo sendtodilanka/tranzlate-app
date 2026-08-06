@@ -59,7 +59,23 @@ protects.
    saying so (that nearly broke #246's landing). Comparing `headSha` to the tip is
    the only thing that catches it; the badge cannot (#253).**
 
-4. **Merge** — with the epic tracker row *already carrying this PR's number*.
+4. **Confirm branch protection is still intact — the server, not a count, is
+   what now protects `main`.** The revised rule 1
+   (`docs/ENGINEERING_STANDARDS.md` §1) drops the open-PR count cap and rests the
+   safety case on GitHub branch protection: `strict:true` makes the server reject
+   a behind-tip `gh pr merge`, and `enforce_admins:true` makes it reject even
+   `--admin` (verified live 2026-08-06). Both live in a GitHub setting outside
+   this repo's version control, so nothing here would notice if either silently
+   reverted. Confirm both are `true` before trusting the merge lane:
+   ```
+   gh api repos/{owner}/{repo}/branches/main/protection \
+     --jq '{strict:.required_status_checks.strict, admins:.enforce_admins.enabled}'
+   ```
+   Expect `{"strict":true,"admins":true}`. Anything else — `false`, `null`, or a
+   `404` (protection off entirely) — means the lane is unguarded: **stop, do not
+   merge**, and restore branch protection first.
+
+5. **Merge** — with the epic tracker row *already carrying this PR's number*.
    The owner's strict rule: a merge that leaves the tracker stale is an
    incomplete merge. Write the row into `docs/plan/issue-NN-*.md` on the branch
    and push it before you merge; `.claude/hooks/guard-tracker.sh` denies the
@@ -84,7 +100,7 @@ protects.
    The list must equal your intended closures. A discussed-but-not-closed issue in
    it → fix the body (lead with the number, or `Refs: #N`) before merging.
 
-5. **Then, and only then**, start the next PR at step 1 — with the tip that now
+6. **Then, and only then**, start the next PR at step 1 — with the tip that now
    includes what you just merged.
 
 ## When several PRs are ready at once
