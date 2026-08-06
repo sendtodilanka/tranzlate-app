@@ -1,5 +1,8 @@
 # ADVERSARIAL JUDGE RULING — Language screens rev3 architecture
 
+> **issue #130 has three plan files.** **This one = the design authority** — the adversarial-judge ruling that fixed each frame/PR scope. The other two: the order-of-work plan → [`issue-130-rev5-completion.md`](issue-130-rev5-completion.md) · the per-PR tracker → [`issue-130-language-rev3.md`](issue-130-language-rev3.md).
+> ⚠️ **"rev3" in this filename is the 2026-07-31 architecture-planning round, NOT a design revision.** It governs the **rev5** design (spec of record: `docs/design/language-screens/language-screens-spec.html`).
+
 දිනය 2026-07-31 · branch `main` (HEAD `7745e04`) · merged: **15a පමණයි** (PR #118+#121).
 Inputs: `langrev3/code-map.md` · `spec-inventory.md` · `platform-audit.md` · `gap-matrix.md` + proposals 3 (incrementalist · consolidator · reliability). Cross-examination claims සියල්ල source-verify කළා (file:line පහත).
 

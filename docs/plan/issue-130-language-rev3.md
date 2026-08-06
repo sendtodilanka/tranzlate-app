@@ -1,5 +1,8 @@
 # Plan — issue #130: Language screens rev3, full implementation
 
+> **issue #130 has three plan files.** **This one = the per-PR tracker + implementation plan** — the PR-N checklist (the ✅ rows). The other two: the order-of-work plan → [`issue-130-rev5-completion.md`](issue-130-rev5-completion.md) · the design authority → [`issue-130-language-rev3-ruling.md`](issue-130-language-rev3-ruling.md).
+> ⚠️ **"rev3" in this filename is the 2026-07-31 architecture-planning round, NOT a design revision.** What these PRs build is the **rev5** design (spec of record: `docs/design/language-screens/language-screens-spec.html`).
+
 status: accepted
 (accepted basis: owner-mandated design debate ran 2026-07-31 — 3 differently-primed
 architects → adversarial judge → verifier who checked 74 load-bearing claims
