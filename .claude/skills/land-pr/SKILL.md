@@ -38,9 +38,11 @@ protects.
    export ANDROID_HOME="$HOME/Library/Android/sdk"
    ./gradlew preflight
    ```
-   `preflight` (#253) compiles every androidTest source set and both APKs — the
-   old five-command line (`test … spotlessCheck detekt`) compiled no androidTest
-   at all, so a rebase could break `:core:database`'s tests and still show green.
+   `preflight` (#253) compiles every androidTest source set, runs Android lint on the
+   debug variants (#315), and packages both APKs — the old five-command line
+   (`test … spotlessCheck detekt`) compiled no androidTest and ran no Android lint at
+   all, so a rebase could break `:core:database`'s tests, or introduce the exact lint
+   error CI's `./gradlew build` would reject (#315), and still show green.
    A rebase can break compilation neither branch broke — that is why this runs here.
 
 3. **Push and wait for CI ON THE REBASED COMMIT — verified by SHA, not by the badge:**
