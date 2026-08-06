@@ -68,7 +68,7 @@
     <!-- 18a/18b first-run suggestion block (#130 PR-21). -->
     <string name="lang_first_run_title">Nenhum pacote ainda</string>
     <string name="lang_first_run_body">Escolha um idioma para baixar uma vez e ele funciona sem sinal.</string>
-    <string name="lang_first_run_privacy">A tradução acontece no dispositivo — nada é enviado a lugar nenhum.</string>
+    <string name="lang_first_run_privacy">Idiomas baixados são traduzidos no seu dispositivo. Sem um pacote, seu texto é enviado pela internet.</string>
     <string name="lang_first_run_suggested_header">Sugeridos para você</string>
     <string name="lang_suggested_reason_device">Idioma do dispositivo</string>
     <string name="lang_suggested_reason_local">Comum onde você está</string>

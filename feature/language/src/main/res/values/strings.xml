@@ -171,7 +171,21 @@
          invents a signal the platform will not give — see firstRunSuggestions(). -->
     <string name="lang_first_run_title">No packs yet</string>
     <string name="lang_first_run_body">Pick a language to download once, then it works with no signal.</string>
-    <string name="lang_first_run_privacy">Translation runs on the device — nothing is sent anywhere.</string>
+    <!-- Ruling ④ (#130 PR-28): this line states only what THIS brand can honour.
+         The tranzlate waterfall is MLKit-offline → GOT → GCT
+         (RealTranslator.kt:41-42; spec 02-…:20 — the two online tiers send "text
+         to the cloud"), so a downloaded pack stays on the device but anything
+         else is sent over the internet. The unconditional "nothing is sent
+         anywhere" that shipped here was false for this brand and is gone. A
+         future OFFLINE-ONLY brand — one whose config carries no online tier —
+         states the stronger "nothing you type is uploaded" claim by shadowing
+         THIS key from its own app/src/<brand>/res/values/strings.xml: app
+         product-flavor resources win over a library module's in the resource
+         merge, the same white-label override the tranzlate flavor already uses
+         for app_name and the launcher icon. This library default is the SAFE
+         fallback — it under-claims privacy, never over-claims it, so a brand that
+         forgets to override cannot ship a lie. Pinned by FirstRunPrivacyCopyTest. -->
+    <string name="lang_first_run_privacy">Downloaded languages translate on your device. Without a pack, your text is sent over the internet.</string>
     <string name="lang_first_run_suggested_header">Suggested for you</string>
     <!-- The supporting line under a suggested language. Only two reasons ship:
          the device's primary locale, and a secondary one. The export draws a
