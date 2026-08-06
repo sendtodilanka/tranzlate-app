@@ -172,6 +172,8 @@
         <item quantity="other">%1$d de %2$d pacotes</item>
     </plurals>
     <string name="manage_downloading_note">Não há pausa — parar descarta o pacote.</string>
+    <!-- 20b failed-row Dismiss (#336) · #115 provisional -->
+    <string name="manage_failed_dismiss">Dispensar</string>
     <string name="manage_used_today">usado hoje</string>
     <plurals name="manage_used_days">
         <item quantity="one">usado há %1$d dia</item>
@@ -187,11 +189,23 @@
     </plurals>
     <string name="manage_used_never">sem uso registrado ainda</string>
     <string name="manage_in_use">EM USO</string>
-    <!-- 20d list-detail (#130 PR-26) · #115 provisional, pending native review -->
-    <string name="manage_detail_usage_header">Uso</string>
+    <!-- 20d list-detail (#130 PR-26 / conformance #332) · #115 provisional, pending native review -->
+    <string name="manage_detail_usage_header">Onde este pacote é usado</string>
     <string name="manage_detail_role_source">Como origem</string>
     <string name="manage_detail_role_target">Como destino</string>
     <string name="manage_detail_empty">Selecione um pacote para ver como ele foi usado.</string>
+    <string name="manage_detail_status_on_device">No dispositivo · pronto para usar sem conexão</string>
+    <string name="manage_detail_cap_text_title">Texto off-line</string>
+    <string name="manage_detail_cap_text_ready">Motor de frase completa</string>
+    <string name="manage_detail_cap_voice_title">Voz off-line</string>
+    <string name="manage_detail_cap_voice_ready">Tem uma voz no dispositivo</string>
+    <string name="manage_detail_cap_offline_unavailable">Precisa de conexão</string>
+    <plurals name="manage_detail_saved">
+        <item quantity="one">%1$d frase salva está em %2$s</item>
+        <item quantity="other">%1$d frases salvas estão em %2$s</item>
+    </plurals>
+    <string name="manage_detail_remove_body">Remover libera o espaço que ele não compartilha com outro pacote. %1$s então precisa de conexão para traduzir, e baixá-lo de novo é grátis.</string>
+    <string name="manage_detail_remove_action">Remover</string>
     <string name="manage_cd_options">Opções para %1$s</string>
     <string name="manage_actions_use_target">Usar como destino agora</string>
     <string name="manage_actions_voice">Pode ser falado off-line</string>

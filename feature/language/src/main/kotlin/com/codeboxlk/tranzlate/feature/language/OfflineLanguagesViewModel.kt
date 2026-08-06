@@ -26,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -199,6 +200,19 @@ class OfflineLanguagesViewModel
         @param:ApplicationScope private val appScope: CoroutineScope,
     ) : ViewModel() {
         /**
+         * Failed-download rows the user has DISMISSED this session (20b · #336). The
+         * manager holds the `Failed` state and has no clear-failure API, so Dismiss is
+         * a view-side mask folded into [catalog]: the failed row leaves the screen, the
+         * language stays offline-capable (its count unchanged) and re-downloadable from
+         * the picker. Session-scoped on purpose — "in-session state", so a plain flow,
+         * not the durable [SavedStateHandle]; a process death re-reads whatever the
+         * manager still reports. A pack that FAILS AGAIN after being dismissed stays
+         * hidden here for the session, but the picker's own row and the app-level
+         * download notice both still surface it, so it is not a silent dead end.
+         */
+        private val dismissedFailures = MutableStateFlow<Set<String>>(emptySet())
+
+        /**
          * Offline-capable catalogue rows with their live model state, and the full
          * catalogue size for the footer's "59 of 194" line.
          *
@@ -213,7 +227,8 @@ class OfflineLanguagesViewModel
             combine(
                 languageRepository.languages(),
                 modelManager.modelStates().onStart { emit(emptyMap()) },
-            ) { catalog, states ->
+                dismissedFailures,
+            ) { catalog, states, dismissed ->
                 CapableCatalog(
                     rows =
                         catalog
@@ -222,7 +237,15 @@ class OfflineLanguagesViewModel
                                 OfflineLanguageRow(
                                     id = language.id,
                                     name = language.name,
-                                    state = states[language.id] ?: OfflineModelState.NotDownloaded,
+                                    // A dismissed failure is masked HERE, before the row is
+                                    // classified, so the failed row leaves the screen while the
+                                    // language stays offline-capable and re-downloadable (#336).
+                                    state =
+                                        maskDismissedFailure(
+                                            states[language.id] ?: OfflineModelState.NotDownloaded,
+                                            language.id,
+                                            dismissed,
+                                        ),
                                     hasOfflineVoice = language.hasOfflineVoice,
                                 )
                             },
@@ -313,6 +336,16 @@ class OfflineLanguagesViewModel
         /** "Not now": hide the nudge for this session without touching a pack. */
         fun dismissNudge() {
             handle[KEY_NUDGE_DISMISSED] = true
+        }
+
+        /**
+         * 20b "Dismiss" on a failed row (#336): drop the failure from the screen for
+         * this session — no retry, no delete. The id joins [dismissedFailures], which
+         * [catalog] masks to `NotDownloaded`, so the row leaves the failed section while
+         * the language stays offline-capable and re-downloadable from the picker.
+         */
+        fun dismissFailure(id: String) {
+            dismissedFailures.value = dismissedFailures.value + id
         }
 
         /** Language id awaiting the mobile-data consent sheet; null = no sheet. */
@@ -462,6 +495,16 @@ class OfflineLanguagesViewModel
             }
 
         /**
+         * The 20d detail pane's saved-phrases count for the SELECTED pack (#332). Public
+         * so the composable can drive it from its screen-local selection via `produceState`
+         * — the detail is shown for one pack at a time, so one keyed query is honest and
+         * far cheaper than counting every pack on every emission. Reuses the same
+         * error-tolerant [savedCountOf] the remove sheets read, so a database that cannot
+         * answer yields 0 (an ABSENT line), never a false number.
+         */
+        suspend fun savedCountFor(id: String): Int = savedCountOf(id)
+
+        /**
          * 20c "Use as target now" — make this pack's language the one the app
          * translates INTO, written through the SAME [TranslatePrefsRepository] (and
          * therefore the same DataStore key) the picker's target selection uses, so the
@@ -573,6 +616,20 @@ internal data class RoleUsage(
 /** Packs actually on the device — Downloaded or mid-delete (still on disk), the storage card's count. */
 internal fun onDevicePackCount(catalog: CapableCatalog): Int =
     catalog.rows.count { it.state == OfflineModelState.Downloaded || it.state == OfflineModelState.Deleting }
+
+/**
+ * A dismissed failure (#336) reads as [OfflineModelState.NotDownloaded]. ONLY a
+ * [OfflineModelState.Failed] whose id the user dismissed is masked — a re-download in
+ * flight (`Downloading`) or completed (`Downloaded`) is a different state and draws as
+ * itself. Pure, so the one decision "which failed rows are hidden" is boundary-tested
+ * without a ViewModel, and a mutation that masks the wrong state reddens directly.
+ */
+internal fun maskDismissedFailure(
+    state: OfflineModelState,
+    id: String,
+    dismissed: Set<String>,
+): OfflineModelState =
+    if (state is OfflineModelState.Failed && id in dismissed) OfflineModelState.NotDownloaded else state
 
 /**
  * Per-language latest use across both roles — the larger of the two stamps, or

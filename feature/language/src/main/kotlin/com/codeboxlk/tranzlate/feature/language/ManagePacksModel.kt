@@ -228,6 +228,63 @@ data class PackRow(
 )
 
 /**
+ * Whether one offline capability WORKS for the selected pack right now, or needs a
+ * connection. The 20d detail pane's capability cards draw one of these per capability
+ * — a filled "supported" tint and its own positive subtitle, or a muted tint and the
+ * shared "needs a connection" subtitle (#332). Two states, and never a bare Boolean,
+ * so the card cannot be drawn "supported" by mistaking `true`-means-what for `false`.
+ */
+@Immutable
+enum class CapabilityState {
+    /** The capability runs on-device — draw it filled, with its own subtitle. */
+    Supported,
+
+    /** The capability needs a connection here — draw it muted, "Needs a connection". */
+    Unavailable,
+}
+
+/**
+ * The 20d detail pane's derived, string-free view of the SELECTED pack (#332): which
+ * offline capabilities work, and whether the pack is one the user can remove. Pure,
+ * so every "what the pane may claim" decision is unit-tested away from Compose — the
+ * module still has only a thin Compose test runtime (#186), and a decision left inside
+ * a `@Composable` is the rev.3 ruling's fourth cause.
+ *
+ * The two capabilities read the SAME device truths the rest of the screen does, never
+ * a new source: text-offline is exactly "the pack is on the device" (a downloaded pack
+ * translates full sentences offline), and voice-offline is that AND [PackRow.hasOfflineVoice]
+ * — a voice is a separate install, so a downloaded pack without one still needs a
+ * connection to speak. A pack that is not on the device (mid-download, or a failed
+ * fetch) supports NEITHER offline yet, so both read [CapabilityState.Unavailable]; the
+ * card's honesty then holds for every row the detail can select, not only a settled one.
+ *
+ * @property onDevice the pack is on disk (Downloaded, or mid-delete and still on disk)
+ *   — the identity subtitle's "On device" and both capabilities turn on this.
+ * @property removable a settled, non-pivot on-device pack: only then does the Remove
+ *   block draw. A mid-delete pack already has a delete in flight, and the English pivot
+ *   is non-actionable (#224, removing it frees nothing) — asked of [isPivotLanguage] by
+ *   id, never a stored flag, so a row and its pivot-ness cannot disagree (#325).
+ */
+@Immutable
+data class PackDetail(
+    val onDevice: Boolean,
+    val textOffline: CapabilityState,
+    val voiceOffline: CapabilityState,
+    val removable: Boolean,
+)
+
+/** Derive the [PackDetail] for the selected [row] — the single home of the pane's capability + remove decisions. */
+fun packDetail(row: PackRow): PackDetail {
+    val onDevice = row.state == OfflineModelState.Downloaded || row.state == OfflineModelState.Deleting
+    return PackDetail(
+        onDevice = onDevice,
+        textOffline = if (onDevice) CapabilityState.Supported else CapabilityState.Unavailable,
+        voiceOffline = if (onDevice && row.hasOfflineVoice) CapabilityState.Supported else CapabilityState.Unavailable,
+        removable = row.state == OfflineModelState.Downloaded && !isPivotLanguage(row.id),
+    )
+}
+
+/**
  * The three lists 20b draws, in the order it draws them: what is transferring,
  * what failed, and what is on the device. A [Downloadable]/[OnlineOnly] language
  * belongs to NONE of them — it is browsed and downloaded from the picker, not

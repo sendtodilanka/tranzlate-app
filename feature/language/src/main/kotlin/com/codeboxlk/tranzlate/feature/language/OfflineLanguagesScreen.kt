@@ -23,14 +23,18 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -58,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
@@ -172,8 +178,10 @@ fun OfflineLanguagesScreen(
         onGet = viewModel::download,
         onStopDownload = viewModel::stopDownload,
         onRetry = viewModel::download,
+        onDismissFailure = viewModel::dismissFailure,
         onRemove = viewModel::requestRemove,
         onUseAsTarget = viewModel::useAsTarget,
+        onSavedCount = viewModel::savedCountFor,
         onDismissNudge = viewModel::dismissNudge,
         onBrowseAll = onBrowseAll,
         pendingConsent = pendingConsent,
@@ -208,6 +216,13 @@ internal fun ManagePacksContent(
     onDismissNudge: () -> Unit,
     onBrowseAll: () -> Unit,
     modifier: Modifier = Modifier,
+    // 20b failed-row "Dismiss" (#336): drop the failed row for the session. Defaulted so
+    // the render-test / preview call sites that do not exercise a failure are untouched.
+    onDismissFailure: (String) -> Unit = {},
+    // 20d detail-pane saved-phrases count for the SELECTED pack (#332), queried by the
+    // two-pane from its screen-local selection. Defaulted to 0 so the compact-width
+    // render tests and previews that draw no detail pane are untouched.
+    onSavedCount: suspend (String) -> Int = { 0 },
     pendingConsent: String? = null,
     alwaysAsk: Boolean = true,
     onAlwaysAskChange: (Boolean) -> Unit = {},
@@ -339,12 +354,15 @@ internal fun ManagePacksContent(
                         nowMillis = nowMillis,
                         selectedId = selectedId,
                         onSelectPack = { selectedId = it.id },
+                        onSavedCount = onSavedCount,
                         onGet = onGet,
                         onStopDownload = onStopDownload,
                         onRetry = onRetry,
+                        onDismissFailure = onDismissFailure,
                         onMoreOptions = { row ->
                             actionsTarget = PackActionsTarget(row.id, row.displayName, row.hasOfflineVoice)
                         },
+                        onRemove = onRemove,
                         onDismissNudge = onDismissNudge,
                         onReviewPacks = { freeUpSpaceOpen = true },
                         onBrowseAll = onBrowseAll,
@@ -361,6 +379,7 @@ internal fun ManagePacksContent(
                         nowMillis = nowMillis,
                         onStopDownload = onStopDownload,
                         onRetry = onRetry,
+                        onDismissFailure = onDismissFailure,
                         onMoreOptions = { row ->
                             actionsTarget = PackActionsTarget(row.id, row.displayName, row.hasOfflineVoice)
                         },
@@ -419,6 +438,9 @@ private fun PopulatedList(
     onDismissNudge: () -> Unit,
     onReviewPacks: () -> Unit,
     onBrowseAll: () -> Unit,
+    // 20b failed-row "Dismiss" (#336): the failed section's second control beside Retry.
+    // Defaulted so the empty/other call sites are untouched.
+    onDismissFailure: (String) -> Unit = {},
     // 20d (#130 PR-26): non-null ONLY in the expanded-width two-pane, where a row
     // tap SELECTS the pack the detail shows. Null on a phone, where the list is the
     // whole screen and the row keeps its single job — the overflow — untouched.
@@ -446,6 +468,7 @@ private fun PopulatedList(
                     onSelectPack = onSelectPack,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
+                    onDismissFailure = onDismissFailure,
                     onMoreOptions = onMoreOptions,
                 )
             }
@@ -461,6 +484,7 @@ private fun PopulatedList(
                     onSelectPack = onSelectPack,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
+                    onDismissFailure = onDismissFailure,
                     onMoreOptions = onMoreOptions,
                 )
             }
@@ -486,6 +510,7 @@ private fun PopulatedList(
                     onSelectPack = onSelectPack,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
+                    onDismissFailure = onDismissFailure,
                     onMoreOptions = onMoreOptions,
                 )
             }
@@ -553,10 +578,13 @@ private fun ManagePacksTwoPane(
     nowMillis: Long,
     selectedId: String?,
     onSelectPack: (PackRow) -> Unit,
+    onSavedCount: suspend (String) -> Int,
     onGet: (String) -> Unit,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
+    onDismissFailure: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
+    onRemove: (String) -> Unit,
     onDismissNudge: () -> Unit,
     onReviewPacks: () -> Unit,
     onBrowseAll: () -> Unit,
@@ -571,6 +599,14 @@ private fun ManagePacksTwoPane(
         remember(selectedPack?.id, usageAsSource, usageAsTarget) {
             selectedPack?.let { packRoleUsage(it.id, usageAsSource, usageAsTarget) }
         }
+    // The selected pack's saved-phrases count for the detail pane (#332). Queried by
+    // the SELECTED id only — the detail shows one pack, so this is one keyed query, not
+    // a walk of every pack — and re-run when the selection changes. `0` while no pack is
+    // selected, which the pane draws as an ABSENT saved line (the remove sheets' rule).
+    val savedCount by
+        produceState(0, selectedPack?.id) {
+            value = selectedPack?.id?.let { onSavedCount(it) } ?: 0
+        }
     Row(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.width(ManagePacksListWidth)) {
             if (sections.hasPacks) {
@@ -583,6 +619,7 @@ private fun ManagePacksTwoPane(
                     nowMillis = nowMillis,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
+                    onDismissFailure = onDismissFailure,
                     onMoreOptions = onMoreOptions,
                     onDismissNudge = onDismissNudge,
                     onReviewPacks = onReviewPacks,
@@ -607,8 +644,9 @@ private fun ManagePacksTwoPane(
         ManagePacksDetailPane(
             pack = selectedPack,
             roleUsage = roleUsage,
-            storage = storage,
+            savedCount = savedCount,
             nowMillis = nowMillis,
+            onRemove = onRemove,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
     }
@@ -632,6 +670,7 @@ private fun SelectablePackRow(
     onSelectPack: ((PackRow) -> Unit)?,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
+    onDismissFailure: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
 ) {
     if (onSelectPack == null) {
@@ -641,6 +680,7 @@ private fun SelectablePackRow(
             onStopDownload = onStopDownload,
             onRetry = onRetry,
             onMoreOptions = onMoreOptions,
+            onDismissFailure = onDismissFailure,
         )
         return
     }
@@ -659,27 +699,38 @@ private fun SelectablePackRow(
             onStopDownload = onStopDownload,
             onRetry = onRetry,
             onMoreOptions = onMoreOptions,
+            onDismissFailure = onDismissFailure,
         )
     }
 }
 
 /**
- * The 20d detail pane: the SELECTED pack, its per-role last-used from the #122
- * store, and the same used-against-free storage bar the list draws.
+ * The 20d detail pane for the SELECTED pack (conformance #332), top→bottom: the
+ * pack's identity with its on-device status subtitle, the offline-capability cards,
+ * the "where this pack is used" section (saved phrases + per-role last-used from the
+ * #122 store), and — for a removable pack — the Remove block.
  *
  * `internal` so the render test and the preview can mount it without the two-pane
- * `Row` around it. The camera card and the pair-share line the spec's 20d also drew
- * are deliberately ABSENT — the first names a feature that does not exist (#78/#112),
- * the second an undocumented version-fragile layout — both standing REJECTs of the
- * rev.3 ruling (§7, :238/:249). Every date shown is a real usage stamp or the
- * honest "no recorded use yet"; the pane never fabricates one (ruling ⑧).
+ * `Row` around it. Two frame elements stay deliberately ABSENT: the camera card names
+ * a feature that does not exist (#78/#112), and the pair-share/`sd_card` line an
+ * undocumented version-fragile layout — both standing REJECTs of the rev.3 ruling
+ * (§7, :238/:249/:252). The aggregate storage card the frame draws in the LIST pane is
+ * NOT duplicated here (#331 / the #330 co-verify). Every date shown is a real usage
+ * stamp or the honest "no recorded use yet"; the pane never fabricates one (ruling ⑧),
+ * and each capability card states its offline status in WORDS, never colour alone.
+ *
+ * @param savedCount saved phrases in this language, on either side — the bookmark
+ *   line, ABSENT at zero (a missing reassurance, never a false one).
+ * @param onRemove routes to the EXISTING 19f/19g remove-confirm flow (the same action
+ *   the 20c sheet takes); it never deletes on tap.
  */
 @Composable
 internal fun ManagePacksDetailPane(
     pack: PackRow?,
     roleUsage: PackRoleUsage?,
-    storage: StorageCard?,
+    savedCount: Int,
     nowMillis: Long,
+    onRemove: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (pack == null || roleUsage == null) {
@@ -687,6 +738,7 @@ internal fun ManagePacksDetailPane(
         return
     }
     val spacing = LocalSpacing.current
+    val detail = packDetail(pack)
     Column(
         modifier =
             modifier
@@ -694,6 +746,47 @@ internal fun ManagePacksDetailPane(
                 .padding(spacing.lg24)
                 .testTag("tt_manage_detail"),
     ) {
+        DetailIdentity(pack = pack, detail = detail)
+        DetailCapabilities(detail = detail, modifier = Modifier.padding(top = spacing.lg24))
+        Text(
+            text = stringResource(R.string.manage_detail_usage_header),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = spacing.lg24, bottom = spacing.xs4),
+        )
+        if (savedCount > 0) {
+            DetailSavedLine(count = savedCount, languageName = pack.displayName)
+        }
+        DetailRoleLine(
+            role = stringResource(R.string.manage_detail_role_source),
+            usage = roleUsage.asSource,
+            nowMillis = nowMillis,
+            tag = "tt_manage_detail_source",
+        )
+        DetailRoleLine(
+            role = stringResource(R.string.manage_detail_role_target),
+            usage = roleUsage.asTarget,
+            nowMillis = nowMillis,
+            tag = "tt_manage_detail_target",
+        )
+        if (detail.removable) {
+            DetailRemoveBlock(
+                pack = pack,
+                onRemove = onRemove,
+                modifier = Modifier.padding(top = spacing.lg24),
+            )
+        }
+    }
+}
+
+/** The detail pane's identity: avatar + name + IN-USE badge, and an honest status subtitle for the state. */
+@Composable
+private fun DetailIdentity(
+    pack: PackRow,
+    detail: PackDetail,
+) {
+    val spacing = LocalSpacing.current
+    Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PackAvatar(id = pack.id, downloaded = pack.state == OfflineModelState.Downloaded)
             Text(
@@ -709,26 +802,192 @@ internal fun ManagePacksDetailPane(
                 InUseBadge(modifier = Modifier.padding(start = spacing.sm8))
             }
         }
+        detailStatusSubtitle(pack = pack, onDevice = detail.onDevice)?.let { subtitle ->
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = spacing.xs4).testTag("tt_manage_detail_status"),
+            )
+        }
+    }
+}
+
+/**
+ * The status subtitle under the identity — "On device · ready to use with no
+ * connection" for a pack on disk, else the honest word for the state it IS in
+ * (downloading, or a failure), never "On device" for a pack that is not (ruling ⑧).
+ */
+@Composable
+private fun detailStatusSubtitle(
+    pack: PackRow,
+    onDevice: Boolean,
+): String? {
+    val state = pack.state
+    return when {
+        onDevice -> stringResource(R.string.manage_detail_status_on_device)
+        state == OfflineModelState.Downloading -> stringResource(R.string.text_lang_downloading)
+        state is OfflineModelState.Failed -> stringResource(downloadFailureCopy(state.cause).rowLine)
+        else -> null
+    }
+}
+
+/** The offline-capability cards: Text offline (always for a downloaded pack) and Voice offline (IFF a device voice). */
+@Composable
+private fun DetailCapabilities(
+    detail: PackDetail,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
+    ) {
+        CapabilityCard(
+            icon = Icons.Outlined.Translate,
+            title = stringResource(R.string.manage_detail_cap_text_title),
+            subtitle =
+                stringResource(
+                    if (detail.textOffline == CapabilityState.Supported) {
+                        R.string.manage_detail_cap_text_ready
+                    } else {
+                        R.string.manage_detail_cap_offline_unavailable
+                    },
+                ),
+            state = detail.textOffline,
+            subtitleTag = "tt_manage_detail_cap_text",
+            modifier = Modifier.weight(1f),
+        )
+        CapabilityCard(
+            icon = Icons.AutoMirrored.Filled.VolumeUp,
+            title = stringResource(R.string.manage_detail_cap_voice_title),
+            subtitle =
+                stringResource(
+                    if (detail.voiceOffline == CapabilityState.Supported) {
+                        R.string.manage_detail_cap_voice_ready
+                    } else {
+                        R.string.manage_detail_cap_offline_unavailable
+                    },
+                ),
+            state = detail.voiceOffline,
+            subtitleTag = "tt_manage_detail_cap_voice",
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/**
+ * One capability card: `icon / title / subtitle`. A [CapabilityState.Supported]
+ * capability draws filled (primary container) with its own "ready" subtitle; an
+ * [CapabilityState.Unavailable] one draws muted (surface container) with "Needs a
+ * connection" — the state is in the WORDS as well as the tint, so a screen reader and
+ * a colour-blind reader both get it (a11y: never colour alone).
+ */
+@Composable
+private fun CapabilityCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    state: CapabilityState,
+    subtitleTag: String,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    val scheme = MaterialTheme.colorScheme
+    val supported = state == CapabilityState.Supported
+    val container = if (supported) scheme.primaryContainer else scheme.surfaceContainerHigh
+    val onContainer = if (supported) scheme.onPrimaryContainer else scheme.onSurfaceVariant
+    Column(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(spacing.md16))
+                .background(container)
+                .padding(spacing.md16)
+                .semantics(mergeDescendants = true) {},
+    ) {
+        Icon(icon, contentDescription = null, tint = onContainer, modifier = Modifier.size(Dimensions.iconSm))
         Text(
-            text = stringResource(R.string.manage_detail_usage_header),
+            text = title,
             style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = spacing.lg24, bottom = spacing.xs4),
+            color = onContainer,
+            modifier = Modifier.padding(top = spacing.sm8),
         )
-        DetailRoleLine(
-            role = stringResource(R.string.manage_detail_role_source),
-            usage = roleUsage.asSource,
-            nowMillis = nowMillis,
-            tag = "tt_manage_detail_source",
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = onContainer,
+            modifier = Modifier.testTag(subtitleTag),
         )
-        DetailRoleLine(
-            role = stringResource(R.string.manage_detail_role_target),
-            usage = roleUsage.asTarget,
-            nowMillis = nowMillis,
-            tag = "tt_manage_detail_target",
+    }
+}
+
+/** "N saved phrases are in <lang>" — the bookmark line of the "where used" section, shown only above zero. */
+@Composable
+private fun DetailSavedLine(
+    count: Int,
+    languageName: String,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = spacing.xs4)
+                .semantics(mergeDescendants = true) {},
+    ) {
+        Icon(
+            Icons.Outlined.Bookmark,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(Dimensions.iconSm),
         )
-        storage?.let {
-            StorageCardView(it, Modifier.padding(top = spacing.lg24))
+        Text(
+            text = pluralStringResource(R.plurals.manage_detail_saved, count, count, languageName),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = spacing.sm8).testTag("tt_manage_detail_saved"),
+        )
+    }
+}
+
+/**
+ * The Remove block (error/loss tone): what removing costs, and the button. The button
+ * ROUTES to the existing 19f/19g remove-confirm sheet via [onRemove] — it never deletes
+ * on tap — exactly as the 20c pack-actions sheet's Remove row does.
+ */
+@Composable
+private fun DetailRemoveBlock(
+    pack: PackRow,
+    onRemove: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                Icons.Outlined.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(Dimensions.iconSm),
+            )
+            Text(
+                text = stringResource(R.string.manage_detail_remove_body, pack.displayName),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = spacing.sm8).weight(1f),
+            )
+        }
+        OutlinedButton(
+            onClick = { onRemove(pack.id) },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier =
+                Modifier
+                    .padding(top = spacing.sm8)
+                    .heightIn(min = Dimensions.touchTargetMin)
+                    .testTag("tt_manage_detail_remove"),
+        ) {
+            Text(stringResource(R.string.manage_detail_remove_action))
         }
     }
 }
@@ -1068,6 +1327,7 @@ private fun PackRow(
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
+    onDismissFailure: (String) -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     Row(
@@ -1089,7 +1349,13 @@ private fun PackRow(
             }
             PackRowSupporting(row, nowMillis)
         }
-        PackRowControl(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
+        PackRowControl(
+            row = row,
+            onStopDownload = onStopDownload,
+            onRetry = onRetry,
+            onDismissFailure = onDismissFailure,
+            onMoreOptions = onMoreOptions,
+        )
     }
 }
 
@@ -1147,6 +1413,7 @@ private fun PackRowControl(
     row: PackRow,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
+    onDismissFailure: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
 ) {
     when (row.state) {
@@ -1155,6 +1422,11 @@ private fun PackRowControl(
         }
 
         is OfflineModelState.Failed -> {
+            // 20b (#336): the failed row draws TWO actions, as the frame does — Dismiss
+            // then Retry. Dismiss hides the failure for the session (`onDismissFailure`)
+            // without retrying or deleting; a lower-emphasis TextButton, so Retry stays
+            // the one filled call to action.
+            //
             // #250: EVERY failed cause, out-of-space included, keeps its Retry pill.
             // Removing it left the STORAGE row a permanent dead-end — its line promises
             // an action with no control to tap, and freeing space elsewhere never
@@ -1162,13 +1434,22 @@ private fun PackRowControl(
             // #234 concern is a Retry that SILENTLY does nothing, not the absence of
             // Retry; the ViewModel now makes it HONEST — a still-full retry surfaces
             // a snackbar (`reportOutcome`), a freed-disk retry actually downloads.
-            Button(
-                onClick = { onRetry(row.id) },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                contentPadding = PaddingValues(horizontal = LocalSpacing.current.md16),
-                modifier = Modifier.heightIn(min = Dimensions.touchTargetMin).testTag("tt_manage_retry"),
-            ) {
-                Text(stringResource(R.string.lang_sheet_failed_retry))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = { onDismissFailure(row.id) },
+                    contentPadding = PaddingValues(horizontal = LocalSpacing.current.sm8),
+                    modifier = Modifier.heightIn(min = Dimensions.touchTargetMin).testTag("tt_manage_dismiss"),
+                ) {
+                    Text(stringResource(R.string.manage_failed_dismiss))
+                }
+                Button(
+                    onClick = { onRetry(row.id) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    contentPadding = PaddingValues(horizontal = LocalSpacing.current.md16),
+                    modifier = Modifier.heightIn(min = Dimensions.touchTargetMin).testTag("tt_manage_retry"),
+                ) {
+                    Text(stringResource(R.string.lang_sheet_failed_retry))
+                }
             }
         }
 
@@ -1492,7 +1773,8 @@ private fun row(
     state: OfflineModelState,
     usage: PackUsage = PackUsage.Used(previewNow),
     inUse: Boolean = false,
-) = PackRow(id, name, state, usage, inUse)
+    hasOfflineVoice: Boolean = false,
+) = PackRow(id, name, state, usage, inUse, hasOfflineVoice)
 
 private val previewOnDevice =
     listOf(
@@ -1766,10 +2048,13 @@ private fun ManagePacksListDetailPreview() {
             nowMillis = previewDetailNow,
             selectedId = null,
             onSelectPack = {},
+            onSavedCount = { 4 },
             onGet = {},
             onStopDownload = {},
             onRetry = {},
+            onDismissFailure = {},
             onMoreOptions = {},
+            onRemove = {},
             onDismissNudge = {},
             onReviewPacks = {},
             onBrowseAll = {},
@@ -1798,10 +2083,13 @@ private fun ManagePacksListDetailEmptyPreview() {
             nowMillis = previewDetailNow,
             selectedId = null,
             onSelectPack = {},
+            onSavedCount = { 0 },
             onGet = {},
             onStopDownload = {},
             onRetry = {},
+            onDismissFailure = {},
             onMoreOptions = {},
+            onRemove = {},
             onDismissNudge = {},
             onReviewPacks = {},
             onBrowseAll = {},
@@ -1809,7 +2097,11 @@ private fun ManagePacksListDetailEmptyPreview() {
     }
 }
 
-/** The detail pane alone, both meaningful states: a selected pack (per-role usage + storage) and no selection. */
+/**
+ * The FULL detail (rule 7): an on-device, in-use, voiced pack with saved phrases —
+ * identity + status, both capability cards supported, the saved line, per-role usage,
+ * and the Remove block — beside the no-selection placeholder.
+ */
 @PreviewLightDark
 @Composable
 private fun ManagePacksDetailPanePreview() {
@@ -1817,18 +2109,62 @@ private fun ManagePacksDetailPanePreview() {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Row {
                 ManagePacksDetailPane(
-                    pack = previewDetailOnDevice.first(),
+                    pack =
+                        row(
+                            "es",
+                            "Spanish",
+                            OfflineModelState.Downloaded,
+                            usedDaysAgo(3),
+                            inUse = true,
+                            hasOfflineVoice = true,
+                        ),
                     roleUsage = PackRoleUsage(asSource = usedDaysAgo(3), asTarget = PackUsage.NoRecord),
-                    storage = previewSizedStorage,
+                    savedCount = 4,
                     nowMillis = previewDetailNow,
-                    modifier = Modifier.weight(1f),
+                    onRemove = {},
+                    modifier = Modifier.width(420.dp),
                 )
+                VerticalDivider()
                 ManagePacksDetailPane(
                     pack = null,
                     roleUsage = null,
-                    storage = null,
+                    savedCount = 0,
                     nowMillis = previewDetailNow,
-                    modifier = Modifier.weight(1f).height(320.dp),
+                    onRemove = {},
+                    modifier = Modifier.width(420.dp).height(320.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * More detail states (rule 7): a downloaded pack with NO on-device voice and no saved
+ * phrases (voice card muted, Remove present), and a FAILED pack (a failure subtitle,
+ * both cards muted, no Remove).
+ */
+@PreviewLightDark
+@Composable
+private fun ManagePacksDetailPaneMutedStatesPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Row {
+                ManagePacksDetailPane(
+                    pack = row("de", "German", OfflineModelState.Downloaded, usedDaysAgo(14)),
+                    roleUsage = PackRoleUsage(asSource = PackUsage.NoRecord, asTarget = usedDaysAgo(14)),
+                    savedCount = 0,
+                    nowMillis = previewDetailNow,
+                    onRemove = {},
+                    modifier = Modifier.width(420.dp),
+                )
+                VerticalDivider()
+                ManagePacksDetailPane(
+                    pack = row("hi", "Hindi", OfflineModelState.Failed(OfflineModelFailure.NETWORK)),
+                    roleUsage = PackRoleUsage(asSource = PackUsage.NoRecord, asTarget = PackUsage.NoRecord),
+                    savedCount = 0,
+                    nowMillis = previewDetailNow,
+                    onRemove = {},
+                    modifier = Modifier.width(420.dp),
                 )
             }
         }

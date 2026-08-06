@@ -504,10 +504,105 @@ class ManagePacksModelTest {
         assertThat(roleUsage.asTarget).isEqualTo(PackUsage.Used(daysAgo(2)))
     }
 
+    // ── packDetail: the 20d capability + remove derivation (#332) ────────────────
+
+    /** A downloaded, non-pivot pack: on device, text offline supported, and removable. */
+    @Test
+    fun `packDetail - a downloaded pack is on device, text-offline, and removable`() {
+        val detail = packDetail(packRow("af", OfflineModelState.Downloaded))
+
+        assertThat(detail.onDevice).isTrue()
+        assertThat(detail.textOffline).isEqualTo(CapabilityState.Supported)
+        assertThat(detail.removable).isTrue()
+    }
+
+    /**
+     * Voice-offline is supported ONLY with an on-device voice.
+     *
+     * Mutation (decided first): drop `&& row.hasOfflineVoice` from `packDetail` — the
+     * no-voice case then reads Supported and this reddens.
+     */
+    @Test
+    fun `packDetail - voice-offline needs an on-device voice`() {
+        assertThat(packDetail(packRow("af", OfflineModelState.Downloaded, hasOfflineVoice = false)).voiceOffline)
+            .isEqualTo(CapabilityState.Unavailable)
+        assertThat(packDetail(packRow("af", OfflineModelState.Downloaded, hasOfflineVoice = true)).voiceOffline)
+            .isEqualTo(CapabilityState.Supported)
+    }
+
+    /**
+     * A pack that is not on the device supports NEITHER offline capability yet.
+     *
+     * Mutation (decided first): make `textOffline` always Supported — a downloading pack
+     * then claims text-offline and this reddens.
+     */
+    @Test
+    fun `packDetail - a downloading pack supports no offline capability`() {
+        val detail = packDetail(packRow("af", OfflineModelState.Downloading))
+
+        assertThat(detail.onDevice).isFalse()
+        assertThat(detail.textOffline).isEqualTo(CapabilityState.Unavailable)
+        assertThat(detail.voiceOffline).isEqualTo(CapabilityState.Unavailable)
+        assertThat(detail.removable).isFalse()
+    }
+
+    /**
+     * A mid-delete pack is still on disk (so "On device"), but NOT removable — a delete
+     * is already in flight.
+     *
+     * Mutation (decided first): widen `removable` to include Deleting — this reddens.
+     */
+    @Test
+    fun `packDetail - a mid-delete pack is on device but not removable`() {
+        val detail = packDetail(packRow("af", OfflineModelState.Deleting))
+
+        assertThat(detail.onDevice).isTrue()
+        assertThat(detail.removable).isFalse()
+    }
+
+    /**
+     * The English pivot (#224) is non-actionable — removing it frees nothing — so it is
+     * never removable even when downloaded.
+     *
+     * Mutation (decided first): drop `!isPivotLanguage(row.id)` from `removable` — the
+     * pivot then reads removable and this reddens.
+     */
+    @Test
+    fun `packDetail - the pivot is not removable`() {
+        assertThat(packDetail(packRow("en", OfflineModelState.Downloaded)).removable).isFalse()
+    }
+
+    // ── maskDismissedFailure: 20b dismiss (#336) ─────────────────────────────────
+
+    /** A dismissed failure reads NotDownloaded; a failure NOT dismissed stays Failed. */
+    @Test
+    fun `maskDismissedFailure - only a dismissed failure is masked`() {
+        val failed = OfflineModelState.Failed(OfflineModelFailure.NETWORK)
+
+        assertThat(maskDismissedFailure(failed, "de", setOf("de"))).isEqualTo(OfflineModelState.NotDownloaded)
+        assertThat(maskDismissedFailure(failed, "de", emptySet())).isEqualTo(failed)
+    }
+
+    /**
+     * A dismissed id in a NON-failed state is untouched — dismiss hides a failure, it does
+     * not hide a download in flight or on disk.
+     *
+     * Mutation (decided first): mask on membership alone (drop the `is Failed` guard) — a
+     * dismissed Downloaded id then reads NotDownloaded and this reddens.
+     */
+    @Test
+    fun `maskDismissedFailure - a dismissed non-failed state is unchanged`() {
+        assertThat(maskDismissedFailure(OfflineModelState.Downloaded, "de", setOf("de")))
+            .isEqualTo(OfflineModelState.Downloaded)
+        assertThat(maskDismissedFailure(OfflineModelState.Downloading, "de", setOf("de")))
+            .isEqualTo(OfflineModelState.Downloading)
+    }
+
     private fun packRow(
         id: String,
         state: OfflineModelState,
         lastUsedMillis: Long? = null,
+        hasOfflineVoice: Boolean = false,
     ) = PackRow(
         id = id,
         displayName = id,
@@ -516,6 +611,7 @@ class ManagePacksModelTest {
         // ([isPivotLanguage]), so a test can no longer set a flag that contradicts it (#325).
         usage = packUsage(lastUsedMillis),
         inUse = false,
+        hasOfflineVoice = hasOfflineVoice,
     )
 
     private companion object {

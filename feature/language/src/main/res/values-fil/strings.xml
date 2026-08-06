@@ -172,6 +172,8 @@
         <item quantity="other">%1$d sa %2$d na pack</item>
     </plurals>
     <string name="manage_downloading_note">Walang pause — kapag itinigil, itatapon ang pack.</string>
+    <!-- 20b failed-row Dismiss (#336) · #115 provisional -->
+    <string name="manage_failed_dismiss">I-dismiss</string>
     <string name="manage_used_today">ginamit ngayon</string>
     <plurals name="manage_used_days">
         <item quantity="one">ginamit %1$d araw na nakalipas</item>
@@ -187,11 +189,23 @@
     </plurals>
     <string name="manage_used_never">wala pang naitalang paggamit</string>
     <string name="manage_in_use">GINAGAMIT</string>
-    <!-- 20d list-detail (#130 PR-26) · #115 provisional, pending native review -->
-    <string name="manage_detail_usage_header">Paggamit</string>
+    <!-- 20d list-detail (#130 PR-26 / conformance #332) · #115 provisional, pending native review -->
+    <string name="manage_detail_usage_header">Kung saan ginagamit ang pack na ito</string>
     <string name="manage_detail_role_source">Bilang pinagmulan</string>
     <string name="manage_detail_role_target">Bilang target</string>
     <string name="manage_detail_empty">Pumili ng pack para makita kung paano ito ginamit.</string>
+    <string name="manage_detail_status_on_device">Nasa device · handa nang gamitin nang walang koneksyon</string>
+    <string name="manage_detail_cap_text_title">Teksto offline</string>
+    <string name="manage_detail_cap_text_ready">Buong-pangungusap na engine</string>
+    <string name="manage_detail_cap_voice_title">Boses offline</string>
+    <string name="manage_detail_cap_voice_ready">May boses sa device</string>
+    <string name="manage_detail_cap_offline_unavailable">Kailangan ng koneksyon</string>
+    <plurals name="manage_detail_saved">
+        <item quantity="one">%1$d naka-save na parirala ang nasa %2$s</item>
+        <item quantity="other">%1$d na naka-save na parirala ang nasa %2$s</item>
+    </plurals>
+    <string name="manage_detail_remove_body">Ang pag-alis ay nagbabakante ng espasyong hindi nito ibinabahagi sa ibang pack. Kakailanganin ng %1$s ang koneksyon para magsalin, at libre ang muling pag-download.</string>
+    <string name="manage_detail_remove_action">Alisin</string>
     <string name="manage_cd_options">Mga opsyon para sa %1$s</string>
     <string name="manage_actions_use_target">Gamitin bilang target ngayon</string>
     <string name="manage_actions_voice">Kayang bigkasin offline</string>
