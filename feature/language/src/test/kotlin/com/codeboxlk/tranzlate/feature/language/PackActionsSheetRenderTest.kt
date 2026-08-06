@@ -1,6 +1,10 @@
 package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -94,6 +98,25 @@ class PackActionsSheetRenderTest {
         compose.onNodeWithTag(TT_SHEET_PACK_ACTIONS).assertExists()
         compose.onNodeWithTag(TT_SHEET_PACK_USE).assertExists()
         compose.onNodeWithTag(TT_SHEET_PACK_REMOVE).assertExists()
+    }
+
+    /**
+     * The tappable rows carry the button role, so TalkBack announces "button" and not
+     * a bare label (the co-verify defect on PR-24). Mutation decided first: drop
+     * `role = Role.Button` from [PackActionRow]'s `clickable` — the Role reads
+     * Unspecified and both assertions redden. The voice line is deliberately NOT here:
+     * it is informational, not a control, so it must carry no button role.
+     */
+    @Test
+    fun `the action rows carry the button role`() {
+        openSheetFor(OfflineLanguageRow("es", "Spanish", OfflineModelState.Downloaded))
+
+        compose
+            .onNodeWithTag(TT_SHEET_PACK_USE)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        compose
+            .onNodeWithTag(TT_SHEET_PACK_REMOVE)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
     }
 
     /**

@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
@@ -122,8 +123,8 @@ internal fun PackActionsSheet(
 /**
  * One tappable action row: a leading glyph and a label, both in [contentColor]
  * (error for the destructive Remove, `onSurface` otherwise). The whole row is the
- * 48 dp+ touch target ([TranzlateSheetDefaults.ListRowMinHeight]); `clickable`
- * gives it the button role and merges the label as its accessible name, so the
+ * 48 dp+ touch target ([TranzlateSheetDefaults.ListRowMinHeight]); `clickable(role =
+ * Role.Button)` gives it the button role and merges the label as its accessible name, so the
  * glyph stays decorative (`contentDescription = null`).
  */
 @Composable
@@ -141,7 +142,7 @@ private fun PackActionRow(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = TranzlateSheetDefaults.ListRowMinHeight)
-                .clickable(onClick = onClick)
+                .clickable(role = Role.Button, onClick = onClick)
                 .testTag(testTag)
                 .padding(vertical = spacing.sm8),
     ) {
