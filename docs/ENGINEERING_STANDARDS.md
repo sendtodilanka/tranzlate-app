@@ -6,27 +6,43 @@ standard with no incident behind it is not in this file.
 
 ---
 
-## 1. WIP limit: **two** PRs in flight, and never two that must land in order
+## 1. WIP limit: parallelise building freely; the guard is branch protection + tip-freshness, not a count
 
-**Incident:** `main` was lost twice to the same accident — PR #108, then PRs
-#132/#134. Sibling branches, each green alone, merged off a base older than the
-tip, so no CI run could ever see the combination (the same accident `CLAUDE.md`
-rule 8 records for the git guard — one incident, two rules draw from it). **It
-recurred on 2026-08-03**
-between #247 and #249: one added a constructor parameter, the other added call
-sites with the old signature, both green alone. `/land-pr`'s local re-verify
-caught it before CI was asked.
+**Incident:** `main` was lost twice — PR #108, then #132/#134. Sibling branches, each green alone,
+merged off a base older than the tip, so no CI run could see the combination. Recurred 2026-08-03
+between #247 and #249 (a constructor param vs call sites with the old signature — a **compile-level**
+break), which `/land-pr`'s local re-verify caught before CI was asked.
 
-**The rule:**
-- **Maximum two open PRs.** At four (2026-08-03) an ordering constraint appeared
-  between #233 and #257 and had to be tracked by hand.
-- **If two PRs must land in a specific order, that is one PR or two waves** —
-  never two concurrent branches with a note about sequence.
-- **Drain before opening.** A third PR waits.
+**Revised 2026-08-06 (owner-directed, red-teamed) — reconciling with rule 7 (never idle-wait).** A
+count cap of two throttled the parallel building rule 7 requires; it is replaced, because the actual
+backstop was never the count:
 
-**Why a limit and not care:** the guard compares *commits*, not semantics. Two
-branches can be zero behind and still break together. The only defence that has
-ever worked is fewer things in flight.
+- **No fixed count cap on independent open PRs.** Open as many as keep CI + co-verify busy.
+- **Tip-freshness brake (the real bound):** no open PR may sit **more than 3 commits behind
+  `origin/main`** without being rebased or closed before another opens — the same
+  `git rev-list --count <branch>..origin/main` guard-git.sh already computes. Targets the actual harm
+  (drift), keeps a legible number for the owner, does not cap parallelism.
+- **INDEPENDENT, checkable, wider than "no shared file":** two live PRs are independent only if they
+  share **no file** (rule 6's `git diff --stat` map) AND touch **no common shared-brain module**
+  (`core/translate|access|usage|ads`) AND **no common cataloged string key** — even via *different*
+  files. Two PRs changing a shared brain or the same string key are **sequence-dependent**, exactly
+  like two sharing a file. (PR #310 alone spanned `feature/language` + `feature/text` strings — the
+  file-map does not see a shared-brain dependency, so name it.)
+- **Merge lane one-at-a-time, backstop SERVER-side (verified live):** GitHub branch protection
+  `strict:true` + `enforce_admins:true` rejects any `gh pr merge` on a behind-tip PR — **including
+  `--admin`** (reproduced 2026-08-06: `--admin` forced it through with `enforce_admins:false`,
+  rejected with it `:true`, the repo's real value). Independent of the client hooks (which #265 shows
+  are prefix-bypassable — guard-git.sh's behind-tip check is *not* load-bearing; the server is). A
+  rebase force-push fires `synchronize` → a fresh required `build` check on the new SHA before
+  `strict` calls the branch clean.
+- **What the layers catch, honestly:** local re-verify + CI-on-the-rebased-SHA catch **compile-level**
+  breaks (#247/#249) — two catches, not one. Neither catches a **semantic break that still compiles**
+  (a shared default/limit/invariant changed in two *different* files, no rename); the
+  shared-brain/string-key independence rule above is what guards that class, not the merge machinery.
+- **Guard the guarantee:** the safety case now rests on a GitHub setting outside this repo's version
+  control, so `/land-pr` confirms `strict` + `enforce_admins` are both `true`
+  (`gh api repos/<o>/<r>/branches/main/protection --jq '{strict:.required_status_checks.strict, admins:.enforce_admins.enabled}'`)
+  before trusting the lane — nothing else would notice if it silently reverted.
 
 ## 2. Definition of Done — checkable, or it is not done
 
@@ -53,6 +69,10 @@ A PR is done when **all** hold. No exceptions, no "will follow up".
 5. Tracker row moved in the **same** PR.
 6. Worktree removed after merge, `git status --porcelain` checked **first** —
    one dead worktree held the only copy of a 449-line research record.
+7. A **rebase that resolves an actual code conflict** (not merely the tracker
+   file) invalidates the prior `Co-verify-verdict:` — a fresh co-verify is
+   required before merge. (Removing the count cap removes the incidental brake
+   on verdict staleness; this replaces it.)
 
 **Where the earlier rule-8 gates apply, their artifacts are on the PR too:** a
 **design-debate** outcome recorded in the plan-doc for a new feature (gate 1); a
@@ -144,10 +164,10 @@ and co-verification is strictly necessary for the zero-touch human repo."*
   immediately start the next independent build / lens / scope. A build running, a lens running,
   a CI-on-tip wait — each is a cue to begin the next thing, never to pause.
 - **Only the final merge is serial** — rebase → CI-green-on-tip → merge, one PR at a time (the
-  guard that protects `main`), bounded by rule 1's two-PR cap. Even its CI-wait overlaps with
+  guard that protects `main`), bounded by rule 1's tip-freshness brake. Even its CI-wait overlaps with
   other PRs building and co-verifying, so it is not idle either.
 - **Building is wide; landing is narrow.** Parallelise building freely (rule 6's ownership map
-  is the safety rail); the merge lane and the open-PR count stay inside rule 1.
+  is the safety rail); the merge lane stays serial and every open PR stays tip-fresh per rule 1.
 
 ## 8. Red-team a design before adopting it — where its failure would be silent
 
@@ -173,7 +193,7 @@ fire (§4). A co-verify of the implementation catches neither — only an attack
   *before merge* — per-PR. The order is **choose → attack the choice → build → co-verify**;
   a design-debate's own adversarial judging picks a winner, it does not stress-test the winner
   for silent failure, which is the red-team's separate job. The **integration-lane** — a
-  merge-queue that would raise rule 1's two-PR cap — is the standing red-team example: it does
+  merge-queue that would change rule 1's merge-lane guarantees — is the standing red-team example: it does
   not ship until a red-team clears it.
 
 ## 9. Risk register — reviewed at every wave boundary
