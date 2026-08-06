@@ -143,8 +143,8 @@
     <!-- Denominator = offline-CAPABLE languages (59), not the 194-row catalog:
          "12 of 194 on device" would imply the other 182 are downloadable. -->
     <plurals name="text_lang_on_device_count">
-        <item quantity="one">%1$d of %2$d on device</item>
-        <item quantity="other">%1$d of %2$d on device</item>
+        <item quantity="one">%1$d of %2$d packs on device</item>
+        <item quantity="other">%1$d of %2$d packs on device</item>
     </plurals>
     <!-- 18a's zero-pack variant of the counter above, on the "All languages"
          header. Shown ONLY when nothing is downloaded — which, like the meter's

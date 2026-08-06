@@ -698,6 +698,12 @@ private fun PickerBody(
     library: OfflineLibraryMeter?,
 ) {
     val spacing = LocalSpacing.current
+    // Div 2: the online-only mark is the text chip in a full-width column and the
+    // `cloud_off` glyph where the catalog is two-up or beside a pane. One decision
+    // for the whole screen, taken once and handed to both the catalog and the side
+    // pane so a recent online-only row in the pane marks the same way the catalog
+    // does.
+    val onlineOnlyMarker = onlineOnlyMarkerFor(arrangement)
     // The saved language, turned into an index against THIS arrangement's grid —
     // which is what makes a position captured in the other one still mean the
     // same language (see `PickerListPosition`).
@@ -758,6 +764,7 @@ private fun PickerBody(
                     onDownload = onDownload,
                     onStop = onStop,
                     onSuggestionGet = onSuggestionGet,
+                    onlineOnlyMarker = onlineOnlyMarker,
                 )
                 // 17a: 8dp, a gap. 17b: 24dp, the strip of window the crease
                 // runs down — content on either side of it, nothing in it. The
@@ -771,6 +778,7 @@ private fun PickerBody(
                 sections = sections,
                 plan = plan,
                 columns = arrangement.columns,
+                onlineOnlyMarker = onlineOnlyMarker,
                 shortcutsInGrid = false,
                 railed = railed,
                 query = query,
@@ -808,6 +816,7 @@ private fun PickerBody(
                 sections = sections,
                 plan = plan,
                 columns = arrangement.columns,
+                onlineOnlyMarker = onlineOnlyMarker,
                 shortcutsInGrid = true,
                 railed = railed,
                 query = query,
@@ -862,6 +871,7 @@ private fun PickerSidePane(
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
     onSuggestionGet: (String) -> Unit,
+    onlineOnlyMarker: OnlineOnlyMarker,
 ) {
     val spacing = LocalSpacing.current
     Column(
@@ -888,11 +898,11 @@ private fun PickerSidePane(
         plan.recentHeader?.let { header ->
             SectionHeader(recentHeaderRes(header))
             sections.recent.forEach { row ->
-                LanguageRow(row, target, onSelect, onDownload, onStop)
+                LanguageRow(row, target, onSelect, onDownload, onStop, onlineOnlyMarker = onlineOnlyMarker)
             }
         }
         sections.detect?.let { detect ->
-            LanguageRow(detect, target, onSelect, onDownload, onStop)
+            LanguageRow(detect, target, onSelect, onDownload, onStop, onlineOnlyMarker = onlineOnlyMarker)
         }
         if (plan.showVoiceLegend) {
             VoiceLegend(modifier = Modifier.padding(top = spacing.sm8))
@@ -1035,6 +1045,7 @@ private fun PickerCatalog(
     sections: PickerSections,
     plan: PickerListPlan,
     columns: Int,
+    onlineOnlyMarker: OnlineOnlyMarker,
     shortcutsInGrid: Boolean,
     railed: Boolean,
     query: String,
@@ -1083,7 +1094,7 @@ private fun PickerCatalog(
             if (shortcutsInGrid) {
                 sections.detect?.let { detect ->
                     item(key = "detect_${detect.id}", contentType = CONTENT_TYPE_ROW) {
-                        LanguageRow(detect, target, onSelect, onDownload, onStop)
+                        LanguageRow(detect, target, onSelect, onDownload, onStop, onlineOnlyMarker = onlineOnlyMarker)
                     }
                 }
             }
@@ -1105,7 +1116,15 @@ private fun PickerCatalog(
                     fullSpanItem(key = "header_recent", contentType = CONTENT_TYPE_HEADER) {
                         SectionHeader(recentHeaderRes(header))
                     }
-                    pickerRows(sections.recent, RECENT_ROW_KEY_PREFIX, target, onSelect, onDownload, onStop)
+                    pickerRows(
+                        sections.recent,
+                        RECENT_ROW_KEY_PREFIX,
+                        target,
+                        onSelect,
+                        onDownload,
+                        onStop,
+                        onlineOnlyMarker = onlineOnlyMarker,
+                    )
                 }
             }
             // No "All languages" banner over a filtered list: the results ARE
@@ -1122,7 +1141,15 @@ private fun PickerCatalog(
                     )
                 }
             }
-            pickerRows(visibleRows, CATALOG_ROW_KEY_PREFIX, target, onSelect, onDownload, onStop)
+            pickerRows(
+                visibleRows,
+                CATALOG_ROW_KEY_PREFIX,
+                target,
+                onSelect,
+                onDownload,
+                onStop,
+                onlineOnlyMarker = onlineOnlyMarker,
+            )
         }
         if (letters.isNotEmpty()) {
             AlphabetRail(
@@ -1165,8 +1192,9 @@ private fun LazyGridScope.pickerRows(
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
+    onlineOnlyMarker: OnlineOnlyMarker,
 ) = items(rows, key = { prefix + it.id }, contentType = { CONTENT_TYPE_ROW }) { row ->
-    LanguageRow(row, target, onSelect, onDownload, onStop)
+    LanguageRow(row, target, onSelect, onDownload, onStop, onlineOnlyMarker = onlineOnlyMarker)
 }
 
 /** 15a says "Recent"; 16a names the role, so its header can be checked against its rows. */
@@ -1640,12 +1668,25 @@ private fun SuggestedRow(
                     .testTag("tt_lang_suggested_get_${suggestion.id}")
                     .semantics { contentDescription = spoken },
         ) {
+            // The `download` glyph the 18a/18b frames draw on this button, and what
+            // the Manage-packs empty-state Get carries too — the two Get buttons now
+            // read the same. Decorative: the button's own `contentDescription` above
+            // already names the action ("Get Spanish for offline use").
+            Icon(
+                Icons.Filled.Download,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(Dimensions.iconSm)
+                        .testTag("tt_lang_suggested_get_icon_${suggestion.id}"),
+            )
             // Left in the tree: TalkBack prefers the contentDescription, so "Get"
             // is not read twice, and a test can still read the label (RetryPill).
             Text(
                 text = stringResource(R.string.lang_suggested_get),
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
+                modifier = Modifier.padding(start = spacing.xs4),
             )
         }
     }
@@ -1675,6 +1716,7 @@ private fun LanguageRow(
     onSelect: (String) -> Unit,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
+    onlineOnlyMarker: OnlineOnlyMarker = OnlineOnlyMarker.Chip,
 ) {
     val spacing = LocalSpacing.current
     val selected = row.state is LanguageRowState.Selected
@@ -1729,7 +1771,7 @@ private fun LanguageRow(
             RowSupportingLine(state = row.state, text = supporting, voiceMark = voiceMark, pivot = pivot)
         }
         Spacer(Modifier.width(spacing.sm8))
-        RowTrailing(row = row, onDownload = onDownload, onStop = onStop)
+        RowTrailing(row = row, onDownload = onDownload, onStop = onStop, onlineOnlyMarker = onlineOnlyMarker)
     }
 }
 
@@ -1940,6 +1982,7 @@ private fun RowTrailing(
     row: LanguagePickerRow,
     onDownload: (String) -> Unit,
     onStop: (String) -> Unit,
+    onlineOnlyMarker: OnlineOnlyMarker = OnlineOnlyMarker.Chip,
 ) {
     // The ML Kit pivot (English) is inside every X↔en pair — there is no
     // standalone `en` pack to download, stop, or retry (#224 settled this on the
@@ -2008,10 +2051,20 @@ private fun RowTrailing(
         }
 
         LanguageRowState.OnlineOnly -> {
-            // Tagged per row so a render test can see WHICH rows draw the chip:
+            // Tagged per row so a render test can see WHICH rows draw the marker:
             // absent on the Detect pseudo-row (ruling 2), present on the 135 real
-            // online-only languages. The chip itself stays silent to TalkBack.
-            OnlineOnlyChip(modifier = Modifier.testTag("tt_lang_online_only_${row.id}"))
+            // online-only languages. BOTH forms keep the same per-row tag — the row
+            // is online-only either way — and BOTH stay silent to TalkBack, because
+            // the row's own content description already says "online only"
+            // (`cd_text_lang_row_online_only`), so a mark that spoke too would say it
+            // twice. Which form is drawn is div 2's `onlineOnlyMarkerFor`: the text
+            // chip where the row is full-width, the `cloud_off` glyph where it shares
+            // a narrow column (17a/17b/17d/18b).
+            val markerModifier = Modifier.testTag("tt_lang_online_only_${row.id}")
+            when (onlineOnlyMarker) {
+                OnlineOnlyMarker.Chip -> OnlineOnlyChip(modifier = markerModifier)
+                OnlineOnlyMarker.Glyph -> OnlineOnlyGlyph(id = row.id, modifier = markerModifier)
+            }
         }
 
         is LanguageRowState.Failed -> {
@@ -2175,6 +2228,38 @@ private fun OnlineOnlyChip(modifier: Modifier = Modifier) {
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(horizontal = spacing.sm8, vertical = spacing.xs4)
                     .clearAndSetSemantics { },
+        )
+    }
+}
+
+/**
+ * The `cloud_off` glyph form of the same mark (div 2), drawn where a row shares a
+ * narrow column and the [OnlineOnlyChip]'s words would wrap or crowd out the
+ * language name beside them — the two-up catalog of 17a / 17d and the foldable
+ * leaves of 17b / 18b, selected by [onlineOnlyMarkerFor].
+ *
+ * **Decorative, exactly like the chip.** The row's own content description already
+ * says "online only" for TalkBack (`cd_text_lang_row_online_only`, folded in by
+ * [rowContentDescription]), so a `contentDescription` on the icon would announce the
+ * same words a second time. [modifier] carries the per-row `tt_lang_online_only_<id>`
+ * tag the chip also carries — the row is online-only whichever mark it draws — and
+ * the inner `tt_lang_online_only_glyph_<id>` is the one thing that differs, so a
+ * render test can tell the two forms apart without depending on either being spoken.
+ */
+@Composable
+private fun OnlineOnlyGlyph(
+    id: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        Icon(
+            Icons.Filled.CloudOff,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier =
+                Modifier
+                    .size(Dimensions.pickerStateIcon)
+                    .testTag("tt_lang_online_only_glyph_$id"),
         )
     }
 }
@@ -2922,6 +3007,7 @@ private fun RowPreviewSurface(
     id: String = "es",
     displayName: String = "Spanish",
     avatar: LanguageAvatar = LanguageAvatar.Code("ES"),
+    onlineOnlyMarker: OnlineOnlyMarker = OnlineOnlyMarker.Chip,
 ) {
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
@@ -2938,6 +3024,7 @@ private fun RowPreviewSurface(
                 onSelect = {},
                 onDownload = {},
                 onStop = {},
+                onlineOnlyMarker = onlineOnlyMarker,
             )
         }
     }
@@ -2973,6 +3060,24 @@ private fun LanguageRowDownloadablePreview() {
 @Composable
 private fun LanguageRowOnlineOnlyPreview() {
     RowPreviewSurface(LanguageRowState.OnlineOnly)
+}
+
+/**
+ * The SAME online-only row as it is drawn where the catalog is two-up or beside a
+ * pane (17a / 17b / 17d / 18b): the `cloud_off` glyph in place of the full "ONLINE
+ * ONLY" chip (div 2, [onlineOnlyMarkerFor]). Amharic, one of the 135 the frames
+ * mark this way.
+ */
+@PreviewLightDark
+@Composable
+private fun LanguageRowOnlineOnlyGlyphPreview() {
+    RowPreviewSurface(
+        LanguageRowState.OnlineOnly,
+        id = "am",
+        displayName = "Amharic",
+        avatar = LanguageAvatar.Code("AM"),
+        onlineOnlyMarker = OnlineOnlyMarker.Glyph,
+    )
 }
 
 @PreviewLightDark

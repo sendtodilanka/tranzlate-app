@@ -46,8 +46,8 @@ The `verifyStringKeyDocs` Gradle task now fails the build if a key ships without
 | `text_lang_on_device_size` | string | `On device · %1$s` | size label | used only once a real size exists — no invented MB |
 | `text_lang_online_only` | string | `Online only` | — | language has no offline model |
 | `text_lang_downloading` | string | `Downloading…` | — | ML Kit reports no progress, so no `%` is shown |
-| `text_lang_on_device_count` | plurals | `%1$d of %2$d on device` | on-device, offline-capable | ⚠ the denominator is **offline-capable** languages, not the full catalogue row count |
-| `text_lang_can_be_offline_count` | plurals | `%1$d can be offline` | offline-capable | 18a's zero-pack variant of the counter above (#130 PR-21), on the "All languages" header when nothing is downloaded. Like the meter's `Empty` state this is the no-Play-Services / fake-flavour reading — a real device counts the English pivot from first launch (#203), so it reads `1 of 59 on device`, never this. Denominator is offline-capable, as above |
+| `text_lang_on_device_count` | plurals | `%1$d of %2$d packs on device` | on-device, offline-capable | ⚠ the denominator is **offline-capable** languages, not the full catalogue row count. Says **packs** to match the frames ("5 of 59 packs on device") and the sibling `manage_on_device_count`, which already did — the two were inconsistent |
+| `text_lang_can_be_offline_count` | plurals | `%1$d can be offline` | offline-capable | 18a's zero-pack variant of the counter above (#130 PR-21), on the "All languages" header when nothing is downloaded. Like the meter's `Empty` state this is the no-Play-Services / fake-flavour reading — a real device counts the English pivot from first launch (#203), so it reads `1 of 59 packs on device`, never this. Denominator is offline-capable, as above |
 
 ### 3.1 Offline-library meter (17b foldable two-leaf · U-5 · issue #130 PR-15)
 

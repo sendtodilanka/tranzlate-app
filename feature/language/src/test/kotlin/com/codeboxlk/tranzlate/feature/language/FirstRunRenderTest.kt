@@ -79,12 +79,18 @@ class FirstRunRenderTest {
         compose.onNodeWithTag("tt_lang_counter").assertTextEquals("3 can be offline")
     }
 
-    /** One or more downloaded → the ordinary on-device counter. The pair is the discriminator. */
+    /**
+     * One or more downloaded → the ordinary on-device counter, which now says
+     * "packs" (div 1): the frames draw "5 of 59 packs on device", the sibling
+     * Manage-packs counter already says "packs", and the two were inconsistent.
+     * This is the div-1 mutate-first proof: revert `text_lang_on_device_count` to
+     * "%1$d of %2$d on device" and this exact-text assertion reddens.
+     */
     @Test
-    fun `some downloaded reads N of M on device`() {
+    fun `some downloaded reads N of M packs on device`() {
         showTarget(capable(3, downloaded = 1))
 
-        compose.onNodeWithTag("tt_lang_counter").assertTextEquals("1 of 3 on device")
+        compose.onNodeWithTag("tt_lang_counter").assertTextEquals("1 of 3 packs on device")
     }
 
     /** The block is a source affordance: a target picker with empty recents draws none of it. */
@@ -124,14 +130,8 @@ class FirstRunRenderTest {
     private var confirms = 0
     private var dismissals = 0
 
-    /**
-     * Renders the source picker with one French suggestion and taps its Get, so
-     * the confirm sheet is open — wired through the REAL call site
-     * (`LanguagePickerContent` → `DownloadConfirmSheet`, the `onConfirm` /
-     * `onDismiss` arguments). [gets] / [confirms] / [dismissals] are what the tests
-     * below read; each JUnit method gets a fresh instance, so they start at zero.
-     */
-    private fun openFrenchConfirm() {
+    /** The source picker with one French suggestion, drawn but not yet acted on. */
+    private fun showFrenchSuggestion() {
         compose.setContent {
             var pending by remember { mutableStateOf<String?>(null) }
             TranzlateTheme {
@@ -173,8 +173,39 @@ class FirstRunRenderTest {
                 )
             }
         }
+        compose.waitForIdle()
+    }
+
+    /**
+     * The same suggestion, its Get tapped, so the confirm sheet is open — wired
+     * through the REAL call site (`LanguagePickerContent` → `DownloadConfirmSheet`,
+     * the `onConfirm` / `onDismiss` arguments). [gets] / [confirms] / [dismissals]
+     * are what the tests below read; each JUnit method gets a fresh instance, so
+     * they start at zero.
+     */
+    private fun openFrenchConfirm() {
+        showFrenchSuggestion()
         compose.onNodeWithTag("tt_lang_suggested_get_fr").performClick()
         compose.waitForIdle()
+    }
+
+    /**
+     * Div 3: the suggestion Get button draws the `download` glyph the 18a / 18b
+     * frames show on it — the icon `SuggestedRow` had none of, and the one the
+     * Manage-packs empty-state Get already carries.
+     *
+     * Mutation decided first: delete the `Icon(Icons.Filled.Download …)` from
+     * `SuggestedRow`'s button. Its `tt_lang_suggested_get_icon_fr` tag then never
+     * exists and this reddens. `useUnmergedTree` because the button merges its icon
+     * and label into one node for TalkBack.
+     */
+    @Test
+    fun `the suggestion Get button draws the download icon`() {
+        showFrenchSuggestion()
+
+        compose
+            .onNodeWithTag("tt_lang_suggested_get_icon_fr", useUnmergedTree = true)
+            .assertIsDisplayed()
     }
 
     /**

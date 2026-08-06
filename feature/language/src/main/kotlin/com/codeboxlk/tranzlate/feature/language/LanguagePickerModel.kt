@@ -168,6 +168,52 @@ data class PickerArrangement(
     }
 }
 
+/**
+ * How an online-only row states "online only" in a given arrangement (design div 2,
+ * the frames' own split).
+ *
+ * The 135 languages ML Kit cannot hold offline are marked one of two ways, and the
+ * export draws BOTH — the same fact, two widths of room to say it in:
+ * - **[Chip]** — the full "ONLINE ONLY" text chip, where a row runs the whole width
+ *   of a single column: 15a / 16a (phone portrait), 17c (tablet-portrait dialog),
+ *   18a (phone first run).
+ * - **[Glyph]** — a bare `cloud_off` icon, where the same row shares its width — the
+ *   two-up catalog of 17a (landscape) and 17d (tablet-landscape dialog), and the
+ *   foldable leaves of 17b / 18b. The chip's words do not fit a narrow column
+ *   without wrapping or ellipsising the language name beside them, so the glyph
+ *   carries the meaning and the row's own content description keeps saying the
+ *   words for TalkBack (`cd_text_lang_row_online_only`).
+ */
+enum class OnlineOnlyMarker {
+    Chip,
+    Glyph,
+}
+
+/**
+ * Which of the two marks an online-only row draws in [arrangement] — the whole of
+ * div 2's decision, pure so a plain unit test can drive every frame.
+ *
+ * **Glyph exactly when the catalog row is NOT full-width in a single column.** Two
+ * shapes make a row narrow, and they are the two the export draws the glyph in:
+ * - **[PickerArrangement.twoPane]** — a shortcut pane sits beside the catalog (17a),
+ *   or the window is folded into two leaves (17b / 18b). Either way the catalog is
+ *   only part of the width, at one column or two.
+ * - **[PickerArrangement.columns] ≥ 2** — the catalog itself is two-up, which is
+ *   how the tablet-landscape dialog (17d) narrows its rows without a side pane
+ *   (`twoPane` is false there — the dialog never draws one).
+ *
+ * Everything else is one full-width column — 15a / 16a, the tablet-portrait dialog
+ * (17c, one column), 18a — and keeps the text [Chip]. Verified against all eight
+ * picker frames; the arrangement each maps to is pinned in `PickerArrangementTest`
+ * and `PickerDialogSizeTest`.
+ */
+fun onlineOnlyMarkerFor(arrangement: PickerArrangement): OnlineOnlyMarker =
+    if (arrangement.twoPane || arrangement.columns >= 2) {
+        OnlineOnlyMarker.Glyph
+    } else {
+        OnlineOnlyMarker.Chip
+    }
+
 /** The gap between the side pane and the catalog on ONE flat surface (17a). */
 internal val PANE_GUTTER: Dp = 8.dp
 

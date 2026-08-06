@@ -59,8 +59,8 @@
         <item quantity="other">Pesquisar %1$d idiomas</item>
     </plurals>
     <plurals name="text_lang_on_device_count">
-        <item quantity="one">%1$d de %2$d no dispositivo</item>
-        <item quantity="other">%1$d de %2$d no dispositivo</item>
+        <item quantity="one">%1$d de %2$d pacotes no dispositivo</item>
+        <item quantity="other">%1$d de %2$d pacotes no dispositivo</item>
     </plurals>
     <plurals name="text_lang_can_be_offline_count">
         <item quantity="one">%1$d pode ficar off-line</item>
