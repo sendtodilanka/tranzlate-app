@@ -706,10 +706,25 @@ fun buildPickerRows(
 }
 
 /**
- * The "Detect language" pseudo-row (spec 02 §4.5). It is not a catalog entry:
- * detection is a server-side call in every engine we ship, so its state is
- * [LanguageRowState.OnlineOnly] — the same chip the design puts on it — unless
- * it is the current source choice.
+ * The "Detect language" pseudo-row (spec 02 §4.5). A source-only shortcut — not a
+ * catalog entry, and not a language pack.
+ *
+ * Language identification runs ON-DEVICE (`MlKitLanguageIdentifier.kt:3,22`,
+ * re-verified for owner ruling 2), so "Detect" is not online-only, and the
+ * `ONLINE ONLY` chip Rev 4 drew on this row states something FALSE. Owner ruling
+ * 2 (2026-08-01) / designer-brief §11-10 strip that chip from the shipped picker
+ * and never build sheet 19i ("detect needs a connection") — its trigger cannot
+ * fire.
+ *
+ * The row still carries a resting [LanguageRowState.OnlineOnly] as an internal
+ * placeholder: a pseudo-row owns no state of its own in the six-state matrix
+ * (designer-brief §4.6), so it borrows one, exactly as the ML Kit pivot borrows
+ * `Downloadable`. **Neither face of that state's "online only" claim is drawn for
+ * this row.** The render layer suppresses both by [DETECT_LANGUAGE_ID] — the
+ * visible chip in `RowTrailing` and the spoken "online only" in
+ * `rowContentDescription` — the same way `isPivotLanguage` suppresses the pivot's
+ * pack controls. What is left is the waveform avatar, the name, and — when it is
+ * the current source choice — the tick.
  */
 fun detectRow(
     label: String,
