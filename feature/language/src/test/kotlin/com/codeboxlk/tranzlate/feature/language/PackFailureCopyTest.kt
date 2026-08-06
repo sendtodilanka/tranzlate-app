@@ -141,21 +141,27 @@ class PackFailureCopyTest {
     }
 
     /**
-     * **Issue #250, the design call PR-23 owns.** A download that failed for lack
-     * of space must NOT offer a Retry: retrying without freeing space just
-     * re-fails, which is the #234 dead-control class. Every other cause keeps its
-     * Retry.
+     * **Issue #250, CORRECTED (co-verify block on PR-23).** PR-23 first shipped the
+     * space-failed row with NO Retry, reasoning that a bare retry re-fails. That made
+     * it a permanent dead-end: the red "Not enough space" line promised an action
+     * with no control to tap, and freeing space by removing other packs never
+     * restored one (the manager's `transient` map only moves on a `download()`, which
+     * `refreshDownloaded()` never touches). The ruling's intent is *"the row still
+     * offers Retry"*; the #234 concern is a Retry that SILENTLY does nothing — a
+     * ViewModel matter, not grounds to drop the control. So EVERY failed cause,
+     * out-of-space included, keeps its Retry, and the ViewModel makes the space retry
+     * HONEST (`OfflineLanguagesViewModelTest`: a still-full retry surfaces a "not
+     * enough space" message; a freed-disk retry actually downloads).
      *
-     * Mutation decided first (rule 11): drop the `if (state.cause != STORAGE)`
-     * guard in `PackRowControl` so a space failure draws the pill too — the space
-     * test's `assertDoesNotExist` then reddens. The network test is the control
-     * that keeps the mutation honest: a guard that hid EVERY Retry would pass the
-     * space case vacuously, and that would redden the network test instead.
+     * Mutation decided first (rule 11): re-add `if (state.cause != STORAGE)` in
+     * `PackRowControl` so the space row draws no pill — this `assertIsDisplayed`
+     * reddens, the #250 dead-end returning. The network test is the control that
+     * keeps it honest: a guard hiding EVERY Retry would redden that one instead.
      */
     @Test
-    fun `a space-failed row offers no dead Retry`() {
+    fun `a space-failed row keeps its Retry - no dead-end`() {
         showOfflineManager(OfflineModelFailure.STORAGE)
-        compose.onNodeWithTag("tt_manage_retry").assertDoesNotExist()
+        compose.onNodeWithTag("tt_manage_retry").assertIsDisplayed()
     }
 
     @Test

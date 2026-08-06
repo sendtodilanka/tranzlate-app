@@ -11,17 +11,20 @@ import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
+import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageUsageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslationRepository
+import com.codeboxlk.tranzlate.domain.translate.DownloadAttempt
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
 import com.codeboxlk.tranzlate.domain.translate.OfflineModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +35,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -304,21 +308,64 @@ class OfflineLanguagesViewModel
         }
 
         /**
-         * A suggestion's "Get", or a Retry on a non-space failure. Metered + no
-         * standing permission → ask first, download never starts.
+         * One-shot "your download could not even start" notices — the SYNCHRONOUS
+         * refusal the manager returns from a pre-flight ([DownloadAttempt.Refused],
+         * issues #234/#250). A `Channel`, the one-shot seam the coroutines rule keeps
+         * for a screen message, and deliberately NOT the shared state map nor the U-1
+         * `PackEvents` channel: a repeat `Failed(STORAGE)` writes a value-EQUAL map so
+         * `modelStates()` does not re-emit, and the refusal fires no `PackEvent`, so a
+         * Retry on a still-full disk was a silent no-op behind an enabled 48 dp pill
+         * (the #250 dead-end). The screen drains [refusals] into a snackbar over the
+         * removable packs — the honest "not enough space" the Retry now owes.
+         */
+        private val refusalEvents = Channel<OfflineModelFailure>(Channel.BUFFERED)
+
+        /** Synchronous download refusals, for the screen's snackbar. See [refusalEvents]. */
+        val refusals: Flow<OfflineModelFailure> = refusalEvents.receiveAsFlow()
+
+        /**
+         * A suggestion's "Get", or a Retry on a failed row. Metered + no standing
+         * permission → ask first, download never starts.
          *
          * Off the main thread (issue #238): `isMetered()` is a synchronous binder
          * IPC and the manager's free-space pre-flight is a `statvfs` syscall, and
          * `viewModelScope` is `Dispatchers.Main.immediate`.
+         *
+         * The attempt is now CAPTURED, not discarded (#234/#250): a `null` return is
+         * the gate only ASKING (the consent sheet is up, nothing to report), and any
+         * real attempt is passed to [reportOutcome]. This is the same capture the
+         * picker proves at `LanguagePickerViewModel.download`.
          */
         fun download(id: String) {
-            viewModelScope.launch { withContext(dispatchers.io) { downloadGate.requestDownload(id) } }
+            viewModelScope.launch {
+                val attempt = withContext(dispatchers.io) { downloadGate.requestDownload(id) } ?: return@launch
+                reportOutcome(attempt)
+            }
         }
 
         /** Dialog "Download now": THIS download only — the standing pref is untouched. */
         fun downloadAnyway() {
             val consented = downloadGate.consentOnce() ?: return
-            viewModelScope.launch { withContext(dispatchers.io) { downloadGate.downloadConsented(consented) } }
+            viewModelScope.launch {
+                val attempt = withContext(dispatchers.io) { downloadGate.downloadConsented(consented) }
+                reportOutcome(attempt)
+            }
+        }
+
+        /**
+         * Surface the SYNCHRONOUS half of a download attempt.
+         *
+         * Only a [DownloadAttempt.Refused] needs a word from this screen. The manager
+         * already wrote its `Failed(cause)` onto the row, but a refusal REPEATED for
+         * the same reason writes a value-equal map — invisible on the conflating
+         * `modelStates()` — and emits no `PackEvent`, so without this the Retry is the
+         * #234/#250 silent no-op. A [DownloadAttempt.Started]'s outcome arrives
+         * through `modelStates()` (the row turns red, or downloaded) AND the U-1
+         * `PackEvents` app snackbar, so reporting it here too would double it;
+         * [DownloadAttempt.Ignored] wrote nothing and has nothing to say.
+         */
+        private suspend fun reportOutcome(attempt: DownloadAttempt) {
+            if (attempt is DownloadAttempt.Refused) refusalEvents.send(attempt.cause)
         }
 
         /** Dialog "Not now" (or dismiss): the row stays as it was — no dead end. */

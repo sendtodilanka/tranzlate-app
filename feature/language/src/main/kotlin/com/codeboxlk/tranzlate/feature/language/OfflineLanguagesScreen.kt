@@ -34,10 +34,14 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -112,6 +116,23 @@ fun OfflineLanguagesScreen(
             manageEmptySuggestions(localeTags, sections.downloadable)
         }
 
+    // The screen's OWN snackbar for a SYNCHRONOUS download refusal (#234/#250) — a
+    // Retry that could not even start because the disk is still full. Drained from
+    // the ViewModel's one-shot channel (never the U-1 PackEvents channel: that is for
+    // a transfer that actually ran) and shown over the packs the user can remove to
+    // free room. `getString`, not `stringResource`, because showSnackbar runs in a
+    // coroutine; the copy is `downloadFailureCopy`'s so the message matches the row.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    LaunchedEffect(viewModel, snackbarHostState) {
+        viewModel.refusals.collect { cause ->
+            snackbarHostState.showSnackbar(
+                message = context.getString(downloadFailureCopy(cause).rowLine),
+                duration = SnackbarDuration.Short,
+            )
+        }
+    }
+
     ManagePacksContent(
         loading = data.loading,
         sections = sections,
@@ -135,6 +156,7 @@ fun OfflineLanguagesScreen(
         pendingRemoval = pendingRemoval,
         onConfirmRemove = viewModel::confirmRemove,
         onDismissRemove = viewModel::dismissRemove,
+        snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
 }
@@ -164,6 +186,7 @@ internal fun ManagePacksContent(
     pendingRemoval: PendingPackRemoval? = null,
     onConfirmRemove: () -> Unit = {},
     onDismissRemove: () -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val spacing = LocalSpacing.current
     // Issue #90's consent question and the 19f/19g remove confirm (#130 PR-19),
@@ -197,6 +220,7 @@ internal fun ManagePacksContent(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
             modifier =
@@ -227,6 +251,7 @@ internal fun ManagePacksContent(
                         onRetry = onRetry,
                         onRemove = onRemove,
                         onDismissNudge = onDismissNudge,
+                        onBrowseAll = onBrowseAll,
                     )
                 }
 
@@ -274,6 +299,7 @@ private fun PopulatedList(
     onRetry: (String) -> Unit,
     onRemove: (String) -> Unit,
     onDismissNudge: () -> Unit,
+    onBrowseAll: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
     LazyColumn(
@@ -312,6 +338,10 @@ private fun PopulatedList(
                 PackRow(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onRemove = onRemove)
             }
         }
+        // "Browse all languages" belongs here too, not only on the empty state (20f):
+        // a user with packs still needs the picker one tap away to add ANOTHER, and
+        // downloading is the picker's job, never a section on this screen.
+        item(key = "browse") { BrowseAllButton(onBrowseAll) }
         item(key = "footer") { FooterView(capable = capable, total = total) }
     }
 }
@@ -576,10 +606,11 @@ private fun SectionHeaderText(
 /**
  * One Manage-packs row. Its trailing control is chosen by state:
  * - **Downloading** → stop (⏹, delete-to-cancel — no cancel API).
- * - **Failed, non-storage** → a labelled **Retry** pill.
- * - **Failed, out of space (#250)** → **no Retry** — a bare retry re-fails; the
- *   cause line guides and the removable packs below are the space-freeing path.
- *   The drawn "Free up space" action opens 20e (PR-25), carried as a residual.
+ * - **Failed (any cause, out-of-space included, #250)** → a labelled **Retry**
+ *   pill. A space-failed retry does not silently re-fail: the ViewModel captures
+ *   the manager's synchronous refusal and the screen shows a "not enough space"
+ *   snackbar over the removable packs, while a retry after space is freed actually
+ *   downloads (see `OfflineLanguagesViewModel.reportOutcome`).
  * - **Downloaded, non-pivot** → `more_vert` opening the remove flow (19f/19g).
  *   The fuller 20c actions sheet ("Use as target now", the voice line) is PR-24.
  * - **Downloaded, pivot (English, #224)** → no control; it cannot be removed.
@@ -668,23 +699,26 @@ private fun PackRowControl(
     onRetry: (String) -> Unit,
     onRemove: (String) -> Unit,
 ) {
-    when (val state = row.state) {
+    when (row.state) {
         OfflineModelState.Downloading -> {
             StopControl(row, onStopDownload)
         }
 
         is OfflineModelState.Failed -> {
-            // #250: a space-failed row offers no Retry (retrying without freeing
-            // space just re-fails). Every other cause keeps its Retry pill.
-            if (state.cause != OfflineModelFailure.STORAGE) {
-                Button(
-                    onClick = { onRetry(row.id) },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                    contentPadding = PaddingValues(horizontal = LocalSpacing.current.md16),
-                    modifier = Modifier.heightIn(min = Dimensions.touchTargetMin).testTag("tt_manage_retry"),
-                ) {
-                    Text(stringResource(R.string.lang_sheet_failed_retry))
-                }
+            // #250: EVERY failed cause, out-of-space included, keeps its Retry pill.
+            // Removing it left the STORAGE row a permanent dead-end — its line promises
+            // an action with no control to tap, and freeing space elsewhere never
+            // restored one (the transient state only moves on a `download()`). The
+            // #234 concern is a Retry that SILENTLY does nothing, not the absence of
+            // Retry; the ViewModel now makes it HONEST — a still-full retry surfaces
+            // a snackbar (`reportOutcome`), a freed-disk retry actually downloads.
+            Button(
+                onClick = { onRetry(row.id) },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                contentPadding = PaddingValues(horizontal = LocalSpacing.current.md16),
+                modifier = Modifier.heightIn(min = Dimensions.touchTargetMin).testTag("tt_manage_retry"),
+            ) {
+                Text(stringResource(R.string.lang_sheet_failed_retry))
             }
         }
 

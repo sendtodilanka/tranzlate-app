@@ -7,6 +7,7 @@ import com.codeboxlk.tranzlate.core.model.Engine
 import com.codeboxlk.tranzlate.core.model.Language
 import com.codeboxlk.tranzlate.core.model.LanguageRole
 import com.codeboxlk.tranzlate.core.model.ModeId
+import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.core.model.Translation
 import com.codeboxlk.tranzlate.core.testing.FakeClock
@@ -307,6 +308,76 @@ class OfflineLanguagesViewModelTest {
 
             assertThat(manager.downloads).isEmpty()
             assertThat(viewModel.pendingConsent.value).isNull()
+        }
+
+    // ── Retry honesty: a synchronous refusal reaches the screen (#234/#250) ─────
+
+    /**
+     * The other half of the #250 fix (the first is that the STORAGE row keeps a
+     * Retry pill at all — an `OfflineLanguagesScreen` render test). A Retry whose
+     * disk is still full is REFUSED synchronously (`DownloadAttempt.Refused(STORAGE)`),
+     * which writes a value-equal `Failed(STORAGE)` map (no re-emit) and fires no
+     * PackEvent — so a discarded return leaves the retry a silent no-op behind an
+     * enabled pill. Captured, it reaches [refusals] for the screen's snackbar.
+     *
+     * Mutation decided first: revert `download()` to
+     * `viewModelScope.launch { withContext(io) { downloadGate.requestDownload(id) } }`
+     * (discard the return, drop the `reportOutcome` capture) — `received` is empty
+     * and this reddens.
+     */
+    @Test
+    fun `a retry refused for space surfaces a message, not silence`() =
+        runTest {
+            manager.attempt = DownloadAttempt.Refused(OfflineModelFailure.STORAGE)
+            val received = mutableListOf<OfflineModelFailure>()
+            viewModel.refusals.onEach { received += it }.launchIn(backgroundScope)
+
+            viewModel.download("de")
+            advanceUntilIdle()
+
+            assertThat(received).containsExactly(OfflineModelFailure.STORAGE)
+        }
+
+    /**
+     * Non-vacuity for the test above: the message is tied to a REFUSAL, not emitted
+     * on every tap. A download that STARTS surfaces nothing here — its outcome
+     * travels through the row and the U-1 PackEvents app snackbar instead. Mutation:
+     * report unconditionally in `reportOutcome` (drop the `is Refused` guard) and
+     * this reddens.
+     */
+    @Test
+    fun `a download that starts surfaces no refusal message`() =
+        runTest {
+            manager.attempt = DownloadAttempt.Started
+            val received = mutableListOf<OfflineModelFailure>()
+            viewModel.refusals.onEach { received += it }.launchIn(backgroundScope)
+
+            viewModel.download("de")
+            advanceUntilIdle()
+
+            assertThat(received).isEmpty()
+        }
+
+    /**
+     * The second capture site: "Download now" on a metered link runs
+     * `downloadConsented`, which can also come back `Refused`. Mutation: discard the
+     * return in `downloadAnyway()` and this reddens while the row-tap test above
+     * stays green — the two sites fail independently.
+     */
+    @Test
+    fun `a consented retry refused for space also surfaces a message`() =
+        runTest {
+            connectivity.metered = true
+            manager.attempt = DownloadAttempt.Refused(OfflineModelFailure.STORAGE)
+            val received = mutableListOf<OfflineModelFailure>()
+            viewModel.refusals.onEach { received += it }.launchIn(backgroundScope)
+
+            viewModel.download("de") // metered → consent sheet, nothing downloaded yet
+            runCurrent()
+            viewModel.downloadAnyway() // "Download now" → downloadConsented → Refused
+            advanceUntilIdle()
+
+            assertThat(received).containsExactly(OfflineModelFailure.STORAGE)
         }
 
     // ── Remove flow (#130 PR-19), unchanged ────────────────────────────────────
@@ -679,6 +750,9 @@ private class RecordingModelManager : OfflineModelManager {
     val downloads = mutableListOf<String>()
     val deletes = mutableListOf<String>()
 
+    /** What `download()` decides. Default [DownloadAttempt.Started]; the refusal tests script a [Refused]. */
+    var attempt: DownloadAttempt = DownloadAttempt.Started
+
     override fun modelStates(): Flow<Map<String, OfflineModelState>> =
         flowOf(
             mapOf(
@@ -691,7 +765,7 @@ private class RecordingModelManager : OfflineModelManager {
 
     override suspend fun download(languageTag: String): DownloadAttempt {
         downloads += languageTag
-        return DownloadAttempt.Started
+        return attempt
     }
 
     override suspend fun delete(languageTag: String) {
