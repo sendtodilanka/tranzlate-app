@@ -29,7 +29,8 @@
     <string name="composer_paste">Colar</string>
     <string name="home_tools">Ferramentas</string>
     <string name="home_translate">Traduzir</string>
-    <string name="home_tool_offline">Modo offline</string>
+    <!-- Owner ruling 5 (#130 PR-23): "Language packs". pt-BR provisória, revisão #115. -->
+    <string name="home_tool_offline">Pacotes de idioma</string>
     <string name="home_tool_offline_sub">Traduza sem conexão</string>
     <string name="home_tool_voice">Voz</string>
     <string name="home_tool_voice_sub">Fale e ouça</string>

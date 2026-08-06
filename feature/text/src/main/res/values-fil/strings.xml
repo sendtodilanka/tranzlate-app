@@ -29,7 +29,8 @@
     <string name="composer_paste">I-paste</string>
     <string name="home_tools">Mga Tool</string>
     <string name="home_translate">Isalin</string>
-    <string name="home_tool_offline">Offline mode</string>
+    <!-- Owner ruling 5 (#130 PR-23): "Language packs". Provisional fil, #115 review. -->
+    <string name="home_tool_offline">Mga language pack</string>
     <string name="home_tool_offline_sub">Magsalin nang walang koneksyon</string>
     <string name="home_tool_voice">Boses</string>
     <string name="home_tool_voice_sub">Magsalita at pakinggan</string>

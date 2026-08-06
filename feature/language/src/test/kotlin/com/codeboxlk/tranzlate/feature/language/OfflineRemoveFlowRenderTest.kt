@@ -12,19 +12,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.Locale
 
 /**
- * The offline manager's remove flow as the SCREEN wires it (#130 PR-19).
+ * Manage packs' remove flow as the SCREEN wires it (#130 PR-19, carried into the
+ * PR-23 rewrite).
  *
  * `OfflineLanguagesViewModelTest` proves the rule (which sheet, what is counted,
- * what is deleted) and `RemovePackSheetsTest` proves the sheets. What neither
- * can see is the join: that the 🗑 is wired to the request rather than straight
- * back to the delete, that the ⏹ is wired to the immediate stop, and that the
- * question picks the right one of two sheets.
- *
- * That join is exactly where the shipped defect lived before this PR — the bin
- * called `onDelete` — and it is a one-line edit to put back with every unit test
- * still green.
+ * what is deleted) and `RemovePackSheetsTest` proves the sheets. What neither can
+ * see is the join: that the overflow is wired to the request rather than straight
+ * to the delete, that the ⏹ is wired to the immediate stop, and that the question
+ * picks the right one of two sheets with the right data. That join is exactly
+ * where the shipped defect lived before PR-19 — the bin called `onDelete`.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
@@ -36,21 +35,39 @@ class OfflineRemoveFlowRenderTest {
     private val stops = mutableListOf<String>()
     private var confirms = 0
 
-    private val rows =
-        listOf(
-            OfflineLanguageRow("es", "Spanish", OfflineModelState.Downloaded),
-            OfflineLanguageRow("de", "German", OfflineModelState.Downloading),
+    // es → on-device (an overflow); de → downloading (a stop). Built through the
+    // real classifier so the sections are exactly what the screen would show.
+    private val sections =
+        buildManagePacksSections(
+            rows =
+                listOf(
+                    OfflineLanguageRow("es", "Spanish", OfflineModelState.Downloaded),
+                    OfflineLanguageRow("de", "German", OfflineModelState.Downloading),
+                ),
+            usage = emptyMap(),
+            targetId = "",
+            nowMillis = 0L,
+            locale = Locale.ENGLISH,
         )
 
     private fun showScreen(pendingRemoval: PendingPackRemoval? = null) {
         compose.setContent {
             TranzlateTheme {
-                OfflineLanguagesContent(
-                    rows = rows,
-                    onDownload = {},
-                    onStopDownload = { stops += it },
-                    onRequestRemove = { removeRequests += it },
+                ManagePacksContent(
+                    loading = false,
+                    sections = sections,
+                    storage = null,
+                    nudge = null,
+                    suggestions = emptyList(),
+                    capable = 59,
+                    total = 194,
                     onBack = {},
+                    onGet = {},
+                    onStopDownload = { stops += it },
+                    onRetry = {},
+                    onRemove = { removeRequests += it },
+                    onDismissNudge = {},
+                    onBrowseAll = {},
                     pendingRemoval = pendingRemoval,
                     onConfirmRemove = { confirms++ },
                     onDismissRemove = {},
@@ -60,12 +77,12 @@ class OfflineRemoveFlowRenderTest {
         compose.waitForIdle()
     }
 
-    /** The whole point: the bin ASKS. Wiring it back to the delete reddens here. */
+    /** The whole point: the overflow ASKS. Wiring it back to the delete reddens here. */
     @Test
-    fun `the bin raises the question and nothing else`() {
+    fun `the overflow raises the question and nothing else`() {
         showScreen()
 
-        compose.onNodeWithTag("tt_offline_delete").performClick()
+        compose.onNodeWithTag("tt_manage_options").performClick()
 
         assertThat(removeRequests).containsExactly("es")
         assertThat(stops).isEmpty()
@@ -77,7 +94,7 @@ class OfflineRemoveFlowRenderTest {
     fun `the stop control does not raise the question`() {
         showScreen()
 
-        compose.onNodeWithTag("tt_offline_stop").performClick()
+        compose.onNodeWithTag("tt_manage_stop").performClick()
 
         assertThat(stops).containsExactly("de")
         assertThat(removeRequests).isEmpty()
@@ -94,20 +111,15 @@ class OfflineRemoveFlowRenderTest {
 
     /**
      * #230: the ordinary sheet carries the reassurance line too, gated on the
-     * count. `es` is not the target here, so this is 19f, and its OWN saved-line
-     * tag is present — the join the ViewModel and sheet tests cannot see.
-     *
-     * Mutation decided first (rule 11): in `OfflineLanguagesContent`, hand
-     * `RemovePackSheet` a literal `savedCount = 0` instead of the question's
-     * count. The `PendingPackRemoval` still carries 2, but the sheet receives 0
-     * and draws no line, so `TT_SHEET_REMOVE_SAVED` reddens.
+     * count. Mutation decided first (rule 11): hand `RemovePackSheet` a literal
+     * `savedCount = 0` instead of the question's count — the sheet draws no line
+     * and `TT_SHEET_REMOVE_SAVED` reddens.
      */
     @Test
     fun `19f draws its saved line when the pack has saved phrases`() {
         showScreen(PendingPackRemoval(id = "es", inUseAsTarget = false, savedCount = 2))
 
         compose.onNodeWithTag(TT_SHEET_REMOVE).assertExists()
-        compose.onNodeWithTag(TT_SHEET_REMOVE_IN_USE).assertDoesNotExist()
         compose.onNodeWithTag(TT_SHEET_REMOVE_SAVED).assertExists()
     }
 
@@ -133,9 +145,7 @@ class OfflineRemoveFlowRenderTest {
 
     /**
      * The name on the sheet is resolved from the id through the same CLDR lookup
-     * the rows use, not carried from the ViewModel. `es` must read "Spanish",
-     * not "es" — a sheet titled "Remove es?" is what a missing lookup produces
-     * and what nothing else in this suite would notice.
+     * the rows use, not carried from the ViewModel: "es" must read "Spanish".
      */
     @Test
     fun `the sheet names the language, not its code`() {

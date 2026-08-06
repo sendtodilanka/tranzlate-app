@@ -1,14 +1,20 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.codeboxlk.tranzlate.core.common.AppClock
 import com.codeboxlk.tranzlate.core.common.ApplicationScope
 import com.codeboxlk.tranzlate.core.common.DispatcherProvider
+import com.codeboxlk.tranzlate.core.common.StorageProbe
 import com.codeboxlk.tranzlate.core.model.Language
+import com.codeboxlk.tranzlate.core.model.LanguageRole
+import com.codeboxlk.tranzlate.core.model.LanguageTagResolver
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.codeboxlk.tranzlate.domain.repository.DownloadPrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.LanguageRepository
+import com.codeboxlk.tranzlate.domain.repository.LanguageUsageRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslatePrefsRepository
 import com.codeboxlk.tranzlate.domain.repository.TranslationRepository
 import com.codeboxlk.tranzlate.domain.translate.DownloadGate
@@ -24,13 +30,14 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-/** One Screen-B row: a catalog language that MLKit can hold offline. */
+/** One Manage-packs row source: a catalog language that MLKit can hold offline. */
 data class OfflineLanguageRow(
     val id: String,
     val name: String,
@@ -42,34 +49,31 @@ data class OfflineLanguageRow(
  *
  * Every ML Kit translation model is an `X↔English` pair; there is no standalone
  * `en` pack, and ML Kit reports English as on-device before ANY pack is fetched
- * (a first-run downloaded count of 1). So on Screen B the English row arrives in
- * the `Downloaded` state and draws the same 🗑 every other downloaded pack does —
- * except tapping it does nothing. Measured on an emulator in
- * `docs/research/issue-224-en-row-delete.md`: `deleteDownloadedModel("en")` is a
- * NO-OP (Branch A) — English stays in the downloaded set, offline translation is
- * unharmed, and the Download side is unreachable because `en` never leaves the set.
+ * (a first-run downloaded count of 1). So the English row arrives in the
+ * `Downloaded` state like any other pack — except deleting it is a NO-OP (Branch
+ * A, `docs/research/issue-224-en-row-delete.md`): English stays in the downloaded
+ * set, offline translation is unharmed, and the Download side is unreachable.
  *
  * Owner ruling (2026-08-05): the pivot row is **not hidden** — English is the 59th
  * id in `BundledLanguageCatalog.offlineCapableIds`, so removing it from the list
  * would make the "59 languages" counter (C-11) lie — but it is **non-actionable**:
- * no Download, no Delete, because neither acts on the pivot. [OfflineRow] renders
- * it as "included with every language" instead of a control.
+ * no overflow, no remove, because neither acts on the pivot, and it is never
+ * nudged for cleanup (removing it frees nothing).
  *
  * Identified by the tag, not a position: `TranslateLanguage.ENGLISH` is `"en"` and
  * this catalog hands ML Kit tags straight through untranslated, so the pivot's id
- * is exactly `"en"` in every layer that touches it (the picker, the catalog, the
- * model store). Because the screen renders the mapped [OfflinePackRow] — whose
- * `buildOfflineRows` transform lives in another file — the identity is a shared
- * predicate here rather than a flag carried on the row, so both the row builder
- * and the screen decide "is this the pivot?" the same way and cannot drift.
+ * is exactly `"en"` in every layer that touches it.
  */
 internal const val PIVOT_LANGUAGE_ID: String = "en"
 
-/** True only for the ML Kit pivot row, whose Download/Delete controls are stripped (#224). */
+/** True only for the ML Kit pivot row, whose controls are stripped (#224). */
 internal fun isPivotLanguage(id: String): Boolean = id == PIVOT_LANGUAGE_ID
 
 /** The saved-state key for the open remove question. Namespaced — the handle is shared. */
 internal const val KEY_PENDING_REMOVAL = "offline_languages.pending_removal"
+
+/** The saved-state key for a dismissed hygiene nudge, so "Not now" survives a config change / process death. */
+internal const val KEY_NUDGE_DISMISSED = "offline_languages.nudge_dismissed"
 
 /**
  * An open "remove this pack?" question, with everything the two sheets need to
@@ -77,17 +81,11 @@ internal const val KEY_PENDING_REMOVAL = "offline_languages.pending_removal"
  *
  * Derived rather than stored: only the language [id] survives process death (a
  * `String` in the `SavedStateHandle`), and the rest is recomputed from the
- * preference seam and the database when the question is restored. Storing the
- * derived fields would freeze a count and a target that the restore is supposed
- * to re-read.
+ * preference seam and the database when the question is restored.
  *
  * @param inUseAsTarget the pack belongs to the language the user is translating
  *   INTO right now, which is the only sense of "in use" either drawn frame has.
- *   Removing it changes no selection — see [RemoveInUseSheet] — it just means
- *   the very next translation is the one that needs a connection.
- * @param savedCount saved phrases using this language, on either side. Read once
- *   per question, for every removal: since #230 both sheets draw the reassurance
- *   line, so the count is no longer reserved for the in-use one.
+ * @param savedCount saved phrases using this language, on either side.
  */
 data class PendingPackRemoval(
     val id: String,
@@ -96,57 +94,196 @@ data class PendingPackRemoval(
 )
 
 /**
- * Screen B state holder (spec 02 D-E2): rows = bundled catalog ∩ MLKit-capable —
- * online-only languages NEVER appear here (they live in the picker with a badge).
- * The screen only ASKS the Translation brain's model manager.
+ * Everything Manage packs shows, as ONE snapshot, locale-independent on purpose:
+ * the names and the alphabetical order are the composable's to apply (via
+ * [buildManagePacksSections]), for the same reason the picker localizes in Compose
+ * — a `Locale` is a platform read, not ViewModel state. What the ViewModel DOES
+ * settle is everything that does not depend on the reader's language: which packs
+ * exist and in what state, when each was last used, the aggregate storage, the
+ * catalogue counts, and the one instant ("now") the relative dates and the nudge
+ * are measured against, captured once per emission so a fling cannot make "used
+ * today" flicker to "yesterday" between frames.
+ */
+@Immutable
+data class ManagePacksData(
+    val rows: List<OfflineLanguageRow>,
+    val usage: Map<String, Long>,
+    val targetId: String,
+    val storage: StorageCard?,
+    val total: Int,
+    val capable: Int,
+    val nowMillis: Long,
+    val nudgeDismissed: Boolean,
+    val loading: Boolean,
+) {
+    companion object {
+        /**
+         * The pre-data seed: the bundled catalogue has not arrived, so there is
+         * nothing to show yet and [loading] is true. It can never be a real
+         * device state — the offline catalogue is static and has 59 rows — so an
+         * empty [rows] means "not read yet", never "this device has no packs",
+         * exactly the distinction the picker's meter draws.
+         */
+        val Initial =
+            ManagePacksData(
+                rows = emptyList(),
+                usage = emptyMap(),
+                targetId = "",
+                storage = null,
+                total = 0,
+                capable = 0,
+                nowMillis = 0L,
+                nudgeDismissed = false,
+                loading = true,
+            )
+    }
+}
+
+/**
+ * Manage packs (20b/20f · #130 PR-23) state holder — the rewrite of Screen B into
+ * the full management screen. Only offline-capable languages ever reach it;
+ * online-only languages live in the picker with a badge and are never managed
+ * here.
  *
- * Issue #90 (debate ruling): a metered download is a CONSENT question, and it
- * is decided by [DownloadGate] — never by MLKit's untested `requireWifi`. This
- * screen only routes the taps and lends the gate its scope.
+ * It ASKS four brains and settles the answer: the language catalog + the model
+ * manager (what exists and in what state), the usage store (#122 — when each was
+ * last PROVEN used, translation-success-stamped, never selection-stamped), and the
+ * storage probe (U-5 aggregate bytes). The consent gate (#90) and the remove
+ * confirm (#130 PR-19) are unchanged seams carried through from Screen B.
  */
 @HiltViewModel
+@Suppress("LongParameterList")
 class OfflineLanguagesViewModel
     @Inject
     constructor(
+        // Twelve collaborators, above detekt's ten — and this IS the anti-god-VM
+        // pressure the rev3 ruling names (§4). Manage packs genuinely consumes four
+        // brains plus its own consent/remove/nudge seams; the honest option is one
+        // wide constructor Dagger can read, not a parameter object that hides the
+        // same dependencies from the next reader. A THIRTEENTH collaborator is a
+        // finding — split the screen — not a threshold to raise.
         languageRepository: LanguageRepository,
         private val modelManager: OfflineModelManager,
         private val downloadGate: DownloadGate,
         private val downloadPrefs: DownloadPrefsRepository,
         private val translatePrefs: TranslatePrefsRepository,
         private val translations: TranslationRepository,
+        private val usageRepository: LanguageUsageRepository,
+        private val storageProbe: StorageProbe,
+        private val clock: AppClock,
         private val handle: SavedStateHandle,
         private val dispatchers: DispatcherProvider,
         @param:ApplicationScope private val appScope: CoroutineScope,
     ) : ViewModel() {
-        val rows: StateFlow<List<OfflineLanguageRow>> =
+        /**
+         * Offline-capable catalogue rows with their live model state, and the full
+         * catalogue size for the footer's "59 of 194" line.
+         *
+         * The `onStart { emit(emptyMap()) }` is the same guard Screen B and the
+         * picker put on this exact source: `combine` waits for EVERY input, and on
+         * a device without Play Services the ML Kit answer may effectively never
+         * come — unprefixed, that parked the screen on a wait state forever (the
+         * EDGE_CASES dead-end class). Prefixed empty, rows paint at their resting
+         * state immediately and flip when the real state arrives.
+         */
+        private val catalog: StateFlow<CapableCatalog> =
             combine(
                 languageRepository.languages(),
-                // Same guard LanguageRepositoryImpl.languages() puts on this exact
-                // source, for the same reason: `combine` waits for EVERY source
-                // before it can emit at all, and on a device without Play Services
-                // the ML Kit answer may effectively never come — unprefixed, that
-                // parked this screen on "Loading…" forever with no retry (the
-                // EDGE_CASES dead-end class: a wait state that guides nowhere).
-                // Prefixed empty, rows paint immediately at their resting state
-                // and flip when the real state arrives — the contract the picker
-                // already honours (its list renders; badges arrive when they do).
                 modelManager.modelStates().onStart { emit(emptyMap()) },
             ) { catalog, states ->
-                catalog
-                    .filter(Language::offlineAvailable)
-                    .map { language ->
-                        OfflineLanguageRow(
-                            id = language.id,
-                            name = language.name,
-                            // Capability is compile-time catalog truth (D-E2:
-                            // `offlineAvailable` is derived from ML Kit's own tag
-                            // list), so a missing map entry can only mean "no
-                            // answer yet", never "not capable" — the resting
-                            // state is NotDownloaded, not a hidden row.
-                            state = states[language.id] ?: OfflineModelState.NotDownloaded,
+                CapableCatalog(
+                    rows =
+                        catalog
+                            .filter(Language::offlineAvailable)
+                            .map { language ->
+                                OfflineLanguageRow(
+                                    id = language.id,
+                                    name = language.name,
+                                    state = states[language.id] ?: OfflineModelState.NotDownloaded,
+                                )
+                            },
+                    total = catalog.size,
+                )
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), CapableCatalog.Empty)
+
+        /**
+         * The aggregate storage card (U-5), or null until the disk has been read.
+         *
+         * Recomputed only when the on-device pack COUNT changes: `packsBytes()`
+         * walks ML Kit's model store file by file, so keying on the count and
+         * dropping repeats is a deliberate trigger, not an optimisation — the same
+         * discipline the picker's meter keeps. All three probe calls run on IO
+         * together (`freeBytes`/`totalBytes` are `StatFs` syscalls, `packsBytes` a
+         * directory walk).
+         */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        private val storage: StateFlow<StorageCard?> =
+            catalog
+                .map(::onDevicePackCount)
+                .distinctUntilChanged()
+                .mapLatest { count ->
+                    withContext(dispatchers.io) {
+                        storageCard(
+                            packCount = count,
+                            packsBytes = storageProbe.packsBytes(),
+                            freeBytes = storageProbe.freeBytes(),
+                            totalBytes = storageProbe.totalBytes(),
                         )
                     }
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyList())
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), null)
+
+        /**
+         * When each language was last PROVEN in use, merged across both roles: a
+         * pack is "used" if it was translated INTO or OUT OF, whichever happened
+         * more recently. The nudge is about a LANGUAGE nobody uses, not a role, so
+         * a language used only as a source is not stale.
+         */
+        private val usage: StateFlow<Map<String, Long>> =
+            combine(
+                usageRepository.lastUsed(LanguageRole.SOURCE),
+                usageRepository.lastUsed(LanguageRole.TARGET),
+            ) { source, target -> mergeLatestUse(source, target) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyMap())
+
+        /**
+         * The current TARGET (canonical), for the "IN USE" badge and the in-use
+         * removal question. Read through the SAME repository and canonicalisation
+         * the picker uses, so a preference persisted before write-side
+         * canonicalisation (`iw`, `zh-CN`) still matches a catalog id.
+         */
+        private val target: StateFlow<String> =
+            translatePrefs.targetLang
+                .map(LanguageTagResolver::canonicalOrSelf)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), "")
+
+        /** "Not now" on the hygiene nudge — durable so it survives a rotation / process death this session. */
+        private val nudgeDismissed: StateFlow<Boolean> =
+            handle.getStateFlow(KEY_NUDGE_DISMISSED, false)
+
+        /** The whole screen in one snapshot; the composable localizes and sections it. */
+        val uiState: StateFlow<ManagePacksData> =
+            combine(catalog, usage, storage, target, nudgeDismissed) { catalog, usage, storage, target, dismissed ->
+                ManagePacksData(
+                    rows = catalog.rows,
+                    usage = usage,
+                    targetId = target,
+                    storage = storage,
+                    total = catalog.total,
+                    capable = catalog.rows.size,
+                    nowMillis = clock.nowMillis(),
+                    nudgeDismissed = dismissed,
+                    // The bundled catalogue is never empty, so an empty row list is
+                    // the pre-emission frame — a loading placeholder, not the 20f
+                    // zero-PACKS empty state (which the composable reads off the
+                    // built sections, since a device can be capable-but-pack-less).
+                    loading = catalog.rows.isEmpty(),
+                )
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), ManagePacksData.Initial)
+
+        /** "Not now": hide the nudge for this session without touching a pack. */
+        fun dismissNudge() {
+            handle[KEY_NUDGE_DISMISSED] = true
+        }
 
         /** Language id awaiting the mobile-data consent sheet; null = no sheet. */
         val pendingConsent: StateFlow<String?> = downloadGate.pendingConsent
@@ -154,10 +291,7 @@ class OfflineLanguagesViewModel
         /**
          * Sheet 19a's checkbox, exactly as the picker exposes it — the stored
          * `allowMobileData` read from the other end ([alwaysAskOf]). Both screens
-         * raise the SAME sheet, so both must answer it the same way; a second
-         * polarity or a second scope here is the drift the one-home rule exists
-         * to stop. See `LanguagePickerViewModel.alwaysAsk` for why the seed is
-         * `true` and why the write runs on the application scope.
+         * raise the SAME sheet, so both must answer it the same way.
          */
         val alwaysAsk: StateFlow<Boolean> =
             downloadPrefs.allowMobileData
@@ -170,61 +304,48 @@ class OfflineLanguagesViewModel
         }
 
         /**
-         * Row ⬇ / ↻. Metered + no standing permission → ask first, download never starts.
+         * A suggestion's "Get", or a Retry on a non-space failure. Metered + no
+         * standing permission → ask first, download never starts.
          *
-         * Off the main thread (issue #238), for the reason
-         * `LanguagePickerViewModel.download` spells out: `isMetered()` is a
-         * synchronous binder IPC and the manager's free-space pre-flight is a
-         * `statvfs` syscall, and `viewModelScope` is `Dispatchers.Main.immediate`.
-         * Both screens raise the SAME sheet through the SAME gate, so both must
-         * reach it the same way — a second answer here is the drift the one-home
-         * rule exists to stop.
+         * Off the main thread (issue #238): `isMetered()` is a synchronous binder
+         * IPC and the manager's free-space pre-flight is a `statvfs` syscall, and
+         * `viewModelScope` is `Dispatchers.Main.immediate`.
          */
         fun download(id: String) {
             viewModelScope.launch { withContext(dispatchers.io) { downloadGate.requestDownload(id) } }
         }
 
-        /** Dialog "Download once": THIS download only — the standing pref is untouched. */
+        /** Dialog "Download now": THIS download only — the standing pref is untouched. */
         fun downloadAnyway() {
             val consented = downloadGate.consentOnce() ?: return
             viewModelScope.launch { withContext(dispatchers.io) { downloadGate.downloadConsented(consented) } }
         }
 
-        /** Dialog "Wait for Wi-Fi" (or dismiss): the row stays NotDownloaded — no dead end. */
+        /** Dialog "Not now" (or dismiss): the row stays as it was — no dead end. */
         fun dismissConsent() = downloadGate.dismiss()
 
         /**
-         * The row ⏹ while Downloading — delete-to-cancel, the verified ML Kit
-         * limit (there is no cancel API, so stopping IS deleting the partial
-         * model).
+         * The row ⏹ while Downloading — delete-to-cancel, the verified ML Kit limit
+         * (there is no cancel API, so stopping IS deleting the partial model).
          *
-         * **Deliberately NOT routed through the remove sheet** that [requestRemove]
-         * raises. 19f's body — *"Frees space on this device. Spanish will need a
-         * connection to translate until you download it again"* — describes
-         * removing a pack the user HAS. A download still in flight is not that:
-         * nothing is being taken away that they had a moment ago, and the ⏹ has
-         * always been the way out of a download they no longer want. Putting a
-         * confirmation in front of an abort turns an escape hatch into a second
-         * decision. The ruling asks for the unconfirmed 🗑 to become confirmed;
-         * this is the ⏹, and it stays immediate.
+         * **Deliberately NOT routed through the remove sheet** [requestRemove]
+         * raises: a download in flight is not a pack the user HAS, nothing is being
+         * taken away that they had a moment ago, and the ⏹ has always been the way
+         * out of a download they no longer want. The ruling asks for the
+         * unconfirmed 🗑 to become confirmed; this is the ⏹, and it stays immediate.
          */
         fun stopDownload(id: String) {
             viewModelScope.launch { modelManager.delete(id) }
         }
 
         /**
-         * The open remove question, or null (#130 PR-19).
-         *
-         * Only the id is durable — a `String` in the `SavedStateHandle`, the same
-         * shape the consent question uses. `inUseAsTarget` and `savedCount` are
-         * DERIVED on every restore, so a question that outlives a process death is
-         * answered against the state that exists now rather than against a
-         * snapshot taken before the app was killed.
+         * The open remove question, or null (#130 PR-19). Only the id is durable;
+         * `inUseAsTarget` and `savedCount` are DERIVED on every restore, so a
+         * question that outlives a process death is answered against the state that
+         * exists now.
          *
          * `distinctUntilChanged` on the target keeps an unrelated preference write
-         * from re-running the count query underneath an open sheet — the same
-         * guard `LanguageRepositoryImpl` puts on its own combine, for the same
-         * reason.
+         * from re-running the count query underneath an open sheet.
          */
         @OptIn(ExperimentalCoroutinesApi::class)
         val pendingRemoval: StateFlow<PendingPackRemoval?> =
@@ -237,38 +358,24 @@ class OfflineLanguagesViewModel
             translatePrefs.targetLang
                 .distinctUntilChanged()
                 .map { target ->
-                    val inUse = target == id
                     PendingPackRemoval(
                         id = id,
-                        inUseAsTarget = inUse,
-                        // Both sheets draw the saved line since #230, so the count
-                        // is read for every removal — not only the in-use one.
+                        inUseAsTarget = target == id,
                         savedCount = savedCountOf(id),
                     )
                 }
 
         /**
          * Best-effort count. A database that cannot answer must not stop the user
-         * removing a pack: zero renders as an ABSENT line, which is what a user
-         * who has saved nothing sees anyway — a missing reassurance, never a false
-         * one.
+         * removing a pack: zero renders as an ABSENT line, which is what a user who
+         * has saved nothing sees anyway — a missing reassurance, never a false one.
          *
-         * `Throwable`, not `Exception` (issue #236). This query is Room, and every
-         * statement Room runs here ends in a `native` method on
-         * `android.database.sqlite.SQLiteConnection`; a JNI link that cannot be
-         * satisfied raises `UnsatisfiedLinkError`, which is a `LinkageError`, so an
-         * `Error`, so NOT an `Exception` — the full reasoning and its citations are
-         * `TextViewModel.kt:768-779` (#195), and this call was simply written on the
-         * un-migrated side of it. It reaches the user through `removalFor`'s `map`,
-         * terminated by `stateIn(viewModelScope, …)`, which installs no
-         * `CoroutineExceptionHandler`: a narrow catch hands the failure back to
-         * `Thread.defaultUncaughtExceptionHandler` and the app disappears on the
-         * trash tap for the pack the user is currently translating INTO.
-         *
-         * `CancellationException` is rethrown FIRST and by name because it is an
-         * `Exception` — widening protects it not at all, and only the rethrow does.
-         * That arm is entered by no test and the fixture cannot express it; the gap
-         * is recorded as #242 and is unchanged by the widening above it.
+         * `Throwable`, not `Exception` (issue #236): this query is Room, every
+         * statement ends in a `native` method on `SQLiteConnection`, and a JNI link
+         * that cannot be satisfied raises `UnsatisfiedLinkError` — a `LinkageError`,
+         * so an `Error`, so NOT an `Exception` (full reasoning `TextViewModel.kt`
+         * #195). `CancellationException` is rethrown FIRST and by name because it IS
+         * an `Exception`: widening protects it not at all, only the rethrow does.
          */
         private suspend fun savedCountOf(id: String): Int =
             try {
@@ -281,7 +388,7 @@ class OfflineLanguagesViewModel
                 0
             }
 
-        /** Row 🗑: ask first. Nothing is deleted until [confirmRemove]. */
+        /** Row overflow / suggestion 🗑: ask first. Nothing is deleted until [confirmRemove]. */
         fun requestRemove(id: String) {
             handle[KEY_PENDING_REMOVAL] = id
         }
@@ -294,23 +401,17 @@ class OfflineLanguagesViewModel
         /**
          * "Remove" / "Remove anyway" — the one place a downloaded pack is deleted.
          *
-         * Reads the id from the durable handle rather than taking it as a
-         * parameter, so a confirm can only ever remove the pack the sheet is
-         * currently asking about, and a second tap on an already-answered sheet
-         * finds nothing to do.
+         * Reads the id from the durable handle rather than a parameter, so a
+         * confirm can only ever remove the pack the sheet is asking about, and a
+         * second tap on an answered sheet finds nothing to do.
          *
-         * **It writes no language preference, and there is nothing here to fall
-         * back to.** The drawn 19g says the target switches to English; it does
-         * not. `OfflineModelManager.delete` removes the model and the row returns
-         * to `NotDownloaded` — the selection is untouched, and the language keeps
+         * **It writes no language preference.** The drawn 19g says the target
+         * switches to English; it does not (PR-19). Removing the model returns the
+         * row to `NotDownloaded`; the selection is untouched and the language keeps
          * translating through the waterfall's online tiers.
          *
-         * On [appScope], not `viewModelScope`, for the reason the picker's `select`
-         * gives: this is a write the user explicitly asked for and the screen it
-         * was asked from can go away underneath it. The delete already outlives its
-         * caller inside `RealOfflineModelManager` (its own scope plus a `join`), so
-         * this is the belt rather than the braces — named because no JVM test in
-         * this repo can tell the two scopes apart here.
+         * On [appScope], not `viewModelScope`: this is a write the user explicitly
+         * asked for and the screen can go away underneath it.
          */
         fun confirmRemove() {
             val id = handle.get<String>(KEY_PENDING_REMOVAL) ?: return
@@ -318,3 +419,36 @@ class OfflineLanguagesViewModel
             appScope.launch { modelManager.delete(id) }
         }
     }
+
+/** Offline-capable rows with their state, plus the full catalogue size for the footer. */
+@Immutable
+internal data class CapableCatalog(
+    val rows: List<OfflineLanguageRow>,
+    val total: Int,
+) {
+    companion object {
+        val Empty = CapableCatalog(rows = emptyList(), total = 0)
+    }
+}
+
+/** Packs actually on the device — Downloaded or mid-delete (still on disk), the storage card's count. */
+internal fun onDevicePackCount(catalog: CapableCatalog): Int =
+    catalog.rows.count { it.state == OfflineModelState.Downloaded || it.state == OfflineModelState.Deleting }
+
+/**
+ * Per-language latest use across both roles — the larger of the two stamps, or
+ * whichever exists. A language used as a target last week and a source in April
+ * is "used last week"; the nudge should not call it stale on the older half.
+ */
+internal fun mergeLatestUse(
+    source: Map<String, Long>,
+    target: Map<String, Long>,
+): Map<String, Long> {
+    if (source.isEmpty()) return target
+    if (target.isEmpty()) return source
+    val merged = HashMap<String, Long>(source)
+    target.forEach { (id, millis) ->
+        merged[id] = maxOf(merged[id] ?: Long.MIN_VALUE, millis)
+    }
+    return merged
+}

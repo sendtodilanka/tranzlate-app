@@ -82,18 +82,33 @@ class PackFailureCopyTest {
     }
 
     private fun showOfflineManager(cause: OfflineModelFailure = OfflineModelFailure.NETWORK) {
+        val sections =
+            buildManagePacksSections(
+                rows = listOf(OfflineLanguageRow("hi", "Hindi", OfflineModelState.Failed(cause))),
+                usage = emptyMap(),
+                targetId = "",
+                nowMillis = 0L,
+                locale = Locale.ENGLISH,
+            )
         compose.setContent {
             TranzlateTheme {
-                OfflineLanguagesContent(
-                    rows = listOf(OfflineLanguageRow("hi", "Hindi", OfflineModelState.Failed(cause))),
-                    onDownload = { retried += it },
-                    // `onDelete` split in two when the 🗑 became a confirmed remove
-                    // (#130 PR-19): the bin raises a question, the ⏹ still stops a
-                    // download outright. Neither is this test's subject — it is
-                    // about the failure SENTENCE — so both are inert here.
-                    onStopDownload = {},
-                    onRequestRemove = {},
+                ManagePacksContent(
+                    loading = false,
+                    sections = sections,
+                    storage = null,
+                    nudge = null,
+                    suggestions = emptyList(),
+                    capable = 59,
+                    total = 194,
                     onBack = {},
+                    // The failure SENTENCE is this test's subject; the actions are
+                    // inert here (retry/stop/remove each have their own coverage).
+                    onGet = { retried += it },
+                    onStopDownload = {},
+                    onRetry = { retried += it },
+                    onRemove = {},
+                    onDismissNudge = {},
+                    onBrowseAll = {},
                 )
             }
         }
@@ -121,8 +136,42 @@ class PackFailureCopyTest {
         showOfflineManager()
 
         compose
-            .onNodeWithTag("tt_offline_error_line")
+            .onNodeWithTag("tt_manage_error_line")
             .assertTextEquals(context.getString(R.string.lang_pack_error_network))
+    }
+
+    /**
+     * **Issue #250, the design call PR-23 owns.** A download that failed for lack
+     * of space must NOT offer a Retry: retrying without freeing space just
+     * re-fails, which is the #234 dead-control class. Every other cause keeps its
+     * Retry.
+     *
+     * Mutation decided first (rule 11): drop the `if (state.cause != STORAGE)`
+     * guard in `PackRowControl` so a space failure draws the pill too — the space
+     * test's `assertDoesNotExist` then reddens. The network test is the control
+     * that keeps the mutation honest: a guard that hid EVERY Retry would pass the
+     * space case vacuously, and that would redden the network test instead.
+     */
+    @Test
+    fun `a space-failed row offers no dead Retry`() {
+        showOfflineManager(OfflineModelFailure.STORAGE)
+        compose.onNodeWithTag("tt_manage_retry").assertDoesNotExist()
+    }
+
+    @Test
+    fun `a network-failed row keeps its Retry`() {
+        showOfflineManager(OfflineModelFailure.NETWORK)
+        compose.onNodeWithTag("tt_manage_retry").assertIsDisplayed()
+    }
+
+    /** The retryable failure's pill does what it says — asks for the download again. */
+    @Test
+    fun `the manager's Retry asks for the download again`() {
+        showOfflineManager(OfflineModelFailure.NETWORK)
+
+        compose.onNodeWithTag("tt_manage_retry").performClick()
+
+        assertThat(retried).containsExactly("hi")
     }
 
     /**

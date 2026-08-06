@@ -34,7 +34,11 @@
     <!-- Home card stack (Claude Design · Offline Translator M3) -->
     <string name="home_tools">Tools</string>
     <string name="home_translate">Translate</string>
-    <string name="home_tool_offline">Offline mode</string>
+    <!-- Owner ruling 5 (#130 rev.3, PR-23): the Home row that opens Manage packs is
+         "Language packs", not "Offline mode". The destination's own header stays
+         "Manage packs" (manage_title, :feature:language); the two are deliberately
+         distinct — the row names WHAT it opens, the screen names what you DO there. -->
+    <string name="home_tool_offline">Language packs</string>
     <!-- Was the design mock's "6 languages ready" — a number nothing computed.
          The downloaded count is only knowable through ML Kit's RemoteModelManager,
          which we will not put on the cold-start path (plan launch-blockers §2), so

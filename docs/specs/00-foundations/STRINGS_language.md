@@ -361,6 +361,71 @@ so every control owns its own text (§9).
 > shipping a false promise since #90"). Shipping the string now would state a
 > promise the app cannot verify it keeps, so PR-22 defers it and leaves `Refs: #208`.
 
+## 5.9 Manage packs — 20b / 20f (#130 PR-23) · **NEW**
+
+The rewrite of the early "Offline translation" screen into the full management
+surface, behind the SAME `LanguagesNavKey`. It lists only what is installed, in
+flight or failed — NEW packs are browsed from the picker — and every figure it
+states is one the app can source: aggregate storage only (no per-pack size, brief
+§2/§3), and relative last-used from the #122 translation-success store, never a
+fabricated date. A pack with no recorded use says so (`manage_used_never`, ruling
+⑧). Sizes reuse the measured 40–65 MB range (#219). `Other apps and system` and
+`%1$s free` reuse `lang_sheet_space_used` / `lang_sheet_space_free` (19b, §5.3),
+so the storage legends read the same in the sheet and the card.
+
+The Home row that OPENS this screen is relabelled `Language packs` (owner ruling
+5) — that is `home_tool_offline` in `:feature:text`, not a key here; the screen's
+own header is `manage_title` (`Manage packs`), deliberately distinct.
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `manage_title` | string | `Manage packs` | — | the screen header, as 20b draws it |
+| `manage_storage_packs_title` | string | `Storage used by packs` | — | Sized storage card title |
+| `manage_storage_across` | plurals | `across %1$d pack(s)` | count | the pack count beside the aggregate size |
+| `manage_storage_explainer` | string | `Packs are free and unlimited. They share data between language pairs, so a single pack has no size of its own.` | — | why no per-pack size exists |
+| `manage_storage_device_title` | string | `Device storage` | — | FreeOnly (empty/degrade) card title |
+| `manage_storage_free_caption` | string | `free on this device` | — | caption under the free figure |
+| `manage_storage_packs_none` | string | `Packs — none yet` | — | 20f empty packs legend — states the absence, never a `0` |
+| `manage_storage_empty_explainer` | string | `Nothing is downloaded yet, so packs use no space. They are free and unlimited — a pack is usually 40–65 MB.` | — | 20f; carries the sanctioned range (#219) |
+| `manage_storage_packs_count` | plurals | `%1$d pack(s) on device` | count | the degrade legend when bytes are unknown but packs are counted |
+| `manage_section_downloading` | string | `Downloading` | — | section header |
+| `manage_section_failed` | string | `Did not download` | — | section header |
+| `manage_section_on_device` | string | `On this device` | — | section header |
+| `manage_on_device_count` | plurals | `%1$d of %2$d pack(s)` | on-device, capable | offline-CAPABLE denominator (59, C-11), not the 194 catalogue |
+| `manage_downloading_note` | string | `There is no pause — stopping discards the pack.` | — | the honest note under the downloading section (no pause API, brief §2) |
+| `manage_used_today` | string | `used today` | — | relative last-used, from a #122 stamp |
+| `manage_used_days` | plurals | `used %1$d day(s) ago` | days | 1..6 days |
+| `manage_used_weeks` | plurals | `used %1$d week(s) ago` | weeks | 1..4 weeks |
+| `manage_used_months` | plurals | `used %1$d month(s) ago` | months | ≥1 month — the stale zone; never a named calendar month (ambiguous past a year) |
+| `manage_used_never` | string | `no recorded use yet` | — | the honest date-less line (ruling ⑧, risk R6) — a pack never translated with; excluded from the nudge |
+| `manage_in_use` | string | `IN USE` | — | badge on the pack of the current TARGET language |
+| `manage_cd_options` | string | `Options for %1$s` | language name | the `more_vert` overflow's accessible name — opens the remove flow (19f/19g); the fuller 20c sheet is PR-24 |
+| `manage_browse_all` | string | `Browse all languages` | — | the empty state's second way forward — opens the picker (no dead end, brief §8) |
+| `manage_footer` | string | `%1$d of the %2$d languages have a pack. The other %3$d translate online only.` | capable, total, online-only | catalogue facts, sourced not hardcoded |
+| `manage_nudge_title` | plurals | `%1$d pack(s) haven't been used in months` | count | the hygiene nudge (brief §6.1) — packs stale past 90 days; date-less packs never counted (ruling ⑧) |
+| `manage_nudge_body` | string | `Keeping only the languages you use keeps the app light. Nothing is deleted without asking.` | — | the nudge's reassurance |
+| `manage_nudge_dismiss` | string | `Not now` | — | dismisses the nudge (session-durable). The drawn `Review N packs` action opens the batch 20e sheet — PR-25 — so it is omitted, not wired to nothing (the stale packs are listed just below, each removable: no dead end) |
+
+### 5.9.1 Manage packs — testTags (C-1)
+
+`tt_manage_back` · `tt_manage_list` · `tt_manage_empty` · `tt_manage_loading` ·
+`tt_manage_storage` · `tt_manage_nudge` · `tt_manage_nudge_dismiss` · `tt_manage_row` ·
+`tt_manage_usage_line` · `tt_manage_error_line` · `tt_manage_options` · `tt_manage_stop` ·
+`tt_manage_retry` · `tt_manage_deleting` · `tt_manage_no_packs` · `tt_manage_suggestion` ·
+`tt_manage_get` · `tt_manage_browse_all`.
+
+### 5.9.2 The #250 design call (space-failed Retry) and the carried residuals
+
+- **#250 — a space-failed row offers no Retry.** `Failed(STORAGE)` rows drop the
+  Retry pill entirely: retrying without freeing space just re-fails (the #234
+  dead-control class). The cause line guides and the removable packs below are the
+  space-freeing path on this very screen. The drawn resolution — a `Free up space`
+  action opening 20e — is **PR-25**, carried as a residual (`Refs: #250`).
+- **`more_vert` → remove.** The overflow opens the existing 19f/19g confirm flow
+  for now; the fuller 20c pack-actions sheet (Use as target now, voice line) is
+  **PR-24**.
+- **Nudge `Review N packs` → 20e.** Omitted (PR-25), as above.
+
 ## 6. Language picker — accessibility (C-4)
 
 Row descriptions carry the language name **and** its state, because the trailing icon alone says

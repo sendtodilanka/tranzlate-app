@@ -453,13 +453,19 @@ private fun AppNavDisplay(
                         },
                     )
                 }
-                // "Offline languages" (Home entries) = the :feature:language
-                // placeholder (download/delete packs) — a different job from the
-                // text vertical's source/target picker above, hence the alias.
+                // "Manage packs" (Home row "Language packs", owner ruling 5) =
+                // the :feature:language management screen (20b/20f, PR-23) — a
+                // different job from the text vertical's source/target picker above,
+                // hence the alias.
                 entry<LanguagesNavKey> {
                     OfflineLanguagesScreen(
                         viewModel = hiltViewModel(),
                         onBack = { pop(LanguagesNavKey) },
+                        // The 20f empty state's "Browse all languages" opens the
+                        // picker so a first pack can be downloaded (forSource = false:
+                        // you download the language you translate INTO). A PUSH, so
+                        // Back returns to Manage packs.
+                        onBrowseAll = { onNavigate(LanguagePickerNavKey(forSource = false)) },
                     )
                 }
                 entry<PaywallNavKey> {

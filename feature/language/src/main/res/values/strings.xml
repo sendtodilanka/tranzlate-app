@@ -339,4 +339,91 @@
     <string name="lang_snackbar_failed">Couldn\'t download %1$s</string>
     <!-- 20a-4 action → ask the manager to try the same download again. -->
     <string name="lang_snackbar_action_retry">Retry</string>
+
+    <!-- 20b / 20f — Manage packs (#130 PR-23). The screen the sheets point at and the
+         only place a pack is removed or a failure retried. New packs are BROWSED
+         from the picker, so this screen lists only what is installed, in flight or
+         failed. Governing rule (designer brief): it may state only what the app can
+         know — aggregate storage, never a per-pack size; relative last-used from the
+         #122 translation-success store, never a fabricated date. -->
+    <!-- The screen header. The Home row that opens the SAME destination is
+         relabelled "Language packs" (owner ruling 5, home_tool_offline); this is the
+         title once you are here, as the 20b frame draws it. -->
+    <string name="manage_title">Manage packs</string>
+    <!-- Storage card (Sized): aggregate bytes only. A single pack has no size of its
+         own — pairs share data — so no per-language figure is ever stated (§2/§3). -->
+    <string name="manage_storage_packs_title">Storage used by packs</string>
+    <plurals name="manage_storage_across">
+        <item quantity="one">across %1$d pack</item>
+        <item quantity="other">across %1$d packs</item>
+    </plurals>
+    <string name="manage_storage_explainer">Packs are free and unlimited. They share data between language pairs, so a single pack has no size of its own.</string>
+    <!-- Storage card (FreeOnly): no packs, or a size the walk could not read (store
+         absent/renamed — the U-5 degrade). Free space is stated; a fraction of the
+         disk is exactly what is not known there. -->
+    <string name="manage_storage_device_title">Device storage</string>
+    <string name="manage_storage_free_caption">free on this device</string>
+    <!-- The empty (20f) packs legend and its expectation-setting line. 40–65 MB is
+         the measured on-disk range of all 58 models (#219), never the export's
+         pre-#219 "20–45 MB". -->
+    <string name="manage_storage_packs_none">Packs — none yet</string>
+    <string name="manage_storage_empty_explainer">Nothing is downloaded yet, so packs use no space. They are free and unlimited — a pack is usually 40–65 MB.</string>
+    <!-- The degrade with packs counted but bytes unknown: state the count, never a
+         "0 MB" the walk did not measure. -->
+    <plurals name="manage_storage_packs_count">
+        <item quantity="one">%1$d pack on device</item>
+        <item quantity="other">%1$d packs on device</item>
+    </plurals>
+    <!-- Section headers, in the order 20b draws them. -->
+    <string name="manage_section_downloading">Downloading</string>
+    <string name="manage_section_failed">Did not download</string>
+    <string name="manage_section_on_device">On this device</string>
+    <!-- The on-device count beside its header — offline-CAPABLE denominator (59), the
+         same C-11 denominator the picker's counter uses. -->
+    <plurals name="manage_on_device_count">
+        <item quantity="one">%1$d of %2$d pack</item>
+        <item quantity="other">%1$d of %2$d packs</item>
+    </plurals>
+    <!-- The one honest thing to say about stopping a download: there is no pause API,
+         so stopping discards (brief §2). -->
+    <string name="manage_downloading_note">There is no pause — stopping discards the pack.</string>
+    <!-- Relative last-used, bucketed elapsed time from a real #122 stamp. Never a
+         named calendar month (ambiguous past a year). `manage_used_never` is the
+         honest date-less line for a pack with no recorded translation-use (ruling ⑧,
+         risk R6) — never a fabricated date. -->
+    <string name="manage_used_today">used today</string>
+    <plurals name="manage_used_days">
+        <item quantity="one">used %1$d day ago</item>
+        <item quantity="other">used %1$d days ago</item>
+    </plurals>
+    <plurals name="manage_used_weeks">
+        <item quantity="one">used %1$d week ago</item>
+        <item quantity="other">used %1$d weeks ago</item>
+    </plurals>
+    <plurals name="manage_used_months">
+        <item quantity="one">used %1$d month ago</item>
+        <item quantity="other">used %1$d months ago</item>
+    </plurals>
+    <string name="manage_used_never">no recorded use yet</string>
+    <!-- The badge on the pack of the current TARGET language. -->
+    <string name="manage_in_use">IN USE</string>
+    <!-- The overflow control's accessible name. It opens the remove flow for now; the
+         fuller 20c actions sheet ("Use as target now", the voice line) is PR-24. -->
+    <string name="manage_cd_options">Options for %1$s</string>
+    <!-- The empty state's second way forward beside the suggestions: open the picker. -->
+    <string name="manage_browse_all">Browse all languages</string>
+    <!-- The footer. Three catalogue facts, sourced not hardcoded: capable (59), total
+         (194), online-only (the remainder, 135). -->
+    <string name="manage_footer">%1$d of the %2$d languages have a pack. The other %3$d translate online only.</string>
+    <!-- The storage-hygiene nudge (brief §6.1) — packs unused past the 90-day stale
+         threshold. Date-less packs are never counted here (ruling ⑧). "Not now"
+         dismisses; the drawn "Review N packs" opens the batch 20e sheet, which is
+         PR-25, so it is not shipped yet — the stale packs it counts are listed just
+         below, each removable, so this is not a dead end. -->
+    <plurals name="manage_nudge_title">
+        <item quantity="one">%1$d pack hasn\'t been used in months</item>
+        <item quantity="other">%1$d packs haven\'t been used in months</item>
+    </plurals>
+    <string name="manage_nudge_body">Keeping only the languages you use keeps the app light. Nothing is deleted without asking.</string>
+    <string name="manage_nudge_dismiss">Not now</string>
 </resources>
