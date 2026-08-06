@@ -416,11 +416,13 @@ own header is `manage_title` (`Manage packs`), deliberately distinct.
 
 ### 5.9.2 The #250 design call (space-failed Retry) and the carried residuals
 
-- **#250 — a space-failed row offers no Retry.** `Failed(STORAGE)` rows drop the
-  Retry pill entirely: retrying without freeing space just re-fails (the #234
-  dead-control class). The cause line guides and the removable packs below are the
-  space-freeing path on this very screen. The drawn resolution — a `Free up space`
-  action opening 20e — is **PR-25**, carried as a residual (`Refs: #250`).
+- **#250 — RESOLVED: the space-failed row keeps an *honest* Retry.** Removing the
+  Retry pill made the row a permanent dead end (co-verify BLOCK) — so `Failed(STORAGE)`
+  rows KEEP the Retry pill, made honest: a still-full retry surfaces a "not enough
+  space" refusal snackbar rather than silently re-failing. The #234 dead-control
+  class is closed by *capturing the refusal and reporting it*, not by hiding the
+  control. The removable packs below remain the in-screen space-freeing path; the
+  drawn batch `Free up space` action opening 20e is still **PR-25** (`Fixes: #250`).
 - **`more_vert` → remove.** The overflow opens the existing 19f/19g confirm flow
   for now; the fuller 20c pack-actions sheet (Use as target now, voice line) is
   **PR-24**.
