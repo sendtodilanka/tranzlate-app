@@ -115,22 +115,21 @@ class ManagePacksListDetailRenderTest {
         compose.onNodeWithTag("tt_manage_detail").assertDoesNotExist()
     }
 
-    // ── the per-role "source" line (fed by #122), honest per role ───────────────
+    // ── the single last-used line (owner override), fed by #122, wired through ──────
 
     /**
-     * The detail's source line shows the store's REAL date; a role with no stamp
-     * shows the honest date-less line, never a fabricated date (ruling ⑧).
+     * The detail's single last-used line (owner override 2026-08-06 — a single "Last used as
+     * a source language …", not the earlier As-source/As-target split) reads the SOURCE-role
+     * #122 stamp, wired all the way through `ManagePacksContent` → the two-pane → the pane.
      *
-     * German was translated FROM three days ago and never INTO. Two mutations this
-     * reddens under, decided first:
-     * - honesty: `packRoleUsage` (or the pane) fabricates a date for the empty
-     *   target role — the target line reads a date instead of `manage_used_never`;
-     * - wiring: the pane ignores `usageAsSource` (reads the empty target map, or a
-     *   constant NoRecord) — the source line reads `manage_used_never` instead of
-     *   "used 3 days ago".
+     * German was translated FROM three days ago; the bucket for 3 days is "3 days ago", so the
+     * line reads "Last used as a source language 3 days ago". Mutation (decided first): the
+     * pane reads `usageAsTarget` (empty here) for this line instead of `usageAsSource` — the
+     * line then reads the honest "Not yet used as a source language" and this reddens, proving
+     * the source map is the one that reaches the pane.
      */
     @Test
-    fun `the detail source line shows the real date and a date-less role shows none`() {
+    fun `the detail last-used line reads the source date wired through the maps`() {
         val now = 100L * DAY_MILLIS
         show(
             rows = listOf(OfflineLanguageRow("de", "German", OfflineModelState.Downloaded)),
@@ -141,11 +140,13 @@ class ManagePacksListDetailRenderTest {
         )
 
         compose
-            .onNodeWithTag("tt_manage_detail_source", useUnmergedTree = true)
-            .assertTextEquals(context.resources.getQuantityString(R.plurals.manage_used_days, 3, 3))
-        compose
-            .onNodeWithTag("tt_manage_detail_target", useUnmergedTree = true)
-            .assertTextEquals(context.getString(R.string.manage_used_never))
+            .onNodeWithTag("tt_manage_detail_last_used", useUnmergedTree = true)
+            .assertTextEquals(
+                context.getString(
+                    R.string.manage_detail_last_used_source,
+                    context.resources.getQuantityString(R.plurals.manage_when_days, 3, 3),
+                ),
+            )
     }
 
     // ── selection drives the detail ─────────────────────────────────────────────

@@ -215,6 +215,54 @@ class OfflineLanguagesViewModelTest {
         }
 
     /**
+     * 20b "Dismiss" (#336): dismissing a failed pack drops it from the screen — the row
+     * is masked to `NotDownloaded`, so it leaves the failed section while the language
+     * stays offline-capable (its count is untouched). The manager still reports `Failed`;
+     * the mask is the ViewModel's, so this drives the manager to a real failure, dismisses,
+     * and reads the row's state after.
+     *
+     * Mutation (decided first): make `dismissFailure` a no-op (never add the id to
+     * `dismissedFailures`). "de" then stays `Failed` after the dismiss and the post-dismiss
+     * assertion — which expects `NotDownloaded` — reddens.
+     */
+    @Test
+    fun `dismissing a failed pack drops it from the failed section`() =
+        runTest {
+            val scripted = ScriptedModelManager()
+            val viewModel = buildViewModel(modelManager = scripted, handle = SavedStateHandle())
+            viewModel.uiState.launchIn(backgroundScope)
+            runCurrent()
+            scripted.states.emit(
+                mapOf(
+                    "de" to OfflineModelState.Failed(OfflineModelFailure.NETWORK),
+                    "fr" to OfflineModelState.NotDownloaded,
+                ),
+            )
+            runCurrent()
+            // Precondition: the manager's failure has reached the row.
+            assertThat(
+                viewModel.uiState.value.rows
+                    .first { it.id == "de" }
+                    .state,
+            ).isInstanceOf(OfflineModelState.Failed::class.java)
+
+            viewModel.dismissFailure("de")
+            runCurrent()
+
+            // The failed row is gone (masked to NotDownloaded), and "de" is still a row —
+            // its offline-capable count is untouched, only the failed state is hidden.
+            assertThat(
+                viewModel.uiState.value.rows
+                    .first { it.id == "de" }
+                    .state,
+            ).isEqualTo(OfflineModelState.NotDownloaded)
+            assertThat(
+                viewModel.uiState.value.rows
+                    .map { it.id },
+            ).containsExactly("de", "fr")
+        }
+
+    /**
      * A usage stamp reaches `uiState.usage`, merged across roles. The stamp is
      * written as a TARGET use; a ViewModel that only read the source role, or read
      * neither, reddens.

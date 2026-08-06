@@ -228,6 +228,137 @@ data class PackRow(
 )
 
 /**
+ * Whether one offline capability WORKS for the selected pack right now, or needs a
+ * connection. The 20d detail pane's capability cards draw one of these per capability
+ * — a filled "supported" tint and its own positive subtitle, or a muted tint and the
+ * shared "needs a connection" subtitle (#332). Two states, and never a bare Boolean,
+ * so the card cannot be drawn "supported" by mistaking `true`-means-what for `false`.
+ */
+@Immutable
+enum class CapabilityState {
+    /** The capability runs on-device — draw it filled, with its own subtitle. */
+    Supported,
+
+    /** The capability needs a connection here — draw it muted, "Needs a connection". */
+    Unavailable,
+}
+
+/**
+ * The 20d detail pane's derived, string-free view of the SELECTED pack (#332): which
+ * offline capabilities work, and whether the pack is one the user can remove. Pure,
+ * so every "what the pane may claim" decision is unit-tested away from Compose — the
+ * module still has only a thin Compose test runtime (#186), and a decision left inside
+ * a `@Composable` is the rev.3 ruling's fourth cause.
+ *
+ * The two capabilities read the SAME device truths the rest of the screen does, never
+ * a new source: text-offline is exactly "the pack is on the device" (a downloaded pack
+ * translates full sentences offline), and voice-offline is that AND [PackRow.hasOfflineVoice]
+ * — a voice is a separate install, so a downloaded pack without one still needs a
+ * connection to speak. A pack that is not on the device (mid-download, or a failed
+ * fetch) supports NEITHER offline yet, so both read [CapabilityState.Unavailable]; the
+ * card's honesty then holds for every row the detail can select, not only a settled one.
+ *
+ * @property onDevice the pack is on disk (Downloaded, or mid-delete and still on disk)
+ *   — the identity subtitle's "On device" and both capabilities turn on this.
+ * @property removable a settled, non-pivot on-device pack: only then does the Remove
+ *   block draw. A mid-delete pack already has a delete in flight, and the English pivot
+ *   is non-actionable (#224, removing it frees nothing) — asked of [isPivotLanguage] by
+ *   id, never a stored flag, so a row and its pivot-ness cannot disagree (#325).
+ */
+@Immutable
+data class PackDetail(
+    val onDevice: Boolean,
+    val textOffline: CapabilityState,
+    val voiceOffline: CapabilityState,
+    val cameraOffline: CapabilityState,
+    val removable: Boolean,
+)
+
+/** Derive the [PackDetail] for the selected [row] — the single home of the pane's capability + remove decisions. */
+fun packDetail(row: PackRow): PackDetail {
+    val onDevice = row.state == OfflineModelState.Downloaded || row.state == OfflineModelState.Deleting
+    return PackDetail(
+        onDevice = onDevice,
+        textOffline = if (onDevice) CapabilityState.Supported else CapabilityState.Unavailable,
+        voiceOffline = if (onDevice && row.hasOfflineVoice) CapabilityState.Supported else CapabilityState.Unavailable,
+        // Camera-offline = an on-device pack AND a script ML Kit can read on-device (owner
+        // ruling 2026-08-06: Camera is a release feature, show it green where capable).
+        cameraOffline =
+            if (onDevice &&
+                offlineOcrCapable(row.id)
+            ) {
+                CapabilityState.Supported
+            } else {
+                CapabilityState.Unavailable
+            },
+        removable = row.state == OfflineModelState.Downloaded && !isPivotLanguage(row.id),
+    )
+}
+
+/**
+ * The offline-capable language ids whose SCRIPT ML Kit Text Recognition reads ON-DEVICE
+ * — the five on-device OCR scripts: **Latin, Chinese, Devanagari, Japanese, Korean**
+ * (developers.google.com/ml-kit/vision/text-recognition/v2 — the bundled script models).
+ *
+ * Derived by writing-system from `BundledLanguageCatalog.offlineCapableIds` (the 59), so
+ * only a pack the user can actually hold is ever asked. The EXCLUDED offline languages use
+ * scripts ML Kit has no on-device recogniser for: Arabic (`ar`, `fa`, `ur`), Cyrillic
+ * (`be`, `bg`, `mk`, `ru`, `uk`), Greek (`el`), Hebrew (`he`), Georgian (`ka`), and the
+ * Brahmic scripts other than Devanagari — Bengali (`bn`), Gujarati (`gu`), Kannada (`kn`),
+ * Tamil (`ta`), Telugu (`te`), Thai (`th`). Devanagari covers Hindi (`hi`) + Marathi (`mr`).
+ */
+internal val OFFLINE_OCR_SCRIPT_IDS: Set<String> =
+    setOf(
+        // Latin script
+        "af",
+        "sq",
+        "ca",
+        "hr",
+        "cs",
+        "da",
+        "nl",
+        "en",
+        "eo",
+        "et",
+        "tl",
+        "fi",
+        "fr",
+        "gl",
+        "de",
+        "ht",
+        "hu",
+        "is",
+        "id",
+        "ga",
+        "it",
+        "lv",
+        "lt",
+        "ms",
+        "mt",
+        "no",
+        "pl",
+        "pt",
+        "ro",
+        "sk",
+        "sl",
+        "es",
+        "sw",
+        "sv",
+        "tr",
+        "vi",
+        "cy",
+        // Chinese · Devanagari · Japanese · Korean
+        "zh",
+        "hi",
+        "mr",
+        "ja",
+        "ko",
+    )
+
+/** True when [id]'s script is one ML Kit reads on-device (Latin/Chinese/Devanagari/Japanese/Korean). */
+internal fun offlineOcrCapable(id: String): Boolean = id in OFFLINE_OCR_SCRIPT_IDS
+
+/**
  * The three lists 20b draws, in the order it draws them: what is transferring,
  * what failed, and what is on the device. A [Downloadable]/[OnlineOnly] language
  * belongs to NONE of them — it is browsed and downloaded from the picker, not

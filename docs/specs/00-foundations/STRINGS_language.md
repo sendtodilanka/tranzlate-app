@@ -392,9 +392,11 @@ own header is `manage_title` (`Manage packs`), deliberately distinct.
 | `manage_storage_packs_count` | plurals | `%1$d pack(s) on device` | count | the degrade legend when bytes are unknown but packs are counted |
 | `manage_section_downloading` | string | `Downloading` | — | section header |
 | `manage_section_failed` | string | `Did not download` | — | section header |
+| `manage_failed_dismiss` | string | `Dismiss` | — | the failed row's second control beside Retry (20b · #336) — hides the failure for the session without retrying or deleting; Retry stays `lang_sheet_failed_retry` |
 | `manage_section_on_device` | string | `On this device` | — | section header |
 | `manage_on_device_count` | plurals | `%1$d of %2$d pack(s)` | on-device, capable | offline-CAPABLE denominator (59, C-11), not the 194 catalogue |
 | `manage_downloading_note` | string | `There is no pause — stopping discards the pack.` | — | the honest note under the downloading section (no pause API, brief §2) |
+| `manage_stop_download` | string | `Stop download and remove` | — | the 20d two-pane downloading card's visible action label (the frame's text); the card names the pack above it, and `cd_text_lang_stop` carries the name for a screen reader |
 | `manage_used_today` | string | `used today` | — | relative last-used, from a #122 stamp |
 | `manage_used_days` | plurals | `used %1$d day(s) ago` | days | 1..6 days |
 | `manage_used_weeks` | plurals | `used %1$d week(s) ago` | weeks | 1..4 weeks |
@@ -408,9 +410,11 @@ own header is `manage_title` (`Manage packs`), deliberately distinct.
 | `manage_browse_all` | string | `Browse all languages` | — | the empty state's second way forward — opens the picker (no dead end, brief §8) |
 | `manage_footer` | string | `%1$d of the %2$d languages have a pack. The other %3$d translate online only.` | capable, total, online-only | catalogue facts, sourced not hardcoded |
 | `manage_nudge_title` | plurals | `%1$d pack(s) haven't been used in months` | count | the hygiene nudge (brief §6.1) — packs stale past 90 days; date-less packs never counted (ruling ⑧) |
-| `manage_nudge_body` | string | `Keeping only the languages you use keeps the app light. Nothing is deleted without asking.` | — | the nudge's reassurance |
+| `manage_nudge_body` | string | `Keeping only the languages you use keeps the app light. Nothing is deleted without asking.` | — | the nudge's reassurance (compact nudge) |
+| `manage_nudge_freeing` | string | `Freeing them takes a tap; downloading again is free.` | — | the 20d two-pane nudge body — the frame's concise line; freeing is a tap and re-downloading is free, so the nudge never pushes a lossy action |
 | `manage_nudge_dismiss` | string | `Not now` | — | dismisses the nudge (session-durable), the text action beside the filled `Review N packs` |
 | `manage_nudge_review` | plurals | `Review %1$d pack(s)` | count | the nudge's filled action (#130 PR-25) — opens the batch 20e "Free up space" sheet over exactly the stale packs it counts (`manage_nudge_title`) |
+| `manage_nudge_review_short` | string | `Review` | — | the 20d two-pane nudge action — the frame's compact "Review" (count omitted, the card states it); opens the same 20e cleanup as `manage_nudge_review` |
 
 ### 5.9.1 Manage packs — testTags (C-1)
 
@@ -462,35 +466,62 @@ reversible; the batch removes through the existing per-pack delete path.
 `tt_lang_sheet_free_cancel` (Cancel) · `tt_lang_sheet_free_close` (empty-state Close) ·
 `tt_lang_sheet_free_row_<id>` (one per stale-pack checkbox row, e.g. `…_row_de`).
 
-## 5.11 Manage packs — list-detail 20d (#130 PR-26)
+## 5.11 Manage packs — list-detail 20d (#130 PR-26 / conformance #332)
 
 At EXPANDED width (a tablet or unfolded foldable in landscape — the ruling's
 1280×800) the screen splits into a plain `Row` two-pane: the SAME §5.9 list on the
-left, and the SELECTED pack's detail on the right. This is a PARTIAL 20d (ruling
-:249): the spec's camera card and pair-share line are OMITTED — a non-existent
-feature (#78/#112) and an undocumented version-fragile layout, both §7 REJECTs. The
-detail carries the pack's identity, the per-role "source" line, and the same
-`StorageCardView` §5.9/§5.10 draw (one vocabulary, one colour). No `adaptive-layout`
-dependency — a plain `Row` gated on `WindowInfo.isExpanded` (ruling :90/:238).
+left, and the SELECTED pack's detail on the right. The detail draws, top→bottom: the
+pack's identity with an on-device status subtitle, the offline-capability cards, the
+"where this pack is used" section (saved phrases + per-role last-used), and — for a
+removable pack — the Remove block, which routes to the 19f/19g confirm and never
+deletes on tap. No `adaptive-layout` dependency — a plain `Row` gated on
+`WindowInfo.isExpanded` (ruling :90/:238).
 
-The "source" line is the pack's last-used from the #122 store, split BY ROLE — the
-list row shows one merged bucket, the detail tells "as source" apart from "as
-target". Each side reuses the §5.9 `manage_used_*` buckets, so a role with no
+Three frame elements are OMITTED, each a standing REJECT (ruling :249/:252): the
+camera card (a non-existent feature, #78/#112), the `sd_card` pair-share line (an
+undocumented version-fragile layout), and the aggregate storage card — the frame draws
+storage in the LIST pane only, so the detail no longer duplicates it (#331). Each
+capability card states its offline status in WORDS as well as a tint (a11y: never
+colour alone): a supported capability reads its own "ready" subtitle, an unavailable
+one reads `manage_detail_cap_offline_unavailable`.
+
+The "source"/"target" lines are the pack's last-used from the #122 store, split BY
+ROLE — the list row shows one merged bucket, the detail tells "as source" apart from
+"as target". Each side reuses the §5.9 `manage_used_*` buckets, so a role with no
 translation stamp reads `manage_used_never` — never a fabricated date (ruling ⑧).
 
 | Key | Type | `en` | Args | Notes |
 |-----|------|------|------|-------|
-| `manage_detail_usage_header` | string | `Usage` | — | the detail pane's usage section header |
-| `manage_detail_role_source` | string | `As source` | — | the "source" line's role label; its value is a `manage_used_*` bucket for the SOURCE-role stamp (#122) |
-| `manage_detail_role_target` | string | `As target` | — | the target-role label; its value is a `manage_used_*` bucket for the TARGET-role stamp (#122) |
+| `manage_detail_usage_header` | string | `Where this pack is used` | — | the "where used" section header (renamed from `Usage`, conformance #332) |
+| `manage_detail_last_used_source` | string | `Last used as a source language %1$s` | bare span | the SINGLE last-used line (owner override 2026-08-06 — replaces the `As source`/`As target` split); `%1$s` is a `manage_when_*` span so it reads "… source language last week" |
+| `manage_detail_never_source` | string | `Not yet used as a source language` | — | the last-used line for a source role with no #122 stamp — the honest date-less form (ruling ⑧), never a fabricated date |
+| `manage_detail_shares_data` | string | `Shares stored data with %1$s — the pair is kept once` | pivot name | the pair-share line the frame draws (owner override — build it as the frame has it); every non-pivot pack stores its data as an English↔X pair, so removing frees only the unshared part. `%1$s` is the pivot (English) |
 | `manage_detail_empty` | string | `Select a pack to see how it has been used.` | — | the no-selection placeholder (no packs, or a removed pack) — never a dead end. No apostrophe (an unescaped `'` breaks the build) |
+| `manage_when_today` | string | `today` | — | bare relative span for the single source line (no `used` prefix, so the sentence reads naturally) |
+| `manage_when_days` | plurals | `%1$d day ago` / `%1$d days ago` | days | bare relative span, days bucket |
+| `manage_when_weeks` | plurals | `last week` / `%1$d weeks ago` | weeks | bare relative span, weeks bucket (one → `last week`) |
+| `manage_when_months` | plurals | `last month` / `%1$d months ago` | months | bare relative span, months bucket; a bucketed elapsed span, never a calendar month (ruling ⑧) |
+| `manage_detail_status_on_device` | string | `On device · ready to use with no connection` | — | the identity status subtitle for a pack on disk; a downloading/failed pack shows its own state line instead (ruling ⑧) |
+| `manage_detail_cap_text_title` | string | `Text offline` | — | the Text-offline capability card title |
+| `manage_detail_cap_text_ready` | string | `Full sentence engine` | — | the Text-offline card's supported subtitle (a downloaded pack translates full sentences offline) |
+| `manage_detail_cap_voice_title` | string | `Voice offline` | — | the Voice-offline capability card title |
+| `manage_detail_cap_voice_ready` | string | `Has an on-device voice` | — | the Voice-offline card's supported subtitle — shown IFF `PackRow.hasOfflineVoice` |
+| `manage_detail_cap_camera_title` | string | `Camera offline` | — | the Camera-offline capability card title (owner ruling 2026-08-06 — Camera is a release feature, green where capable) |
+| `manage_detail_cap_camera_ready` | string | `Reads text in photos` | — | the Camera-offline card's supported subtitle — shown IFF the script is on-device-OCR (`offlineOcrCapable`) AND a pack exists |
+| `manage_detail_cap_offline_unavailable` | string | `Needs a connection` | — | the shared muted subtitle for a capability that needs a connection here (all three cards) |
+| `manage_detail_saved` | plurals | `%1$d saved phrase is in %2$s` / `%1$d saved phrases are in %2$s` | count, language name | the "where used" saved-phrases line; ABSENT at zero (a missing reassurance, never a false one) |
+| `manage_detail_remove_body` | string | `Removing frees the space it does not share with another pack. %1$s then needs a connection to translate, and downloading it again is free.` | language name | the Remove block's consequence copy — true: packs share data between pairs, and re-downloading is free |
+| `manage_detail_remove_action` | string | `Remove` | — | the Remove block's button; ROUTES to the 19f/19g confirm (the same `onRemove` the 20c sheet uses), never deletes on tap |
 
 ### 5.11.1 Manage packs list-detail — testTags (C-1)
 
 `tt_manage_select_row` (each selectable list row in the two-pane) · `tt_manage_detail`
 (the detail pane root) · `tt_manage_detail_name` (the selected pack's name) ·
-`tt_manage_detail_source` / `tt_manage_detail_target` (the two per-role usage values) ·
-`tt_manage_detail_empty` (the no-selection placeholder).
+`tt_manage_detail_status` (the identity status subtitle) · `tt_manage_detail_cap_text`
+/ `tt_manage_detail_cap_voice` (the two capability-card subtitles) ·
+`tt_manage_detail_saved` (the saved-phrases line) · `tt_manage_detail_source` /
+`tt_manage_detail_target` (the two per-role usage values) · `tt_manage_detail_remove`
+(the Remove button) · `tt_manage_detail_empty` (the no-selection placeholder).
 
 ## 6. Language picker — accessibility (C-4)
 

@@ -23,14 +23,21 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DownloadForOffline
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.SdCard
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,6 +58,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -58,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
@@ -67,9 +76,13 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
@@ -172,8 +185,10 @@ fun OfflineLanguagesScreen(
         onGet = viewModel::download,
         onStopDownload = viewModel::stopDownload,
         onRetry = viewModel::download,
+        onDismissFailure = viewModel::dismissFailure,
         onRemove = viewModel::requestRemove,
         onUseAsTarget = viewModel::useAsTarget,
+        onSavedCount = viewModel::savedCountFor,
         onDismissNudge = viewModel::dismissNudge,
         onBrowseAll = onBrowseAll,
         pendingConsent = pendingConsent,
@@ -208,6 +223,13 @@ internal fun ManagePacksContent(
     onDismissNudge: () -> Unit,
     onBrowseAll: () -> Unit,
     modifier: Modifier = Modifier,
+    // 20b failed-row "Dismiss" (#336): drop the failed row for the session. Defaulted so
+    // the render-test / preview call sites that do not exercise a failure are untouched.
+    onDismissFailure: (String) -> Unit = {},
+    // 20d detail-pane saved-phrases count for the SELECTED pack (#332), queried by the
+    // two-pane from its screen-local selection. Defaulted to 0 so the compact-width
+    // render tests and previews that draw no detail pane are untouched.
+    onSavedCount: suspend (String) -> Int = { 0 },
     pendingConsent: String? = null,
     alwaysAsk: Boolean = true,
     onAlwaysAskChange: (Boolean) -> Unit = {},
@@ -339,13 +361,10 @@ internal fun ManagePacksContent(
                         nowMillis = nowMillis,
                         selectedId = selectedId,
                         onSelectPack = { selectedId = it.id },
+                        onSavedCount = onSavedCount,
                         onGet = onGet,
                         onStopDownload = onStopDownload,
-                        onRetry = onRetry,
-                        onMoreOptions = { row ->
-                            actionsTarget = PackActionsTarget(row.id, row.displayName, row.hasOfflineVoice)
-                        },
-                        onDismissNudge = onDismissNudge,
+                        onRemove = onRemove,
                         onReviewPacks = { freeUpSpaceOpen = true },
                         onBrowseAll = onBrowseAll,
                     )
@@ -361,6 +380,7 @@ internal fun ManagePacksContent(
                         nowMillis = nowMillis,
                         onStopDownload = onStopDownload,
                         onRetry = onRetry,
+                        onDismissFailure = onDismissFailure,
                         onMoreOptions = { row ->
                             actionsTarget = PackActionsTarget(row.id, row.displayName, row.hasOfflineVoice)
                         },
@@ -390,7 +410,13 @@ private fun ManagePacksHeader(onBack: () -> Unit) {
     val spacing = LocalSpacing.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(horizontal = spacing.xs4, vertical = spacing.xs4),
+        // The rev5 app bar is 68dp (20b.json / 20d.json: bar y44→112). Without this the Row
+        // wraps to the 48dp icon button + padding (~56dp) and the whole content sits ~12dp too
+        // high against the frame. heightIn keeps a taller title from clipping.
+        modifier =
+            Modifier
+                .heightIn(min = 68.dp)
+                .padding(horizontal = spacing.xs4),
     ) {
         IconButton(onClick = onBack, modifier = Modifier.testTag("tt_manage_back")) {
             Icon(Icons.Outlined.ArrowBack, contentDescription = stringResource(R.string.offline_cd_back))
@@ -419,6 +445,9 @@ private fun PopulatedList(
     onDismissNudge: () -> Unit,
     onReviewPacks: () -> Unit,
     onBrowseAll: () -> Unit,
+    // 20b failed-row "Dismiss" (#336): the failed section's second control beside Retry.
+    // Defaulted so the empty/other call sites are untouched.
+    onDismissFailure: (String) -> Unit = {},
     // 20d (#130 PR-26): non-null ONLY in the expanded-width two-pane, where a row
     // tap SELECTS the pack the detail shows. Null on a phone, where the list is the
     // whole screen and the row keeps its single job — the overflow — untouched.
@@ -446,6 +475,7 @@ private fun PopulatedList(
                     onSelectPack = onSelectPack,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
+                    onDismissFailure = onDismissFailure,
                     onMoreOptions = onMoreOptions,
                 )
             }
@@ -461,6 +491,7 @@ private fun PopulatedList(
                     onSelectPack = onSelectPack,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
+                    onDismissFailure = onDismissFailure,
                     onMoreOptions = onMoreOptions,
                 )
             }
@@ -486,6 +517,7 @@ private fun PopulatedList(
                     onSelectPack = onSelectPack,
                     onStopDownload = onStopDownload,
                     onRetry = onRetry,
+                    onDismissFailure = onDismissFailure,
                     onMoreOptions = onMoreOptions,
                 )
             }
@@ -526,12 +558,12 @@ private fun EmptyList(
 // ── Two-pane list-detail (20d · #130 PR-26) ──────────────────────────────────
 
 /**
- * The list pane's fixed width in the 20d two-pane. A single-column pack list reads
- * best at about a phone's width, so the list keeps ~400dp and the detail takes the
- * rest of a 1280dp tablet — a plain `Row`, never `ListDetailPaneScaffold` and never
- * the `adaptive-layout` dependency (a standing REJECT, ruling :90/:238).
+ * The list pane's fixed width in the 20d two-pane — the rev5 frame's exact 392dp. The
+ * detail takes the rest of a 1280dp tablet, separated by [D20d.PaneGap] (22dp) — a plain
+ * `Row`, never `ListDetailPaneScaffold` and never the `adaptive-layout` dependency (a
+ * standing REJECT, ruling :90/:238).
  */
-private val ManagePacksListWidth = 400.dp
+private val ManagePacksListWidth = D20d.ListWidth
 
 /**
  * 20d Manage packs at EXPANDED width: the existing list on the left, the selected
@@ -553,14 +585,16 @@ private fun ManagePacksTwoPane(
     nowMillis: Long,
     selectedId: String?,
     onSelectPack: (PackRow) -> Unit,
+    onSavedCount: suspend (String) -> Int,
     onGet: (String) -> Unit,
     onStopDownload: (String) -> Unit,
-    onRetry: (String) -> Unit,
-    onMoreOptions: (PackRow) -> Unit,
-    onDismissNudge: () -> Unit,
+    onRemove: (String) -> Unit,
     onReviewPacks: () -> Unit,
     onBrowseAll: () -> Unit,
 ) {
+    // The 20d dense list has no per-row Retry / Dismiss / overflow and the green nudge no
+    // "Not now" (the frame draws none — the detail pane is the action surface at this width),
+    // so the transfer/failure/nudge-dismiss callbacks the compact pane needs are not taken here.
     // Every selectable pack, in the order the list draws them, so the default
     // selection is the first row the eye lands on and the detail is never blank
     // while packs exist. A remembered stale id (its pack removed) falls back to
@@ -571,26 +605,40 @@ private fun ManagePacksTwoPane(
         remember(selectedPack?.id, usageAsSource, usageAsTarget) {
             selectedPack?.let { packRoleUsage(it.id, usageAsSource, usageAsTarget) }
         }
-    Row(modifier = Modifier.fillMaxSize()) {
+    // The selected pack's saved-phrases count for the detail pane (#332). Queried by
+    // the SELECTED id only — the detail shows one pack, so this is one keyed query, not
+    // a walk of every pack — and re-run when the selection changes. `0` while no pack is
+    // selected, which the pane draws as an ABSENT saved line (the remove sheets' rule).
+    val savedCount by
+        produceState(0, selectedPack?.id) {
+            value = selectedPack?.id?.let { onSavedCount(it) } ?: 0
+        }
+    Row(
+        modifier = Modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(D20d.PaneGap),
+    ) {
         Box(modifier = Modifier.width(ManagePacksListWidth)) {
             if (sections.hasPacks) {
-                PopulatedList(
+                // The DENSE 20d list (frame's own presentation): the sized storage card, the
+                // green hygiene nudge, then Downloading / On-this-device / Did-not-download,
+                // each a 36dp selectable row with NO trailing control — at expanded width the
+                // detail pane is the action surface, so a row's one job is to select. This is a
+                // deliberate sibling of the 64dp touch [PopulatedList] the phone (20b) keeps,
+                // because the two frames draw the left column at different densities (20d rows
+                // are 36dp / 36px avatars; 20b rows are 64dp) — verified against 20b.json/20d.json.
+                ManagePacksList20d(
                     sections = sections,
                     storage = storage,
                     nudge = nudge,
                     capable = capable,
-                    total = total,
                     nowMillis = nowMillis,
-                    onStopDownload = onStopDownload,
-                    onRetry = onRetry,
-                    onMoreOptions = onMoreOptions,
-                    onDismissNudge = onDismissNudge,
-                    onReviewPacks = onReviewPacks,
-                    onBrowseAll = onBrowseAll,
-                    // The RESOLVED selection, so the highlighted row and the detail
-                    // always agree — even on the default-first row, before any tap.
+                    // The RESOLVED selection, so the highlighted row and the detail always
+                    // agree — even on the default-first row, before any tap.
                     selectedId = selectedPack?.id,
                     onSelectPack = onSelectPack,
+                    onStopDownload = onStopDownload,
+                    onReviewPacks = onReviewPacks,
+                    onBrowseAll = onBrowseAll,
                 )
             } else {
                 EmptyList(
@@ -603,14 +651,442 @@ private fun ManagePacksTwoPane(
                 )
             }
         }
-        VerticalDivider()
         ManagePacksDetailPane(
             pack = selectedPack,
             roleUsage = roleUsage,
-            storage = storage,
+            savedCount = savedCount,
             nowMillis = nowMillis,
+            onRemove = onRemove,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
+    }
+}
+
+// ── The dense 20d left list (frame-exact) ────────────────────────────────────
+
+/**
+ * The two-pane LEFT column, at the 20d frame's exact geometry: the sized storage card, the
+ * green hygiene nudge, then the sections the frame draws in its order — Downloading, On this
+ * device, Did not download — each a 36dp selectable row. A row carries NO trailing control
+ * (the detail pane holds the actions at expanded width); the only in-list control is the
+ * downloading card's "Stop download and remove". Browse-all sits at the very bottom so a
+ * user with packs can still reach the picker to add another (no dead end).
+ */
+@Composable
+private fun ManagePacksList20d(
+    sections: ManagePacksSections,
+    storage: StorageCard?,
+    nudge: HygieneNudge?,
+    capable: Int,
+    nowMillis: Long,
+    selectedId: String?,
+    onSelectPack: (PackRow) -> Unit,
+    onStopDownload: (String) -> Unit,
+    onReviewPacks: () -> Unit,
+    onBrowseAll: () -> Unit,
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(top = D20d.NudgeTop, bottom = D20d.NudgeTop),
+        modifier = Modifier.fillMaxSize().testTag("tt_manage_list"),
+    ) {
+        storage?.let { item(key = "storage") { TwoPaneStorageCard(it) } }
+        nudge?.let { item(key = "nudge") { TwoPaneNudge(it, onReviewPacks, Modifier.padding(top = D20d.NudgeTop)) } }
+        if (sections.downloading.isNotEmpty()) {
+            item(key = "hdr_dl") { TwoPaneSectionHeader(stringResource(R.string.manage_section_downloading)) }
+            items(sections.downloading, key = { "dl_${it.id}" }) { row ->
+                TwoPaneDownloadingCard(row = row, onStopDownload = onStopDownload)
+            }
+        }
+        if (sections.onDevice.isNotEmpty()) {
+            item(key = "hdr_dev") {
+                TwoPaneSectionHeader(
+                    text = stringResource(R.string.manage_section_on_device),
+                    count =
+                        pluralStringResource(
+                            R.plurals.manage_on_device_count,
+                            sections.onDevice.size,
+                            sections.onDevice.size,
+                            capable,
+                        ),
+                )
+            }
+            items(sections.onDevice, key = { "dev_${it.id}" }) { row ->
+                TwoPaneSettledRow(
+                    row = row,
+                    selected = row.id == selectedId,
+                    nowMillis = nowMillis,
+                    onSelectPack = onSelectPack,
+                )
+            }
+        }
+        if (sections.failed.isNotEmpty()) {
+            item(key = "hdr_fail") { TwoPaneSectionHeader(stringResource(R.string.manage_section_failed)) }
+            items(sections.failed, key = { "fail_${it.id}" }) { row ->
+                TwoPaneFailedRow(row = row, selected = row.id == selectedId, onSelectPack = onSelectPack)
+            }
+        }
+        item(key = "browse") { BrowseAllButton(onBrowseAll) }
+    }
+}
+
+/**
+ * The sized storage card the frame draws in the list pane: the aggregate bytes and pack
+ * count on one line ("110 MB across 5 packs · 1.4 GB free"), the device-used bar, and the
+ * explainer. bg `surfaceContainerLow` (#f0f4f9), r22, p16 — the frame's own values. A
+ * FreeOnly card (no measured bytes) degrades to its device-free figure in the same shell.
+ */
+@Composable
+private fun TwoPaneStorageCard(card: StorageCard) {
+    val context = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(D20d.StorageRadius))
+                .background(scheme.surfaceContainerLow)
+                .padding(D20d.StoragePad)
+                .semantics(mergeDescendants = true) {}
+                .testTag("tt_manage_storage"),
+    ) {
+        val bytesText: String
+        val caption: String
+        when (card) {
+            is StorageCard.Sized -> {
+                bytesText = Formatter.formatShortFileSize(context, card.packsBytes)
+                caption =
+                    pluralStringResource(R.plurals.manage_storage_across, card.packCount, card.packCount) +
+                    " · " +
+                    stringResource(
+                        R.string.lang_sheet_space_free,
+                        Formatter.formatShortFileSize(context, card.freeBytes),
+                    )
+            }
+
+            is StorageCard.FreeOnly -> {
+                bytesText = Formatter.formatShortFileSize(context, card.freeBytes)
+                caption = stringResource(R.string.manage_storage_free_caption)
+            }
+        }
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = bytesText,
+                fontSize = D20d.StorageNumSize,
+                lineHeight = D20d.StorageNumLine,
+                fontWeight = FontWeight.Medium,
+                color = scheme.onSurface,
+            )
+            Text(
+                text = caption,
+                fontSize = D20d.StorageCapSize,
+                lineHeight = D20d.StorageCapLine,
+                color = scheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = D20d.StorageCapStart, bottom = 3.dp),
+            )
+        }
+        if (card is StorageCard.Sized) {
+            LinearProgressIndicator(
+                progress = { deviceUsedFraction(card.freeBytes, card.totalBytes) },
+                color = scheme.primaryContainer,
+                trackColor = scheme.surfaceContainerHigh,
+                gapSize = 0.dp,
+                drawStopIndicator = {},
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = D20d.StorageBarTop)
+                        .height(D20d.StorageBarHeight)
+                        .clip(RoundedCornerShape(D20d.StorageBarRadius))
+                        .clearAndSetSemantics {},
+            )
+        }
+        Text(
+            text = stringResource(R.string.manage_storage_explainer),
+            fontSize = D20d.StorageExplainSize,
+            lineHeight = D20d.StorageExplainLine,
+            color = scheme.outline,
+            modifier = Modifier.padding(top = D20d.StorageExplainTop),
+        )
+    }
+}
+
+/**
+ * The green storage-hygiene nudge (frame): tertiary-fixed fill (#c4eed0), the cleaning icon +
+ * title on one line, the reassurance, and a single "Review" text action (right). Theme-invariant
+ * green via the `*Fixed` roles, so it stays green in dark too. "Not now" is the phone nudge's
+ * action; at expanded width the frame draws Review alone.
+ */
+@Composable
+private fun TwoPaneNudge(
+    nudge: HygieneNudge,
+    onReview: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(D20d.NudgeRadius))
+                .background(scheme.tertiaryFixed)
+                .padding(
+                    start = D20d.NudgePadH,
+                    end = D20d.NudgePadH,
+                    top = D20d.NudgePadTop,
+                    bottom = D20d.NudgePadBottom,
+                ).testTag("tt_manage_nudge"),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(D20d.NudgeIconGap),
+        ) {
+            Icon(
+                Icons.Filled.CleaningServices,
+                contentDescription = null,
+                tint = scheme.onTertiaryFixed,
+                modifier = Modifier.size(D20d.NudgeIcon),
+            )
+            Text(
+                text = pluralStringResource(R.plurals.manage_nudge_title, nudge.stalePackCount, nudge.stalePackCount),
+                fontSize = D20d.NudgeTitleSize,
+                lineHeight = D20d.NudgeTitleLine,
+                fontWeight = FontWeight.Medium,
+                color = scheme.onTertiaryFixed,
+            )
+        }
+        Text(
+            text = stringResource(R.string.manage_nudge_freeing),
+            fontSize = D20d.NudgeBodySize,
+            lineHeight = D20d.NudgeBodyLine,
+            color = scheme.onTertiaryFixed,
+            modifier = Modifier.padding(top = D20d.NudgeBodyTop, start = D20d.NudgeIcon + D20d.NudgeIconGap),
+        )
+        TextButton(
+            onClick = onReview,
+            contentPadding = PaddingValues(horizontal = D20d.NudgeActionPadH),
+            colors = ButtonDefaults.textButtonColors(contentColor = scheme.onTertiaryFixed),
+            modifier =
+                Modifier
+                    .align(Alignment.End)
+                    .height(D20d.NudgeActionHeight)
+                    .testTag("tt_manage_nudge_review"),
+        ) {
+            Text(
+                text = stringResource(R.string.manage_nudge_review_short),
+                fontSize = D20d.NudgeActionText,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+/** A dense list section header (frame): blue (`onPrimaryContainer`), uppercase, tracked, 12sp/500, with an optional " · N of M" count. */
+@Composable
+private fun TwoPaneSectionHeader(
+    text: String,
+    count: String? = null,
+) {
+    Text(
+        text = if (count == null) text.uppercase() else (text + " · " + count).uppercase(),
+        fontSize = D20d.ListHeaderSize,
+        lineHeight = D20d.ListHeaderLine,
+        fontWeight = FontWeight.Medium,
+        letterSpacing = D20d.ListHeaderTracking,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = D20d.ListHeaderTop, bottom = D20d.ListHeaderBottom),
+    )
+}
+
+/**
+ * The downloading card (frame): a blue (`primaryContainer`) card with the pack's avatar, name
+ * and "Downloading…" line, an indeterminate progress bar (ML Kit gives no %; the bar is
+ * indeterminate on purpose, brief §"Engines"), and a "Stop download and remove" text action —
+ * delete-to-cancel, because there is no cancel API.
+ */
+@Composable
+private fun TwoPaneDownloadingCard(
+    row: PackRow,
+    onStopDownload: (String) -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = D20d.DownloadTop)
+                .clip(RoundedCornerShape(D20d.DownloadRadius))
+                .background(scheme.primaryContainer)
+                .padding(
+                    start = D20d.DownloadPadH,
+                    end = D20d.DownloadPadH,
+                    top = D20d.DownloadPadTop,
+                    bottom = D20d.DownloadPadBottom,
+                ).testTag("tt_manage_downloading_card"),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(D20d.DenseRowGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PackAvatar(id = row.id, downloaded = true, size = D20d.DenseAvatar, initialsSize = D20d.InitialsSm)
+            Column {
+                Text(
+                    text = row.displayName,
+                    fontSize = D20d.DownloadNameSize,
+                    lineHeight = D20d.DownloadNameLine,
+                    fontWeight = FontWeight.Medium,
+                    color = scheme.onPrimaryContainer,
+                )
+                Text(
+                    text = stringResource(R.string.text_lang_downloading),
+                    fontSize = D20d.DownloadSubSize,
+                    lineHeight = D20d.DownloadSubLine,
+                    color = scheme.onPrimaryContainer,
+                )
+            }
+        }
+        Column(modifier = Modifier.padding(start = D20d.DenseAvatar + D20d.DenseRowGap)) {
+            // Indeterminate: ML Kit's download() gives no progress %, so the bar cannot claim
+            // one (brief §"Engines"). The indeterminate overload has no drawStopIndicator.
+            LinearProgressIndicator(
+                color = scheme.primary,
+                trackColor = scheme.surfaceContainerLowest,
+                gapSize = 0.dp,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = D20d.DownloadBarTop)
+                        .height(D20d.DownloadBarHeight)
+                        .clip(RoundedCornerShape(D20d.DownloadBarRadius))
+                        .clearAndSetSemantics {},
+            )
+            TextButton(
+                onClick = { onStopDownload(row.id) },
+                contentPadding = PaddingValues(horizontal = D20d.NudgeActionPadH),
+                colors = ButtonDefaults.textButtonColors(contentColor = scheme.onPrimaryContainer),
+                modifier =
+                    Modifier
+                        .align(Alignment.End)
+                        .height(D20d.DownloadActionHeight)
+                        .testTag("tt_manage_stop"),
+            ) {
+                Text(
+                    text = stringResource(R.string.manage_stop_download),
+                    fontSize = D20d.DownloadActionText,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A dense 36dp on-device row (frame): avatar + name + "On device · used …" subtitle, no
+ * trailing control. Selecting it drives the detail pane; the selected row is the frame's blue
+ * stadium (`primaryContainer` clipped to a pill), its text recoloured to `onPrimaryContainer`.
+ * A STALE pack (unused past the threshold) greys its avatar — the frame's own cue that it is a
+ * cleanup candidate. An `IN USE` chip rides the name for the current target.
+ */
+@Composable
+private fun TwoPaneSettledRow(
+    row: PackRow,
+    selected: Boolean,
+    nowMillis: Long,
+    onSelectPack: (PackRow) -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val stale = isStale(row.usage, nowMillis)
+    val nameColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface
+    val subColor = if (selected) scheme.onPrimaryContainer else scheme.outline
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(D20d.DenseRowGap),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = D20d.DenseRowBottom)
+                .heightIn(min = D20d.DenseRowHeight)
+                .clip(RoundedCornerShape(D20d.DenseRowRadius))
+                .background(if (selected) scheme.primaryContainer else Color.Transparent)
+                .selectable(selected = selected, onClick = { onSelectPack(row) })
+                .padding(horizontal = D20d.DenseRowPadH)
+                .testTag("tt_manage_select_row"),
+    ) {
+        PackAvatar(id = row.id, downloaded = !stale, size = D20d.DenseAvatar, initialsSize = D20d.InitialsSm)
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = row.displayName,
+                    fontSize = D20d.DenseNameSize,
+                    lineHeight = D20d.DenseNameLine,
+                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                    color = nameColor,
+                )
+                if (row.inUse) {
+                    InUseBadge(modifier = Modifier.padding(start = D20d.DenseNameChipGap))
+                }
+            }
+            Text(
+                text = stringResource(R.string.text_lang_on_device_size, packUsageText(row.usage, nowMillis)),
+                fontSize = D20d.DenseSubSize,
+                lineHeight = D20d.DenseSubLine,
+                color = subColor,
+            )
+        }
+    }
+}
+
+/**
+ * A dense failed row (frame): a `cloud_off` error glyph in place of the avatar, the name, and
+ * the failure line, both in `error`. Selecting it shows the failure in the detail pane. It
+ * carries no inline Retry — at expanded width the actions live in the detail (the frame draws
+ * the failed row control-free).
+ */
+@Composable
+private fun TwoPaneFailedRow(
+    row: PackRow,
+    selected: Boolean,
+    onSelectPack: (PackRow) -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val failure = (row.state as? OfflineModelState.Failed)?.cause
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(D20d.DenseRowGap),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = D20d.DenseRowBottom)
+                .heightIn(min = D20d.DenseRowHeight)
+                .clip(RoundedCornerShape(D20d.DenseRowRadius))
+                .background(if (selected) scheme.primaryContainer else Color.Transparent)
+                .selectable(selected = selected, onClick = { onSelectPack(row) })
+                .padding(horizontal = D20d.DenseRowPadH)
+                .testTag("tt_manage_select_row"),
+    ) {
+        Icon(
+            Icons.Filled.CloudOff,
+            contentDescription = null,
+            tint = scheme.error,
+            modifier = Modifier.size(D20d.FailedIcon),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = row.displayName,
+                fontSize = D20d.DenseNameSize,
+                lineHeight = D20d.DenseNameLine,
+                color = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
+            )
+            Text(
+                text = failure?.let { stringResource(downloadFailureCopy(it).rowLine) }.orEmpty(),
+                fontSize = D20d.DenseSubSize,
+                lineHeight = D20d.DenseSubLine,
+                color = scheme.error,
+                modifier = Modifier.testTag("tt_manage_error_line"),
+            )
+        }
     }
 }
 
@@ -620,9 +1096,11 @@ private fun ManagePacksTwoPane(
  * When [onSelectPack] is null (the phone's single pane) it is exactly the old
  * [PackRow] and nothing about the row changes. When non-null it wraps the same row
  * in a `selectable`, so a tap picks the pack and the row keeps its own overflow
- * button working (a nested control the selectable does not swallow), and the picked
- * row carries a `secondaryContainer` tint plus the "selected" state a screen reader
- * announces.
+ * button working (a nested control the selectable does not swallow). The picked row is
+ * the frame's STADIUM highlight: `primaryContainer` fill clipped to a `RoundedCornerShape`
+ * of HALF the row height (README's corner rule — the square-corner defect the owner
+ * flagged was a `.background()` with no `.clip()`), its text recoloured to
+ * `onPrimaryContainer`, and the "selected" state a screen reader announces.
  */
 @Composable
 private fun SelectablePackRow(
@@ -632,6 +1110,7 @@ private fun SelectablePackRow(
     onSelectPack: ((PackRow) -> Unit)?,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
+    onDismissFailure: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
 ) {
     if (onSelectPack == null) {
@@ -641,14 +1120,16 @@ private fun SelectablePackRow(
             onStopDownload = onStopDownload,
             onRetry = onRetry,
             onMoreOptions = onMoreOptions,
+            onDismissFailure = onDismissFailure,
         )
         return
     }
-    val background = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(D20d.RowRadius))
                 .background(background)
                 .selectable(selected = selected, onClick = { onSelectPack(row) })
                 .testTag("tt_manage_select_row"),
@@ -656,114 +1137,610 @@ private fun SelectablePackRow(
         PackRow(
             row = row,
             nowMillis = nowMillis,
+            selected = selected,
             onStopDownload = onStopDownload,
             onRetry = onRetry,
             onMoreOptions = onMoreOptions,
+            onDismissFailure = onDismissFailure,
         )
     }
 }
 
 /**
- * The 20d detail pane: the SELECTED pack, its per-role last-used from the #122
- * store, and the same used-against-free storage bar the list draws.
+ * The rev5 20d frame's EXACT geometry + type, extracted from
+ * `docs/design/language-screens/language-screens-spec.html` (`dv-opt id="20d"`), so the
+ * pixel-match is auditable in ONE place rather than scattered as literals (owner's
+ * 100%-visual-match standard, 2026-08-06). Colours are NOT here — they map to
+ * `MaterialTheme.colorScheme` role tokens (README §Tokens / DESIGN_SYSTEM §1); only the
+ * numbers the frame states in px live here, as dp/sp.
+ *
+ * Where a value breaks the README "8dp (or 4) spacing scale" (18/22/26/30/14/10), it is
+ * the frame's own number and rev5 is the SSOT — kept exact, flagged in the PR for
+ * system reconciliation. `RowRadius` is HALF `RowHeight` (README's stadium rule).
+ */
+private object D20d {
+    // Two-pane
+    val PaneGap = 22.dp // list ↔ detail (frame body gap; header/label wrapper was 18)
+    val ListWidth = 392.dp
+
+    // Detail pane card
+    val PaneRadius = 28.dp
+    val PanePadH = 30.dp
+    val PanePadV = 28.dp
+
+    // Identity
+    val IdentityGap = 18.dp
+    val AvatarLg = 64.dp
+    val AvatarSm = 36.dp
+    val InitialsLg = 15.sp
+    val InitialsSm = 11.5.sp
+    val InitialsTracking = 0.5.sp
+    val NameSize = 28.sp
+    val NameLine = 34.sp
+    val StatusSize = 13.5.sp
+    val StatusLine = 19.sp
+    val StatusGap = 4.dp
+
+    // Capability cards
+    val CapRowGap = 14.dp
+    val CapRowTop = 26.dp
+    val CapMinWidth = 190.dp
+    val CapPad = 16.dp
+    val CapRadius = 20.dp
+    val CapIcon = 22.dp
+
+    // The frame draws the icon in a 26-tall line box (Material Symbols 22px glyph in a 26px
+    // line), so the card content stacks to exactly h107: pad16 + iconBox26 + titleTop10 +
+    // title20 + subTop2 + sub17 + pad16. An Icon(size=22) alone is 22 tall and lands the card
+    // at 103 — the 4px the frame's line box carries. Reproduce it, not fudge a padding.
+    val CapIconBox = 26.dp
+    val CapTitleSize = 15.sp
+    val CapTitleLine = 20.sp
+    val CapTitleTop = 10.dp
+    val CapSubSize = 12.5.sp
+    val CapSubLine = 17.sp
+    val CapSubTop = 2.dp
+
+    // "Where this pack is used"
+    val SectionTop = 26.dp
+    val HeaderSize = 12.sp
+    val HeaderLine = 16.sp
+    val HeaderTracking = 0.8.sp
+    val HeaderBottom = 10.dp
+    val UsedLineGap = 2.dp
+    val UsedIcon = 20.dp
+    val UsedRowGap = 14.dp
+    val UsedPadV = 10.dp
+    val UsedPadH = 2.dp
+    val UsedTextSize = 14.sp
+    val UsedTextLine = 20.sp
+
+    // The frame constrains the "where used" lines to a 560-wide column inside the 750-wide
+    // pane (readable measure), not the full pane width. Longer lines wrap at 560.
+    val UsedColWidth = 560.dp
+
+    // Remove block
+    val RemoveTop = 26.dp
+    val RemovePad = 16.dp
+    val RemoveRadius = 20.dp
+    val RemoveGap = 12.dp
+    val RemoveIcon = 20.dp
+    val RemoveBodySize = 13.5.sp
+    val RemoveBodyLine = 19.sp
+    val RemoveBtnHeight = 44.dp
+    val RemoveBtnPadH = 20.dp
+    val RemoveBtnRadius = 22.dp
+    val RemoveBtnText = 14.5.sp
+
+    // List rows (stadium: radius = height / 2) — the COMPACT (phone / 20b) row.
+    val RowHeight = 64.dp
+    val RowRadius = 32.dp
+    val RowGap = 14.dp
+    val RowPadH = 12.dp
+    val RowBottom = 6.dp
+    val RowNameSize = 15.sp
+    val RowNameLine = 20.sp
+    val RowSubSize = 12.sp
+    val RowSubLine = 16.sp
+
+    // ── Two-pane LEFT list (20d dense column) — the frame's own values, distinct from the
+    // 64dp touch rows above: at expanded width the list is a dense index (36dp rows), the
+    // detail pane is where actions live, so a row carries no trailing control. ─────────────
+
+    // Sized storage card
+    val ListPadStart = 12.dp // frame content left pad (screen x8 + 12 → list x20)
+    val ListPadEnd = 28.dp
+    val StorageRadius = 22.dp
+    val StoragePad = 16.dp
+    val StorageNumSize = 26.sp
+    val StorageNumLine = 32.sp
+    val StorageCapSize = 13.sp
+    val StorageCapLine = 16.sp
+    val StorageCapStart = 8.dp
+    val StorageBarTop = 12.dp
+    val StorageBarHeight = 9.dp
+    val StorageBarRadius = 5.dp
+    val StorageExplainTop = 10.dp
+    val StorageExplainSize = 11.5.sp
+    val StorageExplainLine = 16.sp
+
+    // Green hygiene nudge
+    val NudgeTop = 12.dp
+    val NudgeRadius = 20.dp
+    val NudgePadH = 14.dp
+    val NudgePadTop = 14.dp
+    val NudgePadBottom = 10.dp
+    val NudgeIcon = 20.dp
+    val NudgeIconGap = 10.dp
+    val NudgeTitleSize = 14.5.sp
+    val NudgeTitleLine = 20.sp
+    val NudgeBodyTop = 2.dp
+    val NudgeBodySize = 12.sp
+    val NudgeBodyLine = 17.sp
+    val NudgeActionText = 13.5.sp
+    val NudgeActionHeight = 40.dp
+    val NudgeActionPadH = 14.dp
+
+    // Section header (blue, uppercase, tracked)
+    val ListHeaderTop = 14.dp
+    val ListHeaderSize = 12.sp
+    val ListHeaderLine = 16.sp
+    val ListHeaderTracking = 0.8.sp
+    val ListHeaderBottom = 6.dp
+
+    // Downloading card (blue)
+    val DownloadTop = 14.dp
+    val DownloadRadius = 20.dp
+    val DownloadPadH = 12.dp
+    val DownloadPadTop = 12.dp
+    val DownloadPadBottom = 8.dp
+    val DownloadNameSize = 14.5.sp
+    val DownloadNameLine = 20.sp
+    val DownloadSubSize = 12.sp
+    val DownloadSubLine = 16.sp
+    val DownloadBarTop = 9.dp
+    val DownloadBarHeight = 4.dp
+    val DownloadBarRadius = 2.dp
+    val DownloadActionText = 13.5.sp
+    val DownloadActionHeight = 40.dp
+
+    // Dense settled / failed rows
+    val DenseRowHeight = 36.dp
+    val DenseRowRadius = 32.dp
+    val DenseAvatar = 36.dp
+    val DenseRowGap = 14.dp
+    val DenseRowPadH = 12.dp
+    val DenseRowBottom = 6.dp
+    val DenseNameSize = 15.sp
+    val DenseNameLine = 20.sp
+    val DenseNameChipGap = 8.dp
+    val DenseSubSize = 12.sp
+    val DenseSubLine = 16.sp
+    val FailedIcon = 22.dp
+
+    // IN USE chip (tertiary family)
+    val ChipHeight = 19.dp
+    val ChipPadH = 7.dp
+    val ChipRadius = 5.dp
+    val ChipText = 10.sp
+    val ChipTracking = 0.4.sp
+}
+
+/**
+ * The 20d detail pane for the SELECTED pack (conformance #332), top→bottom: the
+ * pack's identity with its on-device status subtitle, the offline-capability cards,
+ * the "where this pack is used" section (saved phrases + per-role last-used from the
+ * #122 store), and — for a removable pack — the Remove block.
  *
  * `internal` so the render test and the preview can mount it without the two-pane
- * `Row` around it. The camera card and the pair-share line the spec's 20d also drew
- * are deliberately ABSENT — the first names a feature that does not exist (#78/#112),
- * the second an undocumented version-fragile layout — both standing REJECTs of the
- * rev.3 ruling (§7, :238/:249). Every date shown is a real usage stamp or the
- * honest "no recorded use yet"; the pane never fabricates one (ruling ⑧).
+ * `Row` around it. Two frame elements stay deliberately ABSENT: the camera card names
+ * a feature that does not exist (#78/#112), and the pair-share/`sd_card` line an
+ * undocumented version-fragile layout — both standing REJECTs of the rev.3 ruling
+ * (§7, :238/:249/:252). The aggregate storage card the frame draws in the LIST pane is
+ * NOT duplicated here (#331 / the #330 co-verify). Every date shown is a real usage
+ * stamp or the honest "no recorded use yet"; the pane never fabricates one (ruling ⑧),
+ * and each capability card states its offline status in WORDS, never colour alone.
+ *
+ * @param savedCount saved phrases in this language, on either side — the bookmark
+ *   line, ABSENT at zero (a missing reassurance, never a false one).
+ * @param onRemove routes to the EXISTING 19f/19g remove-confirm flow (the same action
+ *   the 20c sheet takes); it never deletes on tap.
  */
 @Composable
 internal fun ManagePacksDetailPane(
     pack: PackRow?,
     roleUsage: PackRoleUsage?,
-    storage: StorageCard?,
+    savedCount: Int,
     nowMillis: Long,
+    onRemove: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (pack == null || roleUsage == null) {
         DetailNoSelection(modifier)
         return
     }
-    val spacing = LocalSpacing.current
+    val detail = packDetail(pack)
     Column(
         modifier =
             modifier
+                .clip(RoundedCornerShape(D20d.PaneRadius))
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                 .verticalScroll(rememberScrollState())
-                .padding(spacing.lg24)
+                .padding(horizontal = D20d.PanePadH, vertical = D20d.PanePadV)
                 .testTag("tt_manage_detail"),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PackAvatar(id = pack.id, downloaded = pack.state == OfflineModelState.Downloaded)
+        DetailIdentity(pack = pack, detail = detail)
+        DetailCapabilities(detail = detail, modifier = Modifier.padding(top = D20d.CapRowTop))
+        Column(modifier = Modifier.padding(top = D20d.SectionTop)) {
             Text(
-                text = pack.displayName,
-                style = MaterialTheme.typography.headlineSmall,
-                modifier =
-                    Modifier
-                        .padding(start = spacing.md16)
-                        .weight(1f)
-                        .testTag("tt_manage_detail_name"),
+                text = stringResource(R.string.manage_detail_usage_header).uppercase(),
+                fontSize = D20d.HeaderSize,
+                lineHeight = D20d.HeaderLine,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = D20d.HeaderTracking,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(bottom = D20d.HeaderBottom),
             )
-            if (pack.inUse) {
-                InUseBadge(modifier = Modifier.padding(start = spacing.sm8))
+            Column(
+                modifier = Modifier.width(D20d.UsedColWidth),
+                verticalArrangement = Arrangement.spacedBy(D20d.UsedLineGap),
+            ) {
+                if (savedCount > 0) {
+                    DetailSavedLine(count = savedCount, languageName = pack.displayName)
+                }
+                // Owner override: ONE last-used line, framed as source (not an As-source/
+                // As-target split). It reads the SOURCE-role #122 stamp, honest per role.
+                DetailLastUsedSource(usage = roleUsage.asSource, nowMillis = nowMillis)
+                // The pair-share line the frame draws (owner override). Only meaningful for a
+                // non-pivot pack that is on the device — English IS the pivot, and a pack not
+                // yet on disk has no stored data to share.
+                if (detail.onDevice && !isPivotLanguage(pack.id)) {
+                    DetailSharesLine()
+                }
             }
         }
-        Text(
-            text = stringResource(R.string.manage_detail_usage_header),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = spacing.lg24, bottom = spacing.xs4),
-        )
-        DetailRoleLine(
-            role = stringResource(R.string.manage_detail_role_source),
-            usage = roleUsage.asSource,
-            nowMillis = nowMillis,
-            tag = "tt_manage_detail_source",
-        )
-        DetailRoleLine(
-            role = stringResource(R.string.manage_detail_role_target),
-            usage = roleUsage.asTarget,
-            nowMillis = nowMillis,
-            tag = "tt_manage_detail_target",
-        )
-        storage?.let {
-            StorageCardView(it, Modifier.padding(top = spacing.lg24))
+        if (detail.removable) {
+            DetailRemoveBlock(
+                pack = pack,
+                onRemove = onRemove,
+                modifier = Modifier.padding(top = D20d.RemoveTop),
+            )
         }
     }
 }
 
-/** One "As source · used today" / "As target · no recorded use yet" line, honest per role. */
+/** The detail pane's identity: avatar + name + IN-USE badge, and an honest status subtitle for the state. */
 @Composable
-private fun DetailRoleLine(
-    role: String,
-    usage: PackUsage,
-    nowMillis: Long,
-    tag: String,
+private fun DetailIdentity(
+    pack: PackRow,
+    detail: PackDetail,
 ) {
-    val spacing = LocalSpacing.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = spacing.xs4)
-                .semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(D20d.IdentityGap),
     ) {
-        Text(
-            text = role,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        PackAvatar(
+            id = pack.id,
+            downloaded = pack.state == OfflineModelState.Downloaded,
+            size = D20d.AvatarLg,
+            initialsSize = D20d.InitialsLg,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = pack.displayName,
+                    fontSize = D20d.NameSize,
+                    lineHeight = D20d.NameLine,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.testTag("tt_manage_detail_name"),
+                )
+                if (pack.inUse) {
+                    InUseBadge(modifier = Modifier.padding(start = LocalSpacing.current.sm8))
+                }
+            }
+            detailStatusSubtitle(pack = pack, onDevice = detail.onDevice)?.let { subtitle ->
+                Text(
+                    text = subtitle,
+                    fontSize = D20d.StatusSize,
+                    lineHeight = D20d.StatusLine,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = D20d.StatusGap).testTag("tt_manage_detail_status"),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The status subtitle under the identity — "On device · ready to use with no
+ * connection" for a pack on disk, else the honest word for the state it IS in
+ * (downloading, or a failure), never "On device" for a pack that is not (ruling ⑧).
+ */
+@Composable
+private fun detailStatusSubtitle(
+    pack: PackRow,
+    onDevice: Boolean,
+): String? {
+    val state = pack.state
+    return when {
+        onDevice -> stringResource(R.string.manage_detail_status_on_device)
+        state == OfflineModelState.Downloading -> stringResource(R.string.text_lang_downloading)
+        state is OfflineModelState.Failed -> stringResource(downloadFailureCopy(state.cause).rowLine)
+        else -> null
+    }
+}
+
+/**
+ * The three offline-capability cards, in the frame's order: Text offline (a downloaded pack),
+ * Voice offline (IFF a device voice), and Camera offline (owner override 2026-08-06 — GREEN
+ * where the pack's script is one ML Kit reads on-device, mirroring the voice pattern, instead
+ * of the frame's grey placeholder). Each is [CapabilityState.Supported] → green, else grey.
+ */
+@Composable
+private fun DetailCapabilities(
+    detail: PackDetail,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(D20d.CapRowGap),
+    ) {
+        CapabilityCard(
+            icon = Icons.Outlined.Translate,
+            title = stringResource(R.string.manage_detail_cap_text_title),
+            subtitle = capabilitySubtitle(detail.textOffline, R.string.manage_detail_cap_text_ready),
+            state = detail.textOffline,
+            subtitleTag = "tt_manage_detail_cap_text",
             modifier = Modifier.weight(1f),
         )
-        Text(
-            text = packUsageText(usage, nowMillis),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.testTag(tag),
+        CapabilityCard(
+            icon = Icons.AutoMirrored.Filled.VolumeUp,
+            title = stringResource(R.string.manage_detail_cap_voice_title),
+            subtitle = capabilitySubtitle(detail.voiceOffline, R.string.manage_detail_cap_voice_ready),
+            state = detail.voiceOffline,
+            subtitleTag = "tt_manage_detail_cap_voice",
+            modifier = Modifier.weight(1f),
+        )
+        CapabilityCard(
+            icon = Icons.Outlined.PhotoCamera,
+            title = stringResource(R.string.manage_detail_cap_camera_title),
+            subtitle = capabilitySubtitle(detail.cameraOffline, R.string.manage_detail_cap_camera_ready),
+            state = detail.cameraOffline,
+            subtitleTag = "tt_manage_detail_cap_camera",
+            modifier = Modifier.weight(1f),
         )
     }
 }
+
+/** A capability card's subtitle: its own "ready" line when supported, else the shared "needs a connection". */
+@Composable
+private fun capabilitySubtitle(
+    state: CapabilityState,
+    readyRes: Int,
+): String =
+    stringResource(
+        if (state == CapabilityState.Supported) readyRes else R.string.manage_detail_cap_offline_unavailable,
+    )
+
+/**
+ * One capability card: `icon / title / subtitle`, at the rev5 frame's exact geometry
+ * (padding 16, radius 20, icon 22, title 15/500, subtitle 12.5). A
+ * [CapabilityState.Supported] capability draws GREEN — `tertiaryContainer` fill,
+ * `onTertiaryContainer` on everything — with its own "ready" subtitle; an
+ * [CapabilityState.Unavailable] one draws NEUTRAL: `surfaceContainerHigh` fill, with the
+ * frame's three-tone foreground (icon `onSurfaceVariant`, title `onSurface`, subtitle
+ * `outline`) and "Needs a connection". The state is in the WORDS as well as the tint, so
+ * a screen reader and a colour-blind reader both get it (a11y: never colour alone).
+ */
+@Composable
+private fun CapabilityCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    state: CapabilityState,
+    subtitleTag: String,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val supported = state == CapabilityState.Supported
+    // The green is the THEME-INVARIANT tertiary-FIXED pair (rev5 §B: #C4EED0 / #072711,
+    // identical light+dark), so the supported card stays green in dark too — not the
+    // *Container roles, whose dark values flip to a dark green with poor text contrast.
+    val container = if (supported) scheme.tertiaryFixed else scheme.surfaceContainerHigh
+    val iconTint = if (supported) scheme.onTertiaryFixed else scheme.onSurfaceVariant
+    val titleColor = if (supported) scheme.onTertiaryFixed else scheme.onSurface
+    val subtitleColor = if (supported) scheme.onTertiaryFixed else scheme.outline
+    Column(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(D20d.CapRadius))
+                .background(container)
+                .padding(D20d.CapPad)
+                .semantics(mergeDescendants = true) {},
+    ) {
+        // The 22px glyph sits in the frame's 26px icon line box, so the card stacks to h107.
+        Box(modifier = Modifier.height(D20d.CapIconBox), contentAlignment = Alignment.TopStart) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(D20d.CapIcon))
+        }
+        Text(
+            text = title,
+            fontSize = D20d.CapTitleSize,
+            lineHeight = D20d.CapTitleLine,
+            fontWeight = FontWeight.Medium,
+            color = titleColor,
+            modifier = Modifier.padding(top = D20d.CapTitleTop),
+        )
+        Text(
+            text = subtitle,
+            fontSize = D20d.CapSubSize,
+            lineHeight = D20d.CapSubLine,
+            color = subtitleColor,
+            modifier = Modifier.padding(top = D20d.CapSubTop).testTag(subtitleTag),
+        )
+    }
+}
+
+/**
+ * One "where this pack is used" row — `icon + sentence`, at the frame's exact geometry
+ * (icon 20 `onSurfaceVariant`, text 14/20 `onSurface`, row gap 14, padding 10×2). The
+ * saved-phrases and per-role usage lines share it so they read as one list.
+ */
+@Composable
+private fun UsedLine(
+    icon: ImageVector,
+    text: String,
+    tag: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(D20d.UsedRowGap),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = D20d.UsedPadV, horizontal = D20d.UsedPadH)
+                .semantics(mergeDescendants = true) {},
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(D20d.UsedIcon),
+        )
+        Text(
+            text = text,
+            fontSize = D20d.UsedTextSize,
+            lineHeight = D20d.UsedTextLine,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f).testTag(tag),
+        )
+    }
+}
+
+/** "N saved phrases are in <lang>" — the bookmark line of the "where used" section, shown only above zero. */
+@Composable
+private fun DetailSavedLine(
+    count: Int,
+    languageName: String,
+) {
+    UsedLine(
+        icon = Icons.Outlined.Bookmark,
+        text = pluralStringResource(R.plurals.manage_detail_saved, count, count, languageName),
+        tag = "tt_manage_detail_saved",
+    )
+}
+
+/**
+ * The Remove block (error/loss tone): what removing costs, and the button. The button
+ * ROUTES to the existing 19f/19g remove-confirm sheet via [onRemove] — it never deletes
+ * on tap — exactly as the 20c pack-actions sheet's Remove row does.
+ */
+@Composable
+private fun DetailRemoveBlock(
+    pack: PackRow,
+    onRemove: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(D20d.RemoveGap),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(D20d.RemoveRadius))
+                .background(MaterialTheme.colorScheme.errorContainer)
+                .padding(D20d.RemovePad),
+    ) {
+        Icon(
+            Icons.Outlined.Delete,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.size(D20d.RemoveIcon),
+        )
+        Text(
+            text = stringResource(R.string.manage_detail_remove_body, pack.displayName),
+            fontSize = D20d.RemoveBodySize,
+            lineHeight = D20d.RemoveBodyLine,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.weight(1f),
+        )
+        Button(
+            onClick = { onRemove(pack.id) },
+            shape = RoundedCornerShape(D20d.RemoveBtnRadius),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            contentPadding = PaddingValues(horizontal = D20d.RemoveBtnPadH),
+            modifier = Modifier.height(D20d.RemoveBtnHeight).testTag("tt_manage_detail_remove"),
+        ) {
+            Text(
+                text = stringResource(R.string.manage_detail_remove_action),
+                fontSize = D20d.RemoveBtnText,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+/**
+ * The single last-used line (owner override 2026-08-06): "Last used as a source language
+ * last week", in the frame's `history`-icon + sentence style. It reads the SOURCE-role #122
+ * stamp; a role with no stamp reads the honest date-less line ([R.string.manage_detail_never_source]),
+ * never a fabricated date (ruling ⑧). The relative span is bucketed elapsed time
+ * ([packWhenText]), never a calendar month.
+ */
+@Composable
+private fun DetailLastUsedSource(
+    usage: PackUsage,
+    nowMillis: Long,
+) {
+    val text =
+        when (usage) {
+            PackUsage.NoRecord -> {
+                stringResource(R.string.manage_detail_never_source)
+            }
+
+            is PackUsage.Used -> {
+                stringResource(R.string.manage_detail_last_used_source, packWhenText(usage, nowMillis))
+            }
+        }
+    UsedLine(icon = Icons.Outlined.History, text = text, tag = "tt_manage_detail_last_used")
+}
+
+/**
+ * The pair-share line the frame draws (owner override): "Shares stored data with English —
+ * the pair is kept once". Every non-pivot pack stores its data as an English↔X pair, so this
+ * is true for every pack this line is drawn for (a non-pivot on-device pack). The pivot name
+ * resolves against the composition's locale, like every other name on the screen.
+ */
+@Composable
+private fun DetailSharesLine() {
+    val locale = LocalLocale.current.platformLocale
+    UsedLine(
+        icon = Icons.Outlined.SdCard,
+        text = stringResource(R.string.manage_detail_shares_data, languageDisplayName(PIVOT_LANGUAGE_ID, locale)),
+        tag = "tt_manage_detail_shares",
+    )
+}
+
+/**
+ * The bare relative span for the single source line — "today", "last week", "4 months ago" —
+ * with no "used" prefix, so [R.string.manage_detail_last_used_source] reads as one sentence.
+ * Derived from the stamp at [nowMillis] ([PackUsage.Used.bucket]); a bucketed elapsed span,
+ * never a calendar month (ruling ⑧). Distinct from [packUsageText] (the list rows' "used …").
+ */
+@Composable
+private fun packWhenText(
+    usage: PackUsage.Used,
+    nowMillis: Long,
+): String =
+    when (val bucket = usage.bucket(nowMillis)) {
+        UsageBucket.Today -> stringResource(R.string.manage_when_today)
+        is UsageBucket.DaysAgo -> pluralStringResource(R.plurals.manage_when_days, bucket.days, bucket.days)
+        is UsageBucket.WeeksAgo -> pluralStringResource(R.plurals.manage_when_weeks, bucket.weeks, bucket.weeks)
+        is UsageBucket.MonthsAgo -> pluralStringResource(R.plurals.manage_when_months, bucket.months, bucket.months)
+    }
 
 /** The detail pane with nothing selected (no packs yet, or a removed pack) — never a dead end. */
 @Composable
@@ -1068,28 +2045,47 @@ private fun PackRow(
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
+    onDismissFailure: (String) -> Unit = {},
+    selected: Boolean = false,
 ) {
     val spacing = LocalSpacing.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(D20d.RowGap),
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = Dimensions.pickerRowHeightTall)
-                .padding(start = spacing.md16, end = spacing.xs4)
+                .heightIn(min = D20d.RowHeight)
+                .padding(horizontal = D20d.RowPadH)
                 .testTag("tt_manage_row"),
     ) {
         PackAvatar(id = row.id, downloaded = row.state == OfflineModelState.Downloaded)
-        Column(modifier = Modifier.weight(1f).padding(start = spacing.md16)) {
+        val scheme = MaterialTheme.colorScheme
+        // Selected-row name = onPrimaryFixed (#041E49), the component-library colour for a
+        // selected pack name (higher contrast on the primaryContainer fill than onPrimaryContainer).
+        val nameColor = if (selected) scheme.onPrimaryFixed else scheme.onSurface
+        Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = row.displayName, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = row.displayName,
+                    fontSize = D20d.RowNameSize,
+                    lineHeight = D20d.RowNameLine,
+                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                    color = nameColor,
+                )
                 if (row.inUse) {
                     InUseBadge(modifier = Modifier.padding(start = spacing.sm8))
                 }
             }
-            PackRowSupporting(row, nowMillis)
+            PackRowSupporting(row = row, nowMillis = nowMillis, selected = selected)
         }
-        PackRowControl(row = row, onStopDownload = onStopDownload, onRetry = onRetry, onMoreOptions = onMoreOptions)
+        PackRowControl(
+            row = row,
+            onStopDownload = onStopDownload,
+            onRetry = onRetry,
+            onDismissFailure = onDismissFailure,
+            onMoreOptions = onMoreOptions,
+        )
     }
 }
 
@@ -1097,17 +2093,22 @@ private fun PackRow(
 private fun PackRowSupporting(
     row: PackRow,
     nowMillis: Long,
+    selected: Boolean = false,
 ) {
     // #224: the ML Kit pivot (English) is included with every pack and cannot be
     // removed on its own (a measured no-op). Owner ruling (2026-08-05): keep the
     // row but say WHY it has no control, in place of a usage line. Guarded by id
     // ([isPivotLanguage], not a stored flag), so the story holds whatever state ML
     // Kit reports for the pivot and a row can never disagree with its own id (#325).
+    // The frame's row subtitle is `outline` for a settled row, `error` for a failure,
+    // and `onPrimaryContainer` on the selected (blue) row. Size 12/16.
+    val subColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.outline
     if (isPivotLanguage(row.id)) {
         Text(
             text = stringResource(R.string.offline_included),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = D20d.RowSubSize,
+            lineHeight = D20d.RowSubLine,
+            color = subColor,
             modifier = Modifier.testTag("tt_manage_included"),
         )
         return
@@ -1116,16 +2117,18 @@ private fun PackRowSupporting(
         OfflineModelState.Downloading -> {
             Text(
                 text = stringResource(R.string.text_lang_downloading),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = D20d.RowSubSize,
+                lineHeight = D20d.RowSubLine,
+                color = subColor,
             )
         }
 
         is OfflineModelState.Failed -> {
             Text(
                 text = stringResource(downloadFailureCopy(state.cause).rowLine),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                fontSize = D20d.RowSubSize,
+                lineHeight = D20d.RowSubLine,
+                color = if (selected) subColor else MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag("tt_manage_error_line"),
             )
         }
@@ -1134,8 +2137,9 @@ private fun PackRowSupporting(
             // Downloaded / Deleting: "On device · used today" (or "· no recorded use yet").
             Text(
                 text = stringResource(R.string.text_lang_on_device_size, packUsageText(row.usage, nowMillis)),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = D20d.RowSubSize,
+                lineHeight = D20d.RowSubLine,
+                color = subColor,
                 modifier = Modifier.testTag("tt_manage_usage_line"),
             )
         }
@@ -1147,6 +2151,7 @@ private fun PackRowControl(
     row: PackRow,
     onStopDownload: (String) -> Unit,
     onRetry: (String) -> Unit,
+    onDismissFailure: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
 ) {
     when (row.state) {
@@ -1155,6 +2160,11 @@ private fun PackRowControl(
         }
 
         is OfflineModelState.Failed -> {
+            // 20b (#336): the failed row draws TWO actions, as the frame does — Dismiss
+            // then Retry. Dismiss hides the failure for the session (`onDismissFailure`)
+            // without retrying or deleting; a lower-emphasis TextButton, so Retry stays
+            // the one filled call to action.
+            //
             // #250: EVERY failed cause, out-of-space included, keeps its Retry pill.
             // Removing it left the STORAGE row a permanent dead-end — its line promises
             // an action with no control to tap, and freeing space elsewhere never
@@ -1162,13 +2172,22 @@ private fun PackRowControl(
             // #234 concern is a Retry that SILENTLY does nothing, not the absence of
             // Retry; the ViewModel now makes it HONEST — a still-full retry surfaces
             // a snackbar (`reportOutcome`), a freed-disk retry actually downloads.
-            Button(
-                onClick = { onRetry(row.id) },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                contentPadding = PaddingValues(horizontal = LocalSpacing.current.md16),
-                modifier = Modifier.heightIn(min = Dimensions.touchTargetMin).testTag("tt_manage_retry"),
-            ) {
-                Text(stringResource(R.string.lang_sheet_failed_retry))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = { onDismissFailure(row.id) },
+                    contentPadding = PaddingValues(horizontal = LocalSpacing.current.sm8),
+                    modifier = Modifier.heightIn(min = Dimensions.touchTargetMin).testTag("tt_manage_dismiss"),
+                ) {
+                    Text(stringResource(R.string.manage_failed_dismiss))
+                }
+                Button(
+                    onClick = { onRetry(row.id) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    contentPadding = PaddingValues(horizontal = LocalSpacing.current.md16),
+                    modifier = Modifier.heightIn(min = Dimensions.touchTargetMin).testTag("tt_manage_retry"),
+                ) {
+                    Text(stringResource(R.string.lang_sheet_failed_retry))
+                }
             }
         }
 
@@ -1222,18 +2241,23 @@ private fun StopControl(
 
 @Composable
 private fun InUseBadge(modifier: Modifier = Modifier) {
-    val spacing = LocalSpacing.current
+    // The frame's IN USE chip is GREEN, theme-invariant: bg tertiaryFixed (#C4EED0),
+    // fg onTertiaryFixed (#072711), radius 5, 10sp, height 19, padding 0×7, tracking .4.
     Box(
+        contentAlignment = Alignment.Center,
         modifier =
             modifier
-                .clip(TranzlateShapeFull)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(horizontal = spacing.sm8, vertical = spacing.xs4 / 2),
+                .height(D20d.ChipHeight)
+                .clip(RoundedCornerShape(D20d.ChipRadius))
+                .background(MaterialTheme.colorScheme.tertiaryFixed)
+                .padding(horizontal = D20d.ChipPadH),
     ) {
         Text(
             text = stringResource(R.string.manage_in_use),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontSize = D20d.ChipText,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = D20d.ChipTracking,
+            color = MaterialTheme.colorScheme.onTertiaryFixed,
         )
     }
 }
@@ -1242,17 +2266,24 @@ private fun InUseBadge(modifier: Modifier = Modifier) {
 private fun PackAvatar(
     id: String,
     downloaded: Boolean,
+    modifier: Modifier = Modifier,
+    size: Dp = D20d.AvatarSm,
+    initialsSize: TextUnit = D20d.InitialsSm,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val background = if (downloaded) scheme.primaryContainer else scheme.surfaceContainerHighest
+    // Frame avatars: on-device blue (primaryContainer / onPrimaryContainer), else grey
+    // (surfaceContainerHigh / onSurfaceVariant). Fully round (radius = size / 2).
+    val background = if (downloaded) scheme.primaryContainer else scheme.surfaceContainerHigh
     val foreground = if (downloaded) scheme.onPrimaryContainer else scheme.onSurfaceVariant
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(Dimensions.iconChip).clip(TranzlateShapeFull).background(background),
+        modifier = modifier.size(size).clip(TranzlateShapeFull).background(background),
     ) {
         Text(
             text = languageAvatarCode(id),
-            style = MaterialTheme.typography.labelMedium,
+            fontSize = initialsSize,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = D20d.InitialsTracking,
             color = foreground,
             maxLines = 1,
         )
@@ -1492,7 +2523,8 @@ private fun row(
     state: OfflineModelState,
     usage: PackUsage = PackUsage.Used(previewNow),
     inUse: Boolean = false,
-) = PackRow(id, name, state, usage, inUse)
+    hasOfflineVoice: Boolean = false,
+) = PackRow(id, name, state, usage, inUse, hasOfflineVoice)
 
 private val previewOnDevice =
     listOf(
@@ -1766,11 +2798,10 @@ private fun ManagePacksListDetailPreview() {
             nowMillis = previewDetailNow,
             selectedId = null,
             onSelectPack = {},
+            onSavedCount = { 4 },
             onGet = {},
             onStopDownload = {},
-            onRetry = {},
-            onMoreOptions = {},
-            onDismissNudge = {},
+            onRemove = {},
             onReviewPacks = {},
             onBrowseAll = {},
         )
@@ -1798,18 +2829,21 @@ private fun ManagePacksListDetailEmptyPreview() {
             nowMillis = previewDetailNow,
             selectedId = null,
             onSelectPack = {},
+            onSavedCount = { 0 },
             onGet = {},
             onStopDownload = {},
-            onRetry = {},
-            onMoreOptions = {},
-            onDismissNudge = {},
+            onRemove = {},
             onReviewPacks = {},
             onBrowseAll = {},
         )
     }
 }
 
-/** The detail pane alone, both meaningful states: a selected pack (per-role usage + storage) and no selection. */
+/**
+ * The FULL detail (rule 7): an on-device, in-use, voiced pack with saved phrases —
+ * identity + status, both capability cards supported, the saved line, per-role usage,
+ * and the Remove block — beside the no-selection placeholder.
+ */
 @PreviewLightDark
 @Composable
 private fun ManagePacksDetailPanePreview() {
@@ -1817,18 +2851,135 @@ private fun ManagePacksDetailPanePreview() {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Row {
                 ManagePacksDetailPane(
-                    pack = previewDetailOnDevice.first(),
+                    pack =
+                        row(
+                            "es",
+                            "Spanish",
+                            OfflineModelState.Downloaded,
+                            usedDaysAgo(3),
+                            inUse = true,
+                            hasOfflineVoice = true,
+                        ),
                     roleUsage = PackRoleUsage(asSource = usedDaysAgo(3), asTarget = PackUsage.NoRecord),
-                    storage = previewSizedStorage,
+                    savedCount = 4,
                     nowMillis = previewDetailNow,
-                    modifier = Modifier.weight(1f),
+                    onRemove = {},
+                    modifier = Modifier.width(420.dp),
                 )
+                VerticalDivider()
                 ManagePacksDetailPane(
                     pack = null,
                     roleUsage = null,
-                    storage = null,
+                    savedCount = 0,
                     nowMillis = previewDetailNow,
-                    modifier = Modifier.weight(1f).height(320.dp),
+                    onRemove = {},
+                    modifier = Modifier.width(420.dp).height(320.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * More detail states (rule 7): a downloaded pack with NO on-device voice and no saved
+ * phrases (voice card muted, Remove present), and a FAILED pack (a failure subtitle,
+ * both cards muted, no Remove).
+ */
+@PreviewLightDark
+@Composable
+private fun ManagePacksDetailPaneMutedStatesPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Row {
+                ManagePacksDetailPane(
+                    pack = row("de", "German", OfflineModelState.Downloaded, usedDaysAgo(14)),
+                    roleUsage = PackRoleUsage(asSource = PackUsage.NoRecord, asTarget = usedDaysAgo(14)),
+                    savedCount = 0,
+                    nowMillis = previewDetailNow,
+                    onRemove = {},
+                    modifier = Modifier.width(420.dp),
+                )
+                VerticalDivider()
+                ManagePacksDetailPane(
+                    pack = row("hi", "Hindi", OfflineModelState.Failed(OfflineModelFailure.NETWORK)),
+                    roleUsage = PackRoleUsage(asSource = PackUsage.NoRecord, asTarget = PackUsage.NoRecord),
+                    savedCount = 0,
+                    nowMillis = previewDetailNow,
+                    onRemove = {},
+                    modifier = Modifier.width(420.dp),
+                )
+            }
+        }
+    }
+}
+
+// ── 20d dense list-item previews (rule 7: every custom item, one per meaningful state) ─
+
+/**
+ * The 20d left-column item vocabulary in one 392dp frame (rule 7): the sized storage card, the
+ * green nudge, a plain and a counted section header, the downloading card, and the failed row.
+ */
+@PreviewLightDark
+@Composable
+private fun TwoPaneListItemsPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column(modifier = Modifier.width(ManagePacksListWidth)) {
+                TwoPaneStorageCard(previewSizedStorage)
+                TwoPaneNudge(
+                    HygieneNudge(stalePackCount = 2),
+                    onReview = {},
+                    modifier = Modifier.padding(top = D20d.NudgeTop),
+                )
+                TwoPaneSectionHeader(text = "On this device", count = "5 of 59 packs")
+                TwoPaneDownloadingCard(
+                    row = row("ar", "Arabic", OfflineModelState.Downloading, PackUsage.NoRecord),
+                    onStopDownload = {},
+                )
+                TwoPaneSectionHeader(text = "Did not download")
+                TwoPaneFailedRow(
+                    row = row("hi", "Hindi", OfflineModelState.Failed(OfflineModelFailure.NETWORK), PackUsage.NoRecord),
+                    selected = false,
+                    onSelectPack = {},
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The dense on-device row in its meaningful states (rule 7): selected (blue stadium), in-use
+ * (IN USE chip), stale (grey avatar), and plain.
+ */
+@PreviewLightDark
+@Composable
+private fun TwoPaneSettledRowPreview() {
+    TranzlateTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Column(modifier = Modifier.width(ManagePacksListWidth)) {
+                TwoPaneSettledRow(
+                    row = row("af", "Afrikaans", OfflineModelState.Downloaded, usedDaysAgo(5)),
+                    selected = true,
+                    nowMillis = previewNow,
+                    onSelectPack = {},
+                )
+                TwoPaneSettledRow(
+                    row = row("es", "Spanish", OfflineModelState.Downloaded, PackUsage.Used(previewNow), inUse = true),
+                    selected = false,
+                    nowMillis = previewNow,
+                    onSelectPack = {},
+                )
+                TwoPaneSettledRow(
+                    row = row("de", "German", OfflineModelState.Downloaded, usedDaysAgo(120)),
+                    selected = false,
+                    nowMillis = previewNow,
+                    onSelectPack = {},
+                )
+                TwoPaneSettledRow(
+                    row = row("en", "English", OfflineModelState.Downloaded),
+                    selected = false,
+                    nowMillis = previewNow,
+                    onSelectPack = {},
                 )
             }
         }

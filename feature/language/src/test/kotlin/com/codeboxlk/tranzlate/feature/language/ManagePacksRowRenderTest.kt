@@ -115,6 +115,23 @@ class ManagePacksRowRenderTest {
         compose.onAllNodesWithTag("tt_manage_retry").assertCountEquals(2)
     }
 
+    // ── #336: the failed row draws Dismiss beside Retry ─────────────────────────
+
+    /**
+     * The frame draws the failed row with TWO actions — Dismiss AND Retry (20b, #336).
+     * This pins the second one: a network-failed row renders the Dismiss control.
+     *
+     * Mutation decided first: delete the Dismiss `TextButton` from `PackRowControl`'s
+     * Failed branch — `tt_manage_dismiss` then never mounts and this reddens, the frame's
+     * second action gone. (Retry is pinned by the two tests above; Dismiss is its sibling.)
+     */
+    @Test
+    fun `a failed row renders a Dismiss control`() {
+        show(listOf(OfflineLanguageRow("hi", "Hindi", OfflineModelState.Failed(OfflineModelFailure.NETWORK))))
+
+        compose.onNodeWithTag("tt_manage_dismiss").assertIsDisplayed()
+    }
+
     // ── packUsageText: NoRecord vs Today are drawn distinctly ───────────────────
 
     /**

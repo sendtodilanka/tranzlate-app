@@ -393,6 +393,12 @@
     <!-- The one honest thing to say about stopping a download: there is no pause API,
          so stopping discards (brief §2). -->
     <string name="manage_downloading_note">There is no pause — stopping discards the pack.</string>
+    <!-- The 20d two-pane downloading card's visible action label (the frame's text). The card
+         already names the pack above it; cd_text_lang_stop carries the name for a screen reader. -->
+    <string name="manage_stop_download">Stop download and remove</string>
+    <!-- The failed row's second control beside Retry (20b · #336): hide this failure for
+         the session without retrying or deleting. Retry stays lang_sheet_failed_retry. -->
+    <string name="manage_failed_dismiss">Dismiss</string>
     <!-- Relative last-used, bucketed elapsed time from a real #122 stamp. Never a
          named calendar month (ambiguous past a year). `manage_used_never` is the
          honest date-less line for a pack with no recorded translation-use (ruling ⑧,
@@ -413,15 +419,74 @@
     <string name="manage_used_never">no recorded use yet</string>
     <!-- The badge on the pack of the current TARGET language. -->
     <string name="manage_in_use">IN USE</string>
-    <!-- 20d list-detail (#130 PR-26): the detail pane for the SELECTED pack, at EXPANDED
-         width only (a tablet/foldable in landscape). The "source" line is the pack's
-         last-used from the #122 store, split by role; each side reuses the manage_used_*
-         buckets, so a role with no stamp reads `manage_used_never` — never a fabricated
-         date (ruling ⑧). No apostrophe in manage_detail_empty (unescaped ' breaks the build). -->
-    <string name="manage_detail_usage_header">Usage</string>
-    <string name="manage_detail_role_source">As source</string>
-    <string name="manage_detail_role_target">As target</string>
+    <!-- 20d list-detail (#130 PR-26 · conformance #332 · owner override 2026-08-06): the
+         detail pane for the SELECTED pack, at EXPANDED width only (a tablet/foldable in
+         landscape). The "where this pack is used" section draws the saved-phrases line, ONE
+         last-used line (owner override: a single "Last used as a source language …", not the
+         earlier As-source/As-target split), and the pair-share line the frame draws. The
+         relative span is bucketed elapsed time, never a named calendar month — "since April"
+         is ambiguous past a year (ruling ⑧). A source role with no #122 stamp reads
+         manage_detail_never_source, never a fabricated date.
+         No apostrophe in manage_detail_empty (unescaped ' breaks the build). -->
+    <string name="manage_detail_usage_header">Where this pack is used</string>
+    <!-- The single last-used line (owner override). %1$s is a bare relative span from the
+         manage_when_* buckets, so it reads "Last used as a source language last week". -->
+    <string name="manage_detail_last_used_source">Last used as a source language %1$s</string>
+    <string name="manage_detail_never_source">Not yet used as a source language</string>
+    <!-- The pair-share line the frame draws (owner override: build it as the frame has it).
+         Every non-pivot pack stores its data as an English↔X pair, kept once, so removing it
+         frees only the part it does not share. %1$s is the pivot language name (English). -->
+    <string name="manage_detail_shares_data">Shares stored data with %1$s — the pair is kept once</string>
     <string name="manage_detail_empty">Select a pack to see how it has been used.</string>
+    <!-- Bare relative last-used spans for the single source line — no "used" prefix, so the
+         sentence reads naturally ("… source language last week"). Bucketed elapsed time,
+         never a calendar month (ruling ⑧). Distinct from manage_used_* (which the list rows
+         keep, with their "used …" prefix). -->
+    <string name="manage_when_today">today</string>
+    <plurals name="manage_when_days">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+    <plurals name="manage_when_weeks">
+        <item quantity="one">last week</item>
+        <item quantity="other">%1$d weeks ago</item>
+    </plurals>
+    <plurals name="manage_when_months">
+        <item quantity="one">last month</item>
+        <item quantity="other">%1$d months ago</item>
+    </plurals>
+    <!-- The detail pane's identity subtitle for an on-device pack (#332): the frame's
+         "On device · ready to use with no connection". The middle dot matches text_lang_on_device_size. -->
+    <string name="manage_detail_status_on_device">On device · ready to use with no connection</string>
+    <!-- Capability cards (#332): each is icon / title / subtitle. A capability that runs
+         on-device draws its own "ready" subtitle (a filled tint); one that needs a
+         connection here draws the shared manage_detail_cap_offline_unavailable subtitle (a
+         muted tint), so the state is told by WORDS too, never colour alone (a11y). The
+         camera card the frame also draws is a ruled omission (#78/#112), so it is not here. -->
+    <string name="manage_detail_cap_text_title">Text offline</string>
+    <string name="manage_detail_cap_text_ready">Full sentence engine</string>
+    <string name="manage_detail_cap_voice_title">Voice offline</string>
+    <string name="manage_detail_cap_voice_ready">Has an on-device voice</string>
+    <!-- Camera card (owner ruling 2026-08-06): supported IFF the language's script is one
+         ML Kit reads on-device (Latin/Chinese/Devanagari/Japanese/Korean) AND a pack exists. -->
+    <string name="manage_detail_cap_camera_title">Camera offline</string>
+    <string name="manage_detail_cap_camera_ready">Reads text in photos</string>
+    <string name="manage_detail_cap_offline_unavailable">Needs a connection</string>
+    <!-- The "where this pack is used" saved-phrases line (#332): how many saved phrases
+         use this language, on either side. A plural so one phrase does not read "1 saved
+         phrases"; ABSENT at zero (a missing reassurance, never a false one), the same
+         decision the remove sheets' saved line takes. %2$s is the language name. -->
+    <plurals name="manage_detail_saved">
+        <item quantity="one">%1$d saved phrase is in %2$s</item>
+        <item quantity="other">%1$d saved phrases are in %2$s</item>
+    </plurals>
+    <!-- The detail pane's Remove block (#332). It ROUTES to the existing 19f/19g
+         remove-confirm sheet (the same action the 20c sheet's row takes); it never
+         deletes on tap. The body is the frame's, and true: packs share data between
+         pairs, so removing frees only the part this pack does not share, and a pack is
+         free to download again. %1$s is the language name. -->
+    <string name="manage_detail_remove_body">Removing frees the space it does not share with another pack. %1$s then needs a connection to translate, and downloading it again is free.</string>
+    <string name="manage_detail_remove_action">Remove</string>
     <!-- The overflow control's accessible name. It opens the 20c pack-actions sheet. -->
     <string name="manage_cd_options">Options for %1$s</string>
     <!-- 20c pack-actions sheet (PR-24), opened from a downloaded pack's overflow. It is a
@@ -450,6 +515,9 @@
         <item quantity="other">%1$d packs haven\'t been used in months</item>
     </plurals>
     <string name="manage_nudge_body">Keeping only the languages you use keeps the app light. Nothing is deleted without asking.</string>
+    <!-- The 20d two-pane nudge body (conformance): the frame's concise, honest line. Freeing a
+         pack is one tap and re-downloading is free, so the nudge never pushes a lossy action. -->
+    <string name="manage_nudge_freeing">Freeing them takes a tap; downloading again is free.</string>
     <string name="manage_nudge_dismiss">Not now</string>
     <!-- The nudge's action (#130 PR-25): opens the batch 20e "Free up space" sheet
          over exactly the stale packs it counts. A plural so one pack does not read
@@ -458,6 +526,9 @@
         <item quantity="one">Review %1$d pack</item>
         <item quantity="other">Review %1$d packs</item>
     </plurals>
+    <!-- The 20d two-pane nudge action (the frame's compact "Review", the count omitted — the
+         card already states it). Opens the same 20e "Free up space" cleanup as manage_nudge_review. -->
+    <string name="manage_nudge_review_short">Review</string>
 
     <!-- 20e — Free up space (#130 PR-25). The batch-cleanup sheet the nudge and 19b
          open. It lists ONLY packs with a real translation-use date older than the
