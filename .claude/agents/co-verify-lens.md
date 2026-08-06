@@ -56,6 +56,16 @@ git -C <worktree> diff -M origin/main...HEAD
 git -C <worktree> diff -M origin/main...HEAD --stat
 ```
 
+**A golden / screenshot PNG (`*.png` under `**/screenshots/`) appears in that diff
+as `GIT binary patch` — you cannot see what it depicts.** When a PR adds or changes
+one, you MUST open it with `Read` (the image renders) and compare it, element by
+element, to the SSOT design frame it is supposed to lock. A `git diff` of a golden
+proves nothing: a re-recorded golden that launders a real regression and one that
+correctly re-locks a fixed screen are the *identical* binary blob — only opening the
+pixels and checking them against the frame tells them apart. This is why the lock
+relies on a real reviewer here, not a PR-body marker (see
+`docs/research/red-team-roborazzi-conformance.md`).
+
 Read the issue and the PR body too (`gh issue view N`, `gh pr view N`) — **but
 read them last, after you have formed your own view from the code.** A body read
 first tells you what to see.

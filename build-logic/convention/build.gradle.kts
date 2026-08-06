@@ -11,6 +11,16 @@ dependencies {
     compileOnly(libs.ksp.gradle.plugin)
     compileOnly(libs.room.gradle.plugin)
     compileOnly(libs.hilt.android.gradle.plugin)
+    // Roborazzi is `implementation`, not `compileOnly` like the plugins above — a
+    // deliberate difference (#333). Those plugins are declared `apply false` in the root
+    // `build.gradle.kts`, so they reach every module's buildscript classpath from there
+    // and a convention plugin only needs to COMPILE against them. Roborazzi is instead
+    // applied programmatically inside `ComposeTestConventionPlugin`, which also configures
+    // its `RoborazziExtension`; both need the plugin on build-logic's RUNTIME classpath.
+    // `implementation` keeps the whole screenshot wiring inside `build-logic/**` and off
+    // the shared root build file, rather than adding a root `apply false` line for a
+    // plugin no module applies by alias.
+    implementation(libs.roborazzi.gradle.plugin)
 }
 
 gradlePlugin {

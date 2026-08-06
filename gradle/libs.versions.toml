@@ -66,6 +66,25 @@ robolectric = "4.16.1"
 # merged manifest — to exactly build id 13921718 (read with `javap -c`; the map
 # tops out at 36, so 4.16.1 is also the floor for running here at all).
 robolectricAndroidAll = "16-robolectric-13921718-i7"
+# Roborazzi — JVM screenshot-diff harness layered on the Robolectric compose-test
+# runtime above (#333). 1.70.0 is the newest STABLE line (Maven Central
+# io/github/takahirom/roborazzi/roborazzi/maven-metadata.xml <release>=1.70.0,
+# verified 2026-08-06; no -alpha/-beta/-rc suffix), the same "newest stable" rule
+# robolectric and leakcanary follow above. Two hard requirements this repo forces,
+# each met by a change read from Roborazzi's OWN release notes (not assumed):
+#   - AGP 9 support: this repo is agp = 9.3.0, and Roborazzi migrated off the
+#     deprecated Variant.unitTest / TestedExtension onto the supported variant API
+#     in 1.70.0's line at 1.56.0 (PR #782, "Add AGP 9.0 compatibility"). A pin
+#     before 1.56.0 would not configure on AGP 9 at all.
+#   - Configuration cache: gradle.properties sets org.gradle.configuration-cache=true;
+#     Roborazzi's config-cache integrity check landed in 1.60.0, on top of the
+#     earlier resolvedConfiguration-API fix (PR #759). 1.70.0 carries both, and its
+#     verify wiring resolves its run-mode through Provider chains + taskGraph
+#     (CC-safe), which the self-test exercises end to end under CC.
+# Robolectric Native Graphics — the pixel renderer captureRoboImage() needs — has
+# shipped since Robolectric 4.10; this repo pins 4.16.1, so RNG is available and the
+# screenshot test opts in with @GraphicsMode(NATIVE).
+roborazzi = "1.70.0"
 
 [libraries]
 # Kotlin / coroutines / serialization
@@ -163,6 +182,18 @@ androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version
 # unit-test runtime with one line and never copies a dependency block.
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 robolectric-android-all = { group = "org.robolectric", name = "android-all-instrumented", version.ref = "robolectricAndroidAll" }
+# Roborazzi screenshot-diff (#333). Consumed ONLY through the `tranzlate.compose-test`
+# convention plugin, which applies the Gradle plugin and puts these three on
+# `testImplementation` — a compose-test module opts in with the one alias line it already
+# has, never a copied dependency block (the same discipline robolectric above follows).
+#  - `roborazzi` carries `SemanticsNodeInteraction.captureRoboImage()`, the form used with
+#    `createComposeRule` (Roborazzi.kt); it pulls `roborazzi-core-*` transitively.
+#  - `roborazzi-compose` the composable-content `captureRoboImage(path) { }` form.
+#  - `roborazzi-junit-rule` the OPTIONAL `RoborazziRule`; carried so a future test that
+#    wants capture-on-failure has it without a catalog change.
+roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
+roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
 
 # Gradle plugin artifacts (for build-logic classpath)
 android-gradle-plugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
@@ -171,6 +202,10 @@ compose-compiler-gradle-plugin = { group = "org.jetbrains.kotlin", name = "compo
 ksp-gradle-plugin = { group = "com.google.devtools.ksp", name = "com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }
 room-gradle-plugin = { group = "androidx.room", name = "room-gradle-plugin", version.ref = "room" }
 hilt-android-gradle-plugin = { group = "com.google.dagger", name = "hilt-android-gradle-plugin", version.ref = "hilt" }
+# Roborazzi Gradle plugin on the build-logic classpath, so `ComposeTestConventionPlugin`
+# can apply `io.github.takahirom.roborazzi` by id and configure its `roborazzi { }`
+# extension — the same shape as room/hilt above (#333).
+roborazzi-gradle-plugin = { group = "io.github.takahirom.roborazzi", name = "roborazzi-gradle-plugin", version.ref = "roborazzi" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -189,6 +224,12 @@ spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 # source restrict it to com.android.application / com.android.dynamic-feature, and
 # on a library module it merely logs an error and generates nothing.
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+
+# Screenshot-diff plugin (#333). NOT applied via a module `plugins {}` alias — it is
+# applied inside `tranzlate.compose-test` (through the gradle-plugin artifact on the
+# build-logic classpath) so every compose-test module gets it with no per-module edit.
+# Declared here to keep the id + version in the one catalog the whole build reads.
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 
 # Convention plugins (build-logic included build)
 tranzlate-android-application = { id = "tranzlate.android.application" }
