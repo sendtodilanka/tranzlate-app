@@ -9,7 +9,7 @@ from one that was never run.
 
 | Pass | What | Status |
 |---|---|---|
-| 1 | `pr-review-toolkit:silent-failure-hunter` over `feature/language` | not in this record (other wave) |
+| **1** | **`pr-review-toolkit:silent-failure-hunter` over the pack-download path** | **RECORDED BELOW (pass-1 remediation PR)** |
 | 2 | `pr-review-toolkit:pr-test-analyzer` over every rev5 test | not in this record (other wave) |
 | 3 | `pr-review-toolkit:type-design-analyzer` over rev5 model types | not in this record (other wave) |
 | **4** | **frame-by-frame re-derivation of rev5 against the shipped screens — undeduped, per row** | **RECORDED BELOW (wave-1e)** |
@@ -327,3 +327,114 @@ authority and it is right.)
   type-design-analyzer) — those are other waves and are not recorded here.
 - Did not re-measure device state; every device figure is cited from the E-V1 and
   E-S1b records at the lines named above.
+
+---
+
+# Pass 1 — silent-failure-hunter (the pack-download path)
+
+- **Run:** 2026-08-06, phase-2 pass 1 (read-only analysis; the two defects
+  remediated in the same PR that records this).
+- **Commit audited:** `960cd03` (branch `main` tip — `Merge #317`, PR-24 landed).
+- **Scope:** the offline-model download path end to end — the app-shell observer
+  (`app/.../navigation/DownloadEventsViewModel.kt`), the manager
+  (`core/translate/.../RealOfflineModelManager.kt`), the gate
+  (`core/domain/.../DownloadGate.kt`), and the two screen ViewModels' refusal
+  handling — i.e. the code merged by **PR-20…PR-24**. PR-25 (20e "Free up space")
+  and PR-26 (20d list-detail) are not yet merged; their deltas are to be
+  re-checked in the **final** pass, not here.
+- **Method:** trace every place a synchronous pre-flight can refuse or a binder
+  read can throw, and ask two questions — *does a refusal reach the user, and can
+  a throw reach `Thread.defaultUncaughtExceptionHandler`?*
+
+## Finding 1 — #314 (S2): the app-shell snackbar actions swallowed a refusal
+
+**FIXED in this PR.** `DownloadEventsViewModel.onRetry` (`:106`),
+`onDownloadAgain` (`:98`) and `onConsentOnce` (`:116`) each called
+`modelManager.download()` / `downloadGate.requestDownload()` /
+`downloadGate.downloadConsented()` and **discarded** the returned
+`DownloadAttempt`. When the tap is refused before enqueue — `Refused(NETWORK)`
+because still offline (`RealOfflineModelManager.kt:395-399`), `Refused(STORAGE)`
+because the disk is still full (`:425-429`) — the manager writes a value-EQUAL
+`Failed` map (a `data class`, so the conflating `modelStates()` does not re-emit)
+and fires **no** `PackEvent`. So the snackbar's Retry / Download again / Download
+now was a **silent no-op** behind an enabled control — the exact #234/#250
+dead-end, but on the app-shell surface, which the two screen ViewModels had
+already fixed on theirs.
+
+The shell was **the one caller that ignored the attempt** — confirmed by reading
+all three methods against `OfflineLanguagesViewModel.reportOutcome`/`refusals` and
+`LanguagePickerViewModel`, which already capture it. Remediation mirrors that
+seam: a `Channel<String>` (`refusals`) carrying the pack tag, fed by a
+`reportOutcome` that sends only on `Refused`; the app shell (`TranzlateApp.kt`)
+collects it into a message-only snackbar on the existing app-shell `SnackbarHost`.
+
+**One deviation, stated because the brief named a specific string.** The two
+management screens draw the CAUSE-specific line
+(`downloadFailureCopy(cause).rowLine` → *"Not enough space…"* / *"No
+connection…"*). That resolver is **`internal` to `:feature:language`**, so the
+`:app` shell cannot call it, and re-spelling the cause→string map in `:app` is the
+third copy the rev3 ruling REJECT §7.8 and `DownloadFailureSourceTest` forbid. The
+shell therefore shows the language-named generic *"Couldn't download X"* (the
+public `packSnackbarMessage(PackSnackbarKind.FAILED)` seam) — visible feedback,
+which is the S2. Raising it to the cause-specific line needs a one-line visibility
+widening of `downloadFailureCopy` in `:feature:language`, out of this PR's
+ownership (a second agent held that module); flagged for the owner to route.
+
+## Finding 2 — #319 (S3, crash-class): an unguarded connectivity binder read
+
+**FIXED in this PR.** `RealOfflineModelManager.download()` at `:395` did a bare
+`if (!connectivity.isOnline())`. `isOnline()` is a synchronous binder IPC into
+`ConnectivityManager`, and it runs on the **caller's** coroutine — outside the
+`try/catch` that wraps the launched transfer — with the tap dispatched on a bare
+`viewModelScope`. A binder throw there (`DeadObjectException`, a
+Play-Services/ConnectivityManager crash) went straight to
+`Thread.defaultUncaughtExceptionHandler`: the app vanishing on a download tap.
+This is the **#238 crash class**, and the fix is the one already applied twice
+next to it — the free-space probe immediately below (`:415-424`) and `DownloadGate`
+(`isOnline()`/`isMetered()`, #248/#280) both guard the identical shape.
+Remediation wraps the read in the SAME idiom: rethrow `CancellationException`,
+treat any other `Throwable` as *unreadable → proceed* (never refuse on unknown,
+matching the free-space probe's degrade contract), so a genuinely offline transfer
+still lands `Failed(NETWORK)` through the bounded wait's own path.
+
+## Finding 3 — observability (acceptable as-is, recorded not fixed)
+
+`LanguagePickerViewModel.stampSafely` and `OfflineLanguagesViewModel.savedCountOf`
+each swallow a `Throwable` without logging. Judged **acceptable**: both are
+best-effort side jobs whose failure is correctly non-fatal (a missing usage stamp;
+a saved-count that falls back to 0 rather than blocking a pack removal), and both
+already rethrow `CancellationException` first. The only improvement available is a
+`logError` for field diagnosis — an **optional future**, not a defect. Both files
+are in `:feature:language` and out of this PR's scope regardless.
+
+## Areas audited CLEAN (the pack-download error handling is otherwise disciplined)
+
+Verified by reading each against its source at `960cd03`:
+
+- **The launched transfer** (`RealOfflineModelManager.kt:434-465`) rethrows
+  `CancellationException` first (`:448`), catches `Exception` for the async
+  failure, and only the owning job publishes an outcome.
+- **`bounded()`** (`:131-140`) converts a `TimeoutCancellationException` to an
+  `IOException` on purpose, so a timeout lands in the failure path and is NOT
+  misread as a user Stop — a subtlety a naive `withTimeout` would get wrong.
+- **`refreshDownloaded()`** (`:577-590`) and **the refresh worker** (`:298-314`)
+  both rethrow `CancellationException` and keep the last-known truth on any other
+  failure; the worker's `Throwable` catch is deliberate and documented (it is the
+  sole reader of the request channel).
+- **The free-space probe** (`:415-424`) — the sibling of Finding 2 — was already
+  `Throwable`-guarded with proceed-on-unknown (#238).
+- **`DownloadGate.requestDownload`** (`:112-147`) guards BOTH the standing-pref
+  read and the `isOnline()`/`isMetered()` reads, rethrowing `CancellationException`
+  and asking-not-assuming on any other throw (#248/#280).
+- **The delete path** (`:499-555`) mirrors the download path's ownership +
+  cancellation discipline.
+- **The U-1 `packEvents`** channel is `replay = 0`, drop-oldest, `tryEmit` — a
+  backgrounded app loses notices and reads truth from the state map on return.
+
+## Out-of-scope, same class — recommend a follow-up issue (NOT fixed here)
+
+`RealTranslator.kt:178` has a **structurally identical** unguarded
+`if (!connectivity.isOnline())` pre-flight in the translation waterfall. It is the
+same #238/#319 read; whether it can crash depends on its caller's handler, which
+this pass did not trace. It is a different file, outside this PR's ownership, so it
+is recorded here for a **#238-class follow-up review**, not fixed.

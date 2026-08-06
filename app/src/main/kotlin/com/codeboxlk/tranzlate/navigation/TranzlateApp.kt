@@ -177,6 +177,25 @@ fun TranzlateApp(
         }
     }
 
+    // Raise the SYNCHRONOUS-refusal snackbar (#314) on the SAME app-shell host. When a
+    // snackbar action — Retry (20a-4), Download again (20a-3) or Download now (19a) — is
+    // refused BEFORE anything is enqueued (still offline, or the disk still full), the
+    // manager returns `DownloadAttempt.Refused` and emits NO PackEvent, and the conflating
+    // state map does not re-emit an equal `Failed`, so without this the tap was a silent
+    // no-op. `DownloadEventsViewModel.refusals` carries the pack's tag; the shell names it.
+    // Message-only (no action), matching the two management screens' own refusal snackbar.
+    // The cause-specific line ("Not enough space…" / "No connection…") lives in
+    // `:feature:language`'s `internal downloadFailureCopy`, unreachable from this module, so
+    // the shell shows the language-named "Couldn't download X" (see the #314 PR note).
+    LaunchedEffect(eventsViewModel, snackbarHostState) {
+        eventsViewModel.refusals.collect { languageTag ->
+            snackbarHostState.showSnackbar(
+                message = packSnackbarMessage(context, PackSnackbarKind.FAILED, languageDisplayName(languageTag)),
+                duration = SnackbarDuration.Short,
+            )
+        }
+    }
+
     // The host sits ABOVE the NavDisplay (`PackSnackbarScaffold`), so a nav pop-out does
     // not dismiss a 20a snackbar — its state and host are the shell's, not a screen's.
     PackSnackbarScaffold(snackbarHostState) {

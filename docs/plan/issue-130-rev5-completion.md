@@ -114,6 +114,17 @@ by a cross-model lens; CI green on the rebased commit `d8146a7`; its lens also c
 STRINGS-doc omission, fixed in the same PR). #250 stays deferred to PR-23 by ruling 8,
 carried not fixed. **Wave 1c is complete; 1d is complete but for #250's PR-23 carry.**
 
+**Phase-2 pass-1 remediation note.** The silent-failure-hunter pass over the
+pack-download path (recorded in `docs/research/issue-130-rev5-audit.md` §"Pass 1")
+returned two confirmed defects, both fixed in **PR #PENDING**: **#314** (S2 — the
+app-shell snackbar Retry / Download-again / Download-now discarded the manager's
+`DownloadAttempt`, so a synchronous refusal while still offline or full was a silent
+no-op) and **#319** (S3, crash-class — the `RealOfflineModelManager` connectivity
+pre-flight was an unguarded binder read, the #238 crash class). Finding 3
+(observability in two `:feature:language` VMs) was judged acceptable and recorded, not
+fixed. A same-class out-of-scope read at `RealTranslator.kt:178` is flagged there for a
+follow-up issue. Passes 2 and 3 remain before rule 13's exit condition is met.
+
 **Wave 1f landing note:** **#221** — `git grep -E` silently ignores `\b`, so an enumeration
 written that way reports a false zero and reads as clean — landed in **PR #295**. The command
 vector was already blocked on `main` by the shipped hookify rule `git-grep-word-boundary`; PR #295

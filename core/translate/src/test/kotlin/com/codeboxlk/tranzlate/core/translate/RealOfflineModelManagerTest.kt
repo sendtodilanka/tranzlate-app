@@ -143,6 +143,60 @@ class RealOfflineModelManagerTest {
             assertThat(store.committed).isEmpty()
         }
 
+    // ---- issue #319: the connectivity pre-flight read had no error handling ---
+    //
+    // The exact sibling of the #238 free-space guard above, one read earlier.
+    // `connectivity.isOnline()` is a synchronous binder IPC into ConnectivityManager
+    // and runs on the CALLER's coroutine, OUTSIDE the try/catch that wraps the
+    // launched transfer — so an unguarded throw went straight to
+    // Thread.defaultUncaughtExceptionHandler on a download tap (the #238 crash
+    // class). A read that cannot ANSWER is not a refusal: unknown connectivity
+    // PROCEEDS, exactly as an unknown free-space probe does, and a truly offline
+    // transfer still lands Failed(NETWORK) through the bounded wait's own path. The
+    // "genuinely offline still refuses" edge is already pinned by
+    // `a download refused for being offline answers Refused on every attempt` below.
+
+    /**
+     * Mutation decided first (rule 11): strip the try/catch from
+     * `isOnlineOrUnreadable()` (make it `= connectivity.isOnline()`). The fake's
+     * binder throw then escapes `download()` and reddens this — the process death
+     * the guard prevents.
+     */
+    @Test
+    fun `an unreadable connectivity probe lets the download proceed`() =
+        runTest {
+            val store = FakeStore()
+            val connectivity = FakeConnectivityMonitor()
+            connectivity.onlineFailure = RuntimeException("ConnectivityManager binder died")
+            val manager = RealOfflineModelManager(store, plentyFree, connectivity, backgroundScope)
+
+            manager.download("fr") // must NOT throw
+            runCurrent()
+
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
+        }
+
+    /**
+     * The class a narrow `Exception` catch would let past (issue #236's shape),
+     * pinning that the guard is `Throwable`, not `Exception` — the same widening the
+     * free-space probe above keeps, so both pre-flight reads degrade identically.
+     * Mutation: narrow the connectivity catch to `Exception` and this reddens while
+     * the RuntimeException test above stays green.
+     */
+    @Test
+    fun `a connectivity probe that fails as an Error lets the download proceed`() =
+        runTest {
+            val store = FakeStore()
+            val connectivity = FakeConnectivityMonitor()
+            connectivity.onlineFailure = UnsatisfiedLinkError("nativeGetActiveNetwork")
+            val manager = RealOfflineModelManager(store, plentyFree, connectivity, backgroundScope)
+
+            manager.download("fr")
+            runCurrent()
+
+            assertThat(manager.stateOf("fr")).isEqualTo(OfflineModelState.Downloading)
+        }
+
     @Test
     fun `stop mid-download cancels the manager's job and the row never ghosts back`() =
         runTest {

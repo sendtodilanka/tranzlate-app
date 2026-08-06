@@ -392,7 +392,13 @@ class RealOfflineModelManager internal constructor(
         // cover it. That fix is the return value below: the refusal no longer
         // depends on the state map having changed, so the second, third and tenth
         // taps report exactly as the first one did.
-        if (!connectivity.isOnline()) {
+        //
+        // The binder read behind this is GUARDED (issue #319, the #238 crash
+        // class) — see [isOnlineOrUnreadable]. Only the CERTAIN "we are offline"
+        // answer refuses here; a read that could not answer falls through to
+        // enqueue, so an unguarded throw can no longer kill the process on a
+        // download tap.
+        if (!isOnlineOrUnreadable()) {
             val cause = OfflineModelFailure.NETWORK
             takeTransient(languageTag, OfflineModelState.Failed(cause))
             return DownloadAttempt.Refused(cause)
@@ -553,6 +559,38 @@ class RealOfflineModelManager internal constructor(
         job.start() // registered BEFORE it runs — same window rule as download()
         job.join()
     }
+
+    /**
+     * The connectivity pre-flight read, guarded (issue #319, the #238 crash class).
+     *
+     * `connectivity.isOnline()` is a synchronous binder IPC into
+     * `ConnectivityManager`, and a binder call can throw (`DeadObjectException`, a
+     * Play-Services/ConnectivityManager crash). It runs on the CALLER's coroutine —
+     * outside the try/catch that wraps the launched transfer in [download] — with
+     * the tap dispatched on a bare `viewModelScope`, so an unguarded throw went
+     * straight to `Thread.defaultUncaughtExceptionHandler`: the app vanishing on a
+     * download tap. `DownloadGate` already wraps its own `isOnline()`/`isMetered()`
+     * reads for exactly this (#248/#280); this was the one read one layer lower left
+     * bare, and the free-space probe in [download] is the same shape one line later.
+     *
+     * Returns **true** when online AND when the read could not answer — the SAME
+     * degrade contract the free-space probe keeps (unknown → does not block).
+     * Refusing on an unreadable radio would strand a user who is actually online,
+     * while a transfer that truly has no connection still lands `Failed(NETWORK)`
+     * through the bounded wait's own failure path. So [download] refuses only on a
+     * CERTAIN offline (`false`), never on "cannot tell". `CancellationException` is
+     * rethrown first and by name — widening a catch protects it not at all.
+     */
+    private fun isOnlineOrUnreadable(): Boolean =
+        try {
+            connectivity.isOnline()
+        } catch (rethrown: kotlin.coroutines.cancellation.CancellationException) {
+            throw rethrown // never break structured cancellation
+        } catch (
+            @Suppress("TooGenericExceptionCaught", "SwallowedException") unreadable: Throwable,
+        ) {
+            true // unknown, so it cannot be the thing that refuses — enqueue instead
+        }
 
     private fun owns(
         tag: String,
