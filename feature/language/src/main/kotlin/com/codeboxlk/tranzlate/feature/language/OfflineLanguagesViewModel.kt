@@ -121,6 +121,16 @@ data class PendingPackRemoval(
 data class ManagePacksData(
     val rows: List<OfflineLanguageRow>,
     val usage: Map<String, Long>,
+    /**
+     * Per-role last-used, split for the 20d detail pane's "source" line (#130
+     * PR-26). [usage] is these two merged (the list row's single bucket); the
+     * detail keeps them apart so it can say "used as source 3 days ago · never used
+     * as target". Defaulted empty so the pre-20d [ManagePacksData] constructions
+     * (Initial, the render tests) are untouched — a compact window draws no detail
+     * and never reads them.
+     */
+    val usageAsSource: Map<String, Long> = emptyMap(),
+    val usageAsTarget: Map<String, Long> = emptyMap(),
     val targetId: String,
     val storage: StorageCard?,
     val total: Int,
@@ -247,17 +257,21 @@ class OfflineLanguagesViewModel
                 }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), null)
 
         /**
-         * When each language was last PROVEN in use, merged across both roles: a
-         * pack is "used" if it was translated INTO or OUT OF, whichever happened
-         * more recently. The nudge is about a LANGUAGE nobody uses, not a role, so
-         * a language used only as a source is not stale.
+         * When each language was last PROVEN in use, kept per role AND merged.
+         *
+         * The two role maps are held apart because the 20d detail pane (#130 PR-26)
+         * tells them apart — "used as source 3 days ago · never as target" — while
+         * the list rows and the nudge want them merged: a pack is "used" if it was
+         * translated INTO or OUT OF, whichever is fresher ([RoleUsage.merged]). The
+         * nudge is about a LANGUAGE nobody uses, not a role, so a language used only
+         * as a source is not stale; the detail is the one place the distinction shows.
          */
-        private val usage: StateFlow<Map<String, Long>> =
+        private val usage: StateFlow<RoleUsage> =
             combine(
                 usageRepository.lastUsed(LanguageRole.SOURCE),
                 usageRepository.lastUsed(LanguageRole.TARGET),
-            ) { source, target -> mergeLatestUse(source, target) }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), emptyMap())
+            ) { source, target -> RoleUsage(asSource = source, asTarget = target) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), RoleUsage.Empty)
 
         /**
          * The current TARGET (canonical), for the "IN USE" badge and the in-use
@@ -279,7 +293,9 @@ class OfflineLanguagesViewModel
             combine(catalog, usage, storage, target, nudgeDismissed) { catalog, usage, storage, target, dismissed ->
                 ManagePacksData(
                     rows = catalog.rows,
-                    usage = usage,
+                    usage = usage.merged,
+                    usageAsSource = usage.asSource,
+                    usageAsTarget = usage.asTarget,
                     targetId = target,
                     storage = storage,
                     total = catalog.total,
@@ -531,6 +547,26 @@ internal data class CapableCatalog(
 ) {
     companion object {
         val Empty = CapableCatalog(rows = emptyList(), total = 0)
+    }
+}
+
+/**
+ * The two #122 role maps as one flow value: kept apart for the 20d detail pane,
+ * [merged] on demand for the list rows and the nudge.
+ *
+ * [merged] is computed, not stored, so the single source of the merge stays
+ * [mergeLatestUse] (already boundary-tested) and there is no second copy to drift
+ * from it.
+ */
+@Immutable
+internal data class RoleUsage(
+    val asSource: Map<String, Long>,
+    val asTarget: Map<String, Long>,
+) {
+    val merged: Map<String, Long> get() = mergeLatestUse(asSource, asTarget)
+
+    companion object {
+        val Empty = RoleUsage(asSource = emptyMap(), asTarget = emptyMap())
     }
 }
 

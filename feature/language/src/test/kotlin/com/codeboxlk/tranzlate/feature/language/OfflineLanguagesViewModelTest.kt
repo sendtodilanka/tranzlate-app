@@ -229,6 +229,30 @@ class OfflineLanguagesViewModelTest {
             assertThat(viewModel.uiState.value.usage).containsEntry("de", 1234L)
         }
 
+    /**
+     * The two roles ALSO reach `uiState` kept apart, for the 20d detail pane's
+     * per-role "source" line (#130 PR-26). A SOURCE stamp lands only in
+     * `usageAsSource`, a TARGET stamp only in `usageAsTarget`.
+     *
+     * Mutation: the ViewModel builds `usageAsSource` from the TARGET flow (a swap of
+     * the two `RoleUsage` fields), or drops one — this reddens on the map that goes
+     * wrong, which the merged assertion above cannot see (merging hides the split).
+     */
+    @Test
+    fun `per-role stamps reach uiState split by role`() =
+        runTest {
+            usage.stampUse("de", LanguageRole.SOURCE, atMillis = 111L)
+            usage.stampUse("fr", LanguageRole.TARGET, atMillis = 222L)
+            viewModel.uiState.launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.usageAsSource).containsEntry("de", 111L)
+            assertThat(state.usageAsSource).doesNotContainKey("fr")
+            assertThat(state.usageAsTarget).containsEntry("fr", 222L)
+            assertThat(state.usageAsTarget).doesNotContainKey("de")
+        }
+
     /** "Not now" on the nudge sets a durable flag the screen reads to hide it. Mutation: dismiss does nothing. */
     @Test
     fun `dismissing the nudge sets the durable flag`() =

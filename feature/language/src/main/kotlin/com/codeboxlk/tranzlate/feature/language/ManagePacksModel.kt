@@ -105,6 +105,48 @@ fun packUsage(
     }
 }
 
+/**
+ * A pack's last-used, split by the role it was used IN — the 20d detail pane's
+ * "source" line (#130 PR-26, ruling :144/:82). The list ROW shows one merged
+ * bucket (used INTO or OUT OF, whichever is fresher); the detail is where the two
+ * roles are told apart, because a language you translate FROM often is not the
+ * same as one you translate INTO, and the detail is the room to say so.
+ *
+ * Each side is the SAME honest bucket the row draws ([packUsage]): a role with no
+ * translation-success stamp is [PackUsage.NoRecord] — "no recorded use yet", never
+ * a fabricated date (ruling ⑧, brief §7b). So a pack used only as a source reads a
+ * real date on the source line and the date-less line on the target line, and both
+ * are true.
+ */
+@Immutable
+data class PackRoleUsage(
+    val asSource: PackUsage,
+    val asTarget: PackUsage,
+)
+
+/**
+ * The selected pack's per-role last-used, for the 20d detail pane.
+ *
+ * Pure and now-in-the-signature, the same shape as [packUsage] it delegates to, so
+ * the honesty (a role with no stamp → [PackUsage.NoRecord]) is checkable without a
+ * clock. Each role reads its OWN map — [usageAsSource] for the source line,
+ * [usageAsTarget] for the target line — so a swap of the two is a reddening
+ * mutation, not a silent lie about which way the language was used.
+ *
+ * @param usageAsSource canonical-id → last-used-as-source millis (#122 SOURCE role).
+ * @param usageAsTarget canonical-id → last-used-as-target millis (#122 TARGET role).
+ */
+fun packRoleUsage(
+    id: String,
+    usageAsSource: Map<String, Long>,
+    usageAsTarget: Map<String, Long>,
+    nowMillis: Long,
+): PackRoleUsage =
+    PackRoleUsage(
+        asSource = packUsage(usageAsSource[id], nowMillis),
+        asTarget = packUsage(usageAsTarget[id], nowMillis),
+    )
+
 /** True only for a pack with a real date at or beyond [STALE_THRESHOLD_DAYS]. Date-less packs are never stale. */
 internal fun isStale(
     lastUsedMillis: Long?,

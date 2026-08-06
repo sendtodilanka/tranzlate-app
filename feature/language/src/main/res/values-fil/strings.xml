@@ -187,6 +187,11 @@
     </plurals>
     <string name="manage_used_never">wala pang naitalang paggamit</string>
     <string name="manage_in_use">GINAGAMIT</string>
+    <!-- 20d list-detail (#130 PR-26) · #115 provisional, pending native review -->
+    <string name="manage_detail_usage_header">Paggamit</string>
+    <string name="manage_detail_role_source">Bilang pinagmulan</string>
+    <string name="manage_detail_role_target">Bilang target</string>
+    <string name="manage_detail_empty">Pumili ng pack para makita kung paano ito ginamit.</string>
     <string name="manage_cd_options">Mga opsyon para sa %1$s</string>
     <string name="manage_actions_use_target">Gamitin bilang target ngayon</string>
     <string name="manage_actions_voice">Kayang bigkasin offline</string>

@@ -462,6 +462,36 @@ reversible; the batch removes through the existing per-pack delete path.
 `tt_lang_sheet_free_cancel` (Cancel) · `tt_lang_sheet_free_close` (empty-state Close) ·
 `tt_lang_sheet_free_row_<id>` (one per stale-pack checkbox row, e.g. `…_row_de`).
 
+## 5.11 Manage packs — list-detail 20d (#130 PR-26)
+
+At EXPANDED width (a tablet or unfolded foldable in landscape — the ruling's
+1280×800) the screen splits into a plain `Row` two-pane: the SAME §5.9 list on the
+left, and the SELECTED pack's detail on the right. This is a PARTIAL 20d (ruling
+:249): the spec's camera card and pair-share line are OMITTED — a non-existent
+feature (#78/#112) and an undocumented version-fragile layout, both §7 REJECTs. The
+detail carries the pack's identity, the per-role "source" line, and the same
+`StorageCardView` §5.9/§5.10 draw (one vocabulary, one colour). No `adaptive-layout`
+dependency — a plain `Row` gated on `WindowInfo.isExpanded` (ruling :90/:238).
+
+The "source" line is the pack's last-used from the #122 store, split BY ROLE — the
+list row shows one merged bucket, the detail tells "as source" apart from "as
+target". Each side reuses the §5.9 `manage_used_*` buckets, so a role with no
+translation stamp reads `manage_used_never` — never a fabricated date (ruling ⑧).
+
+| Key | Type | `en` | Args | Notes |
+|-----|------|------|------|-------|
+| `manage_detail_usage_header` | string | `Usage` | — | the detail pane's usage section header |
+| `manage_detail_role_source` | string | `As source` | — | the "source" line's role label; its value is a `manage_used_*` bucket for the SOURCE-role stamp (#122) |
+| `manage_detail_role_target` | string | `As target` | — | the target-role label; its value is a `manage_used_*` bucket for the TARGET-role stamp (#122) |
+| `manage_detail_empty` | string | `Select a pack to see how it has been used.` | — | the no-selection placeholder (no packs, or a removed pack) — never a dead end. No apostrophe (an unescaped `'` breaks the build) |
+
+### 5.11.1 Manage packs list-detail — testTags (C-1)
+
+`tt_manage_select_row` (each selectable list row in the two-pane) · `tt_manage_detail`
+(the detail pane root) · `tt_manage_detail_name` (the selected pack's name) ·
+`tt_manage_detail_source` / `tt_manage_detail_target` (the two per-role usage values) ·
+`tt_manage_detail_empty` (the no-selection placeholder).
+
 ## 6. Language picker — accessibility (C-4)
 
 Row descriptions carry the language name **and** its state, because the trailing icon alone says
