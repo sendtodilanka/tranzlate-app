@@ -165,25 +165,40 @@ class KonsistArchitectureTest {
      *
      * "UI composable" = `@Composable` returning Unit. Value-returning composables
      * (`rememberWindowInfo()`, `adaptiveScreenMargin()`, `languageLabel()`) draw
-     * nothing and are correctly out of scope. [PREVIEW_EXEMPT] carries the one
-     * structural exception with its reason.
+     * nothing and are correctly out of scope.
      *
-     * Scope is FILE level: whether a file's previews cover every meaningful STATE
-     * is a judgement the human co-verify lens makes. What this gate makes
-     * impossible is the regression that keeps recurring — a whole screen or item
-     * file landing with no preview at all.
+     * SCOPE — every module that ships composables, `app/src/main/` INCLUDED (#157).
+     * It was the one module the gate skipped, so `ComingSoonScreen` and the
+     * nav-shell composables could land preview-less and nothing failed — the exact
+     * "rule written down, not enforced" shape rule 7 exists to stop, and `app`, the
+     * composition root, is the last place a blind spot is acceptable.
+     *
+     * Two exemptions, each as narrow as it can be so nothing else slips through:
+     *  - [PREVIEW_EXEMPT] — whole FILES (the `Theme` wrapper renders only its
+     *    content, so a preview of it alone is blank).
+     *  - [PREVIEW_EXEMPT_COMPOSABLES] — individual COMPOSABLES that are pure
+     *    plumbing with no surface of their own (the composition root and its
+     *    NavDisplay wiring). Deliberately NOT a file exemption: a new rendered
+     *    composable added to the shell file is still caught, where a blanket file
+     *    exemption would re-open the very blind spot #157 closed.
+     *
+     * Scope is otherwise FILE level: whether a file's previews cover every
+     * meaningful STATE is a judgement the human co-verify lens makes. What this
+     * gate makes impossible is the regression that keeps recurring — a whole screen
+     * or item file landing with no preview at all.
      */
     @Test
     fun `every UI file ships a PreviewLightDark`() {
         val uiFiles =
-            filesUnder("/feature/", "/core/ui/src/main/", "/core/designsystem/src/main/")
+            filesUnder("/feature/", "/core/ui/src/main/", "/core/designsystem/src/main/", "/app/src/main/")
                 .filter { file -> file.path.contains("/src/main/") }
                 .filter { file -> file.name !in PREVIEW_EXEMPT }
                 .filter { file ->
                     file.functions().any { function ->
                         function.hasAnnotationWithName("Composable") &&
                             !function.annotations.any { it.name.startsWith("Preview") } &&
-                            function.returnType?.name.orEmpty() in setOf("", "Unit")
+                            function.returnType?.name.orEmpty() in setOf("", "Unit") &&
+                            function.name !in PREVIEW_EXEMPT_COMPOSABLES
                     }
                 }
 
@@ -973,6 +988,21 @@ class KonsistArchitectureTest {
          * composable in the app already exercises it (`TranzlateTheme { … }`).
          */
         val PREVIEW_EXEMPT = setOf("Theme")
+
+        /**
+         * Composition-root plumbing exempt from the preview gate — by COMPOSABLE
+         * name, NOT whole files, so every OTHER composable in the shell file is
+         * still enforced (#157: a blanket file exemption is the same blind spot as
+         * skipping the module).
+         *
+         * `TranzlateApp` and `AppNavDisplay` render no surface of their own: they
+         * call `hiltViewModel()` and set up `NavDisplay`, then delegate every
+         * rendered pixel to the feature screens, each of which ships its own
+         * `@PreviewLightDark`. Rule 7 itself forbids a preview from touching DI or a
+         * ViewModel, so these two cannot be previewed the house way at all — a
+         * forced preview would be a blank or crashing stub, not a review surface.
+         */
+        val PREVIEW_EXEMPT_COMPOSABLES = setOf("TranzlateApp", "AppNavDisplay")
 
         /** Marks the checkout root — a worktree has one of its own, which is the point. */
         const val SETTINGS_FILE = "settings.gradle.kts"
