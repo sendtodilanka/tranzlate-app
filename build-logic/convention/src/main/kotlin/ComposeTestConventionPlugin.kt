@@ -1,12 +1,17 @@
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import com.android.build.api.variant.LibraryAndroidComponentsExtension
 import com.codeboxlk.tranzlate.buildlogic.libs
+import io.github.takahirom.roborazzi.RoborazziExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
 
 /**
  * `tranzlate.compose-test` — a Compose test rule that runs in the ordinary unit-test
  * task, so a decision inside a `@Composable` stops being a decision no test can reach
- * (#186).
+ * (#186) — and, on top of it, a JVM screenshot-diff harness that LOCKS what those
+ * composables draw (#333).
  *
  * ## Why this exists
  *
@@ -46,11 +51,39 @@ import org.gradle.kotlin.dsl.dependencies
  *    empty `ComponentActivity` that ONLY that artifact's manifest declares, and its
  *    absence surfaces as an activity-not-found at run time rather than as a compile
  *    error.
+ *
+ * ## Screenshot diff (Roborazzi, #333)
+ *
+ * The same `createComposeRule` a module already has becomes a screenshot recorder:
+ * `compose.onRoot().captureRoboImage("src/test/screenshots/<name>.png")` renders the
+ * composable under Robolectric Native Graphics and, in verify mode, compares it to the
+ * committed golden. This plugin supplies the three pieces a module needs and nothing it
+ * does not:
+ *
+ *  - **The plugin + capture deps.** `io.github.takahirom.roborazzi` is applied here, and
+ *    `roborazzi` / `roborazzi-compose` / `roborazzi-junit-rule` go on `testImplementation`
+ *    — the same opt-in-by-one-line shape the rest of this plugin keeps. A compose-test
+ *    module with no screenshot test pays nothing at run time: `captureRoboImage()`
+ *    early-returns when no record/verify run is active (`Roborazzi.kt`), so the plain
+ *    `test`/`preflight` task is a no-op for it.
+ *  - **A stable, committed golden dir.** [RoborazziExtension.outputDir] is pinned to the
+ *    module's `src/test/screenshots`, so goldens live in source control next to the test
+ *    and survive `clean` — never under `build/`, which is `.gitignore`d. Record and
+ *    verify both resolve the SAME path from the test's explicit argument, so the two can
+ *    never read and write different files.
+ *  - **`./gradlew build` fails on a mismatch.** [wireDebugVerifyIntoCheck] makes `check`
+ *    depend on `verifyRoborazzi<DebugVariant>`, whose presence in the task graph flips
+ *    `testDebugUnitTest` into verify mode (Roborazzi's own wiring), so a pixel change to
+ *    a locked screen fails `build` — the enforceable, server-side regression lock CI
+ *    already runs (`./gradlew build`). A client hook could not enforce this and is not
+ *    added. `preflight` (plain `test`) stays a no-op, by design: it is not the
+ *    screenshot gate.
  */
 class ComposeTestConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
             pluginManager.apply("tranzlate.robolectric")
+            pluginManager.apply("io.github.takahirom.roborazzi")
 
             dependencies {
                 val bom = libs.findLibrary("androidx-compose-bom").get()
@@ -71,7 +104,67 @@ class ComposeTestConventionPlugin : Plugin<Project> {
                 // it twice is a no-op for the modules that already had it.
                 "debugImplementation"(platform(bom))
                 "debugImplementation"(libs.findLibrary("androidx-compose-ui-test-manifest").get())
+
+                // Roborazzi screenshot-diff (#333) — the capture half on top of the
+                // Compose test rule. `roborazzi` carries the
+                // `SemanticsNodeInteraction.captureRoboImage()` used with
+                // `createComposeRule`; the other two are the composable-content form and
+                // the optional `RoborazziRule`.
+                "testImplementation"(libs.findLibrary("roborazzi").get())
+                "testImplementation"(libs.findLibrary("roborazzi-compose").get())
+                "testImplementation"(libs.findLibrary("roborazzi-junit-rule").get())
+            }
+
+            // Goldens live in source control, next to the test, and survive `clean`.
+            extensions.configure<RoborazziExtension> {
+                outputDir.set(layout.projectDirectory.dir(ROBORAZZI_GOLDEN_DIR))
+            }
+
+            wireDebugVerifyIntoCheck()
+        }
+    }
+
+    /**
+     * Make `check` (hence `./gradlew build`, hence CI) depend on the DEBUG variant's
+     * `verifyRoborazzi<Variant>` task, so a golden mismatch fails the build.
+     *
+     * Derived from the variant graph and filtered to `buildType == "debug"`, the same
+     * brand-agnostic filter [PreflightConventionPlugin] applies to `assemble` and
+     * `lint`: a white-label brand added to the flavor catalog is covered with no edit
+     * here, and the release variants stay out — Roborazzi never runs both a debug and a
+     * release verify in one invocation, which is what would otherwise share one output
+     * directory and hit the Gradle-9 race the project warns about (roborazzi #830).
+     *
+     * Debug-only is also why `preflight` stays green regardless of goldens: it runs the
+     * plain `test` task, whose graph contains no `verifyRoborazzi*`, so
+     * `captureRoboImage()` early-returns. The lock lives on `build`, deliberately.
+     */
+    private fun Project.wireDebugVerifyIntoCheck() {
+        plugins.withId("com.android.library") {
+            extensions.configure<LibraryAndroidComponentsExtension> {
+                onVariants { variant -> dependCheckOnDebugVerify(variant.name, variant.buildType) }
             }
         }
+        plugins.withId("com.android.application") {
+            extensions.configure<ApplicationAndroidComponentsExtension> {
+                onVariants { variant -> dependCheckOnDebugVerify(variant.name, variant.buildType) }
+            }
+        }
+    }
+
+    private fun Project.dependCheckOnDebugVerify(variantName: String, buildType: String?) {
+        if (buildType != DEBUG_BUILD_TYPE) return
+        val verifyTask = VERIFY_TASK_PREFIX + variantName.replaceFirstChar(Char::uppercaseChar)
+        tasks.named(CHECK_TASK).configure { dependsOn(verifyTask) }
+    }
+
+    private companion object {
+        /** Where committed goldens live, resolved against each module's project dir. */
+        const val ROBORAZZI_GOLDEN_DIR = "src/test/screenshots"
+        const val CHECK_TASK = "check"
+        const val DEBUG_BUILD_TYPE = "debug"
+
+        /** `verifyRoborazzi` + the capitalized variant name, e.g. `verifyRoborazziDebug`. */
+        const val VERIFY_TASK_PREFIX = "verifyRoborazzi"
     }
 }
