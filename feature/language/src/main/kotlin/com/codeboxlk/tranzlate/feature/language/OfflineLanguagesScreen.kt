@@ -410,7 +410,13 @@ private fun ManagePacksHeader(onBack: () -> Unit) {
     val spacing = LocalSpacing.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(horizontal = spacing.xs4, vertical = spacing.xs4),
+        // The rev5 app bar is 68dp (20b.json / 20d.json: bar y44→112). Without this the Row
+        // wraps to the 48dp icon button + padding (~56dp) and the whole content sits ~12dp too
+        // high against the frame. heightIn keeps a taller title from clipping.
+        modifier =
+            Modifier
+                .heightIn(min = 68.dp)
+                .padding(horizontal = spacing.xs4),
     ) {
         IconButton(onClick = onBack, modifier = Modifier.testTag("tt_manage_back")) {
             Icon(Icons.Outlined.ArrowBack, contentDescription = stringResource(R.string.offline_cd_back))
