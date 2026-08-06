@@ -46,7 +46,6 @@ class OfflineRemoveFlowRenderTest {
                 ),
             usage = emptyMap(),
             targetId = "",
-            nowMillis = 0L,
             locale = Locale.ENGLISH,
         )
 

@@ -50,7 +50,6 @@ class PackActionsSheetRenderTest {
                     listOf(row),
                     usage = emptyMap(),
                     targetId = "",
-                    nowMillis = 0L,
                     locale = Locale.ENGLISH,
                 )
             TranzlateTheme {

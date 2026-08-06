@@ -94,6 +94,9 @@ internal fun freeRowTag(id: String): String = "tt_lang_sheet_free_row_$id"
  * than hoisted. The `@OptIn` is for [TranzlateListSheet]'s default `sheetState`
  * argument, evaluated at this call site; nothing here names it.
  *
+ * @param nowMillis the clock each stale row reads to turn its [PackUsage.Used] stamp
+ *   into a relative "4 months ago" line ([packUsageText]) — the same instant the
+ *   management list uses, so the two can never disagree (#325).
  * @param onRemovePacks the CHECKED pack ids, in one batch. The caller wires this to
  *   [OfflineLanguagesViewModel.removePacks] and dismisses.
  */
@@ -103,6 +106,7 @@ internal fun FreeUpSpaceSheet(
     visible: Boolean,
     stalePacks: List<PackRow>,
     storage: StorageCard?,
+    nowMillis: Long,
     onRemovePacks: (List<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -170,6 +174,7 @@ internal fun FreeUpSpaceSheet(
                 StalePackCheckRow(
                     row = row,
                     checked = row.id in selected,
+                    nowMillis = nowMillis,
                     onToggle = { if (row.id in selected) selected.remove(row.id) else selected.add(row.id) },
                 )
             }
@@ -233,6 +238,7 @@ private fun CleaningIcon() {
 private fun StalePackCheckRow(
     row: PackRow,
     checked: Boolean,
+    nowMillis: Long,
     onToggle: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
@@ -260,7 +266,7 @@ private fun StalePackCheckRow(
         Column(modifier = Modifier.weight(1f).padding(start = spacing.md16)) {
             Text(text = row.displayName, style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = packUsageText(row.usage),
+                text = packUsageText(row.usage, nowMillis),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -277,6 +283,10 @@ private fun StalePackCheckRow(
 private const val PREVIEW_MB = 1_048_576L
 private const val PREVIEW_GB = 1_073_741_824L
 
+/** A fixed instant, and a month in millis, so each preview pack's dated "N months ago" line is stable. */
+private val previewNow = 300L * DAY_MILLIS
+private val previewMonthMillis = 30L * DAY_MILLIS
+
 private fun previewRow(
     id: String,
     name: String,
@@ -286,10 +296,10 @@ private fun previewRow(
     id = id,
     displayName = name,
     state = state,
-    usage = PackUsage.MonthsAgo(monthsAgo),
-    lastUsedMillis = 1L,
+    // A REAL stamp `monthsAgo` months in the past — coherent by construction, the honest
+    // "N months ago" the collapse makes unfabricatable (closes the #325 audit sub-note).
+    usage = PackUsage.Used(previewNow - monthsAgo * previewMonthMillis),
     inUse = false,
-    isPivot = false,
 )
 
 private val previewStale =
@@ -365,7 +375,7 @@ private fun FreeUpSpaceSheetPreviewBody(
                 )
                 StorageCardView(previewStorage, Modifier.padding(bottom = spacing.sm8))
                 stalePacks.forEach { row ->
-                    StalePackCheckRow(row = row, checked = row.id in checkedIds, onToggle = {})
+                    StalePackCheckRow(row = row, checked = row.id in checkedIds, nowMillis = previewNow, onToggle = {})
                 }
             }
         }

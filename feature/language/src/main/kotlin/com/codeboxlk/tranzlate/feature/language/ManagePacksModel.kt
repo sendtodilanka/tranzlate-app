@@ -49,59 +49,78 @@ internal const val DAY_MILLIS: Long = 24L * 60L * 60L * 1000L
 internal const val STALE_THRESHOLD_DAYS: Long = 90L
 
 /**
- * How long ago a pack was last PROVEN in use (a translation success, #122), as
- * the row supporting line reads it.
+ * A pack's last translation-use (a success, #122) — the honest SINGLE source the
+ * row, the detail pane and the nudge all read.
  *
- * Bucketed elapsed time, never a named calendar month: "since April" is
- * unambiguous only within a year, and the store keeps stamps indefinitely, so a
- * month name with no year is exactly the kind of half-true figure this brief
- * exists to keep off the screen. Elapsed days from a stamp the app actually holds
- * is a figure it can always state correctly, in every locale — the same relative
- * form the i18n guide's `minutes_ago` plural endorses.
+ * Two states, and only two, so the illegal ones cannot be written (#325): a pack
+ * either has a real stamp ([Used]) or it has none ([NoRecord]). The relative bucket
+ * a row draws and whether a pack is stale are DERIVED from [Used.lastUsedMillis]
+ * ([PackUsage.Used.bucket], [isStale]) at a given "now" — never a second field stored
+ * beside the stamp. So "used 4 months ago" built from no date, and "no recorded use
+ * yet" on a pack the cleanup sweeps as stale, are each unrepresentable by
+ * construction, not merely avoided by the one factory that builds a row.
  */
 @Immutable
 sealed interface PackUsage {
     /** No translation-success stamp — the honest "we do not know" (ruling ⑧). */
     data object NoRecord : PackUsage
 
-    /** Used within the last day. */
-    data object Today : PackUsage
-
-    /** 1..6 days ago. */
-    data class DaysAgo(
-        val days: Int,
-    ) : PackUsage
-
-    /** 1..4 weeks ago. */
-    data class WeeksAgo(
-        val weeks: Int,
-    ) : PackUsage
-
-    /** A month or more ago — the stale zone the nudge watches. */
-    data class MonthsAgo(
-        val months: Int,
+    /** A real translation-success stamp. Bucket and staleness DERIVE from [lastUsedMillis]. */
+    data class Used(
+        val lastUsedMillis: Long,
     ) : PackUsage
 }
 
 /**
- * A last-used stamp (or its absence) → the relative bucket the row draws.
+ * The relative last-used bucket a row or the detail DRAWS — "used today", "5 days
+ * ago", "4 months ago". Derived from a real [PackUsage.Used] stamp at a given "now",
+ * never stored: a [PackUsage.NoRecord] pack has NO bucket (it draws the honest
+ * date-less line instead), so only a [PackUsage.Used] can be asked for one (#325).
  *
- * [lastUsedMillis] is `null` for a pack with no recorded use, and a future or
- * skewed stamp (elapsed <= 0) reads as [PackUsage.Today] rather than a negative
- * count. Pure and now-in-the-signature so a test fixes "now" and the boundaries
- * are checkable without a clock.
+ * Bucketed elapsed time, never a named calendar month: "since April" is unambiguous
+ * only within a year, and the store keeps stamps indefinitely, so a month name with
+ * no year is exactly the half-true figure this brief keeps off the screen. Elapsed
+ * days from a stamp the app holds is a figure it can always state correctly, in every
+ * locale — the same relative form the i18n guide's `minutes_ago` plural endorses.
  */
-fun packUsage(
-    lastUsedMillis: Long?,
-    nowMillis: Long,
-): PackUsage {
-    if (lastUsedMillis == null) return PackUsage.NoRecord
+@Immutable
+sealed interface UsageBucket {
+    /** Used within the last day. */
+    data object Today : UsageBucket
+
+    /** 1..6 days ago. */
+    data class DaysAgo(
+        val days: Int,
+    ) : UsageBucket
+
+    /** 1..4 weeks ago. */
+    data class WeeksAgo(
+        val weeks: Int,
+    ) : UsageBucket
+
+    /** A month or more ago — the stale zone the nudge watches. */
+    data class MonthsAgo(
+        val months: Int,
+    ) : UsageBucket
+}
+
+/** A last-used stamp (or its absence) → the honest usage. `null` → [PackUsage.NoRecord], else [PackUsage.Used]. */
+fun packUsage(lastUsedMillis: Long?): PackUsage =
+    if (lastUsedMillis == null) PackUsage.NoRecord else PackUsage.Used(lastUsedMillis)
+
+/**
+ * A real stamp's relative [UsageBucket] at [nowMillis]. A future or skewed stamp
+ * (elapsed <= 0) reads as [UsageBucket.Today] rather than a negative count. Pure and
+ * now-in-the-signature so a test fixes "now" and the boundaries are checkable without
+ * a clock.
+ */
+internal fun PackUsage.Used.bucket(nowMillis: Long): UsageBucket {
     val elapsedDays = (nowMillis - lastUsedMillis) / DAY_MILLIS
     return when {
-        elapsedDays <= 0L -> PackUsage.Today
-        elapsedDays < DAYS_PER_WEEK -> PackUsage.DaysAgo(elapsedDays.toInt())
-        elapsedDays < DAYS_PER_MONTH -> PackUsage.WeeksAgo((elapsedDays / DAYS_PER_WEEK).toInt())
-        else -> PackUsage.MonthsAgo((elapsedDays / DAYS_PER_MONTH).toInt())
+        elapsedDays <= 0L -> UsageBucket.Today
+        elapsedDays < DAYS_PER_WEEK -> UsageBucket.DaysAgo(elapsedDays.toInt())
+        elapsedDays < DAYS_PER_MONTH -> UsageBucket.WeeksAgo((elapsedDays / DAYS_PER_WEEK).toInt())
+        else -> UsageBucket.MonthsAgo((elapsedDays / DAYS_PER_MONTH).toInt())
     }
 }
 
@@ -112,8 +131,8 @@ fun packUsage(
  * roles are told apart, because a language you translate FROM often is not the
  * same as one you translate INTO, and the detail is the room to say so.
  *
- * Each side is the SAME honest bucket the row draws ([packUsage]): a role with no
- * translation-success stamp is [PackUsage.NoRecord] — "no recorded use yet", never
+ * Each side is the SAME honest [PackUsage] the row carries ([packUsage]): a role with
+ * no translation-success stamp is [PackUsage.NoRecord] — "no recorded use yet", never
  * a fabricated date (ruling ⑧, brief §7b). So a pack used only as a source reads a
  * real date on the source line and the date-less line on the target line, and both
  * are true.
@@ -127,11 +146,12 @@ data class PackRoleUsage(
 /**
  * The selected pack's per-role last-used, for the 20d detail pane.
  *
- * Pure and now-in-the-signature, the same shape as [packUsage] it delegates to, so
- * the honesty (a role with no stamp → [PackUsage.NoRecord]) is checkable without a
- * clock. Each role reads its OWN map — [usageAsSource] for the source line,
- * [usageAsTarget] for the target line — so a swap of the two is a reddening
- * mutation, not a silent lie about which way the language was used.
+ * Pure and the same shape as [packUsage] it delegates to, so the honesty (a role with
+ * no stamp → [PackUsage.NoRecord]) is checkable directly. Each role reads its OWN map
+ * — [usageAsSource] for the source line, [usageAsTarget] for the target line — so a
+ * swap of the two is a reddening mutation, not a silent lie about which way the
+ * language was used. The relative date each line prints derives from the stamp at the
+ * detail pane's clock ([PackUsage.Used.bucket]), never stored here.
  *
  * @param usageAsSource canonical-id → last-used-as-source millis (#122 SOURCE role).
  * @param usageAsTarget canonical-id → last-used-as-target millis (#122 TARGET role).
@@ -140,18 +160,17 @@ fun packRoleUsage(
     id: String,
     usageAsSource: Map<String, Long>,
     usageAsTarget: Map<String, Long>,
-    nowMillis: Long,
 ): PackRoleUsage =
     PackRoleUsage(
-        asSource = packUsage(usageAsSource[id], nowMillis),
-        asTarget = packUsage(usageAsTarget[id], nowMillis),
+        asSource = packUsage(usageAsSource[id]),
+        asTarget = packUsage(usageAsTarget[id]),
     )
 
-/** True only for a pack with a real date at or beyond [STALE_THRESHOLD_DAYS]. Date-less packs are never stale. */
+/** True only for a [PackUsage.Used] at or beyond [STALE_THRESHOLD_DAYS]. A [PackUsage.NoRecord] pack is never stale. */
 internal fun isStale(
-    lastUsedMillis: Long?,
+    usage: PackUsage,
     nowMillis: Long,
-): Boolean = lastUsedMillis != null && (nowMillis - lastUsedMillis) >= STALE_THRESHOLD_DAYS * DAY_MILLIS
+): Boolean = usage is PackUsage.Used && (nowMillis - usage.lastUsedMillis) >= STALE_THRESHOLD_DAYS * DAY_MILLIS
 
 /**
  * The exact packs the 20e "Free up space" cleanup sheet lists and the nudge counts
@@ -160,10 +179,11 @@ internal fun isStale(
  * Three exclusions, the same three the nudge has always applied (this is now their
  * one home, so the LIST 20e removes and the COUNT the nudge shows can never
  * disagree):
- * - the pivot (English, #224): removing it frees nothing, so it is never offered;
- * - a date-less pack ([PackUsage.NoRecord], `lastUsedMillis == null`): staleness
- *   needs a real date to measure, and a selection must never fabricate one
- *   (ruling ⑧, brief §7b) — so a pack nobody has translated with is NEVER listed;
+ * - the pivot (English, #224): removing it frees nothing, so it is never offered —
+ *   asked of [isPivotLanguage] by id, so a row and its pivot-ness cannot disagree;
+ * - a date-less pack ([PackUsage.NoRecord]): staleness needs a real date to measure,
+ *   and a selection must never fabricate one (ruling ⑧, brief §7b) — so a pack nobody
+ *   has translated with is NEVER listed, which [isStale] enforces by type;
  * - a pack used within [STALE_THRESHOLD_DAYS]: not yet stale.
  *
  * Order is inherited from [buildManagePacksSections]' on-device sort (most-recent
@@ -173,26 +193,29 @@ internal fun isStale(
 internal fun stalePacks(
     onDevice: List<PackRow>,
     nowMillis: Long,
-): List<PackRow> = onDevice.filter { !it.isPivot && isStale(it.lastUsedMillis, nowMillis) }
+): List<PackRow> = onDevice.filter { !isPivotLanguage(it.id) && isStale(it.usage, nowMillis) }
 
 /**
  * One Manage-packs row: an offline-capable language the user HAS, is fetching, or
  * a fetch that failed. Not the catalog — the picker is where new packs are
  * browsed; this screen shows only what is installed / in flight / failed.
  *
- * @property usage relative last-used, for the supporting line (on-device rows).
- * @property lastUsedMillis the raw stamp behind [usage], kept so the nudge's
- *   staleness is measured precisely rather than re-derived from a display bucket.
+ * @property usage the honest last-used ([PackUsage]) — the SINGLE source for the
+ *   supporting line's relative date, the on-device order AND staleness alike. A
+ *   [PackUsage.Used] carries the raw stamp; a [PackUsage.NoRecord] carries none, so a
+ *   date-less pack cannot be asked "how many months" nor be called stale (#325).
  * @property inUse this pack's language is the current translation TARGET — the
  *   "IN USE" badge, and the only sense of in-use either drawn frame has.
- * @property isPivot the ML Kit English pivot (#224): included with every pack,
- *   removable by nothing, so it carries no overflow control and is never nudged.
  * @property hasOfflineVoice this device can also SPEAK this language offline — a
  *   voice, installed separately from the translate pack (device truth, the same
  *   `Language.hasOfflineVoice` the picker's speaker mark reads). Feeds the 20c
  *   pack-actions sheet's informational voice line ONLY; it never gates a row's
  *   presence, its removal, or its ordering. Defaulted so the many existing PackRow
  *   constructions (previews, tests) are untouched (#130 PR-24).
+ *
+ * The pivot-ness the row once stored (`isPivot`) is gone: it is asked of
+ * [isPivotLanguage] by [id] at the few read sites, so a row and its pivot-ness can
+ * never disagree (#224, #325 finding 2).
  */
 @Immutable
 data class PackRow(
@@ -200,9 +223,7 @@ data class PackRow(
     val displayName: String,
     val state: OfflineModelState,
     val usage: PackUsage,
-    val lastUsedMillis: Long?,
     val inUse: Boolean,
-    val isPivot: Boolean,
     val hasOfflineVoice: Boolean = false,
 )
 
@@ -248,7 +269,6 @@ fun buildManagePacksSections(
     rows: List<OfflineLanguageRow>,
     usage: Map<String, Long>,
     targetId: String,
-    nowMillis: Long,
     locale: Locale,
 ): ManagePacksSections {
     // Voice is looked up by id from the INPUT rows, exactly as `usage` is: the
@@ -258,15 +278,14 @@ fun buildManagePacksSections(
     val voiceById = rows.associate { it.id to it.hasOfflineVoice }
     val packRows =
         buildOfflineRows(rows, locale).map { row ->
-            val lastUsed = usage[row.id]
             PackRow(
                 id = row.id,
                 displayName = row.displayName,
                 state = row.state,
-                usage = packUsage(lastUsed, nowMillis),
-                lastUsedMillis = lastUsed,
+                // The stamp travels INSIDE [PackUsage] now: `Used(stamp)` or `NoRecord`,
+                // the single source the row's date, the order and staleness all read (#325).
+                usage = packUsage(usage[row.id]),
                 inUse = row.id == targetId,
-                isPivot = isPivotLanguage(row.id),
                 hasOfflineVoice = voiceById[row.id] == true,
             )
         }
@@ -279,7 +298,7 @@ fun buildManagePacksSections(
             .filter { it.state == OfflineModelState.Downloaded || it.state == OfflineModelState.Deleting }
             .sortedWith(onDeviceOrder)
     val downloadable =
-        packRows.filter { it.state == OfflineModelState.NotDownloaded && !it.isPivot }
+        packRows.filter { it.state == OfflineModelState.NotDownloaded && !isPivotLanguage(it.id) }
     return ManagePacksSections(
         downloading = downloading,
         failed = failed,
@@ -289,14 +308,14 @@ fun buildManagePacksSections(
 }
 
 /**
- * In use first, then most-recently-used, then alphabetical. `lastUsedMillis` is
- * `null` for a pack with no recorded use; it compares as the smallest value so it
- * lands after every dated pack — [buildManagePacksSections] explains why that is
- * ordering-only and not a staleness claim.
+ * In use first, then most-recently-used, then alphabetical. A [PackUsage.NoRecord]
+ * pack has no stamp; it compares as the smallest value so it lands after every dated
+ * pack — [buildManagePacksSections] explains why that is ordering-only and not a
+ * staleness claim.
  */
 private val onDeviceOrder: Comparator<PackRow> =
     compareByDescending<PackRow> { it.inUse }
-        .thenByDescending { it.lastUsedMillis ?: Long.MIN_VALUE }
+        .thenByDescending { (it.usage as? PackUsage.Used)?.lastUsedMillis ?: Long.MIN_VALUE }
         .thenBy { it.displayName }
 
 /**

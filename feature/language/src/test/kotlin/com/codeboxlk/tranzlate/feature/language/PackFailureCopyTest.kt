@@ -87,7 +87,6 @@ class PackFailureCopyTest {
                 rows = listOf(OfflineLanguageRow("hi", "Hindi", OfflineModelState.Failed(cause))),
                 usage = emptyMap(),
                 targetId = "",
-                nowMillis = 0L,
                 locale = Locale.ENGLISH,
             )
         compose.setContent {

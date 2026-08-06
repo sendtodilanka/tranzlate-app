@@ -129,6 +129,16 @@ pre-flight was an unguarded binder read, the #238 crash class). Finding 3
 fixed. A same-class out-of-scope read at `RealTranslator.kt:178` is flagged there for a
 follow-up issue. Passes 2 and 3 remain before rule 13's exit condition is met.
 
+**Phase-2 pass-3 remediation note.** The type-design-analyzer pass (pass 3) over the
+rev5 model types found the load-bearing ⑧ honesty invariant enforced by factory
+CONVENTION, not by the types: `PackRow` carried a raw `lastUsedMillis` beside the
+`PackUsage` display bucket, plus a denormalized `isPivot` (**#325**, S2). Remediated in
+**PR #334**: `PackUsage` collapsed to `NoRecord | Used(lastUsedMillis)`, the display
+bucket and staleness DERIVED, `PackRow.lastUsedMillis`/`isPivot` deleted — the illegal
+states are now uncompilable (proven by a throwaway probe). Both gates green
+(`preflight` + `build`); cross-model co-verify pending. Pass-2's 20e test-hardening
+(**#327**) is held to rebase onto this collapse (shared `FreeUpSpaceSheet*` files).
+
 **Wave 1f landing note:** **#221** — `git grep -E` silently ignores `\b`, so an enumeration
 written that way reports a false zero and reads as clean — landed in **PR #295**. The command
 vector was already blocked on `main` by the shipped hookify rule `git-grep-word-boundary`; PR #295

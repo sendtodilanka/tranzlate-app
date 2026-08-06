@@ -54,7 +54,7 @@ class ManagePacksListDetailRenderTest {
         nowMillis: Long = 0L,
     ) {
         val sections =
-            buildManagePacksSections(rows, usage = usage, targetId = "", nowMillis = nowMillis, locale = Locale.ENGLISH)
+            buildManagePacksSections(rows, usage = usage, targetId = "", locale = Locale.ENGLISH)
         compose.setContent {
             TranzlateTheme {
                 ManagePacksContent(
