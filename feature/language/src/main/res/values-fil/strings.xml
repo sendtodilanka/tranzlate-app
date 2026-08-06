@@ -59,8 +59,8 @@
         <item quantity="other">Maghanap sa %1$d na wika</item>
     </plurals>
     <plurals name="text_lang_on_device_count">
-        <item quantity="one">%1$d sa %2$d ang nasa device</item>
-        <item quantity="other">%1$d sa %2$d ang nasa device</item>
+        <item quantity="one">%1$d sa %2$d na pack ang nasa device</item>
+        <item quantity="other">%1$d sa %2$d na pack ang nasa device</item>
     </plurals>
     <plurals name="text_lang_can_be_offline_count">
         <item quantity="one">%1$d ang puwedeng maging offline</item>
