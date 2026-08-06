@@ -193,6 +193,7 @@
     <string name="manage_detail_usage_header">Kung saan ginagamit ang pack na ito</string>
     <string name="manage_detail_role_source">Bilang pinagmulan</string>
     <string name="manage_detail_role_target">Bilang target</string>
+    <string name="manage_detail_role_line">%1$s · %2$s</string>
     <string name="manage_detail_empty">Pumili ng pack para makita kung paano ito ginamit.</string>
     <string name="manage_detail_status_on_device">Nasa device · handa nang gamitin nang walang koneksyon</string>
     <string name="manage_detail_cap_text_title">Teksto offline</string>

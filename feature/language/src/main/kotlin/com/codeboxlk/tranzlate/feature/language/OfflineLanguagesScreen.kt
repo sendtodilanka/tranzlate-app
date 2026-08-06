@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DownloadForOffline
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.Button
@@ -73,9 +74,13 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
@@ -551,12 +556,12 @@ private fun EmptyList(
 // ── Two-pane list-detail (20d · #130 PR-26) ──────────────────────────────────
 
 /**
- * The list pane's fixed width in the 20d two-pane. A single-column pack list reads
- * best at about a phone's width, so the list keeps ~400dp and the detail takes the
- * rest of a 1280dp tablet — a plain `Row`, never `ListDetailPaneScaffold` and never
- * the `adaptive-layout` dependency (a standing REJECT, ruling :90/:238).
+ * The list pane's fixed width in the 20d two-pane — the rev5 frame's exact 392dp. The
+ * detail takes the rest of a 1280dp tablet, separated by [D20d.PaneGap] (22dp) — a plain
+ * `Row`, never `ListDetailPaneScaffold` and never the `adaptive-layout` dependency (a
+ * standing REJECT, ruling :90/:238).
  */
-private val ManagePacksListWidth = 400.dp
+private val ManagePacksListWidth = D20d.ListWidth
 
 /**
  * 20d Manage packs at EXPANDED width: the existing list on the left, the selected
@@ -607,7 +612,10 @@ private fun ManagePacksTwoPane(
         produceState(0, selectedPack?.id) {
             value = selectedPack?.id?.let { onSavedCount(it) } ?: 0
         }
-    Row(modifier = Modifier.fillMaxSize()) {
+    Row(
+        modifier = Modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(D20d.PaneGap),
+    ) {
         Box(modifier = Modifier.width(ManagePacksListWidth)) {
             if (sections.hasPacks) {
                 PopulatedList(
@@ -640,7 +648,6 @@ private fun ManagePacksTwoPane(
                 )
             }
         }
-        VerticalDivider()
         ManagePacksDetailPane(
             pack = selectedPack,
             roleUsage = roleUsage,
@@ -658,9 +665,11 @@ private fun ManagePacksTwoPane(
  * When [onSelectPack] is null (the phone's single pane) it is exactly the old
  * [PackRow] and nothing about the row changes. When non-null it wraps the same row
  * in a `selectable`, so a tap picks the pack and the row keeps its own overflow
- * button working (a nested control the selectable does not swallow), and the picked
- * row carries a `secondaryContainer` tint plus the "selected" state a screen reader
- * announces.
+ * button working (a nested control the selectable does not swallow). The picked row is
+ * the frame's STADIUM highlight: `primaryContainer` fill clipped to a `RoundedCornerShape`
+ * of HALF the row height (README's corner rule — the square-corner defect the owner
+ * flagged was a `.background()` with no `.clip()`), its text recoloured to
+ * `onPrimaryContainer`, and the "selected" state a screen reader announces.
  */
 @Composable
 private fun SelectablePackRow(
@@ -684,11 +693,12 @@ private fun SelectablePackRow(
         )
         return
     }
-    val background = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(D20d.RowRadius))
                 .background(background)
                 .selectable(selected = selected, onClick = { onSelectPack(row) })
                 .testTag("tt_manage_select_row"),
@@ -696,12 +706,108 @@ private fun SelectablePackRow(
         PackRow(
             row = row,
             nowMillis = nowMillis,
+            selected = selected,
             onStopDownload = onStopDownload,
             onRetry = onRetry,
             onMoreOptions = onMoreOptions,
             onDismissFailure = onDismissFailure,
         )
     }
+}
+
+/**
+ * The rev5 20d frame's EXACT geometry + type, extracted from
+ * `docs/design/language-screens/language-screens-spec.html` (`dv-opt id="20d"`), so the
+ * pixel-match is auditable in ONE place rather than scattered as literals (owner's
+ * 100%-visual-match standard, 2026-08-06). Colours are NOT here — they map to
+ * `MaterialTheme.colorScheme` role tokens (README §Tokens / DESIGN_SYSTEM §1); only the
+ * numbers the frame states in px live here, as dp/sp.
+ *
+ * Where a value breaks the README "8dp (or 4) spacing scale" (18/22/26/30/14/10), it is
+ * the frame's own number and rev5 is the SSOT — kept exact, flagged in the PR for
+ * system reconciliation. `RowRadius` is HALF `RowHeight` (README's stadium rule).
+ */
+private object D20d {
+    // Two-pane
+    val PaneGap = 22.dp // list ↔ detail (frame body gap; header/label wrapper was 18)
+    val ListWidth = 392.dp
+
+    // Detail pane card
+    val PaneRadius = 28.dp
+    val PanePadH = 30.dp
+    val PanePadV = 28.dp
+
+    // Identity
+    val IdentityGap = 18.dp
+    val AvatarLg = 64.dp
+    val AvatarSm = 36.dp
+    val InitialsLg = 15.sp
+    val InitialsSm = 11.5.sp
+    val InitialsTracking = 0.5.sp
+    val NameSize = 28.sp
+    val NameLine = 34.sp
+    val StatusSize = 13.5.sp
+    val StatusLine = 19.sp
+    val StatusGap = 4.dp
+
+    // Capability cards
+    val CapRowGap = 14.dp
+    val CapRowTop = 26.dp
+    val CapMinWidth = 190.dp
+    val CapPad = 16.dp
+    val CapRadius = 20.dp
+    val CapIcon = 22.dp
+    val CapTitleSize = 15.sp
+    val CapTitleLine = 20.sp
+    val CapTitleTop = 10.dp
+    val CapSubSize = 12.5.sp
+    val CapSubLine = 17.sp
+    val CapSubTop = 2.dp
+
+    // "Where this pack is used"
+    val SectionTop = 26.dp
+    val HeaderSize = 12.sp
+    val HeaderLine = 16.sp
+    val HeaderTracking = 0.8.sp
+    val HeaderBottom = 10.dp
+    val UsedLineGap = 2.dp
+    val UsedIcon = 20.dp
+    val UsedRowGap = 14.dp
+    val UsedPadV = 10.dp
+    val UsedPadH = 2.dp
+    val UsedTextSize = 14.sp
+    val UsedTextLine = 20.sp
+
+    // Remove block
+    val RemoveTop = 26.dp
+    val RemovePad = 16.dp
+    val RemoveRadius = 20.dp
+    val RemoveGap = 12.dp
+    val RemoveIcon = 20.dp
+    val RemoveBodySize = 13.5.sp
+    val RemoveBodyLine = 19.sp
+    val RemoveBtnHeight = 44.dp
+    val RemoveBtnPadH = 20.dp
+    val RemoveBtnRadius = 22.dp
+    val RemoveBtnText = 14.5.sp
+
+    // List rows (stadium: radius = height / 2)
+    val RowHeight = 64.dp
+    val RowRadius = 32.dp
+    val RowGap = 14.dp
+    val RowPadH = 12.dp
+    val RowBottom = 6.dp
+    val RowNameSize = 15.sp
+    val RowNameLine = 20.sp
+    val RowSubSize = 12.sp
+    val RowSubLine = 16.sp
+
+    // IN USE chip (tertiary family)
+    val ChipHeight = 19.dp
+    val ChipPadH = 7.dp
+    val ChipRadius = 5.dp
+    val ChipText = 10.sp
+    val ChipTracking = 0.4.sp
 }
 
 /**
@@ -737,43 +843,51 @@ internal fun ManagePacksDetailPane(
         DetailNoSelection(modifier)
         return
     }
-    val spacing = LocalSpacing.current
     val detail = packDetail(pack)
     Column(
         modifier =
             modifier
+                .clip(RoundedCornerShape(D20d.PaneRadius))
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                 .verticalScroll(rememberScrollState())
-                .padding(spacing.lg24)
+                .padding(horizontal = D20d.PanePadH, vertical = D20d.PanePadV)
                 .testTag("tt_manage_detail"),
     ) {
         DetailIdentity(pack = pack, detail = detail)
-        DetailCapabilities(detail = detail, modifier = Modifier.padding(top = spacing.lg24))
-        Text(
-            text = stringResource(R.string.manage_detail_usage_header),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = spacing.lg24, bottom = spacing.xs4),
-        )
-        if (savedCount > 0) {
-            DetailSavedLine(count = savedCount, languageName = pack.displayName)
+        DetailCapabilities(detail = detail, modifier = Modifier.padding(top = D20d.CapRowTop))
+        Column(modifier = Modifier.padding(top = D20d.SectionTop)) {
+            Text(
+                text = stringResource(R.string.manage_detail_usage_header).uppercase(),
+                fontSize = D20d.HeaderSize,
+                lineHeight = D20d.HeaderLine,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = D20d.HeaderTracking,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(bottom = D20d.HeaderBottom),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(D20d.UsedLineGap)) {
+                if (savedCount > 0) {
+                    DetailSavedLine(count = savedCount, languageName = pack.displayName)
+                }
+                DetailRoleLine(
+                    role = stringResource(R.string.manage_detail_role_source),
+                    usage = roleUsage.asSource,
+                    nowMillis = nowMillis,
+                    tag = "tt_manage_detail_source",
+                )
+                DetailRoleLine(
+                    role = stringResource(R.string.manage_detail_role_target),
+                    usage = roleUsage.asTarget,
+                    nowMillis = nowMillis,
+                    tag = "tt_manage_detail_target",
+                )
+            }
         }
-        DetailRoleLine(
-            role = stringResource(R.string.manage_detail_role_source),
-            usage = roleUsage.asSource,
-            nowMillis = nowMillis,
-            tag = "tt_manage_detail_source",
-        )
-        DetailRoleLine(
-            role = stringResource(R.string.manage_detail_role_target),
-            usage = roleUsage.asTarget,
-            nowMillis = nowMillis,
-            tag = "tt_manage_detail_target",
-        )
         if (detail.removable) {
             DetailRemoveBlock(
                 pack = pack,
                 onRemove = onRemove,
-                modifier = Modifier.padding(top = spacing.lg24),
+                modifier = Modifier.padding(top = D20d.RemoveTop),
             )
         }
     }
@@ -785,30 +899,38 @@ private fun DetailIdentity(
     pack: PackRow,
     detail: PackDetail,
 ) {
-    val spacing = LocalSpacing.current
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PackAvatar(id = pack.id, downloaded = pack.state == OfflineModelState.Downloaded)
-            Text(
-                text = pack.displayName,
-                style = MaterialTheme.typography.headlineSmall,
-                modifier =
-                    Modifier
-                        .padding(start = spacing.md16)
-                        .weight(1f)
-                        .testTag("tt_manage_detail_name"),
-            )
-            if (pack.inUse) {
-                InUseBadge(modifier = Modifier.padding(start = spacing.sm8))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(D20d.IdentityGap),
+    ) {
+        PackAvatar(
+            id = pack.id,
+            downloaded = pack.state == OfflineModelState.Downloaded,
+            size = D20d.AvatarLg,
+            initialsSize = D20d.InitialsLg,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = pack.displayName,
+                    fontSize = D20d.NameSize,
+                    lineHeight = D20d.NameLine,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.testTag("tt_manage_detail_name"),
+                )
+                if (pack.inUse) {
+                    InUseBadge(modifier = Modifier.padding(start = LocalSpacing.current.sm8))
+                }
             }
-        }
-        detailStatusSubtitle(pack = pack, onDevice = detail.onDevice)?.let { subtitle ->
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = spacing.xs4).testTag("tt_manage_detail_status"),
-            )
+            detailStatusSubtitle(pack = pack, onDevice = detail.onDevice)?.let { subtitle ->
+                Text(
+                    text = subtitle,
+                    fontSize = D20d.StatusSize,
+                    lineHeight = D20d.StatusLine,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = D20d.StatusGap).testTag("tt_manage_detail_status"),
+                )
+            }
         }
     }
 }
@@ -838,10 +960,9 @@ private fun DetailCapabilities(
     detail: PackDetail,
     modifier: Modifier = Modifier,
 ) {
-    val spacing = LocalSpacing.current
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm8),
+        horizontalArrangement = Arrangement.spacedBy(D20d.CapRowGap),
     ) {
         CapabilityCard(
             icon = Icons.Outlined.Translate,
@@ -877,11 +998,14 @@ private fun DetailCapabilities(
 }
 
 /**
- * One capability card: `icon / title / subtitle`. A [CapabilityState.Supported]
- * capability draws filled (primary container) with its own "ready" subtitle; an
- * [CapabilityState.Unavailable] one draws muted (surface container) with "Needs a
- * connection" — the state is in the WORDS as well as the tint, so a screen reader and
- * a colour-blind reader both get it (a11y: never colour alone).
+ * One capability card: `icon / title / subtitle`, at the rev5 frame's exact geometry
+ * (padding 16, radius 20, icon 22, title 15/500, subtitle 12.5). A
+ * [CapabilityState.Supported] capability draws GREEN — `tertiaryContainer` fill,
+ * `onTertiaryContainer` on everything — with its own "ready" subtitle; an
+ * [CapabilityState.Unavailable] one draws NEUTRAL: `surfaceContainerHigh` fill, with the
+ * frame's three-tone foreground (icon `onSurfaceVariant`, title `onSurface`, subtitle
+ * `outline`) and "Needs a connection". The state is in the WORDS as well as the tint, so
+ * a screen reader and a colour-blind reader both get it (a11y: never colour alone).
  */
 @Composable
 private fun CapabilityCard(
@@ -892,31 +1016,74 @@ private fun CapabilityCard(
     subtitleTag: String,
     modifier: Modifier = Modifier,
 ) {
-    val spacing = LocalSpacing.current
     val scheme = MaterialTheme.colorScheme
     val supported = state == CapabilityState.Supported
-    val container = if (supported) scheme.primaryContainer else scheme.surfaceContainerHigh
-    val onContainer = if (supported) scheme.onPrimaryContainer else scheme.onSurfaceVariant
+    // The green is the THEME-INVARIANT tertiary-FIXED pair (rev5 §B: #C4EED0 / #072711,
+    // identical light+dark), so the supported card stays green in dark too — not the
+    // *Container roles, whose dark values flip to a dark green with poor text contrast.
+    val container = if (supported) scheme.tertiaryFixed else scheme.surfaceContainerHigh
+    val iconTint = if (supported) scheme.onTertiaryFixed else scheme.onSurfaceVariant
+    val titleColor = if (supported) scheme.onTertiaryFixed else scheme.onSurface
+    val subtitleColor = if (supported) scheme.onTertiaryFixed else scheme.outline
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(spacing.md16))
+                .clip(RoundedCornerShape(D20d.CapRadius))
                 .background(container)
-                .padding(spacing.md16)
+                .padding(D20d.CapPad)
                 .semantics(mergeDescendants = true) {},
     ) {
-        Icon(icon, contentDescription = null, tint = onContainer, modifier = Modifier.size(Dimensions.iconSm))
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(D20d.CapIcon))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = onContainer,
-            modifier = Modifier.padding(top = spacing.sm8),
+            fontSize = D20d.CapTitleSize,
+            lineHeight = D20d.CapTitleLine,
+            fontWeight = FontWeight.Medium,
+            color = titleColor,
+            modifier = Modifier.padding(top = D20d.CapTitleTop),
         )
         Text(
             text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = onContainer,
-            modifier = Modifier.testTag(subtitleTag),
+            fontSize = D20d.CapSubSize,
+            lineHeight = D20d.CapSubLine,
+            color = subtitleColor,
+            modifier = Modifier.padding(top = D20d.CapSubTop).testTag(subtitleTag),
+        )
+    }
+}
+
+/**
+ * One "where this pack is used" row — `icon + sentence`, at the frame's exact geometry
+ * (icon 20 `onSurfaceVariant`, text 14/20 `onSurface`, row gap 14, padding 10×2). The
+ * saved-phrases and per-role usage lines share it so they read as one list.
+ */
+@Composable
+private fun UsedLine(
+    icon: ImageVector,
+    text: String,
+    tag: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(D20d.UsedRowGap),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = D20d.UsedPadV, horizontal = D20d.UsedPadH)
+                .semantics(mergeDescendants = true) {},
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(D20d.UsedIcon),
+        )
+        Text(
+            text = text,
+            fontSize = D20d.UsedTextSize,
+            lineHeight = D20d.UsedTextLine,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f).testTag(tag),
         )
     }
 }
@@ -927,28 +1094,11 @@ private fun DetailSavedLine(
     count: Int,
     languageName: String,
 ) {
-    val spacing = LocalSpacing.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = spacing.xs4)
-                .semantics(mergeDescendants = true) {},
-    ) {
-        Icon(
-            Icons.Outlined.Bookmark,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(Dimensions.iconSm),
-        )
-        Text(
-            text = pluralStringResource(R.plurals.manage_detail_saved, count, count, languageName),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = spacing.sm8).testTag("tt_manage_detail_saved"),
-        )
-    }
+    UsedLine(
+        icon = Icons.Outlined.Bookmark,
+        text = pluralStringResource(R.plurals.manage_detail_saved, count, count, languageName),
+        tag = "tt_manage_detail_saved",
+    )
 }
 
 /**
@@ -962,37 +1112,56 @@ private fun DetailRemoveBlock(
     onRemove: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val spacing = LocalSpacing.current
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(
-                Icons.Outlined.Delete,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(Dimensions.iconSm),
-            )
-            Text(
-                text = stringResource(R.string.manage_detail_remove_body, pack.displayName),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = spacing.sm8).weight(1f),
-            )
-        }
-        OutlinedButton(
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(D20d.RemoveGap),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(D20d.RemoveRadius))
+                .background(MaterialTheme.colorScheme.errorContainer)
+                .padding(D20d.RemovePad),
+    ) {
+        Icon(
+            Icons.Outlined.Delete,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.size(D20d.RemoveIcon),
+        )
+        Text(
+            text = stringResource(R.string.manage_detail_remove_body, pack.displayName),
+            fontSize = D20d.RemoveBodySize,
+            lineHeight = D20d.RemoveBodyLine,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.weight(1f),
+        )
+        Button(
             onClick = { onRemove(pack.id) },
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier =
-                Modifier
-                    .padding(top = spacing.sm8)
-                    .heightIn(min = Dimensions.touchTargetMin)
-                    .testTag("tt_manage_detail_remove"),
+            shape = RoundedCornerShape(D20d.RemoveBtnRadius),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            contentPadding = PaddingValues(horizontal = D20d.RemoveBtnPadH),
+            modifier = Modifier.height(D20d.RemoveBtnHeight).testTag("tt_manage_detail_remove"),
         ) {
-            Text(stringResource(R.string.manage_detail_remove_action))
+            Text(
+                text = stringResource(R.string.manage_detail_remove_action),
+                fontSize = D20d.RemoveBtnText,
+                fontWeight = FontWeight.Medium,
+            )
         }
     }
 }
 
-/** One "As source · used today" / "As target · no recorded use yet" line, honest per role. */
+/**
+ * One "As source · used today" / "As target · no recorded use yet" usage line, honest
+ * per role (ruling ⑧), in the frame's `history`-icon + sentence style. NOTE: the frame
+ * draws a SINGLE "last used as a source" line; the impl keeps the co-verify-APPROVED
+ * per-role split (source AND target) in that same visual style — a content decision,
+ * flagged for the owner, not the styling the 100%-match standard governs.
+ */
 @Composable
 private fun DetailRoleLine(
     role: String,
@@ -1000,28 +1169,11 @@ private fun DetailRoleLine(
     nowMillis: Long,
     tag: String,
 ) {
-    val spacing = LocalSpacing.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = spacing.xs4)
-                .semantics(mergeDescendants = true) {},
-    ) {
-        Text(
-            text = role,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = packUsageText(usage, nowMillis),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.testTag(tag),
-        )
-    }
+    UsedLine(
+        icon = Icons.Outlined.History,
+        text = stringResource(R.string.manage_detail_role_line, role, packUsageText(usage, nowMillis)),
+        tag = tag,
+    )
 }
 
 /** The detail pane with nothing selected (no packs yet, or a removed pack) — never a dead end. */
@@ -1328,26 +1480,38 @@ private fun PackRow(
     onRetry: (String) -> Unit,
     onMoreOptions: (PackRow) -> Unit,
     onDismissFailure: (String) -> Unit = {},
+    selected: Boolean = false,
 ) {
     val spacing = LocalSpacing.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(D20d.RowGap),
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = Dimensions.pickerRowHeightTall)
-                .padding(start = spacing.md16, end = spacing.xs4)
+                .heightIn(min = D20d.RowHeight)
+                .padding(horizontal = D20d.RowPadH)
                 .testTag("tt_manage_row"),
     ) {
         PackAvatar(id = row.id, downloaded = row.state == OfflineModelState.Downloaded)
-        Column(modifier = Modifier.weight(1f).padding(start = spacing.md16)) {
+        val scheme = MaterialTheme.colorScheme
+        // Selected-row name = onPrimaryFixed (#041E49), the component-library colour for a
+        // selected pack name (higher contrast on the primaryContainer fill than onPrimaryContainer).
+        val nameColor = if (selected) scheme.onPrimaryFixed else scheme.onSurface
+        Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = row.displayName, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = row.displayName,
+                    fontSize = D20d.RowNameSize,
+                    lineHeight = D20d.RowNameLine,
+                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                    color = nameColor,
+                )
                 if (row.inUse) {
                     InUseBadge(modifier = Modifier.padding(start = spacing.sm8))
                 }
             }
-            PackRowSupporting(row, nowMillis)
+            PackRowSupporting(row = row, nowMillis = nowMillis, selected = selected)
         }
         PackRowControl(
             row = row,
@@ -1363,17 +1527,22 @@ private fun PackRow(
 private fun PackRowSupporting(
     row: PackRow,
     nowMillis: Long,
+    selected: Boolean = false,
 ) {
     // #224: the ML Kit pivot (English) is included with every pack and cannot be
     // removed on its own (a measured no-op). Owner ruling (2026-08-05): keep the
     // row but say WHY it has no control, in place of a usage line. Guarded by id
     // ([isPivotLanguage], not a stored flag), so the story holds whatever state ML
     // Kit reports for the pivot and a row can never disagree with its own id (#325).
+    // The frame's row subtitle is `outline` for a settled row, `error` for a failure,
+    // and `onPrimaryContainer` on the selected (blue) row. Size 12/16.
+    val subColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.outline
     if (isPivotLanguage(row.id)) {
         Text(
             text = stringResource(R.string.offline_included),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = D20d.RowSubSize,
+            lineHeight = D20d.RowSubLine,
+            color = subColor,
             modifier = Modifier.testTag("tt_manage_included"),
         )
         return
@@ -1382,16 +1551,18 @@ private fun PackRowSupporting(
         OfflineModelState.Downloading -> {
             Text(
                 text = stringResource(R.string.text_lang_downloading),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = D20d.RowSubSize,
+                lineHeight = D20d.RowSubLine,
+                color = subColor,
             )
         }
 
         is OfflineModelState.Failed -> {
             Text(
                 text = stringResource(downloadFailureCopy(state.cause).rowLine),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                fontSize = D20d.RowSubSize,
+                lineHeight = D20d.RowSubLine,
+                color = if (selected) subColor else MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag("tt_manage_error_line"),
             )
         }
@@ -1400,8 +1571,9 @@ private fun PackRowSupporting(
             // Downloaded / Deleting: "On device · used today" (or "· no recorded use yet").
             Text(
                 text = stringResource(R.string.text_lang_on_device_size, packUsageText(row.usage, nowMillis)),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = D20d.RowSubSize,
+                lineHeight = D20d.RowSubLine,
+                color = subColor,
                 modifier = Modifier.testTag("tt_manage_usage_line"),
             )
         }
@@ -1503,18 +1675,23 @@ private fun StopControl(
 
 @Composable
 private fun InUseBadge(modifier: Modifier = Modifier) {
-    val spacing = LocalSpacing.current
+    // The frame's IN USE chip is GREEN, theme-invariant: bg tertiaryFixed (#C4EED0),
+    // fg onTertiaryFixed (#072711), radius 5, 10sp, height 19, padding 0×7, tracking .4.
     Box(
+        contentAlignment = Alignment.Center,
         modifier =
             modifier
-                .clip(TranzlateShapeFull)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(horizontal = spacing.sm8, vertical = spacing.xs4 / 2),
+                .height(D20d.ChipHeight)
+                .clip(RoundedCornerShape(D20d.ChipRadius))
+                .background(MaterialTheme.colorScheme.tertiaryFixed)
+                .padding(horizontal = D20d.ChipPadH),
     ) {
         Text(
             text = stringResource(R.string.manage_in_use),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontSize = D20d.ChipText,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = D20d.ChipTracking,
+            color = MaterialTheme.colorScheme.onTertiaryFixed,
         )
     }
 }
@@ -1523,17 +1700,24 @@ private fun InUseBadge(modifier: Modifier = Modifier) {
 private fun PackAvatar(
     id: String,
     downloaded: Boolean,
+    modifier: Modifier = Modifier,
+    size: Dp = D20d.AvatarSm,
+    initialsSize: TextUnit = D20d.InitialsSm,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val background = if (downloaded) scheme.primaryContainer else scheme.surfaceContainerHighest
+    // Frame avatars: on-device blue (primaryContainer / onPrimaryContainer), else grey
+    // (surfaceContainerHigh / onSurfaceVariant). Fully round (radius = size / 2).
+    val background = if (downloaded) scheme.primaryContainer else scheme.surfaceContainerHigh
     val foreground = if (downloaded) scheme.onPrimaryContainer else scheme.onSurfaceVariant
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(Dimensions.iconChip).clip(TranzlateShapeFull).background(background),
+        modifier = modifier.size(size).clip(TranzlateShapeFull).background(background),
     ) {
         Text(
             text = languageAvatarCode(id),
-            style = MaterialTheme.typography.labelMedium,
+            fontSize = initialsSize,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = D20d.InitialsTracking,
             color = foreground,
             maxLines = 1,
         )

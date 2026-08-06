@@ -492,6 +492,7 @@ translation stamp reads `manage_used_never` — never a fabricated date (ruling 
 | `manage_detail_usage_header` | string | `Where this pack is used` | — | the "where used" section header (renamed from `Usage`, conformance #332) |
 | `manage_detail_role_source` | string | `As source` | — | the "source" line's role label; its value is a `manage_used_*` bucket for the SOURCE-role stamp (#122) |
 | `manage_detail_role_target` | string | `As target` | — | the target-role label; its value is a `manage_used_*` bucket for the TARGET-role stamp (#122) |
+| `manage_detail_role_line` | string | `%1$s · %2$s` | role, bucket | combines the role label with its relative last-used, in the frame's `history`-icon + sentence style ("As source · used 3 days ago") |
 | `manage_detail_empty` | string | `Select a pack to see how it has been used.` | — | the no-selection placeholder (no packs, or a removed pack) — never a dead end. No apostrophe (an unescaped `'` breaks the build) |
 | `manage_detail_status_on_device` | string | `On device · ready to use with no connection` | — | the identity status subtitle for a pack on disk; a downloading/failed pack shows its own state line instead (ruling ⑧) |
 | `manage_detail_cap_text_title` | string | `Text offline` | — | the Text-offline capability card title |

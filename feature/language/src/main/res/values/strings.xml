@@ -425,6 +425,9 @@
     <string name="manage_detail_usage_header">Where this pack is used</string>
     <string name="manage_detail_role_source">As source</string>
     <string name="manage_detail_role_target">As target</string>
+    <!-- The "where used" usage line combines the role label with its relative last-used
+         bucket, in the frame's icon+sentence style: "As source · used 3 days ago". -->
+    <string name="manage_detail_role_line">%1$s · %2$s</string>
     <string name="manage_detail_empty">Select a pack to see how it has been used.</string>
     <!-- The detail pane's identity subtitle for an on-device pack (#332): the frame's
          "On device · ready to use with no connection". The middle dot matches text_lang_on_device_size. -->

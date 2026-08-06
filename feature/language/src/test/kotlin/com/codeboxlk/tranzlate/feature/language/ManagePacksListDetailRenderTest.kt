@@ -140,12 +140,27 @@ class ManagePacksListDetailRenderTest {
             nowMillis = now,
         )
 
+        // The rev5 20d line combines role + bucket ("As source · used 3 days ago"), so
+        // the honesty mutation (a fabricated date on the empty target role) still reddens
+        // the target assertion below.
         compose
             .onNodeWithTag("tt_manage_detail_source", useUnmergedTree = true)
-            .assertTextEquals(context.resources.getQuantityString(R.plurals.manage_used_days, 3, 3))
+            .assertTextEquals(
+                context.getString(
+                    R.string.manage_detail_role_line,
+                    context.getString(R.string.manage_detail_role_source),
+                    context.resources.getQuantityString(R.plurals.manage_used_days, 3, 3),
+                ),
+            )
         compose
             .onNodeWithTag("tt_manage_detail_target", useUnmergedTree = true)
-            .assertTextEquals(context.getString(R.string.manage_used_never))
+            .assertTextEquals(
+                context.getString(
+                    R.string.manage_detail_role_line,
+                    context.getString(R.string.manage_detail_role_target),
+                    context.getString(R.string.manage_used_never),
+                ),
+            )
     }
 
     // ── selection drives the detail ─────────────────────────────────────────────

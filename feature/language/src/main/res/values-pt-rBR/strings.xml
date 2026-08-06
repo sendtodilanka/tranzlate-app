@@ -193,6 +193,7 @@
     <string name="manage_detail_usage_header">Onde este pacote é usado</string>
     <string name="manage_detail_role_source">Como origem</string>
     <string name="manage_detail_role_target">Como destino</string>
+    <string name="manage_detail_role_line">%1$s · %2$s</string>
     <string name="manage_detail_empty">Selecione um pacote para ver como ele foi usado.</string>
     <string name="manage_detail_status_on_device">No dispositivo · pronto para usar sem conexão</string>
     <string name="manage_detail_cap_text_title">Texto off-line</string>
