@@ -172,6 +172,7 @@
         <item quantity="other">%1$d sa %2$d na pack</item>
     </plurals>
     <string name="manage_downloading_note">Walang pause — kapag itinigil, itatapon ang pack.</string>
+    <string name="manage_stop_download">Itigil ang download at alisin</string>
     <!-- 20b failed-row Dismiss (#336) · #115 provisional -->
     <string name="manage_failed_dismiss">I-dismiss</string>
     <string name="manage_used_today">ginamit ngayon</string>
@@ -191,15 +192,30 @@
     <string name="manage_in_use">GINAGAMIT</string>
     <!-- 20d list-detail (#130 PR-26 / conformance #332) · #115 provisional, pending native review -->
     <string name="manage_detail_usage_header">Kung saan ginagamit ang pack na ito</string>
-    <string name="manage_detail_role_source">Bilang pinagmulan</string>
-    <string name="manage_detail_role_target">Bilang target</string>
-    <string name="manage_detail_role_line">%1$s · %2$s</string>
+    <string name="manage_detail_last_used_source">Huling ginamit bilang pinagmulang wika %1$s</string>
+    <string name="manage_detail_never_source">Hindi pa nagagamit bilang pinagmulang wika</string>
+    <string name="manage_detail_shares_data">Ibinabahagi ang naka-imbak na data sa %1$s — iisang beses iniingatan ang pares</string>
     <string name="manage_detail_empty">Pumili ng pack para makita kung paano ito ginamit.</string>
+    <string name="manage_when_today">ngayon</string>
+    <plurals name="manage_when_days">
+        <item quantity="one">%1$d araw na nakalipas</item>
+        <item quantity="other">%1$d na araw na nakalipas</item>
+    </plurals>
+    <plurals name="manage_when_weeks">
+        <item quantity="one">noong nakaraang linggo</item>
+        <item quantity="other">%1$d na linggo na nakalipas</item>
+    </plurals>
+    <plurals name="manage_when_months">
+        <item quantity="one">noong nakaraang buwan</item>
+        <item quantity="other">%1$d na buwan na nakalipas</item>
+    </plurals>
     <string name="manage_detail_status_on_device">Nasa device · handa nang gamitin nang walang koneksyon</string>
     <string name="manage_detail_cap_text_title">Teksto offline</string>
     <string name="manage_detail_cap_text_ready">Buong-pangungusap na engine</string>
     <string name="manage_detail_cap_voice_title">Boses offline</string>
     <string name="manage_detail_cap_voice_ready">May boses sa device</string>
+    <string name="manage_detail_cap_camera_title">Camera offline</string>
+    <string name="manage_detail_cap_camera_ready">Nagbabasa ng teksto sa mga larawan</string>
     <string name="manage_detail_cap_offline_unavailable">Kailangan ng koneksyon</string>
     <plurals name="manage_detail_saved">
         <item quantity="one">%1$d naka-save na parirala ang nasa %2$s</item>
@@ -218,11 +234,13 @@
         <item quantity="other">%1$d na pack ang hindi nagamit sa loob ng ilang buwan</item>
     </plurals>
     <string name="manage_nudge_body">Ang pagpapanatili lamang ng mga wikang ginagamit mo ay nagpapagaan sa app. Walang buburahin nang hindi nagtatanong.</string>
+    <string name="manage_nudge_freeing">Isang tap lang ang pagpapalaya; libre ang muling pag-download.</string>
     <string name="manage_nudge_dismiss">Hindi ngayon</string>
     <plurals name="manage_nudge_review">
         <item quantity="one">Suriin ang %1$d pack</item>
         <item quantity="other">Suriin ang %1$d na pack</item>
     </plurals>
+    <string name="manage_nudge_review_short">Suriin</string>
 
     <!-- 20e — Magbakante ng espasyo (#130 PR-25). -->
     <string name="lang_sheet_free_title">Magbakante ng espasyo</string>

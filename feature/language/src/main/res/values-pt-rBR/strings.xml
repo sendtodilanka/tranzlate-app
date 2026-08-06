@@ -172,6 +172,7 @@
         <item quantity="other">%1$d de %2$d pacotes</item>
     </plurals>
     <string name="manage_downloading_note">Não há pausa — parar descarta o pacote.</string>
+    <string name="manage_stop_download">Parar download e remover</string>
     <!-- 20b failed-row Dismiss (#336) · #115 provisional -->
     <string name="manage_failed_dismiss">Dispensar</string>
     <string name="manage_used_today">usado hoje</string>
@@ -191,15 +192,30 @@
     <string name="manage_in_use">EM USO</string>
     <!-- 20d list-detail (#130 PR-26 / conformance #332) · #115 provisional, pending native review -->
     <string name="manage_detail_usage_header">Onde este pacote é usado</string>
-    <string name="manage_detail_role_source">Como origem</string>
-    <string name="manage_detail_role_target">Como destino</string>
-    <string name="manage_detail_role_line">%1$s · %2$s</string>
+    <string name="manage_detail_last_used_source">Usado pela última vez como idioma de origem %1$s</string>
+    <string name="manage_detail_never_source">Ainda não usado como idioma de origem</string>
+    <string name="manage_detail_shares_data">Compartilha os dados armazenados com %1$s — o par é mantido uma vez</string>
     <string name="manage_detail_empty">Selecione um pacote para ver como ele foi usado.</string>
+    <string name="manage_when_today">hoje</string>
+    <plurals name="manage_when_days">
+        <item quantity="one">há %1$d dia</item>
+        <item quantity="other">há %1$d dias</item>
+    </plurals>
+    <plurals name="manage_when_weeks">
+        <item quantity="one">há %1$d semana</item>
+        <item quantity="other">há %1$d semanas</item>
+    </plurals>
+    <plurals name="manage_when_months">
+        <item quantity="one">há %1$d mês</item>
+        <item quantity="other">há %1$d meses</item>
+    </plurals>
     <string name="manage_detail_status_on_device">No dispositivo · pronto para usar sem conexão</string>
     <string name="manage_detail_cap_text_title">Texto off-line</string>
     <string name="manage_detail_cap_text_ready">Motor de frase completa</string>
     <string name="manage_detail_cap_voice_title">Voz off-line</string>
     <string name="manage_detail_cap_voice_ready">Tem uma voz no dispositivo</string>
+    <string name="manage_detail_cap_camera_title">Câmera off-line</string>
+    <string name="manage_detail_cap_camera_ready">Lê texto em fotos</string>
     <string name="manage_detail_cap_offline_unavailable">Precisa de conexão</string>
     <plurals name="manage_detail_saved">
         <item quantity="one">%1$d frase salva está em %2$s</item>
@@ -218,11 +234,13 @@
         <item quantity="other">%1$d pacotes não são usados há meses</item>
     </plurals>
     <string name="manage_nudge_body">Manter apenas os idiomas que você usa deixa o app leve. Nada é excluído sem perguntar.</string>
+    <string name="manage_nudge_freeing">Liberar leva um toque; baixar de novo é grátis.</string>
     <string name="manage_nudge_dismiss">Agora não</string>
     <plurals name="manage_nudge_review">
         <item quantity="one">Revisar %1$d pacote</item>
         <item quantity="other">Revisar %1$d pacotes</item>
     </plurals>
+    <string name="manage_nudge_review_short">Revisar</string>
 
     <!-- 20e — Liberar espaço (#130 PR-25). -->
     <string name="lang_sheet_free_title">Liberar espaço</string>

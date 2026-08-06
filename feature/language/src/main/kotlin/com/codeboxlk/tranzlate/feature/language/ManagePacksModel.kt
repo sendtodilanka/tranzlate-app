@@ -270,6 +270,7 @@ data class PackDetail(
     val onDevice: Boolean,
     val textOffline: CapabilityState,
     val voiceOffline: CapabilityState,
+    val cameraOffline: CapabilityState,
     val removable: Boolean,
 )
 
@@ -280,9 +281,82 @@ fun packDetail(row: PackRow): PackDetail {
         onDevice = onDevice,
         textOffline = if (onDevice) CapabilityState.Supported else CapabilityState.Unavailable,
         voiceOffline = if (onDevice && row.hasOfflineVoice) CapabilityState.Supported else CapabilityState.Unavailable,
+        // Camera-offline = an on-device pack AND a script ML Kit can read on-device (owner
+        // ruling 2026-08-06: Camera is a release feature, show it green where capable).
+        cameraOffline =
+            if (onDevice &&
+                offlineOcrCapable(row.id)
+            ) {
+                CapabilityState.Supported
+            } else {
+                CapabilityState.Unavailable
+            },
         removable = row.state == OfflineModelState.Downloaded && !isPivotLanguage(row.id),
     )
 }
+
+/**
+ * The offline-capable language ids whose SCRIPT ML Kit Text Recognition reads ON-DEVICE
+ * — the five on-device OCR scripts: **Latin, Chinese, Devanagari, Japanese, Korean**
+ * (developers.google.com/ml-kit/vision/text-recognition/v2 — the bundled script models).
+ *
+ * Derived by writing-system from `BundledLanguageCatalog.offlineCapableIds` (the 59), so
+ * only a pack the user can actually hold is ever asked. The EXCLUDED offline languages use
+ * scripts ML Kit has no on-device recogniser for: Arabic (`ar`, `fa`, `ur`), Cyrillic
+ * (`be`, `bg`, `mk`, `ru`, `uk`), Greek (`el`), Hebrew (`he`), Georgian (`ka`), and the
+ * Brahmic scripts other than Devanagari — Bengali (`bn`), Gujarati (`gu`), Kannada (`kn`),
+ * Tamil (`ta`), Telugu (`te`), Thai (`th`). Devanagari covers Hindi (`hi`) + Marathi (`mr`).
+ */
+internal val OFFLINE_OCR_SCRIPT_IDS: Set<String> =
+    setOf(
+        // Latin script
+        "af",
+        "sq",
+        "ca",
+        "hr",
+        "cs",
+        "da",
+        "nl",
+        "en",
+        "eo",
+        "et",
+        "tl",
+        "fi",
+        "fr",
+        "gl",
+        "de",
+        "ht",
+        "hu",
+        "is",
+        "id",
+        "ga",
+        "it",
+        "lv",
+        "lt",
+        "ms",
+        "mt",
+        "no",
+        "pl",
+        "pt",
+        "ro",
+        "sk",
+        "sl",
+        "es",
+        "sw",
+        "sv",
+        "tr",
+        "vi",
+        "cy",
+        // Chinese · Devanagari · Japanese · Korean
+        "zh",
+        "hi",
+        "mr",
+        "ja",
+        "ko",
+    )
+
+/** True when [id]'s script is one ML Kit reads on-device (Latin/Chinese/Devanagari/Japanese/Korean). */
+internal fun offlineOcrCapable(id: String): Boolean = id in OFFLINE_OCR_SCRIPT_IDS
 
 /**
  * The three lists 20b draws, in the order it draws them: what is transferring,

@@ -12,12 +12,14 @@ import androidx.test.core.app.ApplicationProvider
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.ui.languageDisplayName
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.Locale
 
 /**
  * The 20d detail-pane blocks the conformance fix (#332) adds, each verified by a render
@@ -113,6 +115,38 @@ class ManagePacksDetailPaneRenderTest {
     }
 
     /**
+     * The Camera card is GREEN (supported) for a pack whose SCRIPT ML Kit reads on-device
+     * (owner override 2026-08-06) — Afrikaans is Latin, so it draws "Reads text in photos".
+     *
+     * Mutation (decided first): delete the Camera `CapabilityCard` from `DetailCapabilities`.
+     * The tagged subtitle then never mounts and this reddens — the override gone.
+     */
+    @Test
+    fun `the camera card is supported for an on-device OCR script`() {
+        mount(downloadedPack(id = "af", name = "Afrikaans"))
+        compose
+            .onNodeWithTag("tt_manage_detail_cap_camera", useUnmergedTree = true)
+            .assertTextEquals(context.getString(R.string.manage_detail_cap_camera_ready))
+    }
+
+    /**
+     * The Camera card is MUTED for a pack whose script ML Kit has no on-device recogniser —
+     * Arabic — so it says "Needs a connection", not colour alone. Paired with the Latin test
+     * above, this makes the camera card SCRIPT-gated (an IFF), not "a camera card exists".
+     *
+     * Mutation (decided first): drop `&& offlineOcrCapable(row.id)` from `packDetail`'s
+     * `cameraOffline`, so every on-device pack is camera-supported. Arabic then reads
+     * "Reads text in photos" and this muted assertion reddens; the Latin test stays green.
+     */
+    @Test
+    fun `the camera card is muted for a non-OCR script`() {
+        mount(downloadedPack(id = "ar", name = "Arabic"))
+        compose
+            .onNodeWithTag("tt_manage_detail_cap_camera", useUnmergedTree = true)
+            .assertTextEquals(context.getString(R.string.manage_detail_cap_offline_unavailable))
+    }
+
+    /**
      * Above zero, the saved-phrases line draws the plural with the language name.
      *
      * Mutation (decided first): make the `savedCount > 0` guard unconditional-false
@@ -201,5 +235,55 @@ class ManagePacksDetailPaneRenderTest {
             .onNodeWithTag("tt_manage_detail_status", useUnmergedTree = true)
             .assertTextEquals(context.getString(R.string.manage_detail_status_on_device))
             .assertIsDisplayed()
+    }
+
+    /**
+     * A source role with no #122 stamp reads the honest date-less line (owner override's single
+     * last-used line), never a fabricated date (ruling ⑧).
+     *
+     * Mutation (decided first): the `NoRecord` branch reads a bucketed date (e.g. `manage_when_today`)
+     * instead of `manage_detail_never_source` — the line then claims a use that never happened
+     * and this reddens.
+     */
+    @Test
+    fun `a date-less source reads the honest never line`() {
+        mount(downloadedPack(), roleUsage = PackRoleUsage(asSource = PackUsage.NoRecord, asTarget = PackUsage.NoRecord))
+
+        compose
+            .onNodeWithTag("tt_manage_detail_last_used", useUnmergedTree = true)
+            .assertTextEquals(context.getString(R.string.manage_detail_never_source))
+    }
+
+    /**
+     * The pair-share line (owner override — build it as the frame has it) draws for a non-pivot
+     * on-device pack, naming the pivot (English).
+     *
+     * Mutation (decided first): drop the `!isPivotLanguage(pack.id)` half of the shares guard so
+     * the pivot draws it too; paired with `the pivot draws no pair-share line` that reddens. Here
+     * the POSITIVE case: Afrikaans draws it.
+     */
+    @Test
+    fun `the pair-share line draws for a non-pivot on-device pack`() {
+        mount(downloadedPack(id = "af", name = "Afrikaans"))
+
+        compose
+            .onNodeWithTag("tt_manage_detail_shares", useUnmergedTree = true)
+            .assertTextEquals(
+                context.getString(R.string.manage_detail_shares_data, languageDisplayName("en", Locale.getDefault())),
+            )
+    }
+
+    /**
+     * The pivot (English) draws NO pair-share line — it IS the pivot, so there is no other pack
+     * it shares with.
+     *
+     * Mutation (decided first): drop `!isPivotLanguage(pack.id)` from the shares guard so English
+     * draws the line too; this reddens.
+     */
+    @Test
+    fun `the pivot draws no pair-share line`() {
+        mount(downloadedPack(id = "en", name = "English"))
+
+        compose.onNodeWithTag("tt_manage_detail_shares", useUnmergedTree = true).assertDoesNotExist()
     }
 }

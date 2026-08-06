@@ -1,8 +1,11 @@
 package com.codeboxlk.tranzlate.feature.language
 
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
+import com.codeboxlk.tranzlate.core.model.OfflineModelFailure
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -23,13 +26,13 @@ import java.util.Locale
  *  - `ManagePacksContent` at COMPACT width (`w411dp-h891dp`), the phone frame (#333);
  *  - `ManagePacksContent` at EXPANDED width (`w1280dp-h800dp`), the 20d two-pane (#338).
  *
- * **The two-pane golden locks the FIXED 20d.** #337 deliberately DROPPED it: on `main`
- * the two-pane was still the pre-fix `ManagePacksDetailPane` (avatar+name, a bare "Usage"
- * header, a duplicated storage card), and a golden of that would have locked the exact
- * defect #338 fixes. Recorded here against the rebuilt, conformance-verified detail pane,
- * `managePacksTwoPaneExpanded` locks the design #338 ships: identity + on-device status,
- * the Text/Voice capability cards, "Where this pack is used" with the saved-phrases line,
- * the per-role usage, and the Remove action.
+ * **The two-pane golden locks the CONFORMANCE 20d against `specs/20d.json`.** Recorded against
+ * the rebuilt, golden-spec-conformed frame, `managePacksTwoPaneExpanded` locks the whole 20d:
+ * on the LEFT the sized storage card, the green hygiene nudge, the downloading Arabic card, the
+ * dense on-device rows (Afrikaans selected, Spanish IN USE, German/Polish stale-grey) and the
+ * failed Hindi row; on the RIGHT the identity + on-device status, the THREE capability cards
+ * (Text/Voice/Camera — Camera GREEN per the owner override), "Where this pack is used" with the
+ * saved-phrases line, the single last-used line and the pair-share line, and the Remove action.
  *
  * Native graphics (`@GraphicsMode(NATIVE)`) is what makes `captureRoboImage()` produce
  * real pixels under Robolectric; the path names the committed golden under the module's
@@ -121,44 +124,88 @@ class ManagePacksScreenshotTest {
     }
 
     /**
-     * The 20d two-pane at EXPANDED width (`w1280dp-h800dp`, the ruling's tablet frame and
-     * the same gate `ManagePacksListDetailRenderTest` drives), locking the FIXED detail
-     * pane (#338). Method-level `@Config` overrides the class's compact qualifier so this
-     * one test draws `ManagePacksTwoPane`.
+     * The exact 20d frame fixture (make-or-break data, owner 2026-08-06): the seven packs in the
+     * frame's hand-arranged order — a downloading Arabic, a failed Hindi, and on-device Afrikaans
+     * (a week ago), Spanish (IN USE, today), English (today), German + Polish (stale since April).
+     */
+    private fun twentyDSections(now: Long): ManagePacksSections {
+        fun pack(
+            id: String,
+            name: String,
+            state: OfflineModelState,
+            usage: PackUsage,
+            inUse: Boolean = false,
+            voice: Boolean = false,
+        ) = PackRow(id = id, displayName = name, state = state, usage = usage, inUse = inUse, hasOfflineVoice = voice)
+        return ManagePacksSections(
+            downloading = listOf(pack("ar", "Arabic", OfflineModelState.Downloading, PackUsage.NoRecord)),
+            failed =
+                listOf(pack("hi", "Hindi", OfflineModelState.Failed(OfflineModelFailure.NETWORK), PackUsage.NoRecord)),
+            onDevice =
+                listOf(
+                    pack(
+                        "af",
+                        "Afrikaans",
+                        OfflineModelState.Downloaded,
+                        PackUsage.Used(now - 7 * DAY_MILLIS),
+                        voice = true,
+                    ),
+                    pack("es", "Spanish", OfflineModelState.Downloaded, PackUsage.Used(now), inUse = true),
+                    pack("en", "English", OfflineModelState.Downloaded, PackUsage.Used(now)),
+                    pack("de", "German", OfflineModelState.Downloaded, PackUsage.Used(now - 120 * DAY_MILLIS)),
+                    pack("pl", "Polish", OfflineModelState.Downloaded, PackUsage.Used(now - 120 * DAY_MILLIS)),
+                ),
+            downloadable = emptyList(),
+        )
+    }
+
+    /**
+     * The 20d two-pane at EXPANDED width (`w1280dp-h800dp`, the ruling's tablet frame and the
+     * same gate `ManagePacksListDetailRenderTest` drives), locking the CONFORMANCE build against
+     * the golden spec `docs/design/language-screens/specs/20d.json` — the browser-computed
+     * layout of the rev5 20d frame. The fixture is the exact frame data (make-or-break test,
+     * owner 2026-08-06): the detail pane on Afrikaans; the list = Afrikaans (selected, used a
+     * week ago), Spanish (IN USE, today), English (today), German + Polish (stale since April,
+     * grey avatars), a downloading Arabic card, a failed Hindi row; the 110 MB sized storage
+     * card and the 2-packs hygiene nudge.
      *
-     * The fixture ids are REAL (`fr`, `de`): `displayName` derives from the id via
-     * `languageDisplayName(id, …, fallback = row.name)` (`OfflinePackRow.kt`), so `name`
-     * alone would not render "French"/"German". French is the current target
-     * (`targetId = "fr"`) → the default selection the detail draws, and it carries an
-     * on-device voice, a saved count, and a target-role stamp, so every non-ruled block —
-     * the two capability cards, "Where this pack is used" + the saved-phrases line, the
-     * per-role usage, the Remove action — is exercised in one frame. Only downloaded rows,
-     * kept STATIC like the compact fixture: no `Downloading` row whose indeterminate
-     * progress would animate the captured frame.
+     * The sections are built DIRECTLY (not through `buildManagePacksSections`) so the on-device
+     * order matches the frame's hand-arranged rows (Afrikaans first). The shipped sort pins the
+     * IN-USE pack first (Spanish) and orders by recency — a deliberate difference from this
+     * design mock, flagged for the owner; the sort itself is locked by `ManagePacksModelTest`,
+     * not this render. Afrikaans is SELECTED by a tap (the frame's selected pack) because the
+     * screen's default selection is the first row of downloading+failed+on-device — a transient
+     * Arabic here — which is itself flagged as a UX follow-up.
+     *
+     * The Arabic row's indeterminate progress bar renders at its initial animation frame under
+     * Robolectric (no running clock), so the capture stays deterministic within the 1% threshold.
      */
     @Test
     @Config(qualifiers = "w1280dp-h800dp")
     fun managePacksTwoPaneExpanded() {
-        val rows =
-            listOf(
-                OfflineLanguageRow("fr", "French", OfflineModelState.Downloaded, hasOfflineVoice = true),
-                OfflineLanguageRow("de", "German", OfflineModelState.Downloaded),
-            )
-        val sections =
-            buildManagePacksSections(rows, usage = mapOf("fr" to NOW), targetId = "fr", locale = Locale.ENGLISH)
+        val now = NOW
         compose.setContent {
             TranzlateTheme {
                 ManagePacksContent(
                     loading = false,
-                    sections = sections,
-                    storage = StorageCard.FreeOnly(packCount = rows.size, freeBytes = 8L * 1024 * 1024 * 1024),
-                    nudge = null,
+                    sections = twentyDSections(now),
+                    // SI byte values so Formatter.formatShortFileSize renders the frame's exact
+                    // "110 MB" / "1.4 GB" (the formatter divides by 1000, not 1024); the total
+                    // gives the device-used bar ≈ 88%, matching the frame's fill.
+                    storage =
+                        StorageCard.Sized(
+                            packCount = 5,
+                            packsBytes = 110_000_000L,
+                            freeBytes = 1_400_000_000L,
+                            totalBytes = 12_000_000_000L,
+                        ),
+                    nudge = HygieneNudge(stalePackCount = 2),
                     suggestions = emptyList(),
                     capable = 59,
                     total = 194,
-                    usageAsSource = emptyMap(),
-                    usageAsTarget = mapOf("fr" to NOW),
-                    nowMillis = NOW,
+                    usageAsSource = mapOf("af" to now - 7 * DAY_MILLIS),
+                    usageAsTarget = emptyMap(),
+                    nowMillis = now,
                     onBack = {},
                     onGet = {},
                     onStopDownload = {},
@@ -166,11 +213,14 @@ class ManagePacksScreenshotTest {
                     onRemove = {},
                     onDismissNudge = {},
                     onBrowseAll = {},
-                    // The detail's saved-phrases line reads this for the selected pack (#332).
-                    onSavedCount = { 4 },
+                    // The detail's saved-phrases line reads this for the selected pack (frame: 3).
+                    onSavedCount = { 3 },
                 )
             }
         }
+        compose.waitForIdle()
+        // Select Afrikaans — the frame's selected pack — the first on-device selectable row.
+        compose.onAllNodesWithTag("tt_manage_select_row")[0].performClick()
         compose.waitForIdle()
 
         compose.onRoot().captureRoboImage(
