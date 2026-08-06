@@ -5,7 +5,7 @@ status: accepted
 to ratify — his colour-SSOT ruling written down as an order of work. Sub-task of
 the accepted rev5-completion objective, `issue-130-rev5-completion.md`.)
 
-Refs: #347. Design authority for the palette: `docs/design/language-screens/`
+Refs: #347 · delivered in **PR #348**. Design authority for the palette: `docs/design/language-screens/`
 (rev5 drawings) + `README.md:52-54`. Token home: `core/designsystem/.../Color.kt`
 + `Theme.kt`, documented in `docs/specs/00-foundations/DESIGN_SYSTEM.md §1`.
 
