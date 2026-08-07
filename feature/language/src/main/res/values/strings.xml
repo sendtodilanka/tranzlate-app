@@ -474,11 +474,23 @@
          it says so plainly and offers only the way out. -->
     <string name="lang_sheet_free_empty">Every pack here has been used recently, so there is nothing to clean up.</string>
     <!-- The filled action, counting the CHECKED packs; disabled at zero. A plural so
-         one pack does not read "Remove 1 packs". Cancel reuses lang_sheet_remove_cancel. -->
+         one pack does not read "Remove 1 packs". The secondary "keep" action is
+         count-aware below (lang_sheet_free_keep_both / lang_sheet_free_keep). -->
     <plurals name="lang_sheet_free_remove">
         <item quantity="one">Remove %1$d pack</item>
         <item quantity="other">Remove %1$d packs</item>
     </plurals>
-    <!-- The empty state's single action (the populated sheet uses Remove + Cancel). -->
+    <!-- The empty state's single action (the populated sheet uses Remove + Keep). -->
     <string name="lang_sheet_free_close">Close</string>
+    <!-- The secondary "keep" action. Dismissing removes nothing, so it keeps EVERY
+         pack the sheet lists (not only the checked ones) — count-aware over the
+         KEEPABLE count: "Keep it" (1), "Keep both" (2), "Keep all N" (3+). All three
+         are plain strings: only "Keep all N" varies with the number, and it does so
+         uniformly (no singular/plural split above two), so a "%d" string says it
+         without plural machinery — which also avoids the `one`/`many` quantities pt-BR
+         plurals require (lint ImpliedQuantity / MissingQuantity). DISTINCT from
+         lang_sheet_remove_cancel (still RemovePackSheet's "Cancel"). -->
+    <string name="lang_sheet_free_keep_one">Keep it</string>
+    <string name="lang_sheet_free_keep_both">Keep both</string>
+    <string name="lang_sheet_free_keep_all">Keep all %1$d</string>
 </resources>

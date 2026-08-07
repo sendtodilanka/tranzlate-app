@@ -1,5 +1,7 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +26,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -33,10 +36,13 @@ import androidx.compose.ui.unit.dp
 import com.codeboxlk.tranzlate.core.designsystem.Dimensions
 import com.codeboxlk.tranzlate.core.designsystem.LocalSpacing
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateListSheet
+import com.codeboxlk.tranzlate.core.designsystem.TranzlateShapeFull
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetAction
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetDefaults
+import com.codeboxlk.tranzlate.core.designsystem.TranzlateSheetPreviewFrame
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
+import com.codeboxlk.tranzlate.core.ui.languageAvatarCode
 
 /** 20e cleanup-sheet controls — `tt_lang_sheet_free_*` (the rev3 sheet namespace, C-1). */
 internal const val TT_SHEET_FREE = "tt_lang_sheet_free"
@@ -137,6 +143,11 @@ internal fun FreeUpSpaceSheet(
             .map(PackRow::id)
     val selectedCount = selectedIds.size
 
+    // The secondary action dismisses without removing anything, so it KEEPS every pack
+    // the sheet lists that is not already on its way out — not only the checked ones.
+    // Count-aware to the 20e frame: "Keep both" for the common two-pack case.
+    val keepableCount = stalePacks.count { it.state != OfflineModelState.Deleting }
+
     if (stalePacks.isEmpty()) {
         EmptyFreeUpSpaceSheet(storage = storage, onDismiss = onDismiss)
         return
@@ -159,7 +170,7 @@ internal fun FreeUpSpaceSheet(
             ),
         secondaryAction =
             TranzlateSheetAction(
-                label = stringResource(R.string.lang_sheet_remove_cancel),
+                label = keepActionLabel(keepableCount),
                 testTag = TT_SHEET_FREE_CANCEL,
                 onClick = onDismiss,
             ),
@@ -224,12 +235,14 @@ private fun CleaningIcon() {
 }
 
 /**
- * One stale pack: a checkbox, its name, and its relative last-used age in the SAME
- * words the management row uses ([packUsageText] — never a calendar month, ruling
- * ⑧). The whole row is the 48dp+ toggle target (`toggleable` + `Role.Checkbox`), so
- * the `Checkbox` takes `onCheckedChange = null` and contributes no second semantics
- * node — the row's merged name + age is the toggle's accessible label. The same
- * shape [MobileDataSheet]'s standing-preference row uses.
+ * One stale pack: a checkbox, the pack's identity avatar ([StalePackAvatar]), its
+ * name, and its relative last-used age in the SAME words the management row uses
+ * ([packUsageText] — never a calendar month, ruling ⑧). The whole row is the 48dp+
+ * toggle target (`toggleable` + `Role.Checkbox`), so the `Checkbox` takes
+ * `onCheckedChange = null` and adds no second toggle node — the row's merged content
+ * is the toggle's accessible label. The avatar monogram is a decorative echo of the
+ * name, drawn like the management row's avatar. The same shape [MobileDataSheet]'s
+ * standing-preference row uses.
  *
  * A `Deleting` pack is shown, not hidden, but as a spinner in place of the checkbox:
  * it is already being removed, so it is not a choice to make.
@@ -263,6 +276,7 @@ private fun StalePackCheckRow(
         } else {
             Checkbox(checked = checked, onCheckedChange = null)
         }
+        StalePackAvatar(id = row.id, modifier = Modifier.padding(start = spacing.md16))
         Column(modifier = Modifier.weight(1f).padding(start = spacing.md16)) {
             Text(text = row.displayName, style = MaterialTheme.typography.bodyLarge)
             Text(
@@ -274,11 +288,64 @@ private fun StalePackCheckRow(
     }
 }
 
+/**
+ * The stale pack's identity chip — its primary subtag in a tonal circle, the SAME
+ * flags-are-wrong-for-languages avatar the management list and the picker draw (size
+ * [Dimensions.iconChip], full-pill shape, `primaryContainer` tone). A stale pack is
+ * by definition installed, so it always wears the downloaded tone; the monogram is
+ * decorative ([languageAvatarCode] is a duplicate of the name beside it, never the
+ * primary label).
+ *
+ * A LOCAL copy rather than a shared composable, because the two existing avatars —
+ * `OfflineLanguagesScreen`'s `PackAvatar` and `LanguagePickerScreen`'s
+ * `LanguageAvatarCircle` — are private to files an in-flight PR owns; folding the
+ * three into one shared avatar is a follow-up.
+ */
+@Composable
+private fun StalePackAvatar(
+    id: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+            modifier
+                .size(Dimensions.iconChip)
+                .clip(TranzlateShapeFull)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Text(
+            text = languageAvatarCode(id),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * The secondary action's label. Dismiss keeps EVERY listed pack, so it is count-aware
+ * to the 20e frame: "Keep it" for a lone stale pack, "Keep both" for the common
+ * two-pack case, and "Keep all N" for three or more. All three are plain strings:
+ * only "Keep all N" varies with the number, and it does so uniformly (no
+ * singular/plural split above two), so a `%d` string expresses it without plural
+ * machinery — which also sidesteps the pt-BR `one`/`many` quantities Android lint
+ * would otherwise demand of a plural (`ImpliedQuantity` / `MissingQuantity`).
+ */
+@Composable
+private fun keepActionLabel(count: Int): String =
+    when (count) {
+        1 -> stringResource(R.string.lang_sheet_free_keep_one)
+        2 -> stringResource(R.string.lang_sheet_free_keep_both)
+        else -> stringResource(R.string.lang_sheet_free_keep_all, count)
+    }
+
 // ---- Previews (rule 7 — one per meaningful STATE) ------------------------------------------------
-// `ModalBottomSheet` opens a window the tooling renders nothing for, so — as
-// `PackActionsSheet` does — these lay the sheet's anatomy out directly on a surface
-// rather than through the modal host, drawing the title, body, breakdown, rows and
-// the action so the owner reviews the whole sheet.
+// `ModalBottomSheet` opens a window the tooling renders nothing for, so these use the
+// design system's `TranzlateSheetPreviewFrame` — the public preview-only escape that
+// lays a sheet's real anatomy (icon, title, body, list region and the ACTION BAR) on
+// the floating surface, so the owner reviews the whole sheet: the new per-pack avatars
+// and the count-aware "Keep both" / "Keep all N" secondary together.
 
 private const val PREVIEW_MB = 1_048_576L
 private const val PREVIEW_GB = 1_073_741_824L
@@ -302,12 +369,11 @@ private fun previewRow(
     inUse = false,
 )
 
-private val previewStale =
-    listOf(
-        previewRow("de", "German", 4),
-        previewRow("pl", "Polish", 6),
-        previewRow("sv", "Swedish", 3),
-    )
+/** The frame's pair — German + Polish, both stale: the "Keep both" / "Remove 2 packs" state. */
+private val previewTwoStale = listOf(previewRow("de", "German", 4), previewRow("pl", "Polish", 6))
+
+/** Three stale packs — the plural "Keep all 3" / "Remove 3 packs" state. */
+private val previewThreeStale = previewTwoStale + previewRow("sv", "Swedish", 3)
 
 private val previewStorage =
     StorageCard.Sized(
@@ -317,66 +383,111 @@ private val previewStorage =
         totalBytes = 64 * PREVIEW_GB,
     )
 
-/** Several stale packs, all checked — the state the nudge opens into. */
+/** The frame state: two stale packs, both checked — the secondary reads "Keep both". */
 @PreviewLightDark
 @Composable
 private fun FreeUpSpaceSheetPreview() {
-    FreeUpSpaceSheetPreviewBody(
-        stalePacks = previewStale,
-        checkedIds = previewStale.map(PackRow::id).toSet(),
-        empty = false,
-    )
+    FreeUpSpaceSheetPreviewFrame(stalePacks = previewTwoStale, checkedIds = setOf("de", "pl"))
 }
 
-/** A removal already in flight: one pack is `Deleting` (a spinner, not a choice), the rest still checked. */
+/** Three or more stale packs — the secondary reads "Keep all 3". */
+@PreviewLightDark
+@Composable
+private fun FreeUpSpaceSheetManyPacksPreview() {
+    FreeUpSpaceSheetPreviewFrame(stalePacks = previewThreeStale, checkedIds = setOf("de", "pl", "sv"))
+}
+
+/** A removal already in flight: one pack is `Deleting` (a spinner, not a choice); the two kept read "Keep both". */
 @PreviewLightDark
 @Composable
 private fun FreeUpSpaceSheetMidRemovePreview() {
     val midRemove =
         listOf(
-            previewStale[0].copy(state = OfflineModelState.Deleting),
-            previewStale[1],
-            previewStale[2],
+            previewThreeStale[0].copy(state = OfflineModelState.Deleting),
+            previewThreeStale[1],
+            previewThreeStale[2],
         )
-    FreeUpSpaceSheetPreviewBody(
-        stalePacks = midRemove,
-        checkedIds = setOf("pl", "sv"),
-        empty = false,
-    )
+    FreeUpSpaceSheetPreviewFrame(stalePacks = midRemove, checkedIds = setOf("pl", "sv"))
 }
 
 /** Nothing to clean up — the no-dead-end empty state: body + a single Close. */
 @PreviewLightDark
 @Composable
 private fun FreeUpSpaceSheetEmptyPreview() {
-    FreeUpSpaceSheetPreviewBody(stalePacks = emptyList(), checkedIds = emptySet(), empty = true)
+    TranzlateSheetPreviewFrame(
+        title = stringResource(R.string.lang_sheet_free_title),
+        primaryAction =
+            TranzlateSheetAction(
+                label = stringResource(R.string.lang_sheet_free_close),
+                testTag = TT_SHEET_FREE_CLOSE,
+                onClick = {},
+            ),
+        icon = { CleaningIcon() },
+        body = { Text(stringResource(R.string.lang_sheet_free_empty)) },
+        supportingContent = { StorageCardView(previewStorage) },
+    )
 }
 
+/**
+ * The populated sheet on the floating surface: storage breakdown, the stale rows with
+ * their avatars, and the real action bar. Remove counts the CHECKED packs; Keep is
+ * count-aware over what is still keepable — the two agree when nothing is unchecked.
+ */
 @Composable
-private fun FreeUpSpaceSheetPreviewBody(
+private fun FreeUpSpaceSheetPreviewFrame(
     stalePacks: List<PackRow>,
     checkedIds: Set<String>,
-    empty: Boolean,
 ) {
+    val spacing = LocalSpacing.current
+    val keepable = stalePacks.count { it.state != OfflineModelState.Deleting }
+    val checked = stalePacks.count { it.state != OfflineModelState.Deleting && it.id in checkedIds }
+    TranzlateSheetPreviewFrame(
+        title = stringResource(R.string.lang_sheet_free_title),
+        primaryAction =
+            TranzlateSheetAction(
+                label = pluralStringResource(R.plurals.lang_sheet_free_remove, checked, checked),
+                testTag = TT_SHEET_FREE_REMOVE,
+                onClick = {},
+                enabled = checked > 0,
+            ),
+        secondaryAction =
+            TranzlateSheetAction(
+                label = keepActionLabel(keepable),
+                testTag = TT_SHEET_FREE_CANCEL,
+                onClick = {},
+            ),
+        icon = { CleaningIcon() },
+        body = { Text(stringResource(R.string.lang_sheet_free_body)) },
+        supportingContent = {
+            StorageCardView(previewStorage, Modifier.padding(bottom = spacing.sm8))
+            stalePacks.forEach { row ->
+                StalePackCheckRow(
+                    row = row,
+                    checked = row.id in checkedIds,
+                    nowMillis = previewNow,
+                    onToggle = {},
+                )
+            }
+        },
+    )
+}
+
+/** The stale-pack row in isolation — checkbox / spinner, the new monogram avatar, name + last-used. */
+@PreviewLightDark
+@Composable
+private fun StalePackCheckRowPreview() {
     val spacing = LocalSpacing.current
     TranzlateTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             Column(modifier = Modifier.padding(horizontal = spacing.lg24, vertical = spacing.md16)) {
-                Text(
-                    text = stringResource(R.string.lang_sheet_free_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                StalePackCheckRow(row = previewThreeStale[0], checked = true, nowMillis = previewNow, onToggle = {})
+                StalePackCheckRow(row = previewThreeStale[1], checked = false, nowMillis = previewNow, onToggle = {})
+                StalePackCheckRow(
+                    row = previewThreeStale[2].copy(state = OfflineModelState.Deleting),
+                    checked = false,
+                    nowMillis = previewNow,
+                    onToggle = {},
                 )
-                Text(
-                    text = stringResource(if (empty) R.string.lang_sheet_free_empty else R.string.lang_sheet_free_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = spacing.xs4, bottom = spacing.md16),
-                )
-                StorageCardView(previewStorage, Modifier.padding(bottom = spacing.sm8))
-                stalePacks.forEach { row ->
-                    StalePackCheckRow(row = row, checked = row.id in checkedIds, nowMillis = previewNow, onToggle = {})
-                }
             }
         }
     }

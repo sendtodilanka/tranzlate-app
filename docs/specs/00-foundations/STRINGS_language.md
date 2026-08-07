@@ -211,7 +211,7 @@ argued:
 | `lang_sheet_remove_title` | string | `Remove %1$s?` | language name | 19f, as drawn. The verb matches the button's, which is the export's own caption for the frame — and neither is "Delete" |
 | `lang_sheet_remove_body` | string | `Frees space on this device. %1$s will need a connection to translate until you download it again.` | language name | 19f, as drawn, and true: `RealTranslator.waterfall` falls from ML Kit to GOT to GCT, and names this case in its own trace ("MLKit: fr not downloaded · GOT: offline") |
 | `lang_sheet_remove_confirm` | string | `Remove` | — | the error-filled action (spec §5 reserves error for loss and stopping) |
-| `lang_sheet_remove_cancel` | string | `Cancel` | — | **shared by both sheets** — one word, one key. The engineering brief §9 already ruled a sheet dismiss reading "Cancel" is correct; the prohibition is on the ✕ of a downloading row, which stops a download and removes it |
+| `lang_sheet_remove_cancel` | string | `Cancel` | — | the removal sheets' dismiss (`RemovePackSheets`). 20e's Free-up-space sheet no longer shares it — its dismiss is the count-aware `lang_sheet_free_keep_both` / `lang_sheet_free_keep`. The engineering brief §9 already ruled a sheet dismiss reading "Cancel" is correct; the prohibition is on the ✕ of a downloading row, which stops a download and removes it |
 | `lang_sheet_remove_inuse_title` | string | `%1$s is in use right now` | language name | 19g, as drawn |
 | `lang_sheet_remove_inuse_body` | string | `It is your target language, and it stays your target. Translations into %1$s will need a connection until you download it again.` | language name | **NOT as drawn** — see above. What 19g adds over 19f is immediacy: this is not a capability the user might miss one day, it is the next translation they make |
 | `lang_sheet_remove_inuse_confirm` | string | `Remove anyway` | — | as drawn. The word still reads correctly: the sheet does state a reason to hesitate |
@@ -453,13 +453,16 @@ reversible; the batch removes through the existing per-pack delete path.
 | `lang_sheet_free_title` | string | `Free up space` | — | the sheet title, and the nudge/19b actions that open it share the wording |
 | `lang_sheet_free_body` | string | `These packs haven't been used in months. Removing them frees space — each is free to download again whenever you need it.` | — | states that re-downloading is free (packs unlimited), so no one fears the cleanup |
 | `lang_sheet_free_empty` | string | `Every pack here has been used recently, so there is nothing to clean up.` | — | the no-dead-end empty state — the sheet was reached but nothing qualifies; a single Close, no Remove |
-| `lang_sheet_free_remove` | plurals | `Remove %1$d pack(s)` | count of CHECKED packs | the filled action; disabled at zero (nothing checked). Cancel reuses `lang_sheet_remove_cancel` |
-| `lang_sheet_free_close` | string | `Close` | — | the empty state's single action (the populated sheet uses Remove + Cancel) |
+| `lang_sheet_free_remove` | plurals | `Remove %1$d pack(s)` | count of CHECKED packs | the filled action; disabled at zero (nothing checked) |
+| `lang_sheet_free_keep_one` | string | `Keep it` | — | the secondary "keep" (dismiss) action for a lone keepable pack. A plain string, not a plural `one` item: a number-less quantity item is an `ImpliedQuantity` lint error where `one` covers several values (pt-BR `one` = 0, 1) |
+| `lang_sheet_free_keep_both` | string | `Keep both` | — | the secondary "keep" action for the common TWO-pack case (matches the 20e frame). Dismiss removes nothing, so it keeps every listed pack, not only the checked ones. Distinct from `lang_sheet_remove_cancel`; a plain string for the same `ImpliedQuantity` reason as `_keep_one` |
+| `lang_sheet_free_keep_all` | string | `Keep all %1$d` | keepable count | the secondary "keep" action for THREE or more. A plain `%d` string, not a plural: "Keep all N" does not vary grammatically above two, and a plain string avoids the `one`/`many` quantities a pt-BR plural requires. Counts 1 and 2 are the plain strings above |
+| `lang_sheet_free_close` | string | `Close` | — | the empty state's single action (the populated sheet uses Remove + Keep) |
 
 ### 5.10.1 Free up space — testTags (C-1)
 
 `tt_lang_sheet_free` (root) · `tt_lang_sheet_free_remove` (the filled Remove) ·
-`tt_lang_sheet_free_cancel` (Cancel) · `tt_lang_sheet_free_close` (empty-state Close) ·
+`tt_lang_sheet_free_cancel` (the count-aware Keep dismiss — tag name is historical) · `tt_lang_sheet_free_close` (empty-state Close) ·
 `tt_lang_sheet_free_row_<id>` (one per stale-pack checkbox row, e.g. `…_row_de`).
 
 ## 5.11 Manage packs — list-detail 20d (#130 PR-26)

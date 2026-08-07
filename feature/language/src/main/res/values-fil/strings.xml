@@ -218,4 +218,8 @@
         <item quantity="other">Alisin ang %1$d na pack</item>
     </plurals>
     <string name="lang_sheet_free_close">Isara</string>
+    <!-- fil provisional (#115): "Keep it" / "Keep both" / "Keep all N". -->
+    <string name="lang_sheet_free_keep_one">Panatilihin ito</string>
+    <string name="lang_sheet_free_keep_both">Panatilihin pareho</string>
+    <string name="lang_sheet_free_keep_all">Panatilihin lahat (%1$d)</string>
 </resources>

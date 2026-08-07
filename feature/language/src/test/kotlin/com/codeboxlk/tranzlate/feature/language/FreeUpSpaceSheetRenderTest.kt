@@ -1,11 +1,14 @@
 package com.codeboxlk.tranzlate.feature.language
 
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.codeboxlk.tranzlate.core.designsystem.TranzlateTheme
 import com.codeboxlk.tranzlate.core.model.OfflineModelState
@@ -223,6 +226,82 @@ class FreeUpSpaceSheetRenderTest {
         compose.onNodeWithTag(TT_SHEET_FREE).assertExists()
         compose.onNodeWithTag(freeRowTag("de")).assertExists()
         compose.onNodeWithTag(freeRowTag("pl")).assertDoesNotExist()
+    }
+
+    /**
+     * Every stale row draws the pack's monogram avatar — the 20e frame's
+     * `[checkbox] + [avatar] + [name/date]` anatomy. "de" → "DE", "pl" → "PL" via
+     * `languageAvatarCode`; the monogram is unique to the avatar (the names are
+     * "German"/"Polish"), so finding it proves the avatar rendered for that row. The
+     * avatar merges into the row's toggle label, so the query reads the UNMERGED tree
+     * to address the monogram node itself.
+     *
+     * Mutation decided first (rule 11): delete the `StalePackAvatar(...)` call from
+     * `StalePackCheckRow` — no monogram is drawn, and both `assertIsDisplayed` redden.
+     */
+    @Test
+    fun `each stale row draws its pack avatar`() {
+        showSheet()
+
+        compose.onNodeWithText("DE", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("PL", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    /**
+     * The secondary (dismiss) action reads "Keep both" when two packs are listed — the
+     * count-aware label the frame draws, in place of the old shared "Cancel". Dismiss
+     * keeps every listed pack, so the wording counts the packs, not the checks.
+     *
+     * Mutation decided first (rule 11): revert the secondary label to
+     * `stringResource(R.string.lang_sheet_remove_cancel)` — the divergence being fixed
+     * — and the label reads "Cancel", reddening `assertTextEquals("Keep both")`. A
+     * second mutation, dropping `keepActionLabel`'s `count == 2` branch so two falls to
+     * the keep-all branch, renders "Keep all 2" and reddens it too.
+     */
+    @Test
+    fun `secondary reads Keep both for two stale packs`() {
+        showSheet() // twoStale
+
+        compose.onNodeWithTag(TT_SHEET_FREE_CANCEL).assertTextEquals("Keep both")
+    }
+
+    /**
+     * With three stale packs the secondary reads "Keep all 3" — counts of three or more
+     * take the `%d` keep-all string; only one and two have their own wordings.
+     *
+     * Mutation decided first (rule 11): make `keepActionLabel` return
+     * `stringResource(R.string.lang_sheet_free_keep_both)` unconditionally (ignore the
+     * count) — three packs then read "Keep both", reddening
+     * `assertTextEquals("Keep all 3")`.
+     */
+    @Test
+    fun `secondary reads Keep all N for more than two stale packs`() {
+        showSheet(
+            stalePacks =
+                listOf(
+                    stale("de", "German", 4),
+                    stale("pl", "Polish", 6),
+                    stale("sv", "Swedish", 3),
+                ),
+        )
+
+        compose.onNodeWithTag(TT_SHEET_FREE_CANCEL).assertTextEquals("Keep all 3")
+    }
+
+    /**
+     * A single stale pack reads "Keep it" — the count==1 wording, its own plain string
+     * (a plural `one` item with no number would trip `ImpliedQuantity` lint in pt-BR,
+     * where `one` covers 0 and 1).
+     *
+     * Mutation decided first (rule 11): drop `keepActionLabel`'s `count == 1` branch so
+     * one pack falls to the keep-all branch — it renders "Keep all 1", and
+     * `assertTextEquals("Keep it")` reddens.
+     */
+    @Test
+    fun `secondary reads Keep it for a single stale pack`() {
+        showSheet(stalePacks = listOf(stale("de", "German", 4)))
+
+        compose.onNodeWithTag(TT_SHEET_FREE_CANCEL).assertTextEquals("Keep it")
     }
 
     private companion object {
