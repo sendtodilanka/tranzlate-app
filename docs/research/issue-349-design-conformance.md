@@ -21,21 +21,29 @@ Initial design: extract the mockup's computed layout (`extract-specs.mjs`) and t
 golden. **Disconfirmed by the owner and by measurement.** The SSOT STATES the design values
 (README §Tokens); the mockup is a drawing that deviates from them.
 
-`reconcile.mjs` (measured `specs/*.json` vs stated `stated-spec.json`) — the experiment that
-would have falsified "measure everything":
+`reconcile.mjs` (measured `specs/*.json` vs the full stated palette + metrics + type in
+`stated-spec.json`) — the experiment that would have falsified "measure everything":
 
 ```
-Conflicts: 165 font, 115 colour, 78 row-height  across 26 frame(s).
+Divergences: 129 font, 53 colour, 78 row-height  across 26 frame(s).
 ```
 
-All 26 frames diverge. Examples: app-bar drawn 24sp where the SSOT states 22sp; body 14.5sp
-where it states 13.5; `#ffffff` where the surface token is `#f8fafd`. **Frames measure at 1:1
-device dp** (412×892, 1280×800, 800×1280, 760×812, 892×412 — all clean), so these are genuine
-drawing imprecisions, not a scale artifact — measurement is spatially trustworthy but the
-mockup's *values* are not the spec. A pure-measurement golden would have enforced 24sp on the
-20d app-bar, moving a *correct* 22sp build AWAY from the SSOT. Hence golden = STATED
-(authoritative, for colour/type/metrics) ⊕ MEASURED (only the unstated: per-element positions,
-headline/display sizes, camera-green, ad-mock colours). Conflict → stated wins.
+Every frame diverges. That count is a **role-blind diagnostic** and over-states real divergence:
+it includes legitimate unstated roles (a detail-pane headline is 28sp with no stated value) and
+the row-height heuristic is blind on list-detail panes — the gate, not the count, does the
+role-precise check. The genuine, clean divergences: 20d's app-bar drawn 24sp where the SSOT
+states 22sp; body at 14.5/12.5sp where the scale is 13.5/12; 20d's capability-card icon ink
+`#072711` off the `onTertiary` token. **Frames measure at 1:1 device dp** (412×892, 1280×800,
+800×1280, 760×812, 892×412 — all clean), so these are drawing imprecisions, not a scale
+artifact — measurement is spatially trustworthy but the mockup's *values* are not the spec. A
+pure-measurement golden would have enforced 24sp on the 20d app-bar, moving a *correct* 22sp
+build AWAY from the SSOT. Hence golden = STATED (authoritative, for colour/type/metrics) ⊕
+MEASURED (only the unstated: per-element positions, headline/display sizes). Conflict → stated wins.
+
+> The first draft cited 165/115/78 with a `#ffffff`-vs-`#f8fafd` example. The #350 co-verify
+> corrected it: `#ffffff` is `surfaceContainerLowest` (a valid token), the inflation came from a
+> README-subset palette + icon glyphs counted as text. Fixed — full reconciled palette + `ic`
+> flag — giving 129/53/78. See the "Co-verify #350 findings — status" section in the plan doc.
 
 ## Red-team verdict (rule 8): ADOPT-WITH-CONDITIONS
 

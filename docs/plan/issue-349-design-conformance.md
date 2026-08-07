@@ -8,7 +8,7 @@ order of work. Sub-task of the accepted rev5-completion objective, `issue-130-re
 
 Refs: #349 · #256 · #130. Design authority: `docs/design/language-screens/` (rev5 SSOT).
 Red-team + design record: `docs/research/issue-349-design-conformance.md`.
-Component 1 delivered in **PR #TBD**; Component 2 is a follow-up PR.
+Component 1 delivered in **PR #350**; Component 2 is a follow-up PR.
 
 ## The ruling, as stated
 
@@ -21,22 +21,30 @@ Component 1 delivered in **PR #TBD**; Component 2 is a follow-up PR.
 
 ## Why measuring-everything is wrong (the reshaping evidence)
 
-`reconcile.mjs` compares the measured `specs/*.json` against the stated `stated-spec.json`
-(README §Tokens). It flags divergence in **all 26 frames** — 165 font, 115 colour, 78
-row-height. The mockup draws imprecise values: app-bar 24sp where the SSOT states 22sp;
-14.5sp where it states 13.5; `#ffffff` where the surface token is `#f8fafd`. Frames measure
-at clean 1:1 device dp (412×892, 1280×800, 800×1280, 760×812, 892×412), so these are genuine
-drawing imprecisions, not scale artifacts. A pure-measurement golden enforces the drawing's
-imprecision over the SSOT's intent, and would have "fixed" the correct 20d app-bar (22sp)
-to a wrong 24sp. Hence: **golden = STATED (authoritative) ⊕ MEASURED (unstated only).**
+`reconcile.mjs` compares the measured `specs/*.json` against the full stated palette +
+metrics + type in `stated-spec.json`. It flags divergence in every frame — a role-blind
+diagnostic count of 129 font, 53 colour, 78 row-height across 26 frames. That count
+OVER-states real divergence and must not be read as a defect tally: it includes legitimate
+UNSTATED roles (a detail-pane headline is 28sp — no stated value) and the row-height
+heuristic is blind on list-detail panes — which is exactly why the gate, not this count,
+does the role-precise check. The genuine, clean divergences it surfaces: 20d's app-bar drawn
+24sp where the SSOT states 22sp; body text at 14.5/12.5sp where the scale is 13.5/12; 20d's
+capability-card icon ink `#072711` off the `onTertiary` token. Frames measure at clean 1:1
+device dp (412×892, 1280×800, 800×1280, 760×812, 892×412), so these are drawing imprecisions,
+not scale artifacts. A pure-measurement golden would enforce them over the SSOT — and would
+have "fixed" the correct 20d app-bar (22sp) to a wrong 24sp. Hence: **golden = STATED
+(authoritative) ⊕ MEASURED (unstated only); stated wins on conflict.**
 
 ## Scope
 
 **Component 1 (this PR)** — the spec SOURCES, committed durably (red-team §0: they exist
 only in a working tree today; `git clean` deletes them):
-- `stated-spec.json` — the authoritative STATED catalogue transcribed from README §Tokens
-  (palette light+dark, metrics, type scale) + a `measuredUnstated` tier (onErrorContainer
-  `#410e0b`, meter fill — landed #348).
+- `stated-spec.json` — the authoritative value reference: the full reconciled M3 palette
+  (light+dark, from `Color.kt` @ origin/main, which #348 aligned to README §Tokens; pinned by
+  `RevFiveColorTokenTest`), a `readmeStated` list marking README's authoritative subset, an
+  `extensions` tier (meterFill), and metrics + type from README §Tokens. (Co-verify #350 BLOCK:
+  light `#e9eef6` is `surfaceContainerHigh` — chip/pill fill — not `surfaceContainer` `#efeded`;
+  corrected, and the full palette added so the gate/reconcile recognise every valid token.)
 - `extract-specs.mjs` — Playwright extractor → `specs/*.json` (26 frames), the MEASURED layer
   for unstated positions + conflict detection. Frame = largest element with non-transparent
   bg + border-radius + overflow:hidden (the light device screen); descendants only.
@@ -81,7 +89,26 @@ PR-body manifest; a text marker is a rule-12 falsehood-vector). Per frame, start
 5. Assertions before `captureRoboImage`.
 6. co-verify-lens flags any PR touching `feature/language/**` that ALSO edits
    `language-screens-spec.html` or `specs/*.json` (cheapest bypass: edit the SSOT to match a
-   wrong build — the spec HTML has zero branch protection).
+   wrong build — the spec HTML has zero branch protection). **Co-verify #350 Finding 4: this
+   is prose only today — no hook/agent enforces it. It MUST become a mechanism (a line in
+   `.claude/agents/co-verify-lens.md`, or a guard hook) in Component 2's PR, before the gate it
+   protects exists. A rule written but not enforced is the exact rule-11/12 failure mode.**
+
+## Co-verify #350 findings — status
+
+- **Finding 1 (BLOCK) — FIXED.** light `#e9eef6` re-keyed `surfaceContainer` → `surfaceContainerHigh`
+  (verified against `Color.kt` @ origin/main: `LightSurfaceContainerHigh=#e9eef6`,
+  `LightSurfaceContainer=#efeded`); the full palette was added so no valid token is mis-keyed.
+- **Finding 2 (dark 0% measured) — DOCUMENTED.** `specs/*.json` is light-theme GEOMETRY;
+  geometry is theme-invariant, so the gate takes dark COLOUR from `stated-spec.json`'s dark tier
+  (noted in `extract-specs.mjs`). No dark measurement needed.
+- **Finding 3 (reconcile heuristics) — FIXED + documented.** Material-Symbols icon glyphs now
+  carry `ic:1` and are excluded from the font check (165→129); the full palette dropped colour
+  false-positives (115→53); the row-height heuristic's list-detail blindness is stated in
+  `reconcile.mjs`'s header (the gate, not the heuristic, checks list-pane rows).
+- **Finding 4 (bypass is prose) — DEFERRED to Component 2** (condition 6 above), before the gate exists.
+- **Finding 5 (not bit-reproducible) — DOCUMENTED** in `extract-specs.mjs` (sub-pixel hairline
+  drift; never changes a count; absorbed by the gate's ±2px).
 
 ## File ownership (Component 1 touches only these)
 

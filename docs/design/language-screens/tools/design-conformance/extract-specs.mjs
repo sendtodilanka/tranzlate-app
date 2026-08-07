@@ -10,6 +10,16 @@
 // the real layout — every position, size, margin, padding, radius, colour — so the values
 // are exact and nothing is missed. This is the "correctly extract the design specs" step
 // of the zero-touch design-conformance architecture.
+//
+// SCOPE (co-verify #350, Finding 2): the frame picked is the LIGHT device screen (light
+// precedes dark in DOM; the `>` on an area tie keeps light). So specs/*.json is LIGHT-theme
+// GEOMETRY. Geometry is theme-invariant — a dark screen has the same layout — so the light
+// measurement is valid for both themes; only COLOUR differs by theme, and dark colour is
+// taken from stated-spec.json's dark tier, not measured here.
+// NOTE (Finding 5): output is not bit-reproducible — sub-pixel `x` drift (<7px) can appear
+// on thin hairline elements across runs. It never changes a conflict count (reconcile.mjs
+// ignores `x`) and is absorbed by the gate's ±2px tolerance; do not treat specs as bit-exact.
+// `ic:1` marks a Material-Symbols icon glyph (its `f` size is NOT type-scale text).
 
 import { chromium } from 'playwright';
 import { writeFileSync, mkdirSync } from 'fs';
@@ -54,6 +64,7 @@ function extractInPage(id) {
     const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue;
     const cs = getComputedStyle(el), leaf = el.children.length === 0;
     const txt = leaf ? el.textContent.trim() : '';
+    const isIcon = leaf && txt !== '' && /material symbols/i.test(cs.fontFamily);
     const bg = hex(cs.backgroundColor);
     const rad = cs.borderRadius !== '0px' ? spx(cs.borderRadius) : null;
     const pad = cs.padding !== '0px' ? spx(cs.padding) : null;
@@ -64,7 +75,7 @@ function extractInPage(id) {
     const rec = { t: txt.slice(0, 40) || undefined, x: px(r.left - fr.left), y: px(r.top - fr.top), w: px(r.width), h: px(r.height),
       bg, fg: leaf && txt ? hex(cs.color) : undefined, r: rad || undefined, p: pad || undefined, g: gap || undefined,
       f: leaf && txt ? `${parseFloat(cs.fontSize)}/${cs.fontWeight}` : undefined, m: m || undefined,
-      ls: cs.letterSpacing !== 'normal' ? cs.letterSpacing : undefined };
+      ls: cs.letterSpacing !== 'normal' ? cs.letterSpacing : undefined, ic: isIcon ? 1 : undefined };
     out.push(Object.fromEntries(Object.entries(rec).filter(([, v]) => v !== undefined)));
   }
   out.sort((a, b) => a.y - b.y || a.x - b.x);

@@ -170,7 +170,8 @@
    "h": 22,
    "bg": null,
    "fg": "#072711",
-   "f": "22/400"
+   "f": "22/400",
+   "ic": 1
   },
   {
    "t": "A pack is downloaded once. After that yo",
@@ -210,7 +211,8 @@
    "h": 20,
    "bg": null,
    "fg": "#0842a0",
-   "f": "20/400"
+   "f": "20/400",
+   "ic": 1
   },
   {
    "t": "Works with no signal, on a plane or abro",
@@ -239,7 +241,8 @@
    "h": 20,
    "bg": null,
    "fg": "#0842a0",
-   "f": "20/400"
+   "f": "20/400",
+   "ic": 1
   },
   {
    "t": "Nothing you type or say is uploaded",
@@ -268,7 +271,8 @@
    "h": 20,
    "bg": null,
    "fg": "#0842a0",
-   "f": "20/400"
+   "f": "20/400",
+   "ic": 1
   },
   {
    "t": "No round trip, so results appear as you ",

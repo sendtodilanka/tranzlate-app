@@ -170,7 +170,8 @@
    "h": 22,
    "bg": null,
    "fg": "#410e0b",
-   "f": "22/400"
+   "f": "22/400",
+   "ic": 1
   },
   {
    "t": "Frees space on this device. Spanish will",

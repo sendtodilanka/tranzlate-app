@@ -170,7 +170,8 @@
    "h": 22,
    "bg": null,
    "fg": "#0842a0",
-   "f": "22/400"
+   "f": "22/400",
+   "ic": 1
   },
   {
    "t": "There is 12 MB free on this device. A la",

@@ -170,7 +170,8 @@
    "h": 22,
    "bg": null,
    "fg": "#0842a0",
-   "f": "22/400"
+   "f": "22/400",
+   "ic": 1
   },
   {
    "t": "Pick a different target, or swap the two",

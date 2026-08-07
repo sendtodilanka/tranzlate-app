@@ -170,7 +170,8 @@
    "h": 22,
    "bg": null,
    "fg": "#410e0b",
-   "f": "22/400"
+   "f": "22/400",
+   "ic": 1
   },
   {
    "t": "The connection dropped before the pack w",
@@ -214,7 +215,8 @@
    "h": 20,
    "bg": null,
    "fg": "#410e0b",
-   "f": "20/400"
+   "f": "20/400",
+   "ic": 1
   },
   {
    "x": 24,
