@@ -17,6 +17,13 @@ import androidx.compose.ui.graphics.Color
 // LightBackground/DarkBackground, because `android:windowBackground` must be a
 // compiled Android resource the framework can paint before any Compose frame
 // exists. Change one, change the other.
+//
+// 2026-08-05 (#347): reconciled to the rev5 colour SSOT (owner ruling — where a token
+// differs from the rev5 drawings, the token is corrected to rev5, light AND dark). Two
+// role values moved — `LightOnErrorContainer` #8C1D18→#410E0B and
+// `DarkSurfaceContainerHigh` #282A2C→#2D2F31 — and one extension tone (`LightMeterFill`
+// #C4D7F5) was added for a colour the 48-role scheme cannot hold. Diff + WCAG:
+// docs/plan/issue-347-color-token-reconciliation.md; DESIGN_SYSTEM §0/§1.
 
 // ---- Light scheme (§1.1) ------------------------------------------------------------------------
 
@@ -54,7 +61,11 @@ internal val LightOutlineVariant = Color(0xFFC4C7C5)
 internal val LightError = Color(0xFFB3261E)
 internal val LightOnError = Color(0xFFFFFFFF)
 internal val LightErrorContainer = Color(0xFFF9DEDC)
-internal val LightOnErrorContainer = Color(0xFF8C1D18)
+
+// ref error10 — rev5 SSOT failure text/icon tone on `errorContainer` (was error30
+// #8C1D18, which the rev5 drawings never use in light; #347). Restores the M3
+// baseline error10-on-error90 pairing; dark stays #F9DEDC (already rev5-correct).
+internal val LightOnErrorContainer = Color(0xFF410E0B)
 internal val LightScrim = Color(0xFF000000)
 
 // ---- Dark scheme (§1.2) -------------------------------------------------------------------------
@@ -82,7 +93,10 @@ internal val DarkSurfaceBright = Color(0xFF393939)
 internal val DarkSurfaceContainerLowest = Color(0xFF0E0E0F)
 internal val DarkSurfaceContainerLow = Color(0xFF1F1F1F)
 internal val DarkSurfaceContainer = Color(0xFF1E1F20)
-internal val DarkSurfaceContainerHigh = Color(0xFF282A2C)
+
+// rev5 SSOT dark chip / ONLINE-ONLY fill / icon-button hover / meter track (was
+// #282A2C, which the rev5 drawings never use; #2D2F31 appears 202× — README:54, #347).
+internal val DarkSurfaceContainerHigh = Color(0xFF2D2F31)
 internal val DarkSurfaceContainerHighest = Color(0xFF343535)
 internal val DarkSurfaceTint = DarkPrimary // = primary (tonal elevation tint)
 internal val DarkInverseSurface = Color(0xFFE3E3E3)
@@ -113,6 +127,23 @@ internal val TertiaryFixed = Color(0xFFC4EED0) // ref tertiary90
 internal val TertiaryFixedDim = Color(0xFF6DD58C) // ref tertiary80
 internal val OnTertiaryFixed = Color(0xFF072711) // ref tertiary10
 internal val OnTertiaryFixedVariant = Color(0xFF0F5223) // ref tertiary30
+
+// ---- rev5 extension colours — NOT M3 ColorScheme roles (#347) ------------------------------------
+// rev5 draws a handful of tones the fixed 48-role scheme has no slot for. They are
+// provided as CompositionLocals off the ACTIVE scheme by [TranzlateTheme] (the
+// [LocalFloatingSurface] / [LocalPrimaryActionColors] / [LocalResultCardColors]
+// pattern), so a screen reads them theme-aware without branching on
+// isSystemInDarkTheme(). Only the LIGHT raw hex lives here; the dark counterpart is
+// an existing scheme role resolved in Theme.kt. DESIGN_SYSTEM §1.4.
+
+// Storage-meter "used"/consumed-segment tint (storage bar used segment, the "other
+// apps and system" legend dot — 20b/20d/20f/19b). A muted primary between
+// primaryContainer #D3E3FD and primary #0B57D0. Dark counterpart = primaryContainer
+// #0842A0 (resolved in Theme.kt). The downloading-row progress track draws the SAME
+// values (light #C4D7F5 / dark #0842A0); the storage bar's own track (the unfilled
+// remainder) is the different element — dark surfaceContainerHigh #2D2F31 — composed
+// per-screen, not from this token.
+internal val LightMeterFill = Color(0xFFC4D7F5)
 
 /** Static light scheme — guaranteed fallback for API 24–30 / dynamic-color-off (§ header). */
 val TranzlateLightColors =
