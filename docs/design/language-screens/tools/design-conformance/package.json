@@ -1,0 +1,12 @@
+{
+  "name": "design-conformance",
+  "private": true,
+  "type": "module",
+  "description": "Extract exact computed layout/spec from the rev5 design frames (browser-computed, not eyeballed). Dev tool; node_modules gitignored.",
+  "scripts": {
+    "extract": "node extract-specs.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.62.1"
+  }
+}

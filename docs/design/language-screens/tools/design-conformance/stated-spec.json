@@ -1,0 +1,68 @@
+{
+  "_doc": "AUTHORITATIVE stated design values, transcribed verbatim from the rev5 SSOT README.md §Tokens (docs/design/language-screens/README.md:50-56). Owner directive 2026-08-07: the SSOT STATES these values; use them. Measure (extract-specs.mjs) ONLY what is not stated here. Where a measured value conflicts with a stated one, the STATED value wins (reconcile.mjs reports the conflicts). This file is the golden source of record for colour/type/metrics; specs/*.json is the measured layer for unstated per-frame positions + conflict detection.",
+
+  "colors": {
+    "_source": "README.md:52-54 (Material 3, Google Blue). Role names map to androidx.compose.material3.ColorScheme.",
+    "light": {
+      "primary": "#0b57d0",
+      "primaryContainer": "#d3e3fd",
+      "onPrimaryContainer": "#0842a0",
+      "surface": "#f8fafd",
+      "surfaceContainer": "#e9eef6",
+      "onSurface": "#1f1f1f",
+      "onSurfaceVariant": "#444746",
+      "outline": "#747775",
+      "error": "#b3261e",
+      "errorContainer": "#f9dedc"
+    },
+    "dark": {
+      "surface": "#131314",
+      "surfaceContainer": "#1e1f20",
+      "surfaceContainerHigh": "#2d2f31",
+      "primary": "#a8c7fa",
+      "primaryContainer": "#0842a0",
+      "onPrimaryContainer": "#d3e3fd",
+      "onSurface": "#e3e3e3",
+      "onSurfaceVariant": "#c4c7c5",
+      "error": "#f2b8b5",
+      "errorContainer": "#8c1d18"
+    }
+  },
+
+  "measuredUnstated": {
+    "_doc": "Values NOT listed in README §Tokens, so legitimately MEASURED from the drawings (the owner's 'measure only the unstated' rule). Landed in #348. Any role absent from both tiers is unstated -> measure from the drawing or take the M3 default, and record which.",
+    "light": {
+      "onErrorContainer": "#410e0b",
+      "meterFill": "#c4d7f5"
+    },
+    "dark": {
+      "meterFill": "#0842a0"
+    }
+  },
+
+  "metrics": {
+    "_source": "README.md:56",
+    "listRowHeightDp": [56, 60],
+    "compactRowHeightDp": 48,
+    "iconButtonDp": 48,
+    "sheetActionDp": 48,
+    "cornerRadiusRule": "half the row height",
+    "spacingScaleDp": 8,
+    "snackbar": {
+      "_source": "README.md:95",
+      "minDp": 48,
+      "cornerDp": 4,
+      "sideMarginDp": 8
+    }
+  },
+
+  "type": {
+    "_source": "README.md:56",
+    "family": "Roboto Flex",
+    "appBarSp": 22,
+    "rowSp": 16,
+    "bodySp": 13.5,
+    "overlineSp": 12,
+    "_note": "Sizes are stated; weights are NOT stated in README §Tokens -> weight is an unstated value (measure it, or take the M3 default for the role: e.g. titleLarge=Regular/400)."
+  }
+}
