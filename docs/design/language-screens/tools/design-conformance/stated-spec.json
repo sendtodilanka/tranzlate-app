@@ -1,0 +1,118 @@
+{
+  "_doc": "AUTHORITATIVE reference for design-system VALUES (owner directive 2026-08-07: the SSOT states the values; use them; measure only the unstated; stated wins on conflict). `colors` is the app's reconciled M3 ColorScheme on origin/main (core/designsystem/.../Color.kt): #348 aligned it to the rev5 SSOT README.md §Tokens for every role README lists (pinned by RevFiveColorTokenTest), and it carries the M3-standard value for the rest. `readmeStated` names the README-listed subset — the authoritative rev5 values. This is the valid-token reference for the conformance gate: an in-scope language-screen colour must equal the value of the M3 role its element uses (ads #139 are out of scope). specs/*.json is the MEASURED layer, used only for the UNSTATED (per-element positions; font roles outside the 4-size scale). reconcile.mjs reports measured-vs-this divergence.",
+
+  "colors": {
+    "_source": "core/designsystem/.../Color.kt @ origin/main (post-#348). Keys are androidx.compose.material3.ColorScheme role names.",
+    "light": {
+      "primary": "#0b57d0",
+      "onPrimary": "#ffffff",
+      "primaryContainer": "#d3e3fd",
+      "onPrimaryContainer": "#0842a0",
+      "secondary": "#00639b",
+      "onSecondary": "#ffffff",
+      "secondaryContainer": "#c2e7ff",
+      "onSecondaryContainer": "#004a77",
+      "tertiary": "#146c2e",
+      "onTertiary": "#ffffff",
+      "tertiaryContainer": "#c4eed0",
+      "onTertiaryContainer": "#0f5223",
+      "background": "#f8fafd",
+      "onBackground": "#1f1f1f",
+      "surface": "#f8fafd",
+      "onSurface": "#1f1f1f",
+      "surfaceVariant": "#e1e3e1",
+      "onSurfaceVariant": "#444746",
+      "surfaceDim": "#dadada",
+      "surfaceBright": "#f8fafd",
+      "surfaceContainerLowest": "#ffffff",
+      "surfaceContainerLow": "#f0f4f9",
+      "surfaceContainer": "#efeded",
+      "surfaceContainerHigh": "#e9eef6",
+      "surfaceContainerHighest": "#e3e3e3",
+      "inverseSurface": "#303030",
+      "inverseOnSurface": "#f2f2f2",
+      "inversePrimary": "#a8c7fa",
+      "outline": "#747775",
+      "outlineVariant": "#c4c7c5",
+      "error": "#b3261e",
+      "onError": "#ffffff",
+      "errorContainer": "#f9dedc",
+      "onErrorContainer": "#410e0b",
+      "scrim": "#000000"
+    },
+    "dark": {
+      "primary": "#a8c7fa",
+      "onPrimary": "#062e6f",
+      "primaryContainer": "#0842a0",
+      "onPrimaryContainer": "#d3e3fd",
+      "secondary": "#7fcfff",
+      "onSecondary": "#003355",
+      "secondaryContainer": "#004a77",
+      "onSecondaryContainer": "#c2e7ff",
+      "tertiary": "#6dd58c",
+      "onTertiary": "#0a3818",
+      "tertiaryContainer": "#0f5223",
+      "onTertiaryContainer": "#c4eed0",
+      "background": "#131314",
+      "onBackground": "#e3e3e3",
+      "surface": "#131314",
+      "onSurface": "#e3e3e3",
+      "surfaceVariant": "#444746",
+      "onSurfaceVariant": "#c4c7c5",
+      "surfaceDim": "#131314",
+      "surfaceBright": "#393939",
+      "surfaceContainerLowest": "#0e0e0f",
+      "surfaceContainerLow": "#1f1f1f",
+      "surfaceContainer": "#1e1f20",
+      "surfaceContainerHigh": "#2d2f31",
+      "surfaceContainerHighest": "#343535",
+      "inverseSurface": "#e3e3e3",
+      "inverseOnSurface": "#303030",
+      "inversePrimary": "#0b57d0",
+      "outline": "#8e918f",
+      "outlineVariant": "#444746",
+      "error": "#f2b8b5",
+      "onError": "#601410",
+      "errorContainer": "#8c1d18",
+      "onErrorContainer": "#f9dedc",
+      "scrim": "#000000"
+    }
+  },
+
+  "readmeStated": {
+    "_doc": "The roles README.md §Tokens (:52-54) explicitly lists — the authoritative rev5 values #348 pinned into `colors`. README's informal names map to M3 roles: light 'container #e9eef6' -> surfaceContainerHigh (verified: LightSurfaceContainerHigh=#e9eef6, LightSurfaceContainer=#efeded — the co-verify #350 BLOCK); light 'variant #444746' -> onSurfaceVariant; dark 'container #1e1f20'/'high #2d2f31' -> surfaceContainer/surfaceContainerHigh. Roles NOT here (tertiary*, secondary*, the rest of the ladder) are M3-standard, not README-listed — valid tokens, but the README does not pin their value.",
+    "light": ["primary", "primaryContainer", "onPrimaryContainer", "surface", "surfaceContainerHigh", "onSurface", "onSurfaceVariant", "outline", "error", "errorContainer"],
+    "dark": ["surface", "surfaceContainer", "surfaceContainerHigh", "primary", "primaryContainer", "onPrimaryContainer", "onSurface", "onSurfaceVariant", "error", "errorContainer"]
+  },
+
+  "extensions": {
+    "_doc": "App design-system tokens outside the M3 ColorScheme. LocalMeterFillColor (core/designsystem/.../MeterColors.kt) — the storage-bar used segment; light #c4d7f5 / dark #0842a0 (== dark primaryContainer). Landed #348. Not in README §Tokens (the owner's 'measure the unstated' case, measured from the drawings).",
+    "meterFill": { "light": "#c4d7f5", "dark": "#0842a0" }
+  },
+
+  "metrics": {
+    "_source": "README.md:56",
+    "listRowHeightDp": [56, 60],
+    "compactRowHeightDp": 48,
+    "iconButtonDp": 48,
+    "sheetActionDp": 48,
+    "cornerRadiusRule": "half the row height",
+    "spacingScaleDp": 8,
+    "snackbar": {
+      "_source": "README.md:95",
+      "minDp": 48,
+      "cornerDp": 4,
+      "sideMarginDp": 8
+    }
+  },
+
+  "type": {
+    "_source": "README.md:56",
+    "family": "Roboto Flex",
+    "appBarSp": 22,
+    "rowSp": 16,
+    "bodySp": 13.5,
+    "overlineSp": 12,
+    "_note": "Sizes are stated; weights are NOT stated in README §Tokens -> weight is unstated (measure it, or take the M3 default for the role: e.g. titleLarge=Regular/400). Text roles OUTSIDE these 4 (detail-pane headline/display, metric numbers) are unstated -> measured. Material-Symbols icon glyphs are NOT type-scale text and are excluded from the font check (see reconcile.mjs / the `ic` flag in specs)."
+  }
+}
